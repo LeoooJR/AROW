@@ -1,0 +1,440 @@
+from __future__ import annotations
+
+import datetime
+import os
+import threading
+import time
+import traceback as _traceback
+from typing import Any, Callable
+
+import pytest
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+import importlib
+
+from PySide6.QtCore import QCoreApplication, QEventLoop
+
+_async_mod = importlib.import_module("controller.async")
+AsyncRunner = _async_mod.AsyncRunner
+JobError = _async_mod.JobError
+JobSpecification = _async_mod.JobSpecification
+
+pytestmark = [pytest.mark.async_jobs]
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _qt_core_app() -> None:
+    """
+    Ensure a Qt core event loop exists for QTimer.singleShot and signals.
+
+    Note: we use QCoreApplication (not QApplication) to keep tests headless.
+    """
+
+    app = QCoreApplication.instance()
+    if app is None:
+        QCoreApplication([])
+
+
+def _process_events_until(
+    condition: Callable[[], bool], timeout_s: float = 8.0
+) -> None:
+    """
+    Pump the Qt event queue until `condition()` becomes truthy.
+
+    Raises AssertionError on timeout.
+    """
+
+    assert QCoreApplication.instance() is not None
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        if condition():
+            return
+        QCoreApplication.instance().processEvents(QEventLoop.AllEvents, 50)
+        time.sleep(0.01)
+    assert condition(), "Timed out while waiting for async runner signals"
+
+
+# --- Job fns used by ThreadPool / ProcessPool (must be picklable for process pool) ---
+
+
+def _return_value(value: str) -> str:
+    return value
+
+
+def _raise_error(message: str) -> None:
+    raise RuntimeError(message)
+
+
+def _wait_on_event(event: threading.Event, value: str) -> str:
+    # Thread-pool only: threading.Event is not picklable.
+    event.wait()
+    return value
+
+
+def _sleep_then_return(seconds: float, value: str) -> str:
+    time.sleep(seconds)
+    return value
+
+
+def _return_pid_threadid() -> tuple[int, int]:
+    # Used to verify process vs thread dispatch (pid differs for processes).
+    import os as _os
+    import threading as _threading
+
+    return _os.getpid(), _threading.get_ident()
+
+
+class _FakePool:
+    """
+    Minimal pool replacement for tests.
+
+    It does not use threads/processes; it only simulates the async framework
+    contract by calling `emit_completed` / `emit_failed` / `emit_cancelled`,
+    while letting `AsyncRunner` handle Qt signal marshaling + cleanup.
+    """
+
+    def __init__(
+        self,
+        *,
+        shutdown_cb: Callable[[], None] | None = None,
+        pending: dict[str, Callable[[], None]] | None = None,
+        pool_name: str | None = None,
+        pool_by_job_id: dict[str, str] | None = None,
+    ) -> None:
+        self._shutdown_cb = shutdown_cb
+        self._pending = pending
+        self._pool_name = pool_name
+        self._pool_by_job_id = pool_by_job_id
+
+    def submit(
+        self,
+        job_id: str,
+        job: JobSpecification,
+        cancel_token: Any,
+        _emit_progress: Callable[[str, object], None],
+        emit_completed: Callable[[str, object], None],
+        emit_cancelled: Callable[[str], None],
+        emit_failed: Callable[[str, JobError], None],
+    ) -> None:
+        if self._pool_name is not None and self._pool_by_job_id is not None:
+            self._pool_by_job_id[job_id] = self._pool_name
+
+        def _complete() -> None:
+            if cancel_token.is_cancelled():
+                emit_cancelled(job_id)
+                return
+
+            try:
+                result = job.fn(*job.args, **job.kwargs)
+                emit_completed(job_id, result)
+            except Exception as e:  # noqa: BLE001 - test helper
+                emit_failed(
+                    job_id,
+                    JobError(
+                        message=f"Job failed: {job.name}: {e!s}",
+                        traceback=_traceback.format_exc(),
+                        return_code=getattr(e, "returncode", None),
+                        timestamp=datetime.datetime.now(datetime.timezone.utc),
+                    ),
+                )
+
+        if self._pending is not None:
+            self._pending[job_id] = _complete
+            return None
+
+        _complete()
+        return None
+
+    def shutdown(self) -> None:
+        if self._shutdown_cb is not None:
+            self._shutdown_cb()
+
+
+class TestAsyncRunnerThreadSignals:
+    def test_thread_completed_emits_completed_and_cleans_history(self) -> None:
+        runner = AsyncRunner()
+        thread_shutdown_cb = runner._thread_pool.shutdown
+        process_shutdown_cb = runner._process_pool.shutdown
+        runner._thread_pool = _FakePool(shutdown_cb=thread_shutdown_cb)
+        runner._process_pool = _FakePool(shutdown_cb=process_shutdown_cb)
+
+        completed: list[tuple[str, object]] = []
+        failed: list[tuple[str, JobError]] = []
+
+        def on_completed(job_id: str, result: object) -> None:
+            completed.append((job_id, result))
+
+        def on_failed(job_id: str, err: JobError) -> None:
+            failed.append((job_id, err))
+
+        runner.signals.Completed.connect(on_completed)
+        runner.signals.Failed.connect(on_failed)
+
+        spec = JobSpecification(
+            name="thread-success",
+            description="",
+            fn=_return_value,
+            args=("ok",),
+            kwargs={},
+            timeout=None,
+            priority=0,
+            coalesce_key=None,
+            type="thread",
+        )
+        handle = runner.submit(spec)
+        assert handle.job_id in runner.history
+
+        _process_events_until(lambda: len(completed) == 1 or len(failed) == 1)
+        assert failed == []
+        assert completed[0][1] == "ok"
+        assert handle.job_id not in runner.history
+
+        runner.shutdown()
+
+    def test_thread_failed_emits_failed_and_cleans_history(self) -> None:
+        runner = AsyncRunner()
+        thread_shutdown_cb = runner._thread_pool.shutdown
+        process_shutdown_cb = runner._process_pool.shutdown
+        runner._thread_pool = _FakePool(shutdown_cb=thread_shutdown_cb)
+        runner._process_pool = _FakePool(shutdown_cb=process_shutdown_cb)
+
+        completed: list[tuple[str, object]] = []
+        failed: list[tuple[str, JobError]] = []
+
+        runner.signals.Completed.connect(
+            lambda job_id, result: completed.append((job_id, result))
+        )
+        runner.signals.Failed.connect(lambda job_id, err: failed.append((job_id, err)))
+
+        spec = JobSpecification(
+            name="thread-failure",
+            description="",
+            fn=_raise_error,
+            args=("boom",),
+            kwargs={},
+            timeout=None,
+            priority=0,
+            coalesce_key=None,
+            type="thread",
+        )
+        handle = runner.submit(spec)
+        assert handle.job_id in runner.history
+
+        _process_events_until(lambda: len(failed) == 1)
+        assert completed == []
+        _job_id, err = failed[0]
+        assert handle.job_id == _job_id
+        assert "Job failed: thread-failure" in err.message
+        assert "boom" in err.message
+        assert handle.job_id not in runner.history
+
+        runner.shutdown()
+
+    def test_thread_cancelled_emits_cancelled_and_cleans_history(self) -> None:
+        runner = AsyncRunner()
+        thread_shutdown_cb = runner._thread_pool.shutdown
+        process_shutdown_cb = runner._process_pool.shutdown
+        pending: dict[str, Callable[[], None]] = {}
+        runner._thread_pool = _FakePool(shutdown_cb=thread_shutdown_cb, pending=pending)
+        runner._process_pool = _FakePool(shutdown_cb=process_shutdown_cb)
+
+        cancelled: list[str] = []
+        completed: list[str] = []
+
+        runner.signals.Cancelled.connect(lambda job_id: cancelled.append(job_id))
+        runner.signals.Completed.connect(
+            lambda job_id, _result: completed.append(job_id)
+        )
+        spec = JobSpecification(
+            name="thread-cancelled",
+            description="",
+            fn=_return_value,
+            args=("never-emitted",),
+            kwargs={},
+            timeout=None,
+            priority=0,
+            coalesce_key=None,
+            type="thread",
+        )
+        handle = runner.submit(spec)
+        runner.cancel(handle.job_id)
+        assert handle.job_id in pending
+        pending[handle.job_id]()
+        _process_events_until(lambda: len(cancelled) == 1)
+        assert completed == []
+        assert cancelled[0] == handle.job_id
+        assert handle.job_id not in runner.history
+
+        runner.shutdown()
+
+
+class TestAsyncRunnerProcessAndCoalesce:
+    def test_process_failed_emits_failed_and_cleans_history(self) -> None:
+        runner = AsyncRunner()
+        thread_shutdown_cb = runner._thread_pool.shutdown
+        process_shutdown_cb = runner._process_pool.shutdown
+        runner._thread_pool = _FakePool(shutdown_cb=thread_shutdown_cb)
+        runner._process_pool = _FakePool(shutdown_cb=process_shutdown_cb)
+
+        completed: list[tuple[str, object]] = []
+        failed: list[tuple[str, JobError]] = []
+
+        runner.signals.Completed.connect(
+            lambda job_id, result: completed.append((job_id, result))
+        )
+        runner.signals.Failed.connect(lambda job_id, err: failed.append((job_id, err)))
+
+        spec = JobSpecification(
+            name="process-failure",
+            description="",
+            fn=_raise_error,
+            args=("boom",),
+            kwargs={},
+            timeout=None,
+            priority=0,
+            coalesce_key=None,
+            type="process",
+        )
+        handle = runner.submit(spec)
+        assert handle.job_id in runner.history
+
+        _process_events_until(lambda: len(failed) == 1)
+        assert completed == []
+        _job_id, err = failed[0]
+        assert _job_id == handle.job_id
+        assert "Job failed: process-failure" in err.message
+        assert "boom" in err.message
+        assert handle.job_id not in runner.history
+
+        runner.shutdown()
+
+    def test_coalesce_key_cancels_previous_latest_and_only_latest_completes(
+        self,
+    ) -> None:
+        runner = AsyncRunner()
+        thread_shutdown_cb = runner._thread_pool.shutdown
+        process_shutdown_cb = runner._process_pool.shutdown
+        pending: dict[str, Callable[[], None]] = {}
+        runner._thread_pool = _FakePool(shutdown_cb=thread_shutdown_cb, pending=pending)
+        runner._process_pool = _FakePool(shutdown_cb=process_shutdown_cb)
+
+        cancelled: list[str] = []
+        completed: list[tuple[str, object]] = []
+
+        runner.signals.Cancelled.connect(lambda job_id: cancelled.append(job_id))
+        runner.signals.Completed.connect(
+            lambda job_id, result: completed.append((job_id, result))
+        )
+
+        spec1 = JobSpecification(
+            name="job-1",
+            description="",
+            fn=_return_value,
+            args=("job-1-result",),
+            kwargs={},
+            timeout=None,
+            priority=0,
+            coalesce_key="location",
+            type="thread",
+        )
+        handle1 = runner.submit(spec1)
+
+        # Submit a second job with the same coalesce_key. This should cancel `handle1`.
+        spec2 = JobSpecification(
+            name="job-2",
+            description="",
+            fn=_return_value,
+            args=("job-2-result",),
+            kwargs={},
+            timeout=None,
+            priority=0,
+            coalesce_key="location",
+            type="thread",
+        )
+        handle2 = runner.submit(spec2)
+        assert handle1.job_id in runner.history
+        assert handle2.job_id in runner.history
+
+        assert handle1.job_id in pending
+        assert handle2.job_id in pending
+        assert handle1.cancel_token.is_cancelled()
+
+        # Simulate job completion in-order.
+        pending[handle1.job_id]()
+        pending[handle2.job_id]()
+
+        _process_events_until(lambda: len(cancelled) == 1 and len(completed) == 1)
+        assert cancelled[0] == handle1.job_id
+        assert completed[0][0] == handle2.job_id
+        assert completed[0][1] == "job-2-result"
+
+        assert handle1.job_id not in runner.history
+        assert handle2.job_id not in runner.history
+
+        runner.shutdown()
+
+    def test_auto_resolves_job_type_process_vs_thread_by_name_and_coalesce_key(
+        self,
+    ) -> None:
+        runner = AsyncRunner()
+        thread_shutdown_cb = runner._thread_pool.shutdown
+        process_shutdown_cb = runner._process_pool.shutdown
+        pool_by_job_id: dict[str, str] = {}
+        runner._thread_pool = _FakePool(
+            shutdown_cb=thread_shutdown_cb,
+            pool_name="thread",
+            pool_by_job_id=pool_by_job_id,
+        )
+        runner._process_pool = _FakePool(
+            shutdown_cb=process_shutdown_cb,
+            pool_name="process",
+            pool_by_job_id=pool_by_job_id,
+        )
+
+        completed_results: dict[str, object] = {}
+
+        def on_completed(job_id: str, result: object) -> None:
+            completed_results[job_id] = result
+
+        runner.signals.Completed.connect(on_completed)
+
+        # Auto -> process (name contains "map")
+        spec_process = JobSpecification(
+            name="map creation",
+            description="",
+            fn=_return_value,
+            args=("process-result",),
+            kwargs={},
+            timeout=None,
+            priority=0,
+            coalesce_key=None,
+            type="auto",
+        )
+        handle_process = runner.submit(spec_process)
+
+        # Auto -> thread (coalesce_key == "location")
+        spec_thread = JobSpecification(
+            name="location update",
+            description="",
+            fn=_return_value,
+            args=("thread-result",),
+            kwargs={},
+            timeout=None,
+            priority=0,
+            coalesce_key="location",
+            type="auto",
+        )
+        handle_thread = runner.submit(spec_thread)
+
+        _process_events_until(
+            lambda: handle_process.job_id in completed_results
+            and handle_thread.job_id in completed_results
+        )
+
+        assert pool_by_job_id[handle_process.job_id] == "process"
+        assert pool_by_job_id[handle_thread.job_id] == "thread"
+        assert completed_results[handle_process.job_id] == "process-result"
+        assert completed_results[handle_thread.job_id] == "thread-result"
+
+        runner.shutdown()

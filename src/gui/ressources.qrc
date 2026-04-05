@@ -1,0 +1,57 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+    <qresource prefix="/">
+        <!-- Generic Icons -->
+        <file>statics/location.svg</file>
+        <file>statics/fake-location.svg</file>
+        <file>statics/milestone.svg</file>
+        <file>statics/railway.svg</file>
+        <file>statics/globe-central-south-asia.svg</file>
+        <file>statics/globe-central-south-asia-placeholder.svg</file>
+        <file>statics/geo-fill.svg</file>
+        <file>statics/laptop.svg</file>
+        <file>statics/phone.svg</file>
+        <file>statics/device-placeholder.svg</file>
+        <file>statics/substack.svg</file>
+        <file>statics/upload.svg</file>
+        <file>statics/start.svg</file>
+        <file>statics/off.svg</file>
+        <file>statics/on.svg</file>
+        <file>statics/caret-down-fill.svg</file>
+        <file>statics/layout-sidebar.svg</file>
+        <file>statics/layout-sidebar-reverse.svg</file>
+        <file>statics/layout-sidebar-inset.svg</file>
+        <file>statics/layout-sidebar-inset-reverse.svg</file>
+        <file>statics/layout-topbar.svg</file>
+        <file>statics/layout-topbar-inset.svg</file>
+        <file>statics/layout-bottombar.svg</file>
+        <file>statics/layout-bottombar-inset.svg</file>
+        <file>statics/crosshair.svg</file>
+        <file>statics/arrow-clockwise.svg</file>
+        <file>statics/play-circle.svg</file>
+        <file>statics/pause-circle.svg</file>
+        <file>statics/brightness-high.svg</file>
+        <file>statics/moon.svg</file>
+        <file>statics/file-earmark-text.svg</file>
+        <file>statics/info-circle.svg</file>
+        <file>statics/check-circle.svg</file>
+        <file>statics/exclamation-circle.svg</file>
+        <file>statics/x-circle.svg</file>
+        <file>statics/hand-index.svg</file>
+        <file>statics/save-as.svg</file>
+        <file>statics/plus.svg</file>
+        <file>statics/x.svg</file>
+        <file>statics/trash.svg</file>
+
+        <!-- Operating System Icons -->
+        <file>statics/android-icon.svg</file>
+        <file>statics/apple.svg</file>
+        <file>statics/windows.svg</file>
+        <file>statics/linux.svg</file>
+
+        <!-- Application Icons -->
+        <file>statics/logo.png</file>
+        <file>statics/logo-ui.png</file>
+        <file>statics/app-name.svg</file>
+    </qresource>
+</RCC>

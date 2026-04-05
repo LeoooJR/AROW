@@ -1,0 +1,707 @@
+"""
+This file contains all graphical elements related to the host panel.
+"""
+
+from dataclasses import dataclass
+from typing import Literal
+
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QIcon
+from PySide6.QtWidgets import (
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
+)
+
+from gui.elements import (
+    SVG,
+    ConditionIndicator,
+    GroupBox,
+    IconLabel,
+    PanelTitle,
+    ToolButton,
+)
+from gui.icons import GenericIcons, OperatingSystemIcons
+from gui.settings import Settings
+from gui.signals import app_signals
+from gui.svg import get_svg_size
+from gui.wrapper import GridLayoutWrapper, VerticalLayoutWrapper
+
+ADB_SERVER_STATE = str  # "running" | "stopped" | "starting" | "error" | "unknown"
+
+
+class HostIdentityMetadataRow(QWidget):
+    """Key/value row for HostIdentitySection only; stylesheet uses host-identity-metadata-row."""
+
+    @dataclass
+    class UI:
+        key: QLabel
+        value: QLabel
+
+    def __init__(self, key_text: str, value_text: str, parent: QWidget | None = None):
+        super().__init__(parent)
+
+        self.ui: HostIdentityMetadataRow.UI
+        self.setProperty("host-identity-metadata-row", True)
+
+        layout = QHBoxLayout()
+        layout.setContentsMargins(*Settings.SPACING.MARGIN_NONE)
+        layout.setSpacing(Settings.HOST_PANEL.KEY_VALUE_SPACING)
+
+        key = QLabel(key_text, self)
+        key.setProperty("host-metadata-key", True)
+        key.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
+
+        value = QLabel(value_text, self)
+        value.setProperty("host-metadata-value", True)
+        value.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight)
+
+        layout.addWidget(key)
+        layout.addStretch()
+        layout.addWidget(value)
+        layout.setAlignment(value, Qt.AlignmentFlag.AlignRight)
+
+        self.setLayout(layout)
+        self.ui = HostIdentityMetadataRow.UI(key=key, value=value)
+        self._set_size_policy()
+        self._set_alignment()
+        self._connect_signals()
+
+    def _set_size_policy(self) -> None:
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        self.ui.key.setSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred
+        )
+        self.ui.value.setSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred
+        )
+
+    def _set_alignment(self) -> None:
+        self.layout().setAlignment(
+            self.ui.key, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+        )
+        self.layout().setAlignment(
+            self.ui.value, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        )
+
+    def _connect_signals(self) -> None:
+        pass
+
+    def set_key_text(self, text: str) -> None:
+        self.ui.key.setText(text)
+
+    def set_value_text(self, text: str) -> None:
+        self.ui.value.setText(text)
+
+
+class AdbBridgeMetadataRow(QWidget):
+    """Key/value row for AdbBridgeSection only; supports adb-server-state coloring on the value."""
+
+    @dataclass
+    class UI:
+        key: QLabel
+        value: QLabel
+
+    def __init__(self, key_text: str, value_text: str, parent: QWidget | None = None):
+        super().__init__(parent)
+
+        self.ui: AdbBridgeMetadataRow.UI
+        self.setProperty("adb-bridge-metadata-row", True)
+
+        layout = QHBoxLayout()
+        layout.setContentsMargins(*Settings.SPACING.MARGIN_NONE)
+        layout.setSpacing(Settings.HOST_PANEL.KEY_VALUE_SPACING)
+
+        key = QLabel(key_text, self)
+        key.setProperty("host-metadata-key", True)
+        key.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
+
+        value = QLabel(value_text, self)
+        value.setProperty("host-metadata-value", True)
+        value.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight)
+
+        layout.addWidget(key)
+        layout.addStretch()
+        layout.addWidget(value)
+        layout.setAlignment(value, Qt.AlignmentFlag.AlignRight)
+
+        self.setLayout(layout)
+        self.ui = AdbBridgeMetadataRow.UI(key=key, value=value)
+        self.set_value_state("default")
+        self._set_size_policy()
+        self._set_alignment()
+        self._connect_signals()
+
+    def _set_size_policy(self) -> None:
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        self.ui.key.setSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred
+        )
+        self.ui.value.setSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred
+        )
+
+    def _set_alignment(self) -> None:
+        self.layout().setAlignment(
+            self.ui.key, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+        )
+        self.layout().setAlignment(
+            self.ui.value, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        )
+
+    def _connect_signals(self) -> None:
+        pass
+
+    def set_key_text(self, text: str) -> None:
+        self.ui.key.setText(text)
+
+    def set_value_text(self, text: str) -> None:
+        self.ui.value.setText(text)
+
+    def set_value_state(self, state: str = "default") -> None:
+        self.ui.value.setProperty("adb-server-state", state)
+        self.ui.value.style().unpolish(self.ui.value)
+        self.ui.value.style().polish(self.ui.value)
+        self.ui.value.update()
+
+
+class HostIdentitySection(QFrame):
+
+    @dataclass
+    class UI:
+        host_name: QLabel
+        host_summary: QLabel
+        host_item: IconLabel
+        ip_address_row: HostIdentityMetadataRow
+        platform_row: HostIdentityMetadataRow
+
+    def __init__(self, parent: QWidget | None = None):
+        super().__init__(parent)
+
+        self.ui: HostIdentitySection.UI
+        self.setObjectName("host-identity-section")
+        self.setProperty("panel-section-compact", True)
+
+        layout = QVBoxLayout()
+        layout.setContentsMargins(*Settings.SPACING.MARGIN_NONE)
+        layout.setSpacing(Settings.HOST_PANEL.ROW_SPACING)
+
+        host_name = QLabel("Leo-MacBook-Pro", self)
+        host_name.setProperty("host-title", True)
+
+        host_item = IconLabel(
+            self,
+            icon_path=OperatingSystemIcons.MACOS.value,
+            text=host_name,
+            spacing=Settings.SPACING.ICON_SPACING,
+        )
+
+        host_summary = QLabel(
+            "Primary workstation ready for location spoofing workflow.", self
+        )
+        host_summary.setProperty("host-supporting-text", True)
+        host_summary.setWordWrap(True)
+
+        ip_address_row = HostIdentityMetadataRow("Local IP", "192.168.1.26", self)
+        platform_row = HostIdentityMetadataRow("Platform", "macOS 14.5", self)
+
+        layout.addWidget(host_item)
+        layout.addWidget(host_summary)
+        layout.addWidget(ip_address_row)
+        layout.addWidget(platform_row)
+
+        self.setLayout(layout)
+        self.ui = HostIdentitySection.UI(
+            host_name=host_name,
+            host_summary=host_summary,
+            host_item=host_item,
+            ip_address_row=ip_address_row,
+            platform_row=platform_row,
+        )
+        self._set_size_policy()
+        self._set_alignment()
+        self._connect_signals()
+
+    def _set_size_policy(self) -> None:
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        self.ui.host_item.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+        )
+        self.ui.host_summary.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+        )
+        self.ui.ip_address_row.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+        )
+        self.ui.platform_row.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+        )
+
+    def _set_alignment(self) -> None:
+        self.layout().setAlignment(self.ui.host_item, Qt.AlignmentFlag.AlignCenter)
+        self.layout().setAlignment(
+            self.ui.host_summary,
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+        )
+
+    def _connect_signals(self) -> None:
+        pass
+
+    def set_host_values(
+        self,
+        host_name: str | None = None,
+        summary: str | None = None,
+        ip_address: str | None = None,
+        platform: str | None = None,
+        os_icon_path: str | None = None,
+    ) -> None:
+        if host_name is not None:
+            self.ui.host_name.setText(host_name)
+        if summary is not None:
+            self.ui.host_summary.setText(summary)
+        if ip_address is not None:
+            self.ui.ip_address_row.set_value_text(ip_address)
+        if platform is not None:
+            self.ui.platform_row.set_value_text(platform)
+        if os_icon_path is not None:
+            self.ui.host_item.set_icon(os_icon_path)
+
+
+class AdbBridgeSection(QFrame):
+
+    @dataclass
+    class UI:
+        android_svg: SVG
+        status_row: AdbBridgeMetadataRow
+        version_row: AdbBridgeMetadataRow
+        daemon_row: AdbBridgeMetadataRow
+        devices_row: AdbBridgeMetadataRow
+        helper_note: QLabel
+
+    def __init__(self, parent: QWidget | None = None):
+        super().__init__(parent)
+
+        self.ui: AdbBridgeSection.UI
+        self.setObjectName("adb-bridge-section")
+        self.setProperty("panel-section-compact", True)
+
+        layout = QVBoxLayout()
+        layout.setContentsMargins(*Settings.SPACING.MARGIN_NONE)
+        layout.setSpacing(Settings.HOST_PANEL.ROW_SPACING)
+
+        android_svg = SVG(svg_path=OperatingSystemIcons.ANDROID.value, parent=self)
+        android_svg.setFixedSize(get_svg_size(Settings.FONT.SIZE_DEFAULT))
+
+        status_row = AdbBridgeMetadataRow("Server state", "Running", self)
+        status_row.setObjectName("adb-status-row")
+        status_row.setProperty("adb-status-row", True)
+        version_row = AdbBridgeMetadataRow(
+            "ADB version", "Android Debug Bridge 1.0.41", self
+        )
+        daemon_row = AdbBridgeMetadataRow("Daemon", "tcp:5037", self)
+        devices_row = AdbBridgeMetadataRow("Connected devices", "0", self)
+        devices_row.setObjectName("adb-devices-row")
+
+        helper_note = QLabel(
+            "Binary allowing communication between Android devices and the host computer.",
+            self,
+        )
+        helper_note.setProperty("host-supporting-text", True)
+        helper_note.setWordWrap(True)
+        helper_note.setAlignment(
+            Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft
+        )
+
+        layout.addWidget(android_svg)
+        layout.addWidget(status_row)
+        layout.addWidget(version_row)
+        layout.addWidget(daemon_row)
+        layout.addWidget(devices_row)
+        layout.addWidget(helper_note)
+
+        self.setLayout(layout)
+        self.ui = AdbBridgeSection.UI(
+            android_svg=android_svg,
+            status_row=status_row,
+            version_row=version_row,
+            daemon_row=daemon_row,
+            devices_row=devices_row,
+            helper_note=helper_note,
+        )
+        self.set_server_state("running")
+
+        self._set_size_policy()
+        self._set_alignment()
+        self._connect_signals()
+
+    def _set_size_policy(self) -> None:
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        self.ui.android_svg.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+        )
+        self.ui.status_row.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+        )
+        self.ui.version_row.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+        )
+        self.ui.daemon_row.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+        )
+        self.ui.helper_note.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+        )
+
+    def _set_alignment(self) -> None:
+        self.layout().setAlignment(self.ui.android_svg, Qt.AlignmentFlag.AlignCenter)
+        self.layout().setAlignment(
+            self.ui.helper_note,
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+        )
+
+    def _connect_signals(self) -> None:
+        pass
+
+    def set_server_state(
+        self, state: ADB_SERVER_STATE, text: str | None = None
+    ) -> None:
+        display_text = text if text is not None else state.capitalize()
+        self.ui.status_row.set_value_text(display_text)
+        self.ui.status_row.set_value_state(state)
+
+    def set_adb_values(
+        self,
+        server_state: ADB_SERVER_STATE | None = None,
+        server_state_text: str | None = None,
+        adb_version: str | None = None,
+        daemon: str | None = None,
+        connected_devices: str | None = None,
+        helper_note: str | None = None,
+    ) -> None:
+        if server_state is not None:
+            self.set_server_state(server_state, text=server_state_text)
+        elif server_state_text is not None:
+            self.ui.status_row.set_value_text(server_state_text)
+        if adb_version is not None:
+            self.ui.version_row.set_value_text(adb_version)
+        if daemon is not None:
+            self.ui.daemon_row.set_value_text(daemon)
+        if connected_devices is not None:
+            self.ui.devices_row.set_value_text(connected_devices)
+        if helper_note is not None:
+            self.ui.helper_note.setText(helper_note)
+
+
+class HostPanel(QFrame):
+
+    @dataclass
+    class UI:
+        title: PanelTitle
+        expand_button: ToolButton
+        header: QWidget
+        body: VerticalLayoutWrapper
+        host_identity: HostIdentitySection
+        adb_bridge: AdbBridgeSection
+        identity_group_box: GroupBox
+        adb_group_box: GroupBox
+        identity_indicator: ConditionIndicator
+        adb_indicator: ConditionIndicator
+        identity_wrapper: GridLayoutWrapper
+        adb_wrapper: GridLayoutWrapper
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        self.ui: HostPanel.UI
+
+        self.setObjectName("host-panel")
+        self.setProperty("panel", True)
+
+        layout = QVBoxLayout()
+        layout.setContentsMargins(
+            Settings.PANEL.CONTENT_PADDING,
+            Settings.PANEL.CONTENT_PADDING,
+            Settings.PANEL.CONTENT_PADDING,
+            Settings.PANEL.CONTENT_PADDING,
+        )
+        layout.setSpacing(Settings.PANEL.SECTION_SPACING)
+
+        title = PanelTitle(
+            parent=self, text="Host device", icon_path=GenericIcons.LAPTOP.value
+        )
+
+        expand_button = ToolButton(
+            self,
+            icon_path=GenericIcons.LAYOUT_TOPBAR_INSET.value,
+            tooltip="Toggle panel visibility",
+        )
+        expand_button.setProperty("toggle", True)
+
+        header = QWidget(self)
+        header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(*Settings.SPACING.MARGIN_NONE)
+        header_layout.setSpacing(Settings.SPACING.NONE)
+        header_layout.addWidget(title, 1)
+        header_layout.addWidget(expand_button)
+        layout.addWidget(header)
+
+        host_identity = HostIdentitySection(self)
+        identity_group_box = GroupBox(
+            self, layout=QVBoxLayout(), widgets=[host_identity], title="Host identity"
+        )
+        identity_group_box.setObjectName("identity-group-box")
+
+        identity_indicator = ConditionIndicator(
+            self, object_name="host-identity-indicator"
+        )
+        identity_indicator.set_state("default")
+
+        identity_wrapper = GridLayoutWrapper(
+            self,
+            spacing=Settings.SPACING.NONE,
+            margins=Settings.HOST_PANEL.WRAPPER_MARGIN,
+        )
+        identity_wrapper.add_widget(identity_group_box, 0, 0)
+        identity_wrapper.add_widget(
+            identity_indicator,
+            0,
+            0,
+            Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight,
+        )
+
+        adb_bridge = AdbBridgeSection(self)
+        adb_group_box = GroupBox(
+            self,
+            layout=QVBoxLayout(),
+            widgets=[adb_bridge],
+            title="Android Debug Bridge",
+        )
+        adb_group_box.setObjectName("adb-group-box")
+
+        adb_indicator = ConditionIndicator(self, object_name="adb-bridge-indicator")
+        adb_indicator.set_state("default")
+
+        adb_wrapper = GridLayoutWrapper(
+            self,
+            spacing=Settings.SPACING.NONE,
+            margins=Settings.HOST_PANEL.WRAPPER_MARGIN,
+        )
+        adb_wrapper.add_widget(adb_group_box, 0, 0)
+        adb_wrapper.add_widget(
+            adb_indicator, 0, 0, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight
+        )
+
+        body = VerticalLayoutWrapper(
+            self,
+            widgets=[identity_wrapper, adb_wrapper],
+            spacing=Settings.HOST_PANEL.SECTION_SPACING,
+            margins=Settings.SPACING.MARGIN_NONE,
+        )
+        layout.addWidget(body, 1)
+
+        self.setLayout(layout)
+
+        self.ui = HostPanel.UI(
+            title=title,
+            expand_button=expand_button,
+            header=header,
+            body=body,
+            host_identity=host_identity,
+            adb_bridge=adb_bridge,
+            identity_group_box=identity_group_box,
+            adb_group_box=adb_group_box,
+            identity_indicator=identity_indicator,
+            adb_indicator=adb_indicator,
+            identity_wrapper=identity_wrapper,
+            adb_wrapper=adb_wrapper,
+        )
+
+        self._set_size_policy()
+        self._set_alignment()
+        self._connect_signals()
+        self._set_placeholder_values()
+
+    def _set_alignment(self) -> None:
+        """Centralize layout alignment for the panel and its UI widgets."""
+        self.ui.header.layout().setAlignment(
+            self.ui.expand_button,
+            Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight,
+        )
+        self.ui.body.get_layout().setAlignment(
+            self.ui.identity_wrapper, Qt.AlignmentFlag.AlignTop
+        )
+        self.ui.body.get_layout().setAlignment(
+            self.ui.adb_wrapper, Qt.AlignmentFlag.AlignTop
+        )
+        self.layout().setAlignment(self.ui.body, Qt.AlignmentFlag.AlignTop)
+
+    def _set_size_policy(self) -> None:
+        """Centralize size policies for the panel and its UI widgets (window resizing)."""
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+        self.ui.header.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
+        )
+        self.ui.identity_group_box.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+        )
+        self.ui.adb_group_box.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+        )
+        self.ui.body.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
+
+    def _connect_signals(self) -> None:
+        """Connect signals for the host panel and its UI widgets."""
+        #### Debugging signals ####
+        app_signals.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
+
+        #### Signals for toggling the host panel visibility ####
+        self.ui.expand_button.clicked.connect(self.toggle_panel_visibility)
+        self.ui.expand_button.clicked.connect(
+            lambda: app_signals.HostPanelVisibilityRequested.emit(
+                self.is_panel_visible()
+            )
+        )
+
+        app_signals.HostDeviceInformationUpdated.connect(
+            self._on_host_device_information_updated
+        )
+
+    def _on_ui_constraints_disabled(self) -> None:
+        """Handle the UI constraints disabled event."""
+        self._set_placeholder_values()
+
+    def _set_placeholder_values(self) -> None:
+        """Populate placeholder values until controller/core wiring is implemented."""
+        self.set_host_identity_values(
+            host_name="Leo-MacBook-Pro",
+            summary="Primary workstation ready for location spoofing workflow.",
+            ip_address="192.168.1.26",
+            platform="macOS 14.5 (placeholder)",
+            os_icon_path=OperatingSystemIcons.MACOS.value,
+            identity_state="valid",
+        )
+        self.set_adb_bridge_values(
+            server_state="running",
+            server_state_text="Running",
+            adb_version="Android Debug Bridge 1.0.41",
+            daemon="tcp:5037",
+            connected_devices="0",
+            helper_note="Binary allowing communication between Android devices and the host computer.",
+            indicator_state="valid",
+        )
+
+    def set_host_identity_values(
+        self,
+        host_name: str | None = None,
+        summary: str | None = None,
+        ip_address: str | None = None,
+        platform: str | None = None,
+        os_icon_path: str | None = None,
+        identity_state: str | None = None,
+    ) -> None:
+        """Set the values for the host identity section."""
+        self.ui.host_identity.set_host_values(
+            host_name=host_name,
+            summary=summary,
+            ip_address=ip_address,
+            platform=platform,
+            os_icon_path=os_icon_path,
+        )
+        if identity_state is not None:
+            self.ui.identity_indicator.set_state(identity_state)
+
+    def set_adb_bridge_values(
+        self,
+        server_state: ADB_SERVER_STATE | None = None,
+        server_state_text: str | None = None,
+        adb_version: str | None = None,
+        daemon: str | None = None,
+        connected_devices: str | None = None,
+        helper_note: str | None = None,
+        indicator_state: str | None = None,
+    ) -> None:
+        """Set the values for the adb bridge section."""
+        self.ui.adb_bridge.set_adb_values(
+            server_state=server_state,
+            server_state_text=server_state_text,
+            adb_version=adb_version,
+            daemon=daemon,
+            connected_devices=connected_devices,
+            helper_note=helper_note,
+        )
+        if indicator_state is not None:
+            self.ui.adb_indicator.set_state(indicator_state)
+
+    def _on_host_device_information_updated(
+        self, name: str, os: Literal["linux", "windows", "darwin"] | None, ip: str
+    ) -> None:
+        """Handle the host device information updated."""
+        assert os in ["linux", "windows", "darwin"]
+        _os = os.lower()
+        if _os == "linux":
+            os_icon_path = OperatingSystemIcons.LINUX.value
+        elif _os == "windows":
+            os_icon_path = OperatingSystemIcons.WINDOWS.value
+        elif _os == "darwin":
+            os_icon_path = OperatingSystemIcons.MACOS.value
+        else:
+            os_icon_path = GenericIcons.LAPTOP.value
+        self.set_host_identity_values(
+            host_name=name,
+            summary=f"Primary workstation ready for location spoofing workflow.",
+            ip_address=ip,
+            platform=os,
+            os_icon_path=os_icon_path,
+            identity_state="valid",
+        )
+
+    def is_panel_visible(self) -> bool:
+        """Check if the host panel is visible."""
+        return self.ui.body.isVisible()
+
+    def show_panel(self) -> None:
+        """Show the host panel."""
+        if not self.is_panel_visible():
+            self.ui.expand_button.setProperty("toggle", True)
+            self.ui.expand_button.setIcon(QIcon(GenericIcons.LAYOUT_TOPBAR_INSET.value))
+            self.ui.body.setVisible(True)
+            self.setMaximumHeight(Settings.PANEL.UNBOUNDED_HEIGHT)
+            self.updateGeometry()
+
+    def hide_panel(self) -> None:
+        """Hide the host panel."""
+        if self.is_panel_visible():
+            self.ui.expand_button.setProperty("toggle", False)
+            self.ui.expand_button.setIcon(QIcon(GenericIcons.LAYOUT_TOPBAR.value))
+            self.ui.body.setVisible(False)
+            self.setMaximumHeight(self._reduced_height())
+            self.updateGeometry()
+
+    def _reduced_height(self) -> int:
+        """Height of the panel when reduced (header only): layout padding + header size."""
+        height = self.ui.header.sizeHint().height()
+        if height <= 0:
+            height = Settings.DIMENSION.TOOLBUTTON_HEIGHT
+        return 2 * Settings.PANEL.CONTENT_PADDING + height
+
+    def toggle_panel_visibility(self) -> None:
+        """Toggle the visibility of the host panel."""
+        if self.ui.expand_button.property("toggle"):
+            # Reduce: hide body and constrain height so the panel under can grow.
+            self.ui.expand_button.setProperty("toggle", False)
+            self.ui.expand_button.setIcon(QIcon(GenericIcons.LAYOUT_TOPBAR.value))
+            self.ui.body.setVisible(False)
+            self.setMaximumHeight(self._reduced_height())
+        else:
+            # Expand: show body and allow it to grow.
+            self.ui.expand_button.setProperty("toggle", True)
+            self.ui.expand_button.setIcon(QIcon(GenericIcons.LAYOUT_TOPBAR_INSET.value))
+            self.ui.body.setVisible(True)
+            self.setMaximumHeight(Settings.PANEL.UNBOUNDED_HEIGHT)
+        # Notify parent layout so space is reallocated (panel below gets more height when reduced).
+        self.updateGeometry()
