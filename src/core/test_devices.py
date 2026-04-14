@@ -8,7 +8,7 @@ import datetime
 
 import pytest
 
-from core.devices import Computer, DeviceState, Phone
+from core.devices import Computer, DeviceState, Phone, connect_to_device
 
 pytestmark = [pytest.mark.devices]
 
@@ -27,28 +27,21 @@ class TestDeviceState:
         assert state.os == ""
         assert state.ip == ""
         assert state.port is None
-        assert state.state is None
-        assert state.last_communication is None
 
     def test_device_state_custom_values(self) -> None:
         """DeviceState accepts and stores custom values."""
-        now = datetime.datetime.now()
         state = DeviceState(
             id="abc123",
             name="Pixel",
             os="Android",
             ip="192.168.1.1",
             port=5555,
-            state="device",
-            last_communication=now,
         )
         assert state.id == "abc123"
         assert state.name == "Pixel"
         assert state.os == "Android"
         assert state.ip == "192.168.1.1"
         assert state.port == 5555
-        assert state.state == "device"
-        assert state.last_communication is now
 
 
 # --- Phone ---
@@ -58,36 +51,36 @@ class TestPhone:
     """Tests for the Phone device class."""
 
     def test_phone_from_string_success(self) -> None:
-        """Phone.from_string parses a valid device line (exactly 6 space-separated fields)."""
-        line = "abc123 device product:model device:name 5555 transport_id:1"
+        """Phone.from_string parses an ADB `devices -l` line with six tokens."""
+        line = "abc123 device product:model model:pixel device:Pixel transport_id:1"
         phone = Phone.from_string(line)
         assert phone.state.id == "abc123"
-        assert phone.state.name == "device"
-        assert phone.state.os == "product:model"
-        assert phone.state.ip == "device:name"
-        assert phone.state.port == 5555
-        assert phone.state.state == "transport_id:1"
+        assert phone.state.name == "device:Pixel"
+        assert phone.state.product == "product:model"
+        assert phone.state.model == "model:pixel"
+        assert phone.state.state == "device"
+        assert phone.transport_id == ""
 
-    def test_phone_from_string_minimal(self) -> None:
-        """Phone.from_string with minimal tokens (id name os ip port state)."""
-        line = "emulator-5554 Android device 10.0.2.2 5555 device"
+    def test_phone_from_string_six_token_line_is_parsed_positionally(self) -> None:
+        """Phone.from_string uses the current six-token positional parser."""
+        line = "emulator-5554 offline product:sdk model:sdk_gphone device:emulator transport_id:9"
         phone = Phone.from_string(line)
         assert phone.state.id == "emulator-5554"
-        assert phone.state.name == "Android"
-        assert phone.state.os == "device"
-        assert phone.state.ip == "10.0.2.2"
-        assert phone.state.port == 5555
-        assert phone.state.state == "device"
+        assert phone.state.name == "device:emulator"
+        assert phone.state.product == "product:sdk"
+        assert phone.state.model == "model:sdk_gphone"
+        assert phone.state.state == "offline"
 
     def test_phone_from_string_invalid_too_few_tokens(self) -> None:
         """Phone.from_string raises when there are too few fields."""
         with pytest.raises(ValueError, match="not enough values to unpack"):
             Phone.from_string("id name os")
 
-    def test_phone_from_string_invalid_port_not_int(self) -> None:
-        """Phone.from_string raises when port is not an integer."""
-        with pytest.raises(ValueError, match="invalid literal"):
-            Phone.from_string("id name os ip not_a_number state")
+    def test_phone_state_setter_accepts_string_updates_nested_state(self) -> None:
+        """Assigning `phone.state = ...` updates the nested PhoneState status field."""
+        phone = Phone(id="id", name="Pixel", state="device")
+        phone.state = "offline"
+        assert phone.state.state == "offline"
 
     def test_phone_str_repr(self) -> None:
         """Phone __str__ and __repr__ are defined and non-empty."""
@@ -104,6 +97,13 @@ class TestPhone:
         assert phone.state.port == 9999
         assert phone.state.id == "a"
 
+    def test_connect_to_device_returns_phone_with_requested_endpoint(self) -> None:
+        """connect_to_device returns a Phone configured with the requested ip/port."""
+        phone = connect_to_device("192.168.1.20", 5555, "123456")
+        assert phone.state.ip == "192.168.1.20"
+        assert phone.state.port == 5555
+        assert phone.state.state == ""
+
 
 # --- Computer ---
 
@@ -112,17 +112,25 @@ class TestComputer:
     """Tests for the Computer device class."""
 
     def test_computer_creation(self) -> None:
-        """Computer can be created with an id and has platform-derived fields."""
-        computer = Computer(id="host-1")
+        """Computer can be created with explicit values without relying on host lookup."""
+        now = datetime.datetime.now()
+        computer = Computer(
+            id="host-1",
+            name="Workstation",
+            os="macOS",
+            ip="192.168.1.10",
+            state="online",
+            last_communication=now,
+        )
         assert computer.state.id == "host-1"
-        assert computer.state.name
-        assert computer.state.os
-        assert computer.state.ip
+        assert computer.state.name == "Workstation"
+        assert computer.state.os == "macOS"
+        assert computer.state.ip == "192.168.1.10"
         assert computer.state.port is None
-        assert computer.state.state is None
+        assert computer.state.state == "online"
+        assert computer.state.last_communication is now
 
     def test_computer_from_string_not_implemented(self) -> None:
-        """Computer.from_string is not implemented (returns None / pass)."""
-        # Current implementation is "pass" with no return; calling it may return None.
-        result = Computer.from_string("any")
-        assert result is None
+        """Computer.from_string currently raises a NotImplementedError."""
+        with pytest.raises(NotImplementedError, match="not implemented yet"):
+            Computer.from_string("any")

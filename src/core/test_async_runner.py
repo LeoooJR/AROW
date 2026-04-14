@@ -151,13 +151,53 @@ class _FakePool:
             self._shutdown_cb()
 
 
-class TestAsyncRunnerThreadSignals:
-    def test_thread_completed_emits_completed_and_cleans_history(self) -> None:
+@pytest.fixture
+def runner_factory(monkeypatch: pytest.MonkeyPatch) -> Callable[..., AsyncRunner]:
+    """Create AsyncRunner instances with fake pools to avoid system process limits."""
+
+    def _factory(
+        *,
+        thread_pending: dict[str, Callable[[], None]] | None = None,
+        process_pending: dict[str, Callable[[], None]] | None = None,
+        pool_by_job_id: dict[str, str] | None = None,
+    ) -> AsyncRunner:
+        thread_shutdown_called = {"value": False}
+        process_shutdown_called = {"value": False}
+
+        def make_thread_pool() -> _FakePool:
+            return _FakePool(
+                shutdown_cb=lambda: thread_shutdown_called.__setitem__("value", True),
+                pending=thread_pending,
+                pool_name="thread",
+                pool_by_job_id=pool_by_job_id,
+            )
+
+        def make_process_pool() -> _FakePool:
+            return _FakePool(
+                shutdown_cb=lambda: process_shutdown_called.__setitem__("value", True),
+                pending=process_pending,
+                pool_name="process",
+                pool_by_job_id=pool_by_job_id,
+            )
+
+        monkeypatch.setattr(_async_mod, "ThreadPool", make_thread_pool)
+        monkeypatch.setattr(_async_mod, "ProcessPool", make_process_pool)
+
         runner = AsyncRunner()
-        thread_shutdown_cb = runner._thread_pool.shutdown
-        process_shutdown_cb = runner._process_pool.shutdown
-        runner._thread_pool = _FakePool(shutdown_cb=thread_shutdown_cb)
-        runner._process_pool = _FakePool(shutdown_cb=process_shutdown_cb)
+        runner._test_shutdown_called = {
+            "thread": thread_shutdown_called,
+            "process": process_shutdown_called,
+        }
+        return runner
+
+    return _factory
+
+
+class TestAsyncRunnerThreadSignals:
+    def test_thread_completed_emits_completed_and_cleans_history(
+        self, runner_factory: Callable[..., AsyncRunner]
+    ) -> None:
+        runner = runner_factory()
 
         completed: list[tuple[str, object]] = []
         failed: list[tuple[str, JobError]] = []
@@ -192,12 +232,10 @@ class TestAsyncRunnerThreadSignals:
 
         runner.shutdown()
 
-    def test_thread_failed_emits_failed_and_cleans_history(self) -> None:
-        runner = AsyncRunner()
-        thread_shutdown_cb = runner._thread_pool.shutdown
-        process_shutdown_cb = runner._process_pool.shutdown
-        runner._thread_pool = _FakePool(shutdown_cb=thread_shutdown_cb)
-        runner._process_pool = _FakePool(shutdown_cb=process_shutdown_cb)
+    def test_thread_failed_emits_failed_and_cleans_history(
+        self, runner_factory: Callable[..., AsyncRunner]
+    ) -> None:
+        runner = runner_factory()
 
         completed: list[tuple[str, object]] = []
         failed: list[tuple[str, JobError]] = []
@@ -231,13 +269,11 @@ class TestAsyncRunnerThreadSignals:
 
         runner.shutdown()
 
-    def test_thread_cancelled_emits_cancelled_and_cleans_history(self) -> None:
-        runner = AsyncRunner()
-        thread_shutdown_cb = runner._thread_pool.shutdown
-        process_shutdown_cb = runner._process_pool.shutdown
+    def test_thread_cancelled_emits_cancelled_and_cleans_history(
+        self, runner_factory: Callable[..., AsyncRunner]
+    ) -> None:
         pending: dict[str, Callable[[], None]] = {}
-        runner._thread_pool = _FakePool(shutdown_cb=thread_shutdown_cb, pending=pending)
-        runner._process_pool = _FakePool(shutdown_cb=process_shutdown_cb)
+        runner = runner_factory(thread_pending=pending)
 
         cancelled: list[str] = []
         completed: list[str] = []
@@ -270,12 +306,10 @@ class TestAsyncRunnerThreadSignals:
 
 
 class TestAsyncRunnerProcessAndCoalesce:
-    def test_process_failed_emits_failed_and_cleans_history(self) -> None:
-        runner = AsyncRunner()
-        thread_shutdown_cb = runner._thread_pool.shutdown
-        process_shutdown_cb = runner._process_pool.shutdown
-        runner._thread_pool = _FakePool(shutdown_cb=thread_shutdown_cb)
-        runner._process_pool = _FakePool(shutdown_cb=process_shutdown_cb)
+    def test_process_failed_emits_failed_and_cleans_history(
+        self, runner_factory: Callable[..., AsyncRunner]
+    ) -> None:
+        runner = runner_factory()
 
         completed: list[tuple[str, object]] = []
         failed: list[tuple[str, JobError]] = []
@@ -311,13 +345,10 @@ class TestAsyncRunnerProcessAndCoalesce:
 
     def test_coalesce_key_cancels_previous_latest_and_only_latest_completes(
         self,
+        runner_factory: Callable[..., AsyncRunner],
     ) -> None:
-        runner = AsyncRunner()
-        thread_shutdown_cb = runner._thread_pool.shutdown
-        process_shutdown_cb = runner._process_pool.shutdown
         pending: dict[str, Callable[[], None]] = {}
-        runner._thread_pool = _FakePool(shutdown_cb=thread_shutdown_cb, pending=pending)
-        runner._process_pool = _FakePool(shutdown_cb=process_shutdown_cb)
+        runner = runner_factory(thread_pending=pending)
 
         cancelled: list[str] = []
         completed: list[tuple[str, object]] = []
@@ -376,21 +407,10 @@ class TestAsyncRunnerProcessAndCoalesce:
 
     def test_auto_resolves_job_type_process_vs_thread_by_name_and_coalesce_key(
         self,
+        runner_factory: Callable[..., AsyncRunner],
     ) -> None:
-        runner = AsyncRunner()
-        thread_shutdown_cb = runner._thread_pool.shutdown
-        process_shutdown_cb = runner._process_pool.shutdown
         pool_by_job_id: dict[str, str] = {}
-        runner._thread_pool = _FakePool(
-            shutdown_cb=thread_shutdown_cb,
-            pool_name="thread",
-            pool_by_job_id=pool_by_job_id,
-        )
-        runner._process_pool = _FakePool(
-            shutdown_cb=process_shutdown_cb,
-            pool_name="process",
-            pool_by_job_id=pool_by_job_id,
-        )
+        runner = runner_factory(pool_by_job_id=pool_by_job_id)
 
         completed_results: dict[str, object] = {}
 
@@ -436,5 +456,29 @@ class TestAsyncRunnerProcessAndCoalesce:
         assert pool_by_job_id[handle_thread.job_id] == "thread"
         assert completed_results[handle_process.job_id] == "process-result"
         assert completed_results[handle_thread.job_id] == "thread-result"
+
+        runner.shutdown()
+
+    def test_completed_coalesced_job_clears_latest_tracking(
+        self, runner_factory: Callable[..., AsyncRunner]
+    ) -> None:
+        """Completing the latest coalesced job removes its coalesce bookkeeping."""
+        runner = runner_factory()
+        handle = runner.submit(
+            JobSpecification(
+                name="device refresh",
+                description="",
+                fn=_return_value,
+                args=("done",),
+                kwargs={},
+                timeout=None,
+                priority=0,
+                coalesce_key="device",
+                type="thread",
+            )
+        )
+
+        _process_events_until(lambda: handle.job_id not in runner.history)
+        assert "device" not in runner._coalesce_latest
 
         runner.shutdown()

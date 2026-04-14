@@ -156,7 +156,7 @@ class Phone(Device):
             ip=ip or "",
             port=port,
         )
-        self.state = PhoneState(
+        self._state = PhoneState(
             id=id,
             name=name,
             os=os or "",
@@ -173,18 +173,21 @@ class Phone(Device):
         return self._state.product
 
     @property
-    def model(self) -> str:
-        return self._state.model
-
-    @property
-    def state(self) -> str:
-        return self._state.state
+    def state(self) -> PhoneState:
+        return self._state
 
     @state.setter
-    def state(self, value: str) -> None:
+    def state(self, value: PhoneState | str) -> None:
+        if isinstance(value, PhoneState):
+            self._state = value
+            return
         if not isinstance(value, str):
-            raise TypeError("state must be a string")
+            raise TypeError("state must be a string or PhoneState")
         self._state.state = value
+
+    @property
+    def model(self) -> str:
+        return self._state.model
 
     @property
     def last_communication(self) -> datetime.datetime:
