@@ -259,4 +259,4 @@ class TestAdbServerExecuteResult:
 
         monkeypatch.setattr(server, "execute", fake_execute)
         devices = server.get_known_devices()
-        assert [device.state.id for device in devices] == ["abc123"]
+        assert [device.descriptor.id for device in devices] == ["abc123"]

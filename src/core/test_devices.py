@@ -1,5 +1,5 @@
 """
-Tests for src/core/devices.py (DeviceState, Device, Phone, Computer).
+Tests for src/core/devices.py (DeviceDescriptor, Device, Phone, Computer).
 """
 
 from __future__ import annotations
@@ -8,20 +8,20 @@ import datetime
 
 import pytest
 
-from core.devices import Computer, DeviceState, Phone, connect_to_device
+from core.devices import Computer, DeviceDescriptor, Phone, connect_to_device
 
 pytestmark = [pytest.mark.devices]
 
 
-# --- DeviceState ---
+# --- DeviceDescriptor ---
 
 
-class TestDeviceState:
-    """Tests for the DeviceState dataclass."""
+class TestDeviceDescriptor:
+    """Tests for the DeviceDescriptor dataclass."""
 
     def test_device_state_defaults(self) -> None:
-        """DeviceState has expected default values."""
-        state = DeviceState()
+        """DeviceDescriptor has expected default values."""
+        state = DeviceDescriptor()
         assert state.id == ""
         assert state.name == ""
         assert state.os == ""
@@ -29,8 +29,8 @@ class TestDeviceState:
         assert state.port is None
 
     def test_device_state_custom_values(self) -> None:
-        """DeviceState accepts and stores custom values."""
-        state = DeviceState(
+        """DeviceDescriptor accepts and stores custom values."""
+        state = DeviceDescriptor(
             id="abc123",
             name="Pixel",
             os="Android",
@@ -54,33 +54,33 @@ class TestPhone:
         """Phone.from_string parses an ADB `devices -l` line with six tokens."""
         line = "abc123 device product:model model:pixel device:Pixel transport_id:1"
         phone = Phone.from_string(line)
-        assert phone.state.id == "abc123"
-        assert phone.state.name == "device:Pixel"
-        assert phone.state.product == "product:model"
-        assert phone.state.model == "model:pixel"
-        assert phone.state.state == "device"
+        assert phone.descriptor.id == "abc123"
+        assert phone.descriptor.name == "device:Pixel"
+        assert phone.descriptor.product == "product:model"
+        assert phone.descriptor.model == "model:pixel"
+        assert phone.descriptor.state == "device"
         assert phone.transport_id == ""
 
     def test_phone_from_string_six_token_line_is_parsed_positionally(self) -> None:
         """Phone.from_string uses the current six-token positional parser."""
         line = "emulator-5554 offline product:sdk model:sdk_gphone device:emulator transport_id:9"
         phone = Phone.from_string(line)
-        assert phone.state.id == "emulator-5554"
-        assert phone.state.name == "device:emulator"
-        assert phone.state.product == "product:sdk"
-        assert phone.state.model == "model:sdk_gphone"
-        assert phone.state.state == "offline"
+        assert phone.descriptor.id == "emulator-5554"
+        assert phone.descriptor.name == "device:emulator"
+        assert phone.descriptor.product == "product:sdk"
+        assert phone.descriptor.model == "model:sdk_gphone"
+        assert phone.descriptor.state == "offline"
 
     def test_phone_from_string_invalid_too_few_tokens(self) -> None:
         """Phone.from_string raises when there are too few fields."""
         with pytest.raises(ValueError, match="not enough values to unpack"):
             Phone.from_string("id name os")
 
-    def test_phone_state_setter_accepts_string_updates_nested_state(self) -> None:
-        """Assigning `phone.state = ...` updates the nested PhoneState status field."""
+    def test_phone_descriptor_setter_accepts_string_updates_nested_state(self) -> None:
+        """Assigning `phone.descriptor = ...` updates the nested PhoneDescriptor status field."""
         phone = Phone(id="id", name="Pixel", state="device")
-        phone.state = "offline"
-        assert phone.state.state == "offline"
+        phone.descriptor = "offline"
+        assert phone.descriptor.state == "offline"
 
     def test_phone_str_repr(self) -> None:
         """Phone __str__ and __repr__ are defined and non-empty."""
@@ -93,16 +93,16 @@ class TestPhone:
         """Phone.update_state updates only given fields."""
         phone = Phone(id="a", name="b", os="c", ip="d", port=1, state="e")
         phone.update_state(name="updated", port=9999)
-        assert phone.state.name == "updated"
-        assert phone.state.port == 9999
-        assert phone.state.id == "a"
+        assert phone.descriptor.name == "updated"
+        assert phone.descriptor.port == 9999
+        assert phone.descriptor.id == "a"
 
     def test_connect_to_device_returns_phone_with_requested_endpoint(self) -> None:
         """connect_to_device returns a Phone configured with the requested ip/port."""
         phone = connect_to_device("192.168.1.20", 5555, "123456")
-        assert phone.state.ip == "192.168.1.20"
-        assert phone.state.port == 5555
-        assert phone.state.state == ""
+        assert phone.descriptor.ip == "192.168.1.20"
+        assert phone.descriptor.port == 5555
+        assert phone.descriptor.state == ""
 
 
 # --- Computer ---
@@ -122,13 +122,13 @@ class TestComputer:
             state="online",
             last_communication=now,
         )
-        assert computer.state.id == "host-1"
-        assert computer.state.name == "Workstation"
-        assert computer.state.os == "macOS"
-        assert computer.state.ip == "192.168.1.10"
-        assert computer.state.port is None
-        assert computer.state.state == "online"
-        assert computer.state.last_communication is now
+        assert computer.descriptor.id == "host-1"
+        assert computer.descriptor.name == "Workstation"
+        assert computer.descriptor.os == "macOS"
+        assert computer.descriptor.ip == "192.168.1.10"
+        assert computer.descriptor.port is None
+        assert computer.descriptor.state == "online"
+        assert computer.descriptor.last_communication is now
 
     def test_computer_from_string_not_implemented(self) -> None:
         """Computer.from_string currently raises a NotImplementedError."""

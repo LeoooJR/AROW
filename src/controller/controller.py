@@ -84,9 +84,9 @@ class SimulationController(Controller):
         Send the host device information to the view.
         """
         self.view.on_host_device_information_updated(
-            self.model.host.state.name,
-            self.model.host.state.os,
-            self.model.host.state.ip,
+            self.model.host.descriptor.name,
+            self.model.host.descriptor.os,
+            self.model.host.descriptor.ip,
         )
 
     def _startup_core_runtime(self) -> None:
@@ -172,7 +172,7 @@ class SimulationController(Controller):
         """Handle the devices updated event."""
         logger.info(f"Devices updated: {payload.devices}")
         self.view.on_devices_updated(
-            list(map(lambda device: device.state.id, payload.devices))
+            list(map(lambda device: device.descriptor.id, payload.devices))
         )
 
     def _on_device_pairing_succeeded(
@@ -181,7 +181,7 @@ class SimulationController(Controller):
         """Handle the device pairing succeeded event."""
         logger.success(f"Device pairing succeeded: {payload.device}")
         # TODO: Retrieve device informations
-        self.view.on_device_pairing_succeeded(payload.device.state.id)
+        self.view.on_device_pairing_succeeded(payload.device.descriptor.id)
 
     def _on_device_pairing_failed(self, payload: DevicePairingFailedPayload) -> None:
         """Handle the device pairing failed event."""
@@ -205,7 +205,7 @@ class SimulationController(Controller):
         known_devices: list[Phone] = self.model.get_known_devices()
         logger.info(f"Known devices: {known_devices}")
         self.view.on_devices_updated(
-            list(map(lambda device: device.state.id, known_devices))
+            list(map(lambda device: device.descriptor.id, known_devices))
         )
 
 

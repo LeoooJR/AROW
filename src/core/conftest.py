@@ -11,7 +11,7 @@ def pytest_configure(config: pytest.Config) -> None:
     """Register custom markers."""
     config.addinivalue_line(
         "markers",
-        "devices: mark test as belonging to the devices module (Device, Phone, Computer, DeviceState).",
+        "devices: mark test as belonging to the devices module (Device, Phone, Computer, DeviceDescriptor).",
     )
     config.addinivalue_line(
         "markers",

@@ -274,14 +274,14 @@ class AdbClient:
         positional_arguments = positional_arguments or []
         argv: list[str] = [str(self.binary.path)]
         if phone is not None:
-            argv.extend(["-s", phone.state.id])
+            argv.extend(["-s", phone.descriptor.id])
         argv.extend([command.command, *command.args, *positional_arguments])
         try:
             logger.debug(
                 "Executing ADB client command | "
                 f"adb_path={self.binary.path} "
                 f"command={command.command} "
-                f"phone_id={phone.state.id if phone else None} "
+                f"phone_id={phone.descriptor.id if phone else None} "
                 f"argv={argv} "
                 f"command_line={' '.join(shlex.quote(arg) for arg in argv)}"
             )

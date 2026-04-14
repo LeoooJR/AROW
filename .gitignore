@@ -215,3 +215,9 @@ __marimo__/
 
 # MacOS related files
 .DS_Store
+
+# Agents related files
+AGENTS.md
+
+# Codex
+.codex/
