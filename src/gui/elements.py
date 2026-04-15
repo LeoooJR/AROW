@@ -97,9 +97,19 @@ class Logo(QLabel, Element):
     Label that displays the logo of the application.
     """
 
+    @dataclass(frozen=True)
+    class Text:
+        pass
+
+    @dataclass
+    class UI:
+        pass
+
     def __init__(self, parent: QWidget | None, file: str):
         # Initialize parent QLabel
         super().__init__(parent)
+        self.texts = Logo.Text()
+        self.ui = Logo.UI()
 
         # Load and scale pixmap to appropriate size
         pixmap = QPixmap(file)
@@ -133,10 +143,20 @@ class GradientText(QLabel, Element):
     Label that displays text with a linear gradient color.
     """
 
+    @dataclass(frozen=True)
+    class Text:
+        text: str = ""
+
+    @dataclass
+    class UI:
+        pass
+
     def __init__(
         self, parent: QWidget | None, text="", start_color=None, end_color=None
     ):
         super().__init__(text, parent)
+        self.texts = GradientText.Text(text=text)
+        self.ui = GradientText.UI()
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         palette = get_current_palette()
         self.set_gradient_colors(
@@ -171,7 +191,7 @@ class GradientText(QLabel, Element):
 
         # Get text metrics to calculate position
         font_metrics = painter.fontMetrics()
-        text = self.text()
+        text = QLabel.text(self)
         text_width = font_metrics.horizontalAdvance(text)
         text_height = font_metrics.height()
 
@@ -221,6 +241,14 @@ class IconLabel(QWidget, Element):
     Widget that displays an icon and a label.
     """
 
+    @dataclass(frozen=True)
+    class Text:
+        text: str | None = None
+
+    @dataclass
+    class UI:
+        pass
+
     def __init__(
         self,
         parent: QWidget | None,
@@ -232,6 +260,8 @@ class IconLabel(QWidget, Element):
     ):
         # Initialize parent QWidget
         super().__init__(parent)
+        self.texts = IconLabel.Text(text=text if isinstance(text, str) else None)
+        self.ui = IconLabel.UI()
 
         layout = QHBoxLayout()
         layout.setContentsMargins(*margins)
@@ -307,6 +337,14 @@ class PanelTitle(QFrame, Element):
     Widget that displays a panel title.
     """
 
+    @dataclass(frozen=True)
+    class Text:
+        title: str = ""
+
+    @dataclass
+    class UI:
+        pass
+
     def __init__(
         self,
         parent: QWidget | None,
@@ -317,6 +355,8 @@ class PanelTitle(QFrame, Element):
         icon_size=None,
     ):
         super().__init__(parent)
+        self.texts = PanelTitle.Text(title=text)
+        self.ui = PanelTitle.UI()
 
         self.setProperty("panel-title", True)
 
@@ -369,7 +409,17 @@ class PanelTitle(QFrame, Element):
 
 class Button(QPushButton, Element):
 
+    @dataclass(frozen=True)
+    class Text:
+        label: str = ""
+
+    @dataclass
+    class UI:
+        pass
+
     def __init__(self, parent: QWidget | None, text: str, icon_path: str | None = None):
+        self.texts = Button.Text(label=text)
+        self.ui = Button.UI()
 
         if icon_path:
             super().__init__(QIcon(icon_path), text, parent)
@@ -403,6 +453,14 @@ class WalkthroughButton(QPushButton, Element):
     Uses an internal layout (not QPushButton text/icon) so spacing matches the design reference.
     """
 
+    @dataclass(frozen=True)
+    class Text:
+        label: str = ""
+
+    @dataclass
+    class UI:
+        pass
+
     def __init__(
         self,
         parent: QWidget | None,
@@ -411,6 +469,8 @@ class WalkthroughButton(QPushButton, Element):
         trailing_icon_path: str,
     ):
         super().__init__(parent)
+        self.texts = WalkthroughButton.Text(label=text)
+        self.ui = WalkthroughButton.UI()
         self.setObjectName("welcome-walkthrough-button")
         self.setProperty("welcome-walkthrough-button", True)
         self.setFlat(True)
@@ -480,6 +540,15 @@ class WalkthroughButton(QPushButton, Element):
 
 
 class ToolButton(QToolButton):
+
+    @dataclass(frozen=True)
+    class Text:
+        tooltip: str | None = None
+
+    @dataclass
+    class UI:
+        pass
+
     def __init__(
         self,
         parent: QWidget | None,
@@ -488,6 +557,8 @@ class ToolButton(QToolButton):
         tooltip: str | None = None,
     ):
         super().__init__(parent)
+        self.texts = ToolButton.Text(tooltip=tooltip)
+        self.ui = ToolButton.UI()
         self.setProperty("tool-button", True)
         self.set_icon(icon_path, icon_size)
         self.setFixedHeight(Settings.DIMENSION.TOOLBUTTON_HEIGHT)
@@ -523,8 +594,19 @@ class ToolButton(QToolButton):
 
 
 class ButtonGroup(QButtonGroup, Element):
+
+    @dataclass(frozen=True)
+    class Text:
+        pass
+
+    @dataclass
+    class UI:
+        pass
+
     def __init__(self, parent: QWidget | None, buttons: list[QAbstractButton] = []):
         super().__init__(parent)
+        self.texts = ButtonGroup.Text()
+        self.ui = ButtonGroup.UI()
         self.setProperty("button-group", True)
         self.setExclusive(True)
         for button in buttons:
@@ -545,9 +627,19 @@ class ButtonGroup(QButtonGroup, Element):
 
 class SelectionField(QComboBox, Element):
 
+    @dataclass(frozen=True)
+    class Text:
+        placeholder: str = ""
+
+    @dataclass
+    class UI:
+        pass
+
     def __init__(self, parent: QWidget | None, placeholder: str):
 
         super().__init__(parent)
+        self.texts = SelectionField.Text(placeholder=placeholder)
+        self.ui = SelectionField.UI()
 
         self.setProperty("selection-field", True)
         self.setEditable(False)
@@ -576,8 +668,19 @@ class SelectionField(QComboBox, Element):
 
 
 class RegularText(QLabel, Element):
+
+    @dataclass(frozen=True)
+    class Text:
+        label: str = ""
+
+    @dataclass
+    class UI:
+        pass
+
     def __init__(self, parent: QWidget | None, text: str):
         super().__init__(text, parent)
+        self.texts = RegularText.Text(label=text)
+        self.ui = RegularText.UI()
         self.setProperty("regular-text", True)
         self.setStyleSheet(f"color: {get_current_palette().BLACK};")
         self.setFont(
@@ -599,8 +702,19 @@ class RegularText(QLabel, Element):
 
 
 class DemiBoldText(QLabel, Element):
+
+    @dataclass(frozen=True)
+    class Text:
+        label: str = ""
+
+    @dataclass
+    class UI:
+        pass
+
     def __init__(self, parent: QWidget | None, text: str):
         super().__init__(text, parent)
+        self.texts = DemiBoldText.Text(label=text)
+        self.ui = DemiBoldText.UI()
         self.setProperty("demi-bold-text", True)
         self.setStyleSheet(f"color: {get_current_palette().BLACK};")
         self.setFont(
@@ -625,9 +739,19 @@ class DemiBoldText(QLabel, Element):
 
 class HelperText(QLabel, Element):
 
+    @dataclass(frozen=True)
+    class Text:
+        label: str = ""
+
+    @dataclass
+    class UI:
+        pass
+
     def __init__(self, parent: QWidget | None, text: str):
 
         super().__init__(text, parent)
+        self.texts = HelperText.Text(label=text)
+        self.ui = HelperText.UI()
         self.setProperty("helper-text", True)
         self.setStyleSheet(f"color: {get_current_palette().HELPER_TEXT};")
         self.setFont(
@@ -650,6 +774,14 @@ class HelperText(QLabel, Element):
 
 class List(QListWidget, Element):
 
+    @dataclass(frozen=True)
+    class Text:
+        pass
+
+    @dataclass
+    class UI:
+        pass
+
     def __init__(
         self,
         parent: QWidget | None,
@@ -663,6 +795,8 @@ class List(QListWidget, Element):
         | Qt.AlignmentFlag.AlignLeft,
     ):
         super().__init__(parent)
+        self.texts = List.Text()
+        self.ui = List.UI()
         self.setProperty("list", True)
         for item in items:
             self.addItem(item)
@@ -716,8 +850,18 @@ class SVG(QLabel, Element):
 
     path: str
 
+    @dataclass(frozen=True)
+    class Text:
+        pass
+
+    @dataclass
+    class UI:
+        pass
+
     def __init__(self, svg_path: str, parent: QWidget | None = None):
         super().__init__(parent)
+        self.texts = SVG.Text()
+        self.ui = SVG.UI()
         self.setProperty("svg", True)
         self.path = svg_path
         self.renderer: QSvgRenderer | None = None
@@ -761,6 +905,10 @@ class PlaceHolder(QFrame, Element):
     Text uses a softer color (PLACEHOLDER_TEXT). Use icon_path to show an icon above the label.
     """
 
+    @dataclass(frozen=True)
+    class Text:
+        text: str | None = None
+
     @dataclass
     class UI:
         text: QLabel
@@ -776,6 +924,8 @@ class PlaceHolder(QFrame, Element):
         icon_path: str | None = None,
     ):
         super().__init__(parent)
+        self.texts = PlaceHolder.Text(text=text if isinstance(text, str) else None)
+        self.ui: PlaceHolder.UI
 
         layout = QVBoxLayout()
         layout.setContentsMargins(
@@ -839,14 +989,25 @@ class PlaceHolder(QFrame, Element):
 
 class FileOpenDialog(QFileDialog, Element):
 
+    @dataclass(frozen=True)
+    class Text:
+        window_title: str = "Open a file"
+        name_filter: str = "Tablesheet files (*.xlsx, *.xls, *.csv)"
+
+    @dataclass
+    class UI:
+        pass
+
     def __init__(self, parent: QWidget = None):
 
         super().__init__(parent)
+        self.texts = FileOpenDialog.Text()
+        self.ui = FileOpenDialog.UI()
 
-        self.setWindowTitle("Open a file")
+        self.setWindowTitle(self.texts.window_title)
         self.setAcceptMode(QFileDialog.AcceptMode.AcceptOpen)
         self.setFileMode(QFileDialog.FileMode.ExistingFile)
-        self.setNameFilter("Tablesheet files (*.xlsx, *.xls, *.csv)")
+        self.setNameFilter(self.texts.name_filter)
         self.setViewMode(QFileDialog.ViewMode.Detail)
         self.setFilter(QDir.Filter.Files | QDir.Filter.Readable)
         self.setOptions(
@@ -868,18 +1029,30 @@ class FileOpenDialog(QFileDialog, Element):
 
 class FileSaveDialog(QFileDialog, Element):
 
+    @dataclass(frozen=True)
+    class Text:
+        window_title: str = "Save a file"
+        name_filter: str = "Plain text files (*.log)"
+        default_suffix: str = "log"
+
+    @dataclass
+    class UI:
+        pass
+
     def __init__(self, parent: QWidget = None):
 
         super().__init__(parent)
+        self.texts = FileSaveDialog.Text()
+        self.ui = FileSaveDialog.UI()
 
-        self.setWindowTitle("Save a file")
+        self.setWindowTitle(self.texts.window_title)
         self.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
         self.setFileMode(QFileDialog.FileMode.AnyFile)
-        self.setNameFilter("Plain text files (*.log)")
+        self.setNameFilter(self.texts.name_filter)
         self.setViewMode(QFileDialog.ViewMode.Detail)
         self.setFilter(QDir.Filter.Files | QDir.Filter.Readable)
         self.setOptions(QFileDialog.Option.DontUseCustomDirectoryIcons)
-        self.setDefaultSuffix("log")
+        self.setDefaultSuffix(self.texts.default_suffix)
         self._set_size_policy()
         self._set_alignment()
         self._connect_signals()
@@ -896,19 +1069,36 @@ class FileSaveDialog(QFileDialog, Element):
 
 class WarningDialog(QMessageBox, Element):
 
+    @dataclass(frozen=True)
+    class Text:
+        title: str = ""
+        text: str = ""
+        detailed_text: str = ""
+        informative_text: str = (
+            "This software is for experimental purposes. Use at your own risk."
+        )
+
+    @dataclass
+    class UI:
+        pass
+
     def __init__(self, parent: QWidget = None, title=str, text=str, detailed_text=str):
 
         super().__init__(parent)
+        self.texts = WarningDialog.Text(
+            title=title,
+            text=text,
+            detailed_text=detailed_text,
+        )
+        self.ui = WarningDialog.UI()
 
-        self.setWindowTitle(title)
-        self.setText(text)
+        self.setWindowTitle(self.texts.title)
+        self.setText(self.texts.text)
         self.setStandardButtons(
             QMessageBox.StandardButton.Cancel | QMessageBox.StandardButton.Yes
         )
-        self.setDetailedText(detailed_text)
-        self.setInformativeText(
-            "This software is for experimental purposes. Use at your own risk."
-        )
+        self.setDetailedText(self.texts.detailed_text)
+        self.setInformativeText(self.texts.informative_text)
         self.setIcon(QMessageBox.Icon.Warning)
 
         for label in self.findChildren(QLabel):
@@ -932,19 +1122,36 @@ class WarningDialog(QMessageBox, Element):
 
 class QuestionDialog(QMessageBox, Element):
 
+    @dataclass(frozen=True)
+    class Text:
+        title: str = ""
+        text: str = ""
+        detailed_text: str = ""
+        informative_text: str = (
+            "This software is for experimental purposes. Use at your own risk."
+        )
+
+    @dataclass
+    class UI:
+        pass
+
     def __init__(self, parent: QWidget = None, title=str, text=str, detailed_text=str):
 
         super().__init__(parent)
+        self.texts = QuestionDialog.Text(
+            title=title,
+            text=text,
+            detailed_text=detailed_text,
+        )
+        self.ui = QuestionDialog.UI()
 
-        self.setWindowTitle(title)
-        self.setText(text)
+        self.setWindowTitle(self.texts.title)
+        self.setText(self.texts.text)
         self.setStandardButtons(
             QMessageBox.StandardButton.Cancel | QMessageBox.StandardButton.Yes
         )
-        self.setDetailedText(detailed_text)
-        self.setInformativeText(
-            "This software is for experimental purposes. Use at your own risk."
-        )
+        self.setDetailedText(self.texts.detailed_text)
+        self.setInformativeText(self.texts.informative_text)
         self.setIcon(QMessageBox.Icon.Question)
 
         for label in self.findChildren(QLabel):
@@ -968,12 +1175,23 @@ class QuestionDialog(QMessageBox, Element):
 
 class Toast(QWidget, Element):
 
+    @dataclass(frozen=True)
+    class Text:
+        message: str = ""
+        level: str = "info"
+
+    @dataclass
+    class UI:
+        pass
+
     def __init__(
         self, parent: QWidget, message: str, level: str = "info", duration: int = 3000
     ):
         # Ignore parent completely - create as completely independent top-level window
         # This prevents any layout interference with parent widgets
         super().__init__(None)
+        self.texts = Toast.Text(message=message, level=level)
+        self.ui = Toast.UI()
 
         # Set window flags BEFORE any other operations
         # Using Dialog flag for better cross-platform behavior
@@ -1139,8 +1357,18 @@ class ProgressBar(QProgressBar, Element):
         "Ready to start",
     ]
 
+    @dataclass(frozen=True)
+    class Text:
+        pass
+
+    @dataclass
+    class UI:
+        pass
+
     def __init__(self, parent: QWidget | None, step_labels: list[str] | None = None):
         super().__init__(parent)
+        self.texts = ProgressBar.Text()
+        self.ui = ProgressBar.UI()
         self.setProperty("progress-bar", True)
         self.setFixedHeight(Settings.DIMENSION.PROGRESSBAR_HEIGHT)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
@@ -1181,8 +1409,18 @@ class Image(QLabel, Element):
     Label that displays an image.
     """
 
+    @dataclass(frozen=True)
+    class Text:
+        pass
+
+    @dataclass
+    class UI:
+        pass
+
     def __init__(self, parent: QWidget | None, image_path: str):
         super().__init__(parent)
+        self.texts = Image.Text()
+        self.ui = Image.UI()
         self.setProperty("image", True)
         self.setPixmap(QPixmap(image_path))
         self.setScaledContents(True)
@@ -1205,6 +1443,14 @@ class GroupBox(QGroupBox, Element):
     Group box that displays a title and a content area.
     """
 
+    @dataclass(frozen=True)
+    class Text:
+        title: str = ""
+
+    @dataclass
+    class UI:
+        pass
+
     def __init__(
         self,
         parent: QWidget | None,
@@ -1213,6 +1459,8 @@ class GroupBox(QGroupBox, Element):
         title: str = "",
     ):
         super().__init__(parent, title=title, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.texts = GroupBox.Text(title=title)
+        self.ui = GroupBox.UI()
         self.setProperty("group-box", True)
         self.setFlat(False)
         if layout is not None:
@@ -1246,10 +1494,20 @@ class ConditionIndicator(QFrame, Element):
     Use objectName e.g. "host-identity-indicator" or "condition-indicator"; property "indicator-state" for stylesheet.
     """
 
+    @dataclass(frozen=True)
+    class Text:
+        pass
+
+    @dataclass
+    class UI:
+        pass
+
     def __init__(
         self, parent: QWidget | None = None, object_name: str = "condition-indicator"
     ):
         super().__init__(parent)
+        self.texts = ConditionIndicator.Text()
+        self.ui = ConditionIndicator.UI()
         self.setObjectName(object_name)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         size = Settings.DIMENSION.CONDITION_INDICATOR_SIZE
@@ -1354,6 +1612,16 @@ class File(QWidget, Element):
     Filename is elided with ellipsis when too long. Do not add a close button.
     """
 
+    @dataclass(frozen=True)
+    class Text:
+        file_name: str = ""
+        file_type: str = ""
+        save_as_tooltip: str = "Save as"
+
+    @dataclass
+    class UI:
+        pass
+
     def __init__(
         self,
         parent: QWidget | None,
@@ -1362,6 +1630,8 @@ class File(QWidget, Element):
         file_save: bool = False,
     ):
         super().__init__(parent)
+        self.texts = File.Text(file_name=file_name, file_type=file_type)
+        self.ui = File.UI()
 
         self.setProperty("file", True)
         self.setObjectName("file-display")
@@ -1412,7 +1682,9 @@ class File(QWidget, Element):
 
         if self._file_save:
             save_as_button = ToolButton(
-                self, icon_path=GenericIcons.SAVE_AS.value, tooltip="Save as"
+                self,
+                icon_path=GenericIcons.SAVE_AS.value,
+                tooltip=self.texts.save_as_tooltip,
             )
             layout.addWidget(save_as_button)
             layout.setAlignment(save_as_button, Qt.AlignmentFlag.AlignRight)
@@ -1505,8 +1777,18 @@ class OTPLineEdit(QLineEdit, Element):
     QLineEdit subclass to handle backspace focus navigation and paste event for autofill.
     """
 
+    @dataclass(frozen=True)
+    class Text:
+        pass
+
+    @dataclass
+    class UI:
+        pass
+
     def __init__(self, owner, index, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.texts = OTPLineEdit.Text()
+        self.ui = OTPLineEdit.UI()
         self._otp_parent = owner
         self._otp_index = index
         self._set_size_policy()
@@ -1525,7 +1807,7 @@ class OTPLineEdit(QLineEdit, Element):
     def keyPressEvent(self, event):
         if event.key() == Qt.Key.Key_Backspace:
             cursor_pos = self.cursorPosition()
-            if cursor_pos == 0 and (not self.text()) and self._otp_index > 0:
+            if cursor_pos == 0 and (not QLineEdit.text(self)) and self._otp_index > 0:
                 # Move focus to previous field if not first field and field is empty
                 prev_input = self._otp_parent._otp_inputs[self._otp_index - 1]
                 prev_input.setFocus()
@@ -1564,6 +1846,14 @@ class OTPInput(QWidget, Element):
     OTP input widget.
     """
 
+    @dataclass(frozen=True)
+    class Text:
+        pass
+
+    @dataclass
+    class UI:
+        pass
+
     def __init__(
         self,
         parent: QWidget = None,
@@ -1576,6 +1866,8 @@ class OTPInput(QWidget, Element):
             len(max_length) == otp_length
         ), "Max length list must be the same length as the OTP length"
         super().__init__(parent)
+        self.texts = OTPInput.Text()
+        self.ui = OTPInput.UI()
 
         self.setObjectName("otp-input")
         self._otp_type = otp_type
@@ -1670,6 +1962,16 @@ class AuthentificationCard(QFrame, Element):
     Card widget.
     """
 
+    @dataclass(frozen=True)
+    class Text:
+        title: str | None = None
+        description: str | None = None
+        close_button_tooltip: str = "Close"
+        helper_ip_otp_input: str = "IP address"
+        helper_port_otp_input: str = "Port"
+        helper_association_code_otp_input: str = "Association code"
+        confirm_button: str = "Confirm"
+
     @dataclass
     class UI:
         close_button: ToolButton
@@ -1699,6 +2001,7 @@ class AuthentificationCard(QFrame, Element):
     ):
         super().__init__(parent)
 
+        self.texts = AuthentificationCard.Text(title=title, description=description)
         self.ui: AuthentificationCard.UI
         self.setObjectName("card")
         self.setProperty("authentification-card", True)
@@ -1706,7 +2009,11 @@ class AuthentificationCard(QFrame, Element):
         layout.setContentsMargins(*Settings.SPACING.MARGIN_SMALL)
         layout.setSpacing(Settings.SPACING.XS)
 
-        close_button = ToolButton(self, icon_path=GenericIcons.X.value, tooltip="Close")
+        close_button = ToolButton(
+            self,
+            icon_path=GenericIcons.X.value,
+            tooltip=self.texts.close_button_tooltip,
+        )
 
         if icon_path:
             icon = SVG(icon_path, self)
@@ -1733,7 +2040,7 @@ class AuthentificationCard(QFrame, Element):
             description_label = HelperText(self, description)
             layout.addWidget(description_label)
 
-        helper_ip_otp_input = HelperText(self, "IP address")
+        helper_ip_otp_input = HelperText(self, self.texts.helper_ip_otp_input)
         ip_otp_input = OTPInput(
             self,
             otp_type=OTPType.IP,
@@ -1749,7 +2056,7 @@ class AuthentificationCard(QFrame, Element):
             stretch_at_end=True,
         )
 
-        helper_port_otp_input = HelperText(self, "Port")
+        helper_port_otp_input = HelperText(self, self.texts.helper_port_otp_input)
         port_otp_input = OTPInput(
             self,
             otp_type=OTPType.PORT,
@@ -1765,7 +2072,9 @@ class AuthentificationCard(QFrame, Element):
             stretch_at_end=True,
         )
 
-        helper_association_code_otp_input = HelperText(self, "Association code")
+        helper_association_code_otp_input = HelperText(
+            self, self.texts.helper_association_code_otp_input
+        )
         association_code_otp_input = OTPInput(
             self,
             otp_type=OTPType.ASSOCIATION_CODE,
@@ -1791,7 +2100,7 @@ class AuthentificationCard(QFrame, Element):
         layout.addWidget(device_otp_wrapper)
         layout.addWidget(association_code_otp_input_wrapper)
 
-        confirm_button = Button(self, "Confirm")
+        confirm_button = Button(self, self.texts.confirm_button)
         layout.addWidget(confirm_button, 1)
 
         self.setLayout(layout)

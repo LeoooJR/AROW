@@ -1,8 +1,18 @@
+from dataclasses import dataclass
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QVBoxLayout, QWidget
 
 
 class VerticalLayoutWrapper(QFrame):
+
+    @dataclass(frozen=True)
+    class Text:
+        pass
+
+    @dataclass
+    class UI:
+        pass
 
     def __init__(
         self,
@@ -15,6 +25,9 @@ class VerticalLayoutWrapper(QFrame):
     ):
 
         super().__init__(parent)
+
+        self.texts = VerticalLayoutWrapper.Text()
+        self.ui = VerticalLayoutWrapper.UI()
 
         self.setProperty("vertical-layout-wrapper", True)
         layout = QVBoxLayout()
@@ -47,6 +60,14 @@ class VerticalLayoutWrapper(QFrame):
 
 class HorizontalLayoutWrapper(QFrame):
 
+    @dataclass(frozen=True)
+    class Text:
+        pass
+
+    @dataclass
+    class UI:
+        pass
+
     def __init__(
         self,
         parent: QWidget,
@@ -58,6 +79,9 @@ class HorizontalLayoutWrapper(QFrame):
     ):
 
         super().__init__(parent)
+
+        self.texts = HorizontalLayoutWrapper.Text()
+        self.ui = HorizontalLayoutWrapper.UI()
 
         self.setProperty("horizontal-layout-wrapper", True)
         layout = QHBoxLayout()
@@ -90,6 +114,14 @@ class HorizontalLayoutWrapper(QFrame):
 
 class GridLayoutWrapper(QFrame):
 
+    @dataclass(frozen=True)
+    class Text:
+        pass
+
+    @dataclass
+    class UI:
+        pass
+
     def __init__(
         self,
         parent: QWidget,
@@ -100,6 +132,9 @@ class GridLayoutWrapper(QFrame):
     ):
 
         super().__init__(parent)
+
+        self.texts = GridLayoutWrapper.Text()
+        self.ui = GridLayoutWrapper.UI()
 
         self.setProperty("grid-layout-wrapper", True)
         layout = QGridLayout()

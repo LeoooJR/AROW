@@ -7,7 +7,7 @@ from typing import Any, Iterator, Optional, Self
 
 
 @dataclass
-class DeviceState:
+class DeviceDescriptor:
     """
     Metadata about the device
     """
@@ -26,7 +26,7 @@ class DeviceState:
 
 
 @dataclass
-class PhoneState(DeviceState):
+class PhoneDescriptor(DeviceDescriptor):
     """
     Metadata about the phone device
     """
@@ -52,7 +52,7 @@ class PhoneState(DeviceState):
 
 
 @dataclass
-class ComputerState(DeviceState):
+class ComputerDescriptor(DeviceDescriptor):
     """
     Metadata about the computer device
     """
@@ -85,41 +85,41 @@ class Device(ABC):
         ip: str,
         port: Optional[int],
     ) -> None:
-        self._state = DeviceState(id, name, os, ip, port)
+        self._descriptor = DeviceDescriptor(id, name, os, ip, port)
 
     @property
-    def state(self) -> DeviceState:
-        return self._state
+    def descriptor(self) -> DeviceDescriptor:
+        return self._descriptor
 
-    @state.setter
-    def state(self, value: DeviceState) -> None:
-        if not isinstance(value, DeviceState):
-            raise TypeError("state must be an instance of DeviceState")
-        self._state = value
+    @descriptor.setter
+    def descriptor(self, value: DeviceDescriptor) -> None:
+        if not isinstance(value, DeviceDescriptor):
+            raise TypeError("descriptor must be an instance of DeviceDescriptor")
+        self._descriptor = value
 
     @property
     def id(self) -> str:
-        return self._state.id
+        return self._descriptor.id
 
     @property
     def name(self) -> str:
-        return self._state.name
+        return self._descriptor.name
 
     @property
     def os(self) -> str:
-        return self._state.os
+        return self._descriptor.os
 
     @property
     def ip(self) -> str:
-        return self._state.ip
+        return self._descriptor.ip
 
     @property
     def port(self) -> Optional[int]:
-        return self._state.port
+        return self._descriptor.port
 
     def update_state(self, **kwargs: Any) -> None:
         for key, value in kwargs.items():
-            setattr(self._state, key, value)
+            setattr(self._descriptor, key, value)
 
     @classmethod
     @abstractmethod
@@ -127,10 +127,10 @@ class Device(ABC):
         raise NotImplementedError
 
     def __str__(self):
-        return f"{self._state.name} - {self._state.os} - {self._state.ip}:{self._state.port}"
+        return f"{self._descriptor.name} - {self._descriptor.os} - {self._descriptor.ip}:{self._descriptor.port}"
 
     def __repr__(self):
-        return f"{self.__class__.__name__}(id={self._state.id}, name={self._state.name}, os={self._state.os}, ip={self._state.ip}, port={self._state.port})"
+        return f"{self.__class__.__name__}(id={self._descriptor.id}, name={self._descriptor.name}, os={self._descriptor.os}, ip={self._descriptor.ip}, port={self._descriptor.port})"
 
 
 class Phone(Device):
@@ -156,7 +156,7 @@ class Phone(Device):
             ip=ip or "",
             port=port,
         )
-        self._state = PhoneState(
+        self._descriptor = PhoneDescriptor(
             id=id,
             name=name,
             os=os or "",
@@ -170,38 +170,45 @@ class Phone(Device):
 
     @property
     def product(self) -> str:
-        return self._state.product
+        return self._descriptor.product
 
     @property
-    def state(self) -> PhoneState:
-        return self._state
+    def descriptor(self) -> PhoneDescriptor:
+        return self._descriptor
+
+    @descriptor.setter
+    def descriptor(self, value: PhoneDescriptor) -> None:
+        if not isinstance(value, PhoneDescriptor):
+            raise TypeError("descriptor must be an instance of PhoneDescriptor")
+        self._descriptor = value
+
+    @property
+    def state(self) -> str:
+        return self._descriptor.state
 
     @state.setter
-    def state(self, value: PhoneState | str) -> None:
-        if isinstance(value, PhoneState):
-            self._state = value
-            return
+    def state(self, value: str) -> None:
         if not isinstance(value, str):
-            raise TypeError("state must be a string or PhoneState")
-        self._state.state = value
+            raise TypeError("state must be a string")
+        self._descriptor.state = value
 
     @property
     def model(self) -> str:
-        return self._state.model
+        return self._descriptor.model
 
     @property
     def last_communication(self) -> datetime.datetime:
-        return self._state.last_communication
+        return self._descriptor.last_communication
 
     @last_communication.setter
     def last_communication(self, value: datetime.datetime) -> None:
         if not isinstance(value, datetime.datetime):
             raise TypeError("last_communication must be a datetime")
-        self._state.last_communication = value
+        self._descriptor.last_communication = value
 
     @property
     def transport_id(self) -> str:
-        return self._state.transport_id
+        return self._descriptor.transport_id
 
     @classmethod
     def from_string(cls, string: str) -> Self:
@@ -234,7 +241,7 @@ class Computer(Device):
             ip=resolved_ip,
             port=port,
         )
-        self.state = ComputerState(
+        self.descriptor = ComputerDescriptor(
             id=id,
             name=resolved_name,
             os=resolved_os,
@@ -283,14 +290,14 @@ class DeviceRepository(ABC):
         self._working_device = device
 
     def add_device(self, device: Device) -> None:
-        if device.state.id in self._devices:
-            raise ValueError(f"Device with id {device.state.id} already exists")
-        self._devices[device.state.id] = device
+        if device.descriptor.id in self._devices:
+            raise ValueError(f"Device with id {device.descriptor.id} already exists")
+        self._devices[device.descriptor.id] = device
         if self._working_device is None:
             self._working_device = device
 
     def remove_device(self, device: Device) -> None:
-        self._devices.pop(device.state.id)
+        self._devices.pop(device.descriptor.id)
         if self._working_device == device:
             self._working_device = None
 
@@ -307,7 +314,7 @@ class DeviceRepository(ABC):
         return len(self._devices)
 
     def __contains__(self, device: Device) -> bool:
-        return device.state.id in self._devices
+        return device.descriptor.id in self._devices
 
     def __getitem__(self, id: str) -> Device:
         return self._devices[id]

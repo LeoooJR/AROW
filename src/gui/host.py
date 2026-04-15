@@ -36,6 +36,11 @@ ADB_SERVER_STATE = str  # "running" | "stopped" | "starting" | "error" | "unknow
 class HostIdentityMetadataRow(QWidget):
     """Key/value row for HostIdentitySection only; stylesheet uses host-identity-metadata-row."""
 
+    @dataclass(frozen=True)
+    class Text:
+        key: str = ""
+        value: str = ""
+
     @dataclass
     class UI:
         key: QLabel
@@ -45,17 +50,18 @@ class HostIdentityMetadataRow(QWidget):
         super().__init__(parent)
 
         self.ui: HostIdentityMetadataRow.UI
+        self.texts = HostIdentityMetadataRow.Text(key=key_text, value=value_text)
         self.setProperty("host-identity-metadata-row", True)
 
         layout = QHBoxLayout()
         layout.setContentsMargins(*Settings.SPACING.MARGIN_NONE)
         layout.setSpacing(Settings.HOST_PANEL.KEY_VALUE_SPACING)
 
-        key = QLabel(key_text, self)
+        key = QLabel(self.texts.key, self)
         key.setProperty("host-metadata-key", True)
         key.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
 
-        value = QLabel(value_text, self)
+        value = QLabel(self.texts.value, self)
         value.setProperty("host-metadata-value", True)
         value.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight)
 
@@ -100,6 +106,11 @@ class HostIdentityMetadataRow(QWidget):
 class AdbBridgeMetadataRow(QWidget):
     """Key/value row for AdbBridgeSection only; supports adb-server-state coloring on the value."""
 
+    @dataclass(frozen=True)
+    class Text:
+        key: str = ""
+        value: str = ""
+
     @dataclass
     class UI:
         key: QLabel
@@ -109,17 +120,18 @@ class AdbBridgeMetadataRow(QWidget):
         super().__init__(parent)
 
         self.ui: AdbBridgeMetadataRow.UI
+        self.texts = AdbBridgeMetadataRow.Text(key=key_text, value=value_text)
         self.setProperty("adb-bridge-metadata-row", True)
 
         layout = QHBoxLayout()
         layout.setContentsMargins(*Settings.SPACING.MARGIN_NONE)
         layout.setSpacing(Settings.HOST_PANEL.KEY_VALUE_SPACING)
 
-        key = QLabel(key_text, self)
+        key = QLabel(self.texts.key, self)
         key.setProperty("host-metadata-key", True)
         key.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
 
-        value = QLabel(value_text, self)
+        value = QLabel(self.texts.value, self)
         value.setProperty("host-metadata-value", True)
         value.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight)
 
@@ -170,6 +182,15 @@ class AdbBridgeMetadataRow(QWidget):
 
 class HostIdentitySection(QFrame):
 
+    @dataclass(frozen=True)
+    class Text:
+        host_name: str = "Leo-MacBook-Pro"
+        host_summary: str = "Primary workstation ready for location spoofing workflow."
+        ip_address_key: str = "Local IP"
+        ip_address_value: str = "192.168.1.26"
+        platform_key: str = "Platform"
+        platform_value: str = "macOS 14.5"
+
     @dataclass
     class UI:
         host_name: QLabel
@@ -182,6 +203,7 @@ class HostIdentitySection(QFrame):
         super().__init__(parent)
 
         self.ui: HostIdentitySection.UI
+        self.texts = HostIdentitySection.Text()
         self.setObjectName("host-identity-section")
         self.setProperty("panel-section-compact", True)
 
@@ -189,7 +211,7 @@ class HostIdentitySection(QFrame):
         layout.setContentsMargins(*Settings.SPACING.MARGIN_NONE)
         layout.setSpacing(Settings.HOST_PANEL.ROW_SPACING)
 
-        host_name = QLabel("Leo-MacBook-Pro", self)
+        host_name = QLabel(self.texts.host_name, self)
         host_name.setProperty("host-title", True)
 
         host_item = IconLabel(
@@ -199,14 +221,16 @@ class HostIdentitySection(QFrame):
             spacing=Settings.SPACING.ICON_SPACING,
         )
 
-        host_summary = QLabel(
-            "Primary workstation ready for location spoofing workflow.", self
-        )
+        host_summary = QLabel(self.texts.host_summary, self)
         host_summary.setProperty("host-supporting-text", True)
         host_summary.setWordWrap(True)
 
-        ip_address_row = HostIdentityMetadataRow("Local IP", "192.168.1.26", self)
-        platform_row = HostIdentityMetadataRow("Platform", "macOS 14.5", self)
+        ip_address_row = HostIdentityMetadataRow(
+            self.texts.ip_address_key, self.texts.ip_address_value, self
+        )
+        platform_row = HostIdentityMetadataRow(
+            self.texts.platform_key, self.texts.platform_value, self
+        )
 
         layout.addWidget(host_item)
         layout.addWidget(host_summary)
@@ -272,6 +296,20 @@ class HostIdentitySection(QFrame):
 
 class AdbBridgeSection(QFrame):
 
+    @dataclass(frozen=True)
+    class Text:
+        status_key: str = "Server state"
+        status_value: str = "Running"
+        version_key: str = "ADB version"
+        version_value: str = "Android Debug Bridge 1.0.41"
+        daemon_key: str = "Daemon"
+        daemon_value: str = "tcp:5037"
+        devices_key: str = "Connected devices"
+        devices_value: str = "0"
+        helper_note: str = (
+            "Binary allowing communication between Android devices and the host computer."
+        )
+
     @dataclass
     class UI:
         android_svg: SVG
@@ -285,6 +323,7 @@ class AdbBridgeSection(QFrame):
         super().__init__(parent)
 
         self.ui: AdbBridgeSection.UI
+        self.texts = AdbBridgeSection.Text()
         self.setObjectName("adb-bridge-section")
         self.setProperty("panel-section-compact", True)
 
@@ -295,20 +334,23 @@ class AdbBridgeSection(QFrame):
         android_svg = SVG(svg_path=OperatingSystemIcons.ANDROID.value, parent=self)
         android_svg.setFixedSize(get_svg_size(Settings.FONT.SIZE_DEFAULT))
 
-        status_row = AdbBridgeMetadataRow("Server state", "Running", self)
+        status_row = AdbBridgeMetadataRow(
+            self.texts.status_key, self.texts.status_value, self
+        )
         status_row.setObjectName("adb-status-row")
         status_row.setProperty("adb-status-row", True)
         version_row = AdbBridgeMetadataRow(
-            "ADB version", "Android Debug Bridge 1.0.41", self
+            self.texts.version_key, self.texts.version_value, self
         )
-        daemon_row = AdbBridgeMetadataRow("Daemon", "tcp:5037", self)
-        devices_row = AdbBridgeMetadataRow("Connected devices", "0", self)
+        daemon_row = AdbBridgeMetadataRow(
+            self.texts.daemon_key, self.texts.daemon_value, self
+        )
+        devices_row = AdbBridgeMetadataRow(
+            self.texts.devices_key, self.texts.devices_value, self
+        )
         devices_row.setObjectName("adb-devices-row")
 
-        helper_note = QLabel(
-            "Binary allowing communication between Android devices and the host computer.",
-            self,
-        )
+        helper_note = QLabel(self.texts.helper_note, self)
         helper_note.setProperty("host-supporting-text", True)
         helper_note.setWordWrap(True)
         helper_note.setAlignment(
@@ -397,6 +439,24 @@ class AdbBridgeSection(QFrame):
 
 class HostPanel(QFrame):
 
+    @dataclass(frozen=True)
+    class Text:
+        title: str = "Host device"
+        expand_button_tooltip: str = "Toggle panel visibility"
+        identity_group_title: str = "Host identity"
+        adb_group_title: str = "Android Debug Bridge"
+        placeholder_summary: str = (
+            "Primary workstation ready for location spoofing workflow."
+        )
+        placeholder_platform: str = "macOS 14.5 (placeholder)"
+        placeholder_server_state_text: str = "Running"
+        placeholder_adb_version: str = "Android Debug Bridge 1.0.41"
+        placeholder_daemon: str = "tcp:5037"
+        placeholder_connected_devices: str = "0"
+        placeholder_helper_note: str = (
+            "Binary allowing communication between Android devices and the host computer."
+        )
+
     @dataclass
     class UI:
         title: PanelTitle
@@ -416,6 +476,7 @@ class HostPanel(QFrame):
         super().__init__(parent)
 
         self.ui: HostPanel.UI
+        self.texts = HostPanel.Text()
 
         self.setObjectName("host-panel")
         self.setProperty("panel", True)
@@ -430,13 +491,13 @@ class HostPanel(QFrame):
         layout.setSpacing(Settings.PANEL.SECTION_SPACING)
 
         title = PanelTitle(
-            parent=self, text="Host device", icon_path=GenericIcons.LAPTOP.value
+            parent=self, text=self.texts.title, icon_path=GenericIcons.LAPTOP.value
         )
 
         expand_button = ToolButton(
             self,
             icon_path=GenericIcons.LAYOUT_TOPBAR_INSET.value,
-            tooltip="Toggle panel visibility",
+            tooltip=self.texts.expand_button_tooltip,
         )
         expand_button.setProperty("toggle", True)
 
@@ -450,7 +511,10 @@ class HostPanel(QFrame):
 
         host_identity = HostIdentitySection(self)
         identity_group_box = GroupBox(
-            self, layout=QVBoxLayout(), widgets=[host_identity], title="Host identity"
+            self,
+            layout=QVBoxLayout(),
+            widgets=[host_identity],
+            title=self.texts.identity_group_title,
         )
         identity_group_box.setObjectName("identity-group-box")
 
@@ -477,7 +541,7 @@ class HostPanel(QFrame):
             self,
             layout=QVBoxLayout(),
             widgets=[adb_bridge],
-            title="Android Debug Bridge",
+            title=self.texts.adb_group_title,
         )
         adb_group_box.setObjectName("adb-group-box")
 
@@ -578,20 +642,20 @@ class HostPanel(QFrame):
     def _set_placeholder_values(self) -> None:
         """Populate placeholder values until controller/core wiring is implemented."""
         self.set_host_identity_values(
-            host_name="Leo-MacBook-Pro",
-            summary="Primary workstation ready for location spoofing workflow.",
-            ip_address="192.168.1.26",
-            platform="macOS 14.5 (placeholder)",
+            host_name=self.ui.host_identity.text.host_name,
+            summary=self.texts.placeholder_summary,
+            ip_address=self.ui.host_identity.text.ip_address_value,
+            platform=self.texts.placeholder_platform,
             os_icon_path=OperatingSystemIcons.MACOS.value,
             identity_state="valid",
         )
         self.set_adb_bridge_values(
             server_state="running",
-            server_state_text="Running",
-            adb_version="Android Debug Bridge 1.0.41",
-            daemon="tcp:5037",
-            connected_devices="0",
-            helper_note="Binary allowing communication between Android devices and the host computer.",
+            server_state_text=self.texts.placeholder_server_state_text,
+            adb_version=self.texts.placeholder_adb_version,
+            daemon=self.texts.placeholder_daemon,
+            connected_devices=self.texts.placeholder_connected_devices,
+            helper_note=self.texts.placeholder_helper_note,
             indicator_state="valid",
         )
 
@@ -653,7 +717,7 @@ class HostPanel(QFrame):
             os_icon_path = GenericIcons.LAPTOP.value
         self.set_host_identity_values(
             host_name=name,
-            summary=f"Primary workstation ready for location spoofing workflow.",
+            summary=self.texts.placeholder_summary,
             ip_address=ip,
             platform=os,
             os_icon_path=os_icon_path,

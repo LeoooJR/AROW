@@ -1,8 +1,18 @@
+from dataclasses import dataclass
+
 from PySide6.QtCore import QElapsedTimer, QEvent, QObject, QTimer, Signal
 
 
 class ActivityTracker(QObject):
     """Track user activity and idle state."""
+
+    @dataclass(frozen=True)
+    class Text:
+        pass
+
+    @dataclass
+    class UI:
+        pass
 
     became_active = Signal()  # Emitted when user becomes active
     became_idle = Signal()  # Emitted when user becomes idle
@@ -11,6 +21,8 @@ class ActivityTracker(QObject):
         self, parent=None, idle_ms: int = 30_000, track_mouse_move: bool = False
     ):
         super().__init__(parent)
+        self.texts = ActivityTracker.Text()
+        self.ui = ActivityTracker.UI()
         self.idle_ms = idle_ms  # Idle timeout in milliseconds
         self.track_mouse_move = track_mouse_move  # Track mouse movement
 

@@ -40,8 +40,18 @@ DeviceBadge = Literal["none", "active", "trusted", "new"]
 class _DeviceItemRowWidget(QWidget):
     """Keeps the host `QListWidgetItem` height in sync when wrapped labels reflow on resize."""
 
+    @dataclass(frozen=True)
+    class Text:
+        pass
+
+    @dataclass
+    class UI:
+        pass
+
     def __init__(self, device_item: "DeviceItem"):
         super().__init__()
+        self.texts = _DeviceItemRowWidget.Text()
+        self.ui = _DeviceItemRowWidget.UI()
         self._device_item = device_item
 
     def resizeEvent(self, event: QResizeEvent) -> None:
@@ -58,6 +68,16 @@ class DeviceItem(QListWidgetItem):
 
     _ICON_INNER_PX: int = 24
     _SUBTITLE_ICON_PX: int = 14
+
+    @dataclass(frozen=True)
+    class Text:
+        default_name: str = "Unknown Device"
+        menu_button: str = "⋮"
+        menu_button_tooltip: str = "Device actions"
+        active_badge: str = "Active"
+        trusted_badge: str = "Trusted"
+        new_badge: str = "New"
+        empty_subtitle: str = "—"
 
     @dataclass
     class UI:
@@ -91,7 +111,9 @@ class DeviceItem(QListWidgetItem):
     ):
         super().__init__(parent)
 
-        display_name = text if text is not None else "Unknown Device"
+        self.texts = DeviceItem.Text()
+
+        display_name = text if text is not None else self.texts.default_name
         helper_text = f"{type.capitalize()} device"
 
         self.setToolTip(display_name)
@@ -182,8 +204,8 @@ class DeviceItem(QListWidgetItem):
 
         menu_button = QToolButton(row)
         menu_button.setObjectName("device-item-menu")
-        menu_button.setText("⋮")
-        menu_button.setToolTip("Device actions")
+        menu_button.setText(self.texts.menu_button)
+        menu_button.setToolTip(self.texts.menu_button_tooltip)
         menu_button.setCursor(Qt.CursorShape.PointingHandCursor)
         menu_button.setAutoRaise(True)
         menu_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
@@ -354,7 +376,7 @@ class DeviceItem(QListWidgetItem):
         if self._badge == "none":
             return
         if self._badge == "active":
-            lab = QLabel("Active")
+            lab = QLabel(self.texts.active_badge)
             lab.setProperty("device-item-badge", "active")
             lab.setFont(
                 QFont(
@@ -372,7 +394,7 @@ class DeviceItem(QListWidgetItem):
                     QSize(self._SUBTITLE_ICON_PX, self._SUBTITLE_ICON_PX)
                 )
             )
-            tx = QLabel("Trusted")
+            tx = QLabel(self.texts.trusted_badge)
             tx.setProperty("device-item-badge", "trusted-text")
             tx.setFont(
                 QFont(
@@ -385,7 +407,7 @@ class DeviceItem(QListWidgetItem):
             layout.addWidget(ic)
             layout.addWidget(tx)
         elif self._badge == "new":
-            lab = QLabel("New")
+            lab = QLabel(self.texts.new_badge)
             lab.setProperty("device-item-badge", "new")
             lab.setFont(
                 QFont(
@@ -406,7 +428,9 @@ class DeviceItem(QListWidgetItem):
             chunks.append(self._operating_system)
         if self._location:
             chunks.append(self._location)
-        self.ui.subtitle_label.setText(" · ".join(chunks) if chunks else "—")
+        self.ui.subtitle_label.setText(
+            " · ".join(chunks) if chunks else self.texts.empty_subtitle
+        )
 
     def get_text(self) -> str:
         return self.ui.name_label.text()
@@ -482,6 +506,13 @@ class DeviceItem(QListWidgetItem):
 
 class DeviceState(QGroupBox):
 
+    @dataclass(frozen=True)
+    class Text:
+        title: str = "About device"
+        state: str = "State: <state>"
+        operating_system: str = "Operating system: <operating_system>"
+        last_communication: str = "Last communication: <last_communication>"
+
     @dataclass
     class UI:
 
@@ -490,8 +521,9 @@ class DeviceState(QGroupBox):
         last_communication: QLabel
 
     def __init__(self, parent=None):
+        self.texts = DeviceState.Text()
         super().__init__(
-            parent, title="About device", alignment=Qt.AlignmentFlag.AlignLeft
+            parent, title=self.texts.title, alignment=Qt.AlignmentFlag.AlignLeft
         )
 
         self.ui: DeviceState.UI
@@ -502,19 +534,19 @@ class DeviceState(QGroupBox):
         layout.setContentsMargins(0, 0, 0, 0)  # Padding handled by panel-section style
         layout.setSpacing(8)  # Spacing between state items
 
-        state = QLabel("State: <state>", self)
+        state = QLabel(self.texts.state, self)
         state.setFont(
             QFont(Settings.FONT.FAMILY, Settings.FONT.SIZE_DEFAULT, QFont.Weight.Normal)
         )
         layout.addWidget(state)
 
-        operating_system = QLabel("Operating system: <operating_system>", self)
+        operating_system = QLabel(self.texts.operating_system, self)
         operating_system.setFont(
             QFont(Settings.FONT.FAMILY, Settings.FONT.SIZE_DEFAULT, QFont.Weight.Normal)
         )
         layout.addWidget(operating_system)
 
-        last_communication = QLabel("Last communication: <last_communication>", self)
+        last_communication = QLabel(self.texts.last_communication, self)
         last_communication.setFont(
             QFont(Settings.FONT.FAMILY, Settings.FONT.SIZE_DEFAULT, QFont.Weight.Normal)
         )
@@ -561,6 +593,11 @@ class DeviceState(QGroupBox):
 
 
 class DevicePairingPanel(QFrame):
+
+    @dataclass(frozen=True)
+    class Text:
+        title: str = "Pairing Device"
+
     @dataclass
     class UI:
 
@@ -572,6 +609,7 @@ class DevicePairingPanel(QFrame):
         super().__init__(parent)
 
         self.ui: DevicePairingPanel.UI
+        self.texts = DevicePairingPanel.Text()
 
         self.setObjectName("device-pairing-panel")
         self.setProperty("panel", True)
@@ -588,7 +626,7 @@ class DevicePairingPanel(QFrame):
         )  # Consistent spacing between major sections
 
         title = PanelTitle(
-            parent=None, text="Pairing Device", icon_path=GenericIcons.DEVICE.value
+            parent=None, text=self.texts.title, icon_path=GenericIcons.DEVICE.value
         )
         title.setProperty("main-panel-title", True)
 
@@ -641,6 +679,26 @@ class DevicePairingPanel(QFrame):
 
 class DeviceSelectionPanel(QFrame):
 
+    @dataclass(frozen=True)
+    class Text:
+        title: str = "Linked Devices"
+        expand_button_tooltip: str = "Toggle panel visibility"
+        empty_state: str = "No device found"
+        add_device_tooltip: str = "Add a device"
+        refresh_button_tooltip: str = "Refresh device list"
+        trash_button_tooltip: str = "Remove all devices"
+        select_helper_text: str = "Select a device to work with"
+        available_devices_group_title: str = "Available devices"
+        placeholder_primary_device: str = "Samsung Galaxy S24"
+        placeholder_secondary_device: str = "Google Pixel 8"
+        placeholder_unknown_device: str = "Unknown Device"
+        placeholder_operating_system: str = "Android 14"
+        placeholder_location_primary: str = "New York, NY"
+        placeholder_location_secondary: str = "Chicago, IL"
+        placeholder_last_communication_active: str = "Active now"
+        placeholder_last_communication_recent: str = "30 min ago"
+        placeholder_last_communication_old: str = "2 hours ago"
+
     @dataclass
     class UI:
 
@@ -663,6 +721,7 @@ class DeviceSelectionPanel(QFrame):
         super().__init__(parent)
 
         self.ui: DeviceSelectionPanel.UI
+        self.texts = DeviceSelectionPanel.Text()
 
         self.setObjectName("device-selection-panel")
         self.setProperty("panel", True)
@@ -679,13 +738,13 @@ class DeviceSelectionPanel(QFrame):
         )  # Consistent spacing between major sections
 
         title = PanelTitle(
-            parent=self, text="Linked Devices", icon_path=GenericIcons.DEVICE.value
+            parent=self, text=self.texts.title, icon_path=GenericIcons.DEVICE.value
         )
 
         expand_button = ToolButton(
             self,
             icon_path=GenericIcons.LAYOUT_TOPBAR_INSET.value,
-            tooltip="Toggle panel visibility",
+            tooltip=self.texts.expand_button_tooltip,
         )
         expand_button.setProperty("toggle", True)
 
@@ -701,7 +760,7 @@ class DeviceSelectionPanel(QFrame):
         available_device_list.setObjectName("availabe-device-list")
         available_device_empty_state = PlaceHolder(
             available_device_list.viewport(),
-            text="No device found",
+            text=self.texts.empty_state,
             minimum_width=0,
             minimum_height=0,
             icon_path=GenericIcons.DEVICE_PLACEHOLDER.value,
@@ -721,7 +780,9 @@ class DeviceSelectionPanel(QFrame):
         available_device_empty_state.hide()
 
         add_device_button = ToolButton(
-            self, icon_path=GenericIcons.PLUS.value, tooltip="Add a device"
+            self,
+            icon_path=GenericIcons.PLUS.value,
+            tooltip=self.texts.add_device_tooltip,
         )
         add_device_button.setEnabled(True)
         add_device_button.setObjectName("add-device-button")
@@ -729,13 +790,15 @@ class DeviceSelectionPanel(QFrame):
         refresh_button = ToolButton(
             self,
             icon_path=GenericIcons.ARROW_CLOCKWISE.value,
-            tooltip="Refresh device list",
+            tooltip=self.texts.refresh_button_tooltip,
         )
         refresh_button.setEnabled(True)
         refresh_button.setObjectName("refresh-button")
 
         trash_button = ToolButton(
-            self, icon_path=GenericIcons.TRASH.value, tooltip="Remove all devices"
+            self,
+            icon_path=GenericIcons.TRASH.value,
+            tooltip=self.texts.trash_button_tooltip,
         )
         trash_button.setEnabled(True)
         trash_button.setObjectName("trash-button")
@@ -755,13 +818,13 @@ class DeviceSelectionPanel(QFrame):
         available_device_wrapper.get_layout().setStretchFactor(available_device_list, 1)
         available_device_wrapper.get_layout().setStretchFactor(buttons_wrapper, 0)
 
-        select_helper_text = HelperText(self, "Select a device to work with")
+        select_helper_text = HelperText(self, self.texts.select_helper_text)
 
         available_device_group_box = GroupBox(
             self,
             layout=QVBoxLayout(),
             widgets=[available_device_wrapper, select_helper_text],
-            title="Available devices",
+            title=self.texts.available_devices_group_title,
         )
 
         body = VerticalLayoutWrapper(
@@ -937,9 +1000,9 @@ class DeviceSelectionPanel(QFrame):
             text=device,
             type="available",
             badge="active",
-            operating_system="Android 14",
-            location="New York, NY",
-            last_communication="Active now",
+            operating_system=self.texts.placeholder_operating_system,
+            location=self.texts.placeholder_location_primary,
+            last_communication=self.texts.placeholder_last_communication_active,
             alert_highlight=True,
         )
         self.ui.available_device_list.setCurrentItem(item)
@@ -1071,33 +1134,33 @@ class DeviceSelectionPanel(QFrame):
         """Add sample device rows for UI debugging (fake OS / location / activity)."""
         DeviceItem.add_to_list(
             list_widget,
-            text="Samsung Galaxy S24",
+            text=self.texts.placeholder_primary_device,
             type="available",
             device_kind="mobile",
             badge="trusted",
-            operating_system="Android 14",
-            location="New York, NY",
-            last_communication="Active now",
+            operating_system=self.texts.placeholder_operating_system,
+            location=self.texts.placeholder_location_primary,
+            last_communication=self.texts.placeholder_last_communication_active,
         )
         DeviceItem.add_to_list(
             list_widget,
-            text="Google Pixel 8",
+            text=self.texts.placeholder_secondary_device,
             type="available",
             device_kind="mobile",
             badge="trusted",
-            operating_system="Android 14",
-            location="New York, NY",
-            last_communication="30 min ago",
+            operating_system=self.texts.placeholder_operating_system,
+            location=self.texts.placeholder_location_primary,
+            last_communication=self.texts.placeholder_last_communication_recent,
         )
         DeviceItem.add_to_list(
             list_widget,
-            text="Unknown Device",
+            text=self.texts.placeholder_unknown_device,
             type="available",
             device_kind="mobile",
             badge="new",
-            operating_system="Android 14",
-            location="Chicago, IL",
-            last_communication="2 hours ago",
+            operating_system=self.texts.placeholder_operating_system,
+            location=self.texts.placeholder_location_secondary,
+            last_communication=self.texts.placeholder_last_communication_old,
             alert_highlight=True,
         )
         self._update_available_device_empty_state_visibility()

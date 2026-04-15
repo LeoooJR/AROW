@@ -25,6 +25,16 @@ from gui.wrapper import HorizontalLayoutWrapper, VerticalLayoutWrapper
 
 class LogPanel(QFrame):
 
+    @dataclass(frozen=True)
+    class Text:
+        title: str = "Activity log"
+        expand_button_tooltip: str = "Toggle panel visibility"
+        placeholder_items: tuple[str, ...] = ("Log 1", "Log 2", "Log 3")
+        helper_text: str = "Logs are saved in the following file"
+        file_name: str = "test.log"
+        file_type: str = "TXT"
+        group_title: str = "Logs"
+
     @dataclass
     class UI:
         title: PanelTitle
@@ -41,6 +51,7 @@ class LogPanel(QFrame):
         super().__init__(parent)
 
         self.ui: LogPanel.UI
+        self.texts = LogPanel.Text()
 
         self.setObjectName("log-panel")
         self.setProperty("panel", True)
@@ -57,13 +68,13 @@ class LogPanel(QFrame):
         )  # Consistent spacing between major sections
 
         title = PanelTitle(
-            parent=self, text="Activity log", icon_path=GenericIcons.LOGS.value
+            parent=self, text=self.texts.title, icon_path=GenericIcons.LOGS.value
         )
 
         expand_button = ToolButton(
             self,
             icon_path=GenericIcons.LAYOUT_BOTTOMBAR_INSET.value,
-            tooltip="Toggle panel visibility",
+            tooltip=self.texts.expand_button_tooltip,
         )
         expand_button.setProperty("toggle", True)
 
@@ -77,11 +88,16 @@ class LogPanel(QFrame):
 
         logs_list = List(None)
         logs_list.setObjectName("logs-list")
-        self.add_list_items_placeholder(logs_list, items=["Log 1", "Log 2", "Log 3"])
-        logs_list_helper_text = HelperText(self, "Logs are saved in the following file")
+        self.add_list_items_placeholder(
+            logs_list, items=list(self.texts.placeholder_items)
+        )
+        logs_list_helper_text = HelperText(self, self.texts.helper_text)
 
         file_display_widget = File(
-            None, file_name="test.log", file_type="TXT", file_save=True
+            None,
+            file_name=self.texts.file_name,
+            file_type=self.texts.file_type,
+            file_save=True,
         )
 
         logs_wrapper = VerticalLayoutWrapper(
@@ -95,7 +111,10 @@ class LogPanel(QFrame):
         logs_wrapper.get_layout().setStretchFactor(logs_list_helper_text, 0)
 
         logs_group_box = GroupBox(
-            self, layout=QVBoxLayout(), widgets=[logs_wrapper], title="Logs"
+            self,
+            layout=QVBoxLayout(),
+            widgets=[logs_wrapper],
+            title=self.texts.group_title,
         )
         logs_group_box.setObjectName("logs-group-box")
 

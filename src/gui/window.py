@@ -67,6 +67,13 @@ class Header(QWidget):
     Header widget of the application.
     """
 
+    @dataclass(frozen=True)
+    class Text:
+        light_palette_button_tooltip: str = "Switch to light mode"
+        dark_palette_button_tooltip: str = "Switch to dark mode"
+        left_panel_visibility_button_tooltip: str = "Toggle left panels visibility"
+        right_panel_visibility_button_tooltip: str = "Toggle right panels visibility"
+
     @dataclass
     class UI:
         name: SVG
@@ -86,6 +93,7 @@ class Header(QWidget):
         self.setObjectName("header")
 
         self.ui: Header.UI
+        self.texts = Header.Text()
 
         # Set fixed height from settings
         self.setFixedHeight(Settings.DIMENSION.HEADER_HEIGHT)
@@ -98,10 +106,12 @@ class Header(QWidget):
         light_palette_button = ToolButton(
             self,
             icon_path=GenericIcons.LIGHT_MODE.value,
-            tooltip="Switch to light mode",
+            tooltip=self.texts.light_palette_button_tooltip,
         )
         dark_palette_button = ToolButton(
-            self, icon_path=GenericIcons.DARK_MODE.value, tooltip="Switch to dark mode"
+            self,
+            icon_path=GenericIcons.DARK_MODE.value,
+            tooltip=self.texts.dark_palette_button_tooltip,
         )
         palette_button_group.addButton(light_palette_button, 0)
         palette_button_group.addButton(dark_palette_button, 1)
@@ -137,7 +147,7 @@ class Header(QWidget):
         left_panel_visibility_request_button = ToolButton(
             self,
             icon_path=GenericIcons.LAYOUT_SIDEBAR_INSET.value,
-            tooltip="Toggle left panels visibility",
+            tooltip=self.texts.left_panel_visibility_button_tooltip,
         )
         left_panel_visibility_request_button.setObjectName(
             "left-panel-visibility-request-button"
@@ -149,7 +159,7 @@ class Header(QWidget):
         right_panel_visibility_request_button = ToolButton(
             self,
             icon_path=GenericIcons.LAYOUT_SIDEBAR_INSET_REVERSE.value,
-            tooltip="Toggle right panels visibility",
+            tooltip=self.texts.right_panel_visibility_button_tooltip,
         )
         right_panel_visibility_request_button.setObjectName(
             "right-panel-visibility-request-button"
@@ -303,6 +313,12 @@ class Header(QWidget):
 
 class Body(QWidget):
 
+    @dataclass(frozen=True)
+    class Text:
+        welcome_tab: str = "Welcome"
+        map_tab: str = "Map"
+        device_tab: str = "Device"
+
     @dataclass
     class UI:
         device_selection_panel: DeviceSelectionPanel
@@ -321,6 +337,7 @@ class Body(QWidget):
         super().__init__(parent)
 
         self.ui: Body.UI
+        self.texts = Body.Text()
 
         self.setObjectName("body")
 
@@ -359,21 +376,21 @@ class Body(QWidget):
         welcome_panel = WelcomePanel(None)
         welcome_panel.setVisible(True)
 
-        tabs.addTab(welcome_panel, "Welcome")
+        tabs.addTab(welcome_panel, self.texts.welcome_tab)
 
         tabs.setTabIcon(0, QIcon(ApplicationIcons.LOGO.value))
 
         map_panel = MapPanel(None)
         map_panel.setVisible(True)
 
-        tabs.addTab(map_panel, "Map")
+        tabs.addTab(map_panel, self.texts.map_tab)
 
         tabs.setTabIcon(1, QIcon(GenericIcons.MAP.value))
 
         device_pairing_panel = DevicePairingPanel(None)
         device_pairing_panel.setVisible(False)
 
-        tabs.addTab(device_pairing_panel, "Device")
+        tabs.addTab(device_pairing_panel, self.texts.device_tab)
 
         tabs.setTabIcon(2, QIcon(GenericIcons.DEVICE.value))
 
@@ -565,6 +582,17 @@ class Body(QWidget):
 
 class MainContainer(QWidget):
 
+    @dataclass(frozen=True)
+    class Text:
+        add_device_dialog_title: str = "Adding a device"
+        add_device_dialog_text: str = "Do you want to add a new device?"
+        add_device_dialog_detailed_text: str = (
+            "This action will add a new device to the list of available devices.\n"
+            "Make sure the device is powered on, in developer mode and connected to the same network as the computer.\n"
+            "You must own full ownership of the device to use it with this software."
+        )
+        connecting_to_device_toast: str = "Trying to connect to device... Please wait."
+
     @dataclass
     class UI:
 
@@ -577,6 +605,7 @@ class MainContainer(QWidget):
         super().__init__()
 
         self.ui: MainContainer.UI
+        self.texts = MainContainer.Text()
         self._toast_queue: Deque[tuple[str, str]] = deque()
 
         # Get palette from container
@@ -647,9 +676,9 @@ class MainContainer(QWidget):
         logger.info("Add device request received.")
         dialog = QuestionDialog(
             self,
-            title="Adding a device",
-            text=f"Do you want to add a new device?",
-            detailed_text=f"This action will add a new device to the list of available devices.\nMake sure the device is powered on, in developer mode and connected to the same network as the computer.\nYou must own full ownership of the device to use it with this software.",
+            title=self.texts.add_device_dialog_title,
+            text=self.texts.add_device_dialog_text,
+            detailed_text=self.texts.add_device_dialog_detailed_text,
         )
         button = dialog.exec()
 
@@ -662,7 +691,7 @@ class MainContainer(QWidget):
     def _on_authentification_confirmed(self) -> None:
         """Handle the authentification confirmation."""
         logger.info("Authentification confirmation received.")
-        self.post_toast("Trying to connect to device... Please wait.", level="info")
+        self.post_toast(self.texts.connecting_to_device_toast, level="info")
 
     def post_toast(self, text: str, level: str) -> None:
         """Enqueue a toast and display messages sequentially."""
@@ -723,12 +752,19 @@ class AuthentificationOverlay(QWidget):
     Authentification overlay widget.
     """
 
+    @dataclass(frozen=True)
+    class Text:
+        title: str = "Authentification"
+        description: str = "Please enter your access credentials to continue."
+
     @dataclass
     class UI:
         authentification_card: AuthentificationCard
 
     def __init__(self, parent: QWidget = None):
         super().__init__(parent)
+
+        self.texts = AuthentificationOverlay.Text()
 
         self.setObjectName("authentification-overlay")
 
@@ -742,9 +778,9 @@ class AuthentificationOverlay(QWidget):
 
         authentification_card = AuthentificationCard(
             self,
-            title="Authentification",
+            title=self.texts.title,
             icon_path=GenericIcons.DEVICE.value,
-            description="Please enter your access credentials to continue.",
+            description=self.texts.description,
         )
         layout.addWidget(authentification_card)
 
@@ -777,6 +813,22 @@ class MainWindow(QMainWindow):
     Main window of the application.
     """
 
+    @dataclass(frozen=True)
+    class Text:
+        window_title: str = f"{__application__} - Main Window"
+        connect_device_dialog_title: str = "Connecting to device"
+        connect_device_dialog_text: str = "Do you want to connect to {device} device?"
+        connect_device_dialog_detailed_text: str = (
+            "This action will connect to the {device} device.\n"
+            "Make sure the device is powered on, in developer mode and connected to the same network as the computer.\n"
+            "You must own full ownership of the device to use it with this software."
+        )
+        demo_device_name: str = "Samsung Galaxy"
+        pairing_success_toast: str = "Successfully connected to device: {device}."
+        pairing_failed_toast: str = (
+            "Failed to connect to device: {ip}:{port} with association code: {association_code}."
+        )
+
     @dataclass
     class UI:
 
@@ -791,8 +843,9 @@ class MainWindow(QMainWindow):
         self._device_selection_dialog_open: bool = False
 
         self.ui: MainWindow.UI
+        self.texts = MainWindow.Text()
 
-        self.setWindowTitle(f"{__application__} - Main Window")
+        self.setWindowTitle(self.texts.window_title)
 
         # Get available screen size
         screen_size = QScreen.availableSize(QApplication.primaryScreen())
@@ -886,9 +939,11 @@ class MainWindow(QMainWindow):
         logger.info(f"Device selection requested: {device.get_text()}.")
         dialog = QuestionDialog(
             self,
-            title="Connecting to device",
-            text=f"Do you want to connect to {device.get_text()} device?",
-            detailed_text=f"This action will connect to the {device.get_text()} device.\nMake sure the device is powered on, in developer mode and connected to the same network as the computer.\nYou must own full ownership of the device to use it with this software.",
+            title=self.texts.connect_device_dialog_title,
+            text=self.texts.connect_device_dialog_text.format(device=device.get_text()),
+            detailed_text=self.texts.connect_device_dialog_detailed_text.format(
+                device=device.get_text()
+            ),
         )
         try:
             button = dialog.exec()
@@ -921,14 +976,14 @@ class MainWindow(QMainWindow):
         logger.info("Authentification confirmed.")
         self.ui.authentification_overlay.hide()
         if self._ui_constraints_disabled:
-            self.on_device_pairing_succeeded("Samsung Galaxy")
+            self.on_device_pairing_succeeded(self.texts.demo_device_name)
 
     def on_device_pairing_succeeded(self, device: str) -> None:
         """Handle the device pairing succeeded."""
         logger.info(f"Device pairing succeeded: {device}.")
         app_signals.AuthentificationSucceeded.emit(device)
         self.ui.container.post_toast(
-            f"Successfully connected to device: {device}.", level="success"
+            self.texts.pairing_success_toast.format(device=device), level="success"
         )
 
     def on_device_selection_succeeded(self, device: str) -> None:
@@ -936,7 +991,7 @@ class MainWindow(QMainWindow):
         logger.info(f"Device selection succeeded: {device}.")
         app_signals.DeviceSelectionSucceeded.emit(device)
         self.ui.container.post_toast(
-            f"Successfully connected to device: {device}.", level="success"
+            self.texts.pairing_success_toast.format(device=device), level="success"
         )
 
     def on_device_pairing_failed(
@@ -948,7 +1003,9 @@ class MainWindow(QMainWindow):
         )
         app_signals.AuthentificationFailed.emit(ip, port, association_code)
         self.ui.container.post_toast(
-            f"Failed to connect to device: {ip}:{port} with association code: {association_code}.",
+            self.texts.pairing_failed_toast.format(
+                ip=ip, port=port, association_code=association_code
+            ),
             level="error",
         )
 

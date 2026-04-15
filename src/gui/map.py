@@ -37,8 +37,18 @@ from logger import logger
 class Canvas(QWebEngineView):
     """Map canvas: web engine view."""
 
+    @dataclass(frozen=True)
+    class Text:
+        pass
+
+    @dataclass
+    class UI:
+        pass
+
     def __init__(self, parent: QWidget = None):
         super().__init__(parent)
+        self.texts = Canvas.Text()
+        self.ui = Canvas.UI()
 
         self.setObjectName("map-canvas")
         self.setMinimumSize(
@@ -64,6 +74,12 @@ class Canvas(QWebEngineView):
 
 class Legend(QFrame):
 
+    @dataclass(frozen=True)
+    class Text:
+        location_label: str = "Real position"
+        simulated_location_label: str = "Simulated position"
+        kilometric_point_label: str = "Kilometric point"
+
     @dataclass
     class UI:
         location_label_icon: IconLabel
@@ -76,6 +92,7 @@ class Legend(QFrame):
         super().__init__(parent)
 
         self.ui: Legend.UI
+        self.texts = Legend.Text()
 
         self.setObjectName("map-legend")
         self.setProperty("main-section-divider-bottom", True)
@@ -92,14 +109,14 @@ class Legend(QFrame):
         location_label_icon = IconLabel(
             None,
             icon_path=GenericIcons.LOCATION.value,
-            text="Real position",
+            text=self.texts.location_label,
             spacing=Settings.SPACING.ICON_SPACING,
             margins=Settings.SPACING.MARGIN_NONE,
         )
         simulated_location_label_icon = IconLabel(
             None,
             icon_path=GenericIcons.FAKE_LOCATION.value,
-            text="Simulated position",
+            text=self.texts.simulated_location_label,
             spacing=Settings.SPACING.ICON_SPACING,
             margins=Settings.SPACING.MARGIN_NONE,
         )
@@ -115,7 +132,7 @@ class Legend(QFrame):
         kilometric_point_label_icon = IconLabel(
             None,
             icon_path=GenericIcons.MILESTONE.value,
-            text="Kilometric point",
+            text=self.texts.kilometric_point_label,
             spacing=Settings.SPACING.ICON_SPACING,
             margins=Settings.SPACING.MARGIN_NONE,
         )
@@ -160,6 +177,12 @@ class Legend(QFrame):
 
 class Location(QWidget):
 
+    @dataclass(frozen=True)
+    class Text:
+        latitude_label: str = "Latitude"
+        longitude_label: str = "Longitude"
+        crosshair_button_tooltip: str = "Center map on current location"
+
     @dataclass
     class UI:
         latitude_widget: QWidget
@@ -172,6 +195,7 @@ class Location(QWidget):
         super().__init__(parent)
 
         self.ui: Location.UI
+        self.texts = Location.Text()
 
         layout = QHBoxLayout()
         layout.setContentsMargins(*Settings.SPACING.MARGIN_NONE)
@@ -196,7 +220,7 @@ class Location(QWidget):
         )
         latitude_widget.layout().setSpacing(Settings.LOCATION.WIDGET_SPACING)
 
-        latitude_label = QLabel("Latitude")
+        latitude_label = QLabel(self.texts.latitude_label)
         latitude_label.setStyleSheet(
             f"background-color: {palette.TRANSPARENT}; color: {palette.HELPER_TEXT}; font-size: {Settings.LOCATION.LABEL_FONT_SIZE}px;"
         )
@@ -230,7 +254,7 @@ class Location(QWidget):
         )
         longitude_widget.layout().setSpacing(Settings.LOCATION.WIDGET_SPACING)
 
-        longitude_label = QLabel("Longitude")
+        longitude_label = QLabel(self.texts.longitude_label)
         longitude_label.setStyleSheet(
             f"background-color: {palette.TRANSPARENT}; color: {palette.HELPER_TEXT}; font-size: {Settings.LOCATION.LABEL_FONT_SIZE}px;"
         )
@@ -245,7 +269,7 @@ class Location(QWidget):
         crosshair_button = ToolButton(
             parent=self,
             icon_path=GenericIcons.CROSSHAIR.value,
-            tooltip="Center map on current location",
+            tooltip=self.texts.crosshair_button_tooltip,
         )
         crosshair_button.setEnabled(False)
         layout.addWidget(crosshair_button)
@@ -310,6 +334,13 @@ class Location(QWidget):
 
 class Coordinates(QFrame):
 
+    @dataclass(frozen=True)
+    class Text:
+        simulation_state_off: str = "Simulation inactive"
+        simulation_state_on: str = "Simulation active"
+        play_button_tooltip: str = "Start simulation"
+        pause_button_tooltip: str = "Pause simulation"
+
     @dataclass
     class UI:
         simulation_state_container: QWidget
@@ -323,6 +354,7 @@ class Coordinates(QFrame):
         super().__init__(parent)
 
         self.ui: Coordinates.UI
+        self.texts = Coordinates.Text()
 
         self.setObjectName("map-coordinates")
         self.setProperty("main-section-divider", True)
@@ -341,14 +373,14 @@ class Coordinates(QFrame):
         simulation_state_off = IconLabel(
             self,
             icon_path=GenericIcons.OFF.value,
-            text="Simulation inactive",
+            text=self.texts.simulation_state_off,
             spacing=Settings.SPACING.ICON_SPACING,
             margins=Settings.SPACING.MARGIN_NONE,
         )
         simulation_state_on = IconLabel(
             self,
             icon_path=GenericIcons.ON.value,
-            text="Simulation active",
+            text=self.texts.simulation_state_on,
             spacing=Settings.SPACING.ICON_SPACING,
             margins=Settings.SPACING.MARGIN_NONE,
         )
@@ -369,7 +401,7 @@ class Coordinates(QFrame):
             parent=self,
             icon_path=GenericIcons.PLAY.value,
             icon_size=get_svg_size(Settings.FONT.SIZE_DEFAULT),
-            tooltip="Start simulation",
+            tooltip=self.texts.play_button_tooltip,
         )
         play_button.setEnabled(True)
         play_button.setProperty("toggle", False)
@@ -429,7 +461,7 @@ class Coordinates(QFrame):
             self.ui.play_button.set_icon(
                 GenericIcons.PAUSE.value, Settings.FONT.SIZE_DEFAULT
             )
-            self.ui.play_button.setToolTip("Pause simulation")
+            self.ui.play_button.setToolTip(self.texts.pause_button_tooltip)
             anim_off = QPropertyAnimation(effect_off, b"opacity")
             anim_off.setDuration(duration)
             anim_off.setStartValue(1.0)
@@ -444,7 +476,7 @@ class Coordinates(QFrame):
             self.ui.play_button.set_icon(
                 GenericIcons.PLAY.value, Settings.FONT.SIZE_DEFAULT
             )
-            self.ui.play_button.setToolTip("Start simulation")
+            self.ui.play_button.setToolTip(self.texts.play_button_tooltip)
             anim_off = QPropertyAnimation(effect_off, b"opacity")
             anim_off.setDuration(duration)
             anim_off.setStartValue(0.0)
@@ -482,6 +514,10 @@ class Coordinates(QFrame):
 class Map(QWidget):
     """Map view: canvas/placeholder (expandable) and coordinates bar."""
 
+    @dataclass(frozen=True)
+    class Text:
+        placeholder: str = "Select a device to get started..."
+
     @dataclass
     class UI:
         canvas: Canvas
@@ -492,6 +528,7 @@ class Map(QWidget):
         super().__init__(parent)
 
         self.ui: Map.UI
+        self.texts = Map.Text()
 
         layout = QVBoxLayout()
         layout.setContentsMargins(
@@ -507,7 +544,7 @@ class Map(QWidget):
 
         placeholder = PlaceHolder(
             self,
-            text="Select a device to get started...",
+            text=self.texts.placeholder,
             minimum_width=Settings.DIMENSION.MIN_WIDTH_LARGE,
             minimum_height=Settings.DIMENSION.MIN_HEIGHT_SMALL,
             stretch_widgets=False,
@@ -602,6 +639,11 @@ class MapPanel(QFrame):
     Panel that displays the map view.
     """
 
+    @dataclass(frozen=True)
+    class Text:
+        title: str = "Map"
+        loading_placeholder: str = "Map is being loaded..."
+
     @dataclass
     class UI:
 
@@ -613,6 +655,7 @@ class MapPanel(QFrame):
         super().__init__(parent)
 
         self.ui: MapPanel.UI
+        self.texts = MapPanel.Text()
 
         self.setObjectName("map-panel")
         self.setProperty("main-panel", True)
@@ -628,7 +671,9 @@ class MapPanel(QFrame):
             Settings.PANEL.SECTION_SPACING
         )  # Consistent spacing between major sections
 
-        title = PanelTitle(parent=self, text="Map", icon_path=GenericIcons.MAP.value)
+        title = PanelTitle(
+            parent=self, text=self.texts.title, icon_path=GenericIcons.MAP.value
+        )
         title.setProperty("main-panel-title", True)
         layout.addWidget(title)
 
@@ -662,7 +707,7 @@ class MapPanel(QFrame):
     def _on_device_connected(self, device: str) -> None:
         """Handle map UI updates for any successful connection flow."""
         self.ui.map.update_placeholder(
-            "Map is being loaded...", GenericIcons.MAP_PLACEHOLDER.value
+            self.texts.loading_placeholder, GenericIcons.MAP_PLACEHOLDER.value
         )
         self.ui.map.play_placeholder_helper_animation()
 

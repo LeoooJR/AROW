@@ -39,6 +39,25 @@ class LocationPanel(QFrame):
     Panel that displays the location settings.
     """
 
+    @dataclass(frozen=True)
+    class Text:
+        title: str = "Location"
+        expand_button_tooltip: str = "Toggle panel visibility"
+        railway_label: str = "Railway"
+        railway_input: str = "Select a railway"
+        railway_helper_text: str = "Select a railway to get started"
+        kilometric_label: str = "Kilometric point"
+        kilometric_input: str = "Select a kilometric point"
+        kilometric_helper_text: str = "Select a kilometric point to get started"
+        start_simulation_button: str = "Start simulation"
+        start_simulation_dialog_title: str = "Start simulation"
+        start_simulation_dialog_text: str = (
+            "Are you sure you want to start the simulation?"
+        )
+        start_simulation_dialog_detailed_text: str = (
+            "This action will launch the simulation and start the devices."
+        )
+
     @dataclass
     class UI:
 
@@ -62,6 +81,7 @@ class LocationPanel(QFrame):
         super().__init__(parent)
 
         self.ui: LocationPanel.UI
+        self.texts = LocationPanel.Text()
 
         self.setObjectName("location-panel")
         self.setProperty("panel", True)
@@ -78,12 +98,12 @@ class LocationPanel(QFrame):
         )  # Consistent spacing between major sections
 
         title = PanelTitle(
-            parent=self, text="Location", icon_path=GenericIcons.GEO.value
+            parent=self, text=self.texts.title, icon_path=GenericIcons.GEO.value
         )
         expand_button = ToolButton(
             self,
             icon_path=GenericIcons.LAYOUT_BOTTOMBAR_INSET.value,
-            tooltip="Toggle panel visibility",
+            tooltip=self.texts.expand_button_tooltip,
         )
         expand_button.setProperty("toggle", True)
         header = QWidget(self)
@@ -117,7 +137,7 @@ class LocationPanel(QFrame):
         # body_layout.setAlignment(upload_button, Qt.AlignmentFlag.AlignCenter)
 
         # Railway section with divider
-        railway_label = DemiBoldText(None, "Railway")
+        railway_label = DemiBoldText(None, self.texts.railway_label)
         railway_label_icon = IconLabel(
             None,
             icon_path=GenericIcons.RAILWAY.value,
@@ -126,9 +146,9 @@ class LocationPanel(QFrame):
             margins=Settings.SPACING.MARGIN_NONE,
         )
 
-        railway_input = SelectionField(None, "Select a railway")
+        railway_input = SelectionField(None, self.texts.railway_input)
 
-        railway_helper_text = HelperText(self, "Select a railway to get started")
+        railway_helper_text = HelperText(self, self.texts.railway_helper_text)
 
         railway_input_wrapper = VerticalLayoutWrapper(
             self,
@@ -142,7 +162,7 @@ class LocationPanel(QFrame):
         body_layout.addWidget(railway_input_wrapper)
 
         # Kilometric section with divider
-        kilometric_label = DemiBoldText(None, "Kilometric point")
+        kilometric_label = DemiBoldText(None, self.texts.kilometric_label)
         kilometric_label_icon = IconLabel(
             None,
             icon_path=GenericIcons.MILESTONE.value,
@@ -151,11 +171,9 @@ class LocationPanel(QFrame):
             margins=Settings.SPACING.MARGIN_NONE,
         )
 
-        kilometric_input = SelectionField(self, "Select a kilometric point")
+        kilometric_input = SelectionField(self, self.texts.kilometric_input)
 
-        kilometric_helper_text = HelperText(
-            self, "Select a kilometric point to get started"
-        )
+        kilometric_helper_text = HelperText(self, self.texts.kilometric_helper_text)
 
         kilometric_input_wrapper = VerticalLayoutWrapper(
             self,
@@ -169,7 +187,7 @@ class LocationPanel(QFrame):
         body_layout.addWidget(kilometric_input_wrapper)
 
         start_simulation_button = Button(
-            self, "Start simulation", icon_path=GenericIcons.START.value
+            self, self.texts.start_simulation_button, icon_path=GenericIcons.START.value
         )
         body_layout.addWidget(start_simulation_button)
 
@@ -337,9 +355,9 @@ class LocationPanel(QFrame):
 
         dialog = WarningDialog(
             self,
-            title="Start simulation",
-            text="Are you sure you want to start the simulation?",
-            detailed_text="This action will launch the simulation and start the devices.",
+            title=self.texts.start_simulation_dialog_title,
+            text=self.texts.start_simulation_dialog_text,
+            detailed_text=self.texts.start_simulation_dialog_detailed_text,
         )
 
         button = dialog.exec()
