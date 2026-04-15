@@ -1,8 +1,23 @@
+from dataclasses import dataclass
+
 from PySide6.QtCore import QObject, Signal
 
 
 class AppSignals(QObject):
     """Central signal hub for app-wide communication."""
+
+    @dataclass(frozen=True)
+    class Text:
+        pass
+
+    @dataclass
+    class UI:
+        pass
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.texts = AppSignals.Text()
+        self.ui = AppSignals.UI()
 
     UiConstraintsDisabled = Signal()
     UpdatePaletteSignal = Signal(str)

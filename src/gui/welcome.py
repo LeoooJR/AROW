@@ -12,6 +12,22 @@ from gui.wrapper import HorizontalLayoutWrapper, VerticalLayoutWrapper
 
 class WelcomePanel(QFrame):
 
+    @dataclass(frozen=True)
+    class Text:
+        tagline: str = (
+            "Connect your Android device and simulate GPS location from your computer."
+        )
+        start_label: str = "Start"
+        recent_label: str = "Recent"
+        walkthrough_label: str = "Walkthrough"
+        walkthrough_wifi_button: str = "Connect phone over Wi-Fi (Android >= 11)"
+        walkthrough_usb_button: str = "Connect phone with USB (Android < 11)"
+        recent_files: tuple[tuple[str, str], ...] = (
+            ("text.txt", "txt"),
+            ("readme.md", "md"),
+            ("map.html", "html"),
+        )
+
     @dataclass
     class UI:
         image: Image
@@ -32,6 +48,8 @@ class WelcomePanel(QFrame):
 
         super().__init__(parent)
 
+        self.texts = WelcomePanel.Text()
+
         self.setObjectName("welcome-panel")
         self.setProperty("welcome-panel", True)
 
@@ -40,10 +58,7 @@ class WelcomePanel(QFrame):
             Settings.DIMENSION.WELCOME_LOGO_SIZE, Settings.DIMENSION.WELCOME_LOGO_SIZE
         )
 
-        tagline = QLabel(
-            "Connect your Android device and simulate GPS location from your computer.",
-            self,
-        )
+        tagline = QLabel(self.texts.tagline, self)
         tagline.setWordWrap(True)
         tagline.setProperty("welcome-tagline", True)
 
@@ -56,10 +71,10 @@ class WelcomePanel(QFrame):
         hero.setObjectName("welcome-hero")
         hero.get_layout().setStretchFactor(tagline, 1)
 
-        start_label = QLabel("Start", self)
+        start_label = QLabel(self.texts.start_label, self)
         start_label.setProperty("welcome-section-title", True)
 
-        recent_label = QLabel("Recent", self)
+        recent_label = QLabel(self.texts.recent_label, self)
         recent_label.setProperty("welcome-section-title", True)
 
         recent_files_wrapper = VerticalLayoutWrapper(
@@ -84,18 +99,18 @@ class WelcomePanel(QFrame):
         start_card.setObjectName("welcome-start-card")
         start_card.setProperty("welcome-card", True)
 
-        walkthrough_label = QLabel("Walkthrough", self)
+        walkthrough_label = QLabel(self.texts.walkthrough_label, self)
         walkthrough_label.setProperty("welcome-section-title", True)
 
         walkthrough_wifi_button = WalkthroughButton(
             self,
-            "Connect phone over Wi-Fi (Android >= 11)",
+            self.texts.walkthrough_wifi_button,
             lead_icon_path=OperatingSystemIcons.ANDROID.value,
             trailing_icon_path=GenericIcons.HAND_INDEX.value,
         )
         walkthrough_usb_button = WalkthroughButton(
             self,
-            "Connect phone with USB (Android < 11)",
+            self.texts.walkthrough_usb_button,
             lead_icon_path=OperatingSystemIcons.ANDROID.value,
             trailing_icon_path=GenericIcons.HAND_INDEX.value,
         )
@@ -173,11 +188,7 @@ class WelcomePanel(QFrame):
         Visual-only placeholders shown under the "Recent" label.
         No selection/click logic is implemented for these placeholder elements.
         """
-        placeholder_items: list[tuple[str, str]] = [
-            ("text.txt", "txt"),
-            ("readme.md", "md"),
-            ("map.html", "html"),
-        ]
+        placeholder_items = self.texts.recent_files
         for i in range(min(count, len(placeholder_items))):
             file_name, file_type = placeholder_items[i]
             recent_files_wrapper.add_widget(
