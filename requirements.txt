@@ -1,8 +1,20 @@
+
+# Geo and map stack
 folium==0.20.0
+geopandas==1.1.2
 loguru==0.7.3
 pandas==3.0.0
-pre-commit>=4.5.1
-pyside6==6.10.1
-pytest>=8.0.0
+pre-commit==4.5.1
+
+# GUI
+PySide6==6.10.1
+
+# Agent workflow and validation
+pytest==9.0.2
 rich==14.2.0
-typer>=0.24.1
+shapely==2.1.2
+
+# TUI
+textual==8.2.3
+# Core app and CLI
+typer==0.24.1
