@@ -303,7 +303,7 @@ class AdbBridgeSection(QFrame):
         status_key: Final[str] = "Server state"
         status_value: Final[str] = "Running"
         version_key: Final[str] = "ADB version"
-        version_value: Final[str] = "Android Debug Bridge 1.0.41"
+        version_value: Final[str] = "1.0.41"
         daemon_key: Final[str] = "Daemon"
         daemon_value: Final[str] = "tcp:5037"
         devices_key: Final[str] = "Connected devices"
@@ -450,9 +450,9 @@ class HostPanel(QFrame):
         placeholder_summary: Final[str] = (
             "Primary workstation ready for location spoofing workflow."
         )
-        placeholder_platform: Final[str] = "macOS 14.5 (placeholder)"
+        placeholder_platform: Final[str] = "macOS 14.5"
         placeholder_server_state_text: Final[str] = "Running"
-        placeholder_adb_version: Final[str] = "Android Debug Bridge 1.0.41"
+        placeholder_adb_version: Final[str] = "1.0.41"
         placeholder_daemon: Final[str] = "tcp:5037"
         placeholder_connected_devices: Final[str] = "0"
         placeholder_helper_note: Final[str] = (
@@ -644,9 +644,9 @@ class HostPanel(QFrame):
     def _set_placeholder_values(self) -> None:
         """Populate placeholder values until controller/core wiring is implemented."""
         self.set_host_identity_values(
-            host_name=self.ui.host_identity.text.host_name,
+            host_name=self.ui.host_identity.texts.host_name,
             summary=self.texts.placeholder_summary,
-            ip_address=self.ui.host_identity.text.ip_address_value,
+            ip_address=self.ui.host_identity.texts.ip_address_value,
             platform=self.texts.placeholder_platform,
             os_icon_path=OperatingSystemIcons.MACOS.value,
             identity_state="valid",

@@ -220,7 +220,7 @@ class AdbClient:
         """
         self._history.pop(datetime.datetime.now())
 
-    def pair(self, ip: str, port: int, association_code: str) -> Phone:
+    def pair(self, ip: str, port: int, association_code: str) -> Phone | None:
         """
         Pair with a device
         """
@@ -457,12 +457,6 @@ class AdbServer:
             except (ValueError, TypeError):
                 continue
         return phones
-
-    def get_paired_devices(self) -> list[Phone]:
-        """
-        Get the paired devices
-        """
-        return list(self.paired_devices)
 
     def execute(self, command: AdbCommand) -> AdbCommandResult:
         """

@@ -14,10 +14,10 @@ app = typer.Typer()
 
 @app.command()
 def main(
-    view_only: Annotated[
+    interface_only: Annotated[
         bool,
         typer.Option(
-            help="Only start the view, no controller and model, useful for debugging."
+            help="Only start the interface, no controller and model, useful for debugging."
         ),
     ] = False,
 ) -> None:
@@ -31,9 +31,9 @@ def main(
 
     qt_application.setApplicationVersion(__version__)
 
-    main_window = MainWindow(ui_constraints_disabled=view_only)
+    main_window = MainWindow(ui_constraints_disabled=interface_only)
 
-    if not view_only:
+    if not interface_only:
 
         simulation_model: CoreRuntimeModel = CoreRuntimeModel()
 
