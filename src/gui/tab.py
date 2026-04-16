@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Final
 
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QTabWidget, QWidget
@@ -11,7 +12,7 @@ class Tab(QFrame):
 
     @dataclass(frozen=True)
     class Text:
-        map_tab: str = "Map"
+        map_tab: Final[str] = "Map"
 
     @dataclass
     class UI:

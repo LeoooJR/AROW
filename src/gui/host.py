@@ -3,7 +3,7 @@ This file contains all graphical elements related to the host panel.
 """
 
 from dataclasses import dataclass
-from typing import Literal
+from typing import Final, Literal
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QIcon
@@ -184,12 +184,14 @@ class HostIdentitySection(QFrame):
 
     @dataclass(frozen=True)
     class Text:
-        host_name: str = "Leo-MacBook-Pro"
-        host_summary: str = "Primary workstation ready for location spoofing workflow."
-        ip_address_key: str = "Local IP"
-        ip_address_value: str = "192.168.1.26"
-        platform_key: str = "Platform"
-        platform_value: str = "macOS 14.5"
+        host_name: Final[str] = "Leo-MacBook-Pro"
+        host_summary: Final[str] = (
+            "Primary workstation ready for location spoofing workflow."
+        )
+        ip_address_key: Final[str] = "Local IP"
+        ip_address_value: Final[str] = "192.168.1.26"
+        platform_key: Final[str] = "Platform"
+        platform_value: Final[str] = "macOS 14.5"
 
     @dataclass
     class UI:
@@ -298,15 +300,15 @@ class AdbBridgeSection(QFrame):
 
     @dataclass(frozen=True)
     class Text:
-        status_key: str = "Server state"
-        status_value: str = "Running"
-        version_key: str = "ADB version"
-        version_value: str = "Android Debug Bridge 1.0.41"
-        daemon_key: str = "Daemon"
-        daemon_value: str = "tcp:5037"
-        devices_key: str = "Connected devices"
-        devices_value: str = "0"
-        helper_note: str = (
+        status_key: Final[str] = "Server state"
+        status_value: Final[str] = "Running"
+        version_key: Final[str] = "ADB version"
+        version_value: Final[str] = "Android Debug Bridge 1.0.41"
+        daemon_key: Final[str] = "Daemon"
+        daemon_value: Final[str] = "tcp:5037"
+        devices_key: Final[str] = "Connected devices"
+        devices_value: Final[str] = "0"
+        helper_note: Final[str] = (
             "Binary allowing communication between Android devices and the host computer."
         )
 
@@ -441,19 +443,19 @@ class HostPanel(QFrame):
 
     @dataclass(frozen=True)
     class Text:
-        title: str = "Host device"
-        expand_button_tooltip: str = "Toggle panel visibility"
-        identity_group_title: str = "Host identity"
-        adb_group_title: str = "Android Debug Bridge"
-        placeholder_summary: str = (
+        title: Final[str] = "Host device"
+        expand_button_tooltip: Final[str] = "Toggle panel visibility"
+        identity_group_title: Final[str] = "Host identity"
+        adb_group_title: Final[str] = "Android Debug Bridge"
+        placeholder_summary: Final[str] = (
             "Primary workstation ready for location spoofing workflow."
         )
-        placeholder_platform: str = "macOS 14.5 (placeholder)"
-        placeholder_server_state_text: str = "Running"
-        placeholder_adb_version: str = "Android Debug Bridge 1.0.41"
-        placeholder_daemon: str = "tcp:5037"
-        placeholder_connected_devices: str = "0"
-        placeholder_helper_note: str = (
+        placeholder_platform: Final[str] = "macOS 14.5 (placeholder)"
+        placeholder_server_state_text: Final[str] = "Running"
+        placeholder_adb_version: Final[str] = "Android Debug Bridge 1.0.41"
+        placeholder_daemon: Final[str] = "tcp:5037"
+        placeholder_connected_devices: Final[str] = "0"
+        placeholder_helper_note: Final[str] = (
             "Binary allowing communication between Android devices and the host computer."
         )
 

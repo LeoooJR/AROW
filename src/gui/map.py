@@ -3,6 +3,7 @@ This file contains all graphical elements related to the map panel.
 """
 
 from dataclasses import dataclass
+from typing import Final
 
 from PySide6.QtCore import (
     QAbstractAnimation,
@@ -76,9 +77,9 @@ class Legend(QFrame):
 
     @dataclass(frozen=True)
     class Text:
-        location_label: str = "Real position"
-        simulated_location_label: str = "Simulated position"
-        kilometric_point_label: str = "Kilometric point"
+        location_label: Final[str] = "Real position"
+        simulated_location_label: Final[str] = "Simulated position"
+        kilometric_point_label: Final[str] = "Kilometric point"
 
     @dataclass
     class UI:
@@ -179,9 +180,9 @@ class Location(QWidget):
 
     @dataclass(frozen=True)
     class Text:
-        latitude_label: str = "Latitude"
-        longitude_label: str = "Longitude"
-        crosshair_button_tooltip: str = "Center map on current location"
+        latitude_label: Final[str] = "Latitude"
+        longitude_label: Final[str] = "Longitude"
+        crosshair_button_tooltip: Final[str] = "Center map on current location"
 
     @dataclass
     class UI:
@@ -336,10 +337,10 @@ class Coordinates(QFrame):
 
     @dataclass(frozen=True)
     class Text:
-        simulation_state_off: str = "Simulation inactive"
-        simulation_state_on: str = "Simulation active"
-        play_button_tooltip: str = "Start simulation"
-        pause_button_tooltip: str = "Pause simulation"
+        simulation_state_off: Final[str] = "Simulation inactive"
+        simulation_state_on: Final[str] = "Simulation active"
+        play_button_tooltip: Final[str] = "Start simulation"
+        pause_button_tooltip: Final[str] = "Pause simulation"
 
     @dataclass
     class UI:
@@ -516,7 +517,7 @@ class Map(QWidget):
 
     @dataclass(frozen=True)
     class Text:
-        placeholder: str = "Select a device to get started..."
+        placeholder: Final[str] = "Select a device to get started..."
 
     @dataclass
     class UI:
@@ -641,8 +642,8 @@ class MapPanel(QFrame):
 
     @dataclass(frozen=True)
     class Text:
-        title: str = "Map"
-        loading_placeholder: str = "Map is being loaded..."
+        title: Final[str] = "Map"
+        loading_placeholder: Final[str] = "Map is being loaded..."
 
     @dataclass
     class UI:

@@ -3,6 +3,7 @@ This file contains all graphical elements related to the logs panel.
 """
 
 from dataclasses import dataclass
+from typing import Final
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QIcon
@@ -27,13 +28,13 @@ class LogPanel(QFrame):
 
     @dataclass(frozen=True)
     class Text:
-        title: str = "Activity log"
-        expand_button_tooltip: str = "Toggle panel visibility"
-        placeholder_items: tuple[str, ...] = ("Log 1", "Log 2", "Log 3")
-        helper_text: str = "Logs are saved in the following file"
-        file_name: str = "test.log"
-        file_type: str = "TXT"
-        group_title: str = "Logs"
+        title: Final[str] = "Activity log"
+        expand_button_tooltip: Final[str] = "Toggle panel visibility"
+        placeholder_items: Final[tuple[str, ...]] = ("Log 1", "Log 2", "Log 3")
+        helper_text: Final[str] = "Logs are saved in the following file"
+        file_name: Final[str] = "test.log"
+        file_type: Final[str] = "TXT"
+        group_title: Final[str] = "Logs"
 
     @dataclass
     class UI:

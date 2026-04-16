@@ -3,7 +3,7 @@ This file contains all graphical elements related to the device panel.
 """
 
 from dataclasses import dataclass
-from typing import Literal, Optional
+from typing import Final, Literal, Optional
 
 from PySide6.QtCore import QElapsedTimer, QEvent, QObject, QSize, Qt, QTimer
 from PySide6.QtGui import QFont, QIcon, QResizeEvent
@@ -71,13 +71,13 @@ class DeviceItem(QListWidgetItem):
 
     @dataclass(frozen=True)
     class Text:
-        default_name: str = "Unknown Device"
-        menu_button: str = "⋮"
-        menu_button_tooltip: str = "Device actions"
-        active_badge: str = "Active"
-        trusted_badge: str = "Trusted"
-        new_badge: str = "New"
-        empty_subtitle: str = "—"
+        default_name: Final[str] = "Unknown Device"
+        menu_button: Final[str] = "⋮"
+        menu_button_tooltip: Final[str] = "Device actions"
+        active_badge: Final[str] = "Active"
+        trusted_badge: Final[str] = "Trusted"
+        new_badge: Final[str] = "New"
+        empty_subtitle: Final[str] = "—"
 
     @dataclass
     class UI:
@@ -508,10 +508,10 @@ class DeviceState(QGroupBox):
 
     @dataclass(frozen=True)
     class Text:
-        title: str = "About device"
-        state: str = "State: <state>"
-        operating_system: str = "Operating system: <operating_system>"
-        last_communication: str = "Last communication: <last_communication>"
+        title: Final[str] = "About device"
+        state: Final[str] = "State: <state>"
+        operating_system: Final[str] = "Operating system: <operating_system>"
+        last_communication: Final[str] = "Last communication: <last_communication>"
 
     @dataclass
     class UI:
@@ -596,7 +596,7 @@ class DevicePairingPanel(QFrame):
 
     @dataclass(frozen=True)
     class Text:
-        title: str = "Pairing Device"
+        title: Final[str] = "Pairing Device"
 
     @dataclass
     class UI:
@@ -681,23 +681,23 @@ class DeviceSelectionPanel(QFrame):
 
     @dataclass(frozen=True)
     class Text:
-        title: str = "Linked Devices"
-        expand_button_tooltip: str = "Toggle panel visibility"
-        empty_state: str = "No device found"
-        add_device_tooltip: str = "Add a device"
-        refresh_button_tooltip: str = "Refresh device list"
-        trash_button_tooltip: str = "Remove all devices"
-        select_helper_text: str = "Select a device to work with"
-        available_devices_group_title: str = "Available devices"
-        placeholder_primary_device: str = "Samsung Galaxy S24"
-        placeholder_secondary_device: str = "Google Pixel 8"
-        placeholder_unknown_device: str = "Unknown Device"
-        placeholder_operating_system: str = "Android 14"
-        placeholder_location_primary: str = "New York, NY"
-        placeholder_location_secondary: str = "Chicago, IL"
-        placeholder_last_communication_active: str = "Active now"
-        placeholder_last_communication_recent: str = "30 min ago"
-        placeholder_last_communication_old: str = "2 hours ago"
+        title: Final[str] = "Linked Devices"
+        expand_button_tooltip: Final[str] = "Toggle panel visibility"
+        empty_state: Final[str] = "No device found"
+        add_device_tooltip: Final[str] = "Add a device"
+        refresh_button_tooltip: Final[str] = "Refresh device list"
+        trash_button_tooltip: Final[str] = "Remove all devices"
+        select_helper_text: Final[str] = "Select a device to work with"
+        available_devices_group_title: Final[str] = "Available devices"
+        placeholder_primary_device: Final[str] = "Samsung Galaxy S24"
+        placeholder_secondary_device: Final[str] = "Google Pixel 8"
+        placeholder_unknown_device: Final[str] = "Unknown Device"
+        placeholder_operating_system: Final[str] = "Android 14"
+        placeholder_location_primary: Final[str] = "New York, NY"
+        placeholder_location_secondary: Final[str] = "Chicago, IL"
+        placeholder_last_communication_active: Final[str] = "Active now"
+        placeholder_last_communication_recent: Final[str] = "30 min ago"
+        placeholder_last_communication_old: Final[str] = "2 hours ago"
 
     @dataclass
     class UI:
