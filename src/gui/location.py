@@ -3,6 +3,7 @@ This file contains all graphical elements related to the location settings.
 """
 
 from dataclasses import dataclass
+from typing import Final
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QIcon
@@ -41,20 +42,20 @@ class LocationPanel(QFrame):
 
     @dataclass(frozen=True)
     class Text:
-        title: str = "Location"
-        expand_button_tooltip: str = "Toggle panel visibility"
-        railway_label: str = "Railway"
-        railway_input: str = "Select a railway"
-        railway_helper_text: str = "Select a railway to get started"
-        kilometric_label: str = "Kilometric point"
-        kilometric_input: str = "Select a kilometric point"
-        kilometric_helper_text: str = "Select a kilometric point to get started"
-        start_simulation_button: str = "Start simulation"
-        start_simulation_dialog_title: str = "Start simulation"
-        start_simulation_dialog_text: str = (
+        title: Final[str] = "Location"
+        expand_button_tooltip: Final[str] = "Toggle panel visibility"
+        railway_label: Final[str] = "Railway"
+        railway_input: Final[str] = "Select a railway"
+        railway_helper_text: Final[str] = "Select a railway to get started"
+        kilometric_label: Final[str] = "Kilometric point"
+        kilometric_input: Final[str] = "Select a kilometric point"
+        kilometric_helper_text: Final[str] = "Select a kilometric point to get started"
+        start_simulation_button: Final[str] = "Start simulation"
+        start_simulation_dialog_title: Final[str] = "Start simulation"
+        start_simulation_dialog_text: Final[str] = (
             "Are you sure you want to start the simulation?"
         )
-        start_simulation_dialog_detailed_text: str = (
+        start_simulation_dialog_detailed_text: Final[str] = (
             "This action will launch the simulation and start the devices."
         )
 

@@ -5,7 +5,7 @@ This file contains the generic graphical elements used in the application.
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Iterator
+from typing import Any, Final, Iterator
 
 from loguru import logger
 from PySide6.QtCore import (
@@ -991,8 +991,8 @@ class FileOpenDialog(QFileDialog, Element):
 
     @dataclass(frozen=True)
     class Text:
-        window_title: str = "Open a file"
-        name_filter: str = "Tablesheet files (*.xlsx, *.xls, *.csv)"
+        window_title: Final[str] = "Open a file"
+        name_filter: Final[str] = "Tablesheet files (*.xlsx, *.xls, *.csv)"
 
     @dataclass
     class UI:
@@ -1031,9 +1031,9 @@ class FileSaveDialog(QFileDialog, Element):
 
     @dataclass(frozen=True)
     class Text:
-        window_title: str = "Save a file"
-        name_filter: str = "Plain text files (*.log)"
-        default_suffix: str = "log"
+        window_title: Final[str] = "Save a file"
+        name_filter: Final[str] = "Plain text files (*.log)"
+        default_suffix: Final[str] = "log"
 
     @dataclass
     class UI:
@@ -1074,7 +1074,7 @@ class WarningDialog(QMessageBox, Element):
         title: str = ""
         text: str = ""
         detailed_text: str = ""
-        informative_text: str = (
+        informative_text: Final[str] = (
             "This software is for experimental purposes. Use at your own risk."
         )
 
@@ -1127,7 +1127,7 @@ class QuestionDialog(QMessageBox, Element):
         title: str = ""
         text: str = ""
         detailed_text: str = ""
-        informative_text: str = (
+        informative_text: Final[str] = (
             "This software is for experimental purposes. Use at your own risk."
         )
 
@@ -1616,7 +1616,7 @@ class File(QWidget, Element):
     class Text:
         file_name: str = ""
         file_type: str = ""
-        save_as_tooltip: str = "Save as"
+        save_as_tooltip: Final[str] = "Save as"
 
     @dataclass
     class UI:
@@ -1966,11 +1966,11 @@ class AuthentificationCard(QFrame, Element):
     class Text:
         title: str | None = None
         description: str | None = None
-        close_button_tooltip: str = "Close"
-        helper_ip_otp_input: str = "IP address"
-        helper_port_otp_input: str = "Port"
-        helper_association_code_otp_input: str = "Association code"
-        confirm_button: str = "Confirm"
+        close_button_tooltip: Final[str] = "Close"
+        helper_ip_otp_input: Final[str] = "IP address"
+        helper_port_otp_input: Final[str] = "Port"
+        helper_association_code_otp_input: Final[str] = "Association code"
+        confirm_button: Final[str] = "Confirm"
 
     @dataclass
     class UI:

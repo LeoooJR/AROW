@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Final
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
@@ -14,15 +15,15 @@ class WelcomePanel(QFrame):
 
     @dataclass(frozen=True)
     class Text:
-        tagline: str = (
+        tagline: Final[str] = (
             "Connect your Android device and simulate GPS location from your computer."
         )
-        start_label: str = "Start"
-        recent_label: str = "Recent"
-        walkthrough_label: str = "Walkthrough"
-        walkthrough_wifi_button: str = "Connect phone over Wi-Fi (Android >= 11)"
-        walkthrough_usb_button: str = "Connect phone with USB (Android < 11)"
-        recent_files: tuple[tuple[str, str], ...] = (
+        start_label: Final[str] = "Start"
+        recent_label: Final[str] = "Recent"
+        walkthrough_label: Final[str] = "Walkthrough"
+        walkthrough_wifi_button: Final[str] = "Connect phone over Wi-Fi (Android >= 11)"
+        walkthrough_usb_button: Final[str] = "Connect phone with USB (Android < 11)"
+        recent_files: Final[tuple[tuple[str, str], ...]] = (
             ("text.txt", "txt"),
             ("readme.md", "md"),
             ("map.html", "html"),

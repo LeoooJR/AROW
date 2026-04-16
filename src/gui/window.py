@@ -5,7 +5,7 @@ This file contains the main window of the application.
 from collections import deque
 from dataclasses import dataclass
 from time import monotonic
-from typing import Deque, Optional
+from typing import Deque, Final, Optional
 
 from PySide6.QtCore import (
     QAbstractAnimation,
@@ -69,10 +69,14 @@ class Header(QWidget):
 
     @dataclass(frozen=True)
     class Text:
-        light_palette_button_tooltip: str = "Switch to light mode"
-        dark_palette_button_tooltip: str = "Switch to dark mode"
-        left_panel_visibility_button_tooltip: str = "Toggle left panels visibility"
-        right_panel_visibility_button_tooltip: str = "Toggle right panels visibility"
+        light_palette_button_tooltip: Final[str] = "Switch to light mode"
+        dark_palette_button_tooltip: Final[str] = "Switch to dark mode"
+        left_panel_visibility_button_tooltip: Final[str] = (
+            "Toggle left panels visibility"
+        )
+        right_panel_visibility_button_tooltip: Final[str] = (
+            "Toggle right panels visibility"
+        )
 
     @dataclass
     class UI:
@@ -315,9 +319,9 @@ class Body(QWidget):
 
     @dataclass(frozen=True)
     class Text:
-        welcome_tab: str = "Welcome"
-        map_tab: str = "Map"
-        device_tab: str = "Device"
+        welcome_tab: Final[str] = "Welcome"
+        map_tab: Final[str] = "Map"
+        device_tab: Final[str] = "Device"
 
     @dataclass
     class UI:
@@ -584,14 +588,16 @@ class MainContainer(QWidget):
 
     @dataclass(frozen=True)
     class Text:
-        add_device_dialog_title: str = "Adding a device"
-        add_device_dialog_text: str = "Do you want to add a new device?"
-        add_device_dialog_detailed_text: str = (
+        add_device_dialog_title: Final[str] = "Adding a device"
+        add_device_dialog_text: Final[str] = "Do you want to add a new device?"
+        add_device_dialog_detailed_text: Final[str] = (
             "This action will add a new device to the list of available devices.\n"
             "Make sure the device is powered on, in developer mode and connected to the same network as the computer.\n"
             "You must own full ownership of the device to use it with this software."
         )
-        connecting_to_device_toast: str = "Trying to connect to device... Please wait."
+        connecting_to_device_toast: Final[str] = (
+            "Trying to connect to device... Please wait."
+        )
 
     @dataclass
     class UI:
@@ -754,8 +760,8 @@ class AuthentificationOverlay(QWidget):
 
     @dataclass(frozen=True)
     class Text:
-        title: str = "Authentification"
-        description: str = "Please enter your access credentials to continue."
+        title: Final[str] = "Authentification"
+        description: Final[str] = "Please enter your access credentials to continue."
 
     @dataclass
     class UI:
@@ -815,15 +821,15 @@ class MainWindow(QMainWindow):
 
     @dataclass(frozen=True)
     class Text:
-        window_title: str = f"{__application__} - Main Window"
-        connect_device_dialog_title: str = "Connecting to device"
+        window_title: Final[str] = f"{__application__} - Main Window"
+        connect_device_dialog_title: Final[str] = "Connecting to device"
         connect_device_dialog_text: str = "Do you want to connect to {device} device?"
         connect_device_dialog_detailed_text: str = (
             "This action will connect to the {device} device.\n"
             "Make sure the device is powered on, in developer mode and connected to the same network as the computer.\n"
             "You must own full ownership of the device to use it with this software."
         )
-        demo_device_name: str = "Samsung Galaxy"
+        demo_device_name: Final[str] = "Samsung Galaxy"
         pairing_success_toast: str = "Successfully connected to device: {device}."
         pairing_failed_toast: str = (
             "Failed to connect to device: {ip}:{port} with association code: {association_code}."
