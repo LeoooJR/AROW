@@ -8,6 +8,7 @@ from __init__ import __application__, __version__
 from controller.controller import SimulationController
 from core.models import CoreRuntimeModel
 from gui.window import MainWindow
+from logger import setup_logger
 
 app = typer.Typer()
 
@@ -22,6 +23,8 @@ def main(
     ] = False,
 ) -> None:
     """Start the application."""
+
+    setup_logger()
 
     qt_application = QtWidgets.QApplication([])
 

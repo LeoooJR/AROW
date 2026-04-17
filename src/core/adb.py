@@ -7,11 +7,10 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional
 
-from loguru import logger
-
 from core.devices import Phone, PhoneRepository
 from core.exceptions import AdbClientException, AdbServerException
 from core.location import Location
+from logger import logger
 
 
 @dataclass(frozen=True)
@@ -278,21 +277,21 @@ class AdbClient:
         argv.extend([command.command, *command.args, *positional_arguments])
         try:
             logger.debug(
-                "Executing ADB client command | "
-                f"adb_path={self.binary.path} "
-                f"command={command.command} "
-                f"phone_id={phone.descriptor.id if phone else None} "
-                f"argv={argv} "
-                f"command_line={' '.join(shlex.quote(arg) for arg in argv)}"
+                "AdbClient: executing command",
+                adb_path=str(self.binary.path),
+                command=command.command,
+                phone_id=phone.descriptor.id if phone else None,
+                argv=argv,
+                command_line=" ".join(shlex.quote(arg) for arg in argv),
             )
             result = subprocess.run(argv, capture_output=True, text=True)
             logger.debug(
-                "ADB client command completed | "
-                f"adb_path={self.binary.path} "
-                f"command={command.command} "
-                f"return_code={result.returncode} "
-                f"stdout={result.stdout.strip()!r} "
-                f"stderr={result.stderr.strip()!r}"
+                "AdbClient: command completed",
+                adb_path=str(self.binary.path),
+                command=command.command,
+                return_code=result.returncode,
+                stdout=result.stdout.strip(),
+                stderr=result.stderr.strip(),
             )
             if result.returncode != 0:
                 raise AdbClientException(
@@ -465,20 +464,20 @@ class AdbServer:
         argv: list[str] = [str(self.binary.path), command.command, *command.args]
         try:
             logger.debug(
-                "Executing ADB server command | "
-                f"adb_path={self.binary.path} "
-                f"command={command.command} "
-                f"argv={argv} "
-                f"command_line={' '.join(shlex.quote(arg) for arg in argv)}"
+                "AdbServer: executing command",
+                adb_path=str(self.binary.path),
+                command=command.command,
+                argv=argv,
+                command_line=" ".join(shlex.quote(arg) for arg in argv),
             )
             result = subprocess.run(argv, capture_output=True, text=True)
             logger.debug(
-                "ADB server command completed | "
-                f"adb_path={self.binary.path} "
-                f"command={command.command} "
-                f"return_code={result.returncode} "
-                f"stdout={result.stdout.strip()!r} "
-                f"stderr={result.stderr.strip()!r}"
+                "AdbServer: command completed",
+                adb_path=str(self.binary.path),
+                command=command.command,
+                return_code=result.returncode,
+                stdout=result.stdout.strip(),
+                stderr=result.stderr.strip(),
             )
             if result.returncode != 0:
                 raise AdbServerException(

@@ -164,6 +164,9 @@ class AnimationSettings:
     ATTENTION_HIGHLIGHT_UPDATE_MS: int = (
         40  # timer interval for smooth level updates (~25 fps)
     )
+    # ActivityTracker: each idle timeout without input lengthens the next single-shot poll.
+    ACTIVITY_IDLE_ESCALATION_STEP_MS: int = 10_000
+    ACTIVITY_IDLE_ESCALATION_CAP_MS: int = 300_000
 
 
 @dataclass(frozen=True)

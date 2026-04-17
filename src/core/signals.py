@@ -5,10 +5,9 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Protocol, TypeVar
 
-from loguru import logger
-
 from core.devices import Phone
 from core.location import Location
+from logger import logger
 
 
 class CoreSignal(StrEnum):
@@ -202,13 +201,16 @@ class InMemoryCoreSignalBus(CoreSignalBus):
         """
         handlers = self._subscribers.setdefault(signal, [])
         if handler in handlers:
-            logger.debug("Signal subscription ignored (already registered): {}", signal)
+            logger.debug(
+                "CoreSignalBus: subscription ignored (duplicate handler)",
+                signal=str(signal),
+            )
             return
         handlers.append(handler)
         logger.debug(
-            "Signal handler subscribed: signal={}, subscribers={}",
-            signal,
-            len(handlers),
+            "CoreSignalBus: handler subscribed",
+            signal=str(signal),
+            subscriber_count=len(handlers),
         )
 
     def unsubscribe(self, signal: CoreSignal, handler: SignalHandler[object]) -> None:
@@ -227,9 +229,9 @@ class InMemoryCoreSignalBus(CoreSignalBus):
         if not handlers:
             self._subscribers.pop(signal, None)
         logger.debug(
-            "Signal handler unsubscribed: signal={}, subscribers={}",
-            signal,
-            len(self._subscribers.get(signal, [])),
+            "CoreSignalBus: handler unsubscribed",
+            signal=str(signal),
+            subscriber_count=len(self._subscribers.get(signal, [])),
         )
 
     def emit(self, signal: CoreSignal, payload: object) -> None:
@@ -247,10 +249,9 @@ class InMemoryCoreSignalBus(CoreSignalBus):
         for handler in tuple(handlers):
             try:
                 handler(payload)
-            except Exception as error:
+            except Exception:
                 logger.exception(
-                    "Signal handler failure: signal={}, payload_type={}, error={}",
-                    signal,
-                    type(payload).__name__,
-                    error,
+                    "CoreSignalBus: handler raised during emit",
+                    signal=str(signal),
+                    payload_type=type(payload).__name__,
                 )

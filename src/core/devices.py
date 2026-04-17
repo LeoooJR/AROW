@@ -57,12 +57,12 @@ class ComputerDescriptor(DeviceDescriptor):
     Metadata about the computer device
     """
 
-    state: str = field(
-        metadata={"description": "The state of the computer"}, default=""
+    state: Optional[str] = field(
+        metadata={"description": "The state of the computer"}, default=None
     )
-    last_communication: datetime.datetime = field(
+    last_communication: Optional[datetime.datetime] = field(
         metadata={"description": "The last communication time of the computer"},
-        default=datetime.datetime.now(),
+        default=None,
     )
 
     def __str__(self):
@@ -156,7 +156,7 @@ class Phone(Device):
             ip=ip or "",
             port=port,
         )
-        self._descriptor = PhoneDescriptor(
+        self._descriptor: PhoneDescriptor = PhoneDescriptor(
             id=id,
             name=name,
             os=os or "",

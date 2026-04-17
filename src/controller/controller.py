@@ -95,7 +95,7 @@ class SimulationController(Controller):
         """
         if not isinstance(self.model, CoreRuntimeModel):
             logger.warning(
-                "Controller model does not support runtime startup",
+                "SimulationController: core runtime startup skipped (model type)",
                 model_type=type(self.model).__name__,
             )
             return
@@ -164,49 +164,77 @@ class SimulationController(Controller):
     ) -> None:
         """Handle the authentification confirmation."""
         logger.info(
-            f"Trying to connect to device with such credentials: IP: {ip}, Port: {port}, Association code: {association_code}."
+            "SimulationController: pair_device requested (auth confirmed)",
+            ip=ip,
+            port=port,
+            association_code=association_code,
         )
         self.model.pair_device(ip, port, association_code)
 
     def _on_devices_updated(self, payload: DevicesUpdatedPayload) -> None:
         """Handle the devices updated event."""
-        logger.info(f"Devices updated: {payload.devices}")
-        self.view.on_devices_updated(
-            list(map(lambda device: device.descriptor.id, payload.devices))
+        device_ids = [d.descriptor.id for d in payload.devices]
+        logger.info(
+            "SimulationController: devices updated",
+            device_count=len(device_ids),
+            device_ids=device_ids,
         )
+        self.view.on_devices_updated(device_ids)
 
     def _on_device_pairing_succeeded(
         self, payload: DevicePairingSucceededPayload
     ) -> None:
         """Handle the device pairing succeeded event."""
-        logger.success(f"Device pairing succeeded: {payload.device}")
+        desc = payload.device.descriptor
+        logger.success(
+            "SimulationController: device pairing succeeded",
+            device_id=desc.id,
+            device_name=desc.name,
+        )
         # TODO: Retrieve device informations
-        self.view.on_device_pairing_succeeded(payload.device.descriptor.id)
+        self.view.on_device_pairing_succeeded(desc.id)
 
     def _on_device_pairing_failed(self, payload: DevicePairingFailedPayload) -> None:
         """Handle the device pairing failed event."""
         logger.warning(
-            f"Device pairing failed: {payload.ip}:{payload.port} with association code: {payload.association_code}"
+            "SimulationController: device pairing failed",
+            ip=payload.ip,
+            port=payload.port,
+            association_code=payload.association_code,
         )
 
     def _on_device_connection_requested(self, device_id: str) -> None:
         """Handle the device connection requested event."""
-        logger.info(f"Device connection requested: {device_id}")
+        logger.info(
+            "SimulationController: device connection requested",
+            device_id=device_id,
+        )
         device: Phone | None = self.model.get_device(device_id)
         if device is None:
-            logger.warning(f"Device with id {device_id} not found")
+            logger.warning(
+                "SimulationController: device not found",
+                device_id=device_id,
+            )
             return
-        self.state.device = device
-        logger.info(f"Working on device: {device}")
+        self._state.device = device
+        desc = device.descriptor
+        logger.info(
+            "SimulationController: active device set",
+            device_id=desc.id,
+            device_name=desc.name,
+        )
 
     def _on_refresh_device_list_requested(self) -> None:
         """Handle the refresh device list requested event."""
-        logger.info("Refresh device list requested.")
+        logger.info("SimulationController: refresh device list requested")
         known_devices: list[Phone] = self.model.get_known_devices()
-        logger.info(f"Known devices: {known_devices}")
-        self.view.on_devices_updated(
-            list(map(lambda device: device.descriptor.id, known_devices))
+        device_ids = [d.descriptor.id for d in known_devices]
+        logger.info(
+            "SimulationController: known devices listed",
+            device_count=len(device_ids),
+            device_ids=device_ids,
         )
+        self.view.on_devices_updated(device_ids)
 
 
 class MapController(Controller):

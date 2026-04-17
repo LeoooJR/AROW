@@ -46,6 +46,7 @@ class GenericIcons(Enum):
     PLUS = ":/statics/plus.svg"
     X = ":/statics/x.svg"
     TRASH = ":/statics/trash.svg"
+    HAND_RAISED = ":/statics/person-raised-hand.svg"
 
 
 class OperatingSystemIcons(Enum):

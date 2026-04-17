@@ -42,6 +42,7 @@
         <file>statics/plus.svg</file>
         <file>statics/x.svg</file>
         <file>statics/trash.svg</file>
+        <file>statics/person-raised-hand.svg</file>
 
         <!-- Operating System Icons -->
         <file>statics/android-icon.svg</file>

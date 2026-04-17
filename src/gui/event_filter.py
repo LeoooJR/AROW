@@ -1,5 +1,7 @@
 from PySide6.QtCore import QElapsedTimer, QEvent, QObject, QTimer, Signal
 
+from gui.settings import Settings
+
 
 class ActivityTracker(QObject):
     """Track user activity and idle state."""
@@ -26,21 +28,35 @@ class ActivityTracker(QObject):
         self._mm_timer.start()
 
         self._is_idle = False
+        # Counts consecutive idle timeouts since last activity; drives longer poll intervals.
+        self._idle_stretch_index: int = 0
         self.reset_idle_timer()
 
-    def reset_idle_timer(self):
+    def reset_idle_timer(self, msecs: int = None):
+        """Reset the idle timer.
+
+        Args:
+            msecs: The number of milliseconds to reset the idle timer to. If None, the idle timer will be reset to the idle_ms value.
+        """
         self._idle_timer.stop()
-        self._idle_timer.start(self.idle_ms)
+        self._idle_timer.start(msecs if msecs is not None else self.idle_ms)
 
     def _mark_activity(self):
         if self._is_idle:
             self._is_idle = False
+        self._idle_stretch_index = 0
         self.became_active.emit()
         self.reset_idle_timer()
 
     def _on_idle_timeout(self):
         self._is_idle = True
         self.became_idle.emit()
+        # Each following timeout uses a longer interval (capped) until the user acts again.
+        step = Settings.ANIMATION.ACTIVITY_IDLE_ESCALATION_STEP_MS
+        cap = Settings.ANIMATION.ACTIVITY_IDLE_ESCALATION_CAP_MS
+        next_ms = min(self.idle_ms + (self._idle_stretch_index + 1) * step, cap)
+        self._idle_stretch_index += 1
+        self.reset_idle_timer(msecs=next_ms)
 
     def eventFilter(self, obj, event):
         et = event.type()

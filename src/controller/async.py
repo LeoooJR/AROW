@@ -170,10 +170,22 @@ class ProcessPool:
         Submit a job to the process pool. Callbacks run in the executor's thread;
         callers must marshal to the main thread if needed (e.g. for Qt signals).
         """
+        logger.debug(
+            "Process pool: job queued",
+            job_id=job_id,
+            name=job.name,
+            timeout_s=job.timeout,
+            fn=getattr(job.fn, "__qualname__", repr(job.fn)),
+        )
         fut: Future[Any] = self._executor.submit(job.fn, *job.args, **job.kwargs)
 
         def _on_done(f: Future[Any]) -> None:
             if cancel_token.is_cancelled():
+                logger.debug(
+                    "Process pool: done callback skipped (cancelled)",
+                    job_id=job_id,
+                    name=job.name,
+                )
                 emit_cancelled(job_id)
                 return
             try:
@@ -182,8 +194,20 @@ class ProcessPool:
                     if job.timeout is not None
                     else f.result()
                 )
+                logger.debug(
+                    "Process pool: job finished OK",
+                    job_id=job_id,
+                    name=job.name,
+                    result_type=type(result).__name__,
+                )
                 emit_completed(job_id, result)
             except FuturesTimeoutError:
+                logger.warning(
+                    "Process pool: job timed out waiting for result",
+                    job_id=job_id,
+                    name=job.name,
+                    timeout_s=job.timeout,
+                )
                 emit_failed(
                     job_id,
                     JobError(
@@ -211,6 +235,7 @@ class ProcessPool:
         """
         Shutdown the process pool
         """
+        logger.info("Process pool: shutdown requested (cancel_futures=True)")
         self._executor.shutdown(wait=False, cancel_futures=True)
 
 
@@ -237,10 +262,22 @@ class ThreadPool:
         """
         Submit a job to the thread pool.
         """
+        logger.debug(
+            "Thread pool: job queued",
+            job_id=job_id,
+            name=job.name,
+            timeout_s=job.timeout,
+            fn=getattr(job.fn, "__qualname__", repr(job.fn)),
+        )
         fut: Future[Any] = self._executor.submit(job.fn, *job.args, **job.kwargs)
 
         def _on_done(f: Future[Any]) -> None:
             if cancel_token.is_cancelled():
+                logger.debug(
+                    "Thread pool: done callback skipped (cancelled)",
+                    job_id=job_id,
+                    name=job.name,
+                )
                 emit_cancelled(job_id)
                 return
             try:
@@ -249,8 +286,20 @@ class ThreadPool:
                     if job.timeout is not None
                     else f.result()
                 )
+                logger.debug(
+                    "Thread pool: job finished OK",
+                    job_id=job_id,
+                    name=job.name,
+                    result_type=type(result).__name__,
+                )
                 emit_completed(job_id, result)
             except FuturesTimeoutError:
+                logger.warning(
+                    "Thread pool: job timed out waiting for result",
+                    job_id=job_id,
+                    name=job.name,
+                    timeout_s=job.timeout,
+                )
                 emit_failed(
                     job_id,
                     JobError(
@@ -276,6 +325,7 @@ class ThreadPool:
 
     def shutdown(self) -> None:
         """Shutdown the thread pool."""
+        logger.info("Thread pool: shutdown requested (cancel_futures=True)")
         self._executor.shutdown(wait=False, cancel_futures=True)
 
 
@@ -328,6 +378,13 @@ class AsyncRunner(QObject):
         if job.coalesce_key is not None:
             latest_job = self._coalesce_latest.get(job.coalesce_key)
             if latest_job and latest_job in self.history:
+                logger.info(
+                    "Async job coalesce: superseding previous job",
+                    coalesce_key=job.coalesce_key,
+                    previous_job_id=latest_job,
+                    new_job_id=job_id,
+                    name=job.name,
+                )
                 self.cancel(latest_job)
             self._coalesce_latest[job.coalesce_key] = job_id
 
@@ -378,6 +435,7 @@ class AsyncRunner(QObject):
 
     def shutdown(self) -> None:
         """Shutdown process and thread pools."""
+        logger.info("AsyncRunner.shutdown: stopping process and thread pools")
         self._process_pool.shutdown()
         self._thread_pool.shutdown()
 
@@ -408,7 +466,17 @@ class AsyncRunner(QObject):
         """Mark job as cancelled (next completion callback will emit Cancelled)."""
         tup = self.history.get(job_id)
         if tup:
+            logger.debug(
+                "Async job cancel: token set",
+                job_id=job_id,
+                name=tup[0].name,
+            )
             tup[0].cancel_token.cancel()
+        else:
+            logger.debug(
+                "Async job cancel: no active job (ignored)",
+                job_id=job_id,
+            )
 
     def bind_handle_signals(self, handle: JobHandler) -> JobHandlerSignals:
         """
@@ -426,29 +494,44 @@ class AsyncRunner(QObject):
 
     def _emit_completed_safe(self, job_id: str, result: Any) -> None:
         """Emit completed on main thread and cleanup."""
-        logger.debug("Async job completed", job_id=job_id)
-        self._signals.Completed.emit(job_id, result)
         tup = self.history.get(job_id)
+        job_name = tup[0].name if tup else ""
+        logger.debug(
+            "Async job completed (signals)",
+            job_id=job_id,
+            name=job_name,
+            result_type=type(result).__name__,
+        )
+        self._signals.Completed.emit(job_id, result)
         if tup:
             tup[1].Completed.emit(result)
         self._cleanup(job_id)
 
     def _emit_cancelled_safe(self, job_id: str) -> None:
         """Emit cancelled on main thread and cleanup."""
-        logger.debug("Async job cancelled", job_id=job_id)
-        self._signals.Cancelled.emit(job_id)
         tup = self.history.get(job_id)
+        job_name = tup[0].name if tup else ""
+        logger.debug(
+            "Async job cancelled (signals)",
+            job_id=job_id,
+            name=job_name,
+        )
+        self._signals.Cancelled.emit(job_id)
         if tup:
             tup[1].Cancelled.emit()
         self._cleanup(job_id)
 
     def _emit_failed_safe(self, job_id: str, error: JobError) -> None:
         """Emit failed on main thread and cleanup."""
+        tup = self.history.get(job_id)
+        job_name = tup[0].name if tup else ""
         logger.error(
-            "Async job failed",
+            "Async job failed (signals)",
             job_id=job_id,
+            name=job_name,
             message=error.message,
-            traceback=error.traceback,
+            return_code=error.return_code,
+            traceback=error.traceback or None,
         )
         self._signals.Failed.emit(job_id, error)
         tup = self.history.get(job_id)
@@ -461,5 +544,11 @@ class AsyncRunner(QObject):
         self.history.pop(job_id, None)
         for key, latest_id in list(self._coalesce_latest.items()):
             if latest_id == job_id:
+                logger.debug(
+                    "Async job cleanup: removed coalesce slot",
+                    job_id=job_id,
+                    coalesce_key=key,
+                )
                 del self._coalesce_latest[key]
                 break
+        logger.debug("Async job cleanup: removed from history", job_id=job_id)

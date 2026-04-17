@@ -76,10 +76,10 @@ class TestPhone:
         with pytest.raises(ValueError, match="not enough values to unpack"):
             Phone.from_string("id name os")
 
-    def test_phone_descriptor_setter_accepts_string_updates_nested_state(self) -> None:
+    def test_phone_descriptor_setter(self) -> None:
         """Assigning `phone.descriptor = ...` updates the nested PhoneDescriptor status field."""
-        phone = Phone(id="id", name="Pixel", state="device")
-        phone.descriptor = "offline"
+        phone = Phone(id="id", name="Pixel", state="online")
+        phone.state = "offline"
         assert phone.descriptor.state == "offline"
 
     def test_phone_str_repr(self) -> None:

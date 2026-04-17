@@ -382,7 +382,7 @@ class Body(QWidget):
 
         tabs.addTab(welcome_panel, self.texts.welcome_tab)
 
-        tabs.setTabIcon(0, QIcon(ApplicationIcons.LOGO.value))
+        tabs.setTabIcon(0, QIcon(GenericIcons.HAND_RAISED.value))
 
         map_panel = MapPanel(None)
         map_panel.setVisible(True)
@@ -679,7 +679,7 @@ class MainContainer(QWidget):
 
     def _on_add_device_requested(self) -> None:
         """Handle the add device request."""
-        logger.info("Add device request received.")
+        logger.info("MainContainer: add device requested")
         dialog = QuestionDialog(
             self,
             title=self.texts.add_device_dialog_title,
@@ -696,7 +696,7 @@ class MainContainer(QWidget):
 
     def _on_authentification_confirmed(self) -> None:
         """Handle the authentification confirmation."""
-        logger.info("Authentification confirmation received.")
+        logger.info("MainContainer: authentification confirmation received")
         self.post_toast(self.texts.connecting_to_device_toast, level="info")
 
     def post_toast(self, text: str, level: str) -> None:
@@ -704,14 +704,18 @@ class MainContainer(QWidget):
         if not text:
             return
         if not self.isVisible():
-            logger.debug("Skipping toast because container is not visible.")
+            logger.debug(
+                "MainContainer: toast skipped (container not visible)",
+            )
             return
 
         now = monotonic()
         last_payload = getattr(self, "_last_toast_payload", None)
         last_timestamp = getattr(self, "_last_toast_timestamp", 0.0)
         if last_payload == (text, level) and now - last_timestamp < 0.35:
-            logger.debug("Skipping duplicate toast posted too quickly.")
+            logger.debug(
+                "MainContainer: toast skipped (duplicate within debounce window)",
+            )
             return
         self._last_toast_payload = (text, level)
         self._last_toast_timestamp = now
@@ -738,7 +742,7 @@ class MainContainer(QWidget):
             self.ui.toast = toast
         except RuntimeError:
             logger.warning(
-                "Failed to display toast: widget was deleted during creation."
+                "MainContainer: toast display failed (widget deleted during creation)",
             )
             self.ui.toast = None
             QTimer.singleShot(0, self._show_next_toast)
@@ -925,11 +929,11 @@ class MainWindow(QMainWindow):
     def _on_palette_update(self, theme: Theme) -> None:
         """Handle the palette update."""
         self.setStyleSheet(stylesheet_light if theme == "light" else stylesheet_dark)
-        logger.info(f"Palette updated to {theme}.")
+        logger.info("MainWindow: palette updated", theme=str(theme))
 
     def _on_idle(self) -> None:
         """Handle the idle state: run helper and highlight device lists to draw attention."""
-        logger.info("Idle state detected.")
+        logger.info("MainWindow: idle state detected")
         self.ui.container.wake_up()
 
     def _on_device_selection(self, device: DeviceItem) -> None:
@@ -938,11 +942,14 @@ class MainWindow(QMainWindow):
             return
         if self._device_selection_dialog_open:
             logger.debug(
-                "Ignoring device selection while confirmation dialog is already open."
+                "MainWindow: device selection ignored (dialog already open)",
             )
             return
         self._device_selection_dialog_open = True
-        logger.info(f"Device selection requested: {device.get_text()}.")
+        logger.info(
+            "MainWindow: device selection requested",
+            device_label=device.get_text(),
+        )
         dialog = QuestionDialog(
             self,
             title=self.texts.connect_device_dialog_title,
@@ -957,7 +964,7 @@ class MainWindow(QMainWindow):
             if button == QMessageBox.StandardButton.Yes:
                 if self._ui_constraints_disabled:
                     logger.warning(
-                        "UI constraints disabled, skipping device connection request."
+                        "MainWindow: device connection request skipped (UI constraints disabled)",
                     )
                     self.on_device_selection_succeeded(device.get_text())
                 app_signals.DeviceConnectionRequested.emit(device.get_text())
@@ -974,19 +981,19 @@ class MainWindow(QMainWindow):
 
     def _on_authentification_cancelled(self) -> None:
         """Handle the authentification cancelled."""
-        logger.info("Authentification cancelled.")
+        logger.info("MainWindow: authentification cancelled")
         self.ui.authentification_overlay.hide()
 
     def _on_authentification_confirmed(self) -> None:
         """Handle the authentification confirmation."""
-        logger.info("Authentification confirmed.")
+        logger.info("MainWindow: authentification confirmed")
         self.ui.authentification_overlay.hide()
         if self._ui_constraints_disabled:
             self.on_device_pairing_succeeded(self.texts.demo_device_name)
 
     def on_device_pairing_succeeded(self, device: str) -> None:
         """Handle the device pairing succeeded."""
-        logger.info(f"Device pairing succeeded: {device}.")
+        logger.info("MainWindow: device pairing succeeded", device=device)
         app_signals.AuthentificationSucceeded.emit(device)
         self.ui.container.post_toast(
             self.texts.pairing_success_toast.format(device=device), level="success"
@@ -994,7 +1001,7 @@ class MainWindow(QMainWindow):
 
     def on_device_selection_succeeded(self, device: str) -> None:
         """Handle the device selection succeeded without adding a new list entry."""
-        logger.info(f"Device selection succeeded: {device}.")
+        logger.info("MainWindow: device selection succeeded", device=device)
         app_signals.DeviceSelectionSucceeded.emit(device)
         self.ui.container.post_toast(
             self.texts.pairing_success_toast.format(device=device), level="success"
@@ -1005,7 +1012,10 @@ class MainWindow(QMainWindow):
     ) -> None:
         """Handle the device pairing failed."""
         logger.warning(
-            f"Device pairing failed: {ip}:{port} with association code: {association_code}."
+            "MainWindow: device pairing failed",
+            ip=ip,
+            port=port,
+            association_code=association_code,
         )
         app_signals.AuthentificationFailed.emit(ip, port, association_code)
         self.ui.container.post_toast(
@@ -1017,12 +1027,21 @@ class MainWindow(QMainWindow):
 
     def on_devices_updated(self, devices: list[str]) -> None:
         """Handle the devices updated."""
-        logger.info(f"Devices updated: {devices}.")
+        logger.info(
+            "MainWindow: devices updated",
+            device_count=len(devices),
+            device_ids=devices,
+        )
         app_signals.DevicesUpdated.emit(devices)
 
     def on_host_device_information_updated(self, name: str, os: str, ip: str) -> None:
         """Handle the host device information updated."""
-        logger.info(f"Host device information updated: {name} {os} {ip}.")
+        logger.info(
+            "MainWindow: host device information updated",
+            name=name,
+            host_os=os,
+            ip=ip,
+        )
         app_signals.HostDeviceInformationUpdated.emit(name, os, ip)
 
     def resizeEvent(self, event) -> None:

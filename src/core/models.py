@@ -3,8 +3,6 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Callable
 
-from loguru import logger
-
 from core.adb import AdbBinary, AdbClient, AdbClientException, AdbServer
 from core.devices import Computer, Phone
 from core.signals import (
@@ -15,6 +13,7 @@ from core.signals import (
     InMemoryCoreSignalBus,
     SignalHandler,
 )
+from logger import logger
 
 
 class Model(ABC):
@@ -99,9 +98,9 @@ class CoreRuntimeModel(Model):
         """
         try:
             adb_binary: AdbBinary = AdbBinary(path=self._resolve_adb_binary_path())
-            self._adb_server = AdbServer(binary=adb_binary)
+            self._adb_server: AdbServer = AdbServer(binary=adb_binary)
             logger.info(
-                "ADB server started from CoreRuntimeModel",
+                "CoreRuntimeModel: ADB server started",
                 adb_path=str(adb_binary.path),
             )
             self._signal_bus.emit(
@@ -111,7 +110,8 @@ class CoreRuntimeModel(Model):
         except Exception as error:
             self._adb_server = None
             logger.exception(
-                "Failed to start ADB server from CoreRuntimeModel", error=str(error)
+                "CoreRuntimeModel: failed to start ADB server",
+                error=str(error),
             )
 
     def stop_adb_server(self) -> None:
@@ -121,9 +121,11 @@ class CoreRuntimeModel(Model):
         if self._adb_server is not None:
             self._adb_server.stop()
             self._adb_server = None
-            logger.info("ADB server stopped from CoreRuntimeModel")
+            logger.info("CoreRuntimeModel: ADB server stopped")
         else:
-            logger.warning("ADB server not found in CoreRuntimeModel")
+            logger.warning(
+                "CoreRuntimeModel: ADB server stop skipped (not running)",
+            )
 
     def restart_adb_server(self) -> None:
         """
@@ -131,13 +133,15 @@ class CoreRuntimeModel(Model):
         """
         if self._adb_server is not None:
             self._adb_server.restart()
-            logger.info("ADB server restarted from CoreRuntimeModel")
+            logger.info("CoreRuntimeModel: ADB server restarted")
             self._signal_bus.emit(
                 CoreSignal.DEVICES_UPDATED,
                 DevicesUpdatedPayload(devices=self.get_known_devices()),
             )
         else:
-            logger.warning("ADB server not found in CoreRuntimeModel")
+            logger.warning(
+                "CoreRuntimeModel: ADB server restart skipped (not running)",
+            )
 
     def get_device(self, device_id: str) -> Phone | None:
         """
@@ -156,7 +160,7 @@ class CoreRuntimeModel(Model):
         Get the ADB client.
         """
         if self._adb_client is None:
-            logger.debug("Creating ADB client from CoreRuntimeModel")
+            logger.debug("CoreRuntimeModel: creating ADB client")
             adb_binary: AdbBinary = AdbBinary(path=self._resolve_adb_binary_path())
             self._adb_client = AdbClient(binary=adb_binary)
         return self._adb_client
@@ -176,7 +180,10 @@ class CoreRuntimeModel(Model):
         except AdbClientException as error:
             error_message: str = str(error)
             logger.warning(
-                f"ADB pairing failed on first attempt | ip={ip} port={port} error={error_message!r}"
+                "CoreRuntimeModel: device pairing failed (first attempt)",
+                ip=ip,
+                port=port,
+                error=error_message,
             )
             # ADB can return protocol-fault errors when the daemon is in a stale state.
             # Restarting the daemon and retrying once reproduces the manual workaround.
@@ -187,7 +194,9 @@ class CoreRuntimeModel(Model):
                     else:
                         self.start_adb_server()
                     logger.info(
-                        f"ADB server restarted after protocol fault | ip={ip} port={port}"
+                        "CoreRuntimeModel: ADB server restarted after protocol fault",
+                        ip=ip,
+                        port=port,
                     )
                     phone = adb_client.pair(ip, port, association_code)
                     self._signal_bus.emit(
@@ -197,7 +206,10 @@ class CoreRuntimeModel(Model):
                     return
                 except AdbClientException as retry_error:
                     logger.warning(
-                        f"ADB pairing retry failed after restart | ip={ip} port={port} error={str(retry_error)!r}"
+                        "CoreRuntimeModel: pairing retry failed after restart",
+                        ip=ip,
+                        port=port,
+                        error=str(retry_error),
                     )
             self._signal_bus.emit(
                 CoreSignal.DEVICE_PAIRING_FAILED,
