@@ -19,6 +19,10 @@ def pytest_configure(config: pytest.Config) -> None:
     )
     config.addinivalue_line(
         "markers",
+        "adb_parser: mark test as belonging to the adb_parser module (ADBCommandParser).",
+    )
+    config.addinivalue_line(
+        "markers",
         "adb_server: mark test as exercising ADB server commands (start-server, kill-server) only.",
     )
     config.addinivalue_line(

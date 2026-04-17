@@ -1,11 +1,14 @@
 import datetime
+import re
 import shlex
 import subprocess
 from collections import OrderedDict
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import Enum, member
 from pathlib import Path
-from typing import Optional
+from typing import Any, Callable, Optional
+
+ParserFn = Callable[[str], Any]
 
 from core.devices import Phone, PhoneRepository
 from core.exceptions import AdbClientException, AdbServerException
@@ -88,15 +91,138 @@ class AdbCommandResult:
     )
 
 
-class AdbCommandParser(Enum):
-    """
-    Parser for the adb commands
-    """
+def _make_strip_parser() -> ParserFn:
+    """Build a distinct callable for Enum members that only need stripped stdout."""
 
-    START_SERVER = None
-    KILL_SERVER = None
-    GET_DEVICES = None
-    PAIR = None
+    def _fn(output: str) -> str:
+        return output.strip()
+
+    return _fn
+
+
+def _parse_devices(output: str) -> list[Phone]:
+    """Parse `adb devices -l` stdout into `Phone` rows; skip header and malformed lines."""
+    phones: list[Phone] = []
+    for raw in output.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("List of devices attached"):
+            continue
+        parts = line.split()
+        if len(parts) < 6:
+            continue
+        try:
+            phones.append(Phone.from_string(line))
+        except (ValueError, TypeError):
+            continue
+    return phones
+
+
+def _parse_optional_int_line(output: str) -> int | None:
+    """Parse a lone integer line (`getprop` sdk, `settings get` ints); empty -> None."""
+    text = output.strip()
+    if not text:
+        return None
+    try:
+        return int(text)
+    except ValueError:
+        return None
+
+
+def _normalize_kv_key(key: str) -> str:
+    return key.strip().lower().replace(" ", "_").replace("/", "_")
+
+
+def _coerce_dumpsys_scalar(text: str) -> int | bool | str:
+    lowered = text.strip()
+    if lowered.lower() in ("true", "false"):
+        return lowered.lower() == "true"
+    try:
+        return int(lowered)
+    except ValueError:
+        return text.strip()
+
+
+def _parse_battery(output: str) -> dict[str, int | bool | str]:
+    """
+    Parse `dumpsys battery` key/value lines after `Current Battery Service state:`.
+    Keys are normalized snake_case (e.g. `ac_powered`, `level`).
+    """
+    parsed: dict[str, int | bool | str] = {}
+    in_section = False
+    for raw_line in output.splitlines():
+        if "Current Battery Service state:" in raw_line:
+            in_section = True
+            continue
+        if not in_section:
+            continue
+        stripped = raw_line.strip()
+        if not stripped:
+            if parsed:
+                break
+            continue
+        match = re.match(r"^\s+(.+?):\s*(.+)$", raw_line)
+        if match:
+            k = _normalize_kv_key(match.group(1))
+            parsed[k] = _coerce_dumpsys_scalar(match.group(2))
+            continue
+    return parsed
+
+
+def _parse_window_summary(output: str) -> dict[str, str | bool | None]:
+    """
+    Pull a small subset from `dumpsys window` (screen/power/focus/size).
+    Keys: m_awake, m_screen_on_fully, screen_state, display_size, m_focused_app, m_current_focus.
+    """
+    summary: dict[str, str | bool | None] = {}
+    m = re.search(r"mAwake=(true|false)", output)
+    if m:
+        summary["m_awake"] = m.group(1) == "true"
+    m = re.search(r"mScreenOnFully=(true|false)", output)
+    if m:
+        summary["m_screen_on_fully"] = m.group(1) == "true"
+    m = re.search(r"screenState=(\S+)", output)
+    if m:
+        summary["screen_state"] = m.group(1)
+    m = re.search(r"Display\{#[0-9]+\s+state=\w+\s+size=([0-9]+x[0-9]+)", output)
+    if m:
+        summary["display_size"] = m.group(1)
+    m = re.search(r"mFocusedApp=(.+)$", output, re.MULTILINE)
+    if m:
+        summary["m_focused_app"] = m.group(1).strip()
+    m = re.search(r"mCurrentFocus=(.+)$", output, re.MULTILINE)
+    if m:
+        summary["m_current_focus"] = m.group(1).strip()
+    return summary
+
+
+def _parse_notification_post(output: str) -> bool:
+    """True when `cmd notification post` echoed a posting confirmation."""
+    return "posting:" in output.lower()
+
+
+class ADBCommandParser(Enum):
+    """Structured parsing for stdout shapes documented in adb-commands-output."""
+
+    # Callables must be wrapped with enum.member() or Enum treats them as methods.
+    GET_DEVICES = member(_parse_devices)
+    GET_ANDROID_VERSION = member(_make_strip_parser())
+    GET_MANUFACTURER = member(_make_strip_parser())
+    GET_DEVICE_NAME = member(_make_strip_parser())
+    GET_PRODUCT_MODEL = member(_make_strip_parser())
+    GET_SDK_VERSION = member(_parse_optional_int_line)
+    GET_LOCATION_MODE = member(_parse_optional_int_line)
+    GET_SERIAL_NO = member(_make_strip_parser())
+    SHELL_GET_SERIAL_NO = member(_make_strip_parser())
+    GET_BATTERY_INFOS = member(_parse_battery)
+    DUMPSYS_WINDOW = member(_parse_window_summary)
+    POST_CONNECTION_NOTIFICATION = member(_parse_notification_post)
+
+    def parse(self, output: str) -> Any:
+        """Parse raw adb stdout (or stderr if piped) using this command's rules."""
+        fn = self.value
+        if not callable(fn):
+            raise TypeError(f"{self} has no callable parser")
+        return fn(output)
 
 
 @dataclass(unsafe_hash=True, frozen=True)
@@ -149,24 +275,93 @@ class AdbCommands(Enum):
     GET_DEVICE_NAME = AdbCommand(
         name="Get device name",
         description="Get the name of the device",
-        command="shell getprop device_name",
+        command="shell",
+        args=["getprop", "device_name"],
     )
     GET_ANDROID_VERSION = AdbCommand(
         name="Get Android version",
         description="Get the Android version",
-        command="shell getprop ro.build.version.release",
+        command="shell",
+        args=["getprop", "ro.build.version.release"],
     )
     GET_BATTERY_INFOS = AdbCommand(
         name="Get battery infos",
         description="Get the battery infos",
-        command="shell dumpsys battery",
+        command="shell",
+        args=["dumpsys", "battery"],
     )
     GET_MANUFACTURER = AdbCommand(
         name="Get manufacturer",
         description="Get the manufacturer",
-        command="shell getprop ro.product.manufacturer",
+        command="shell",
+        args=["getprop", "ro.product.manufacturer"],
+    )
+    GET_SERIAL_NO = AdbCommand(
+        name="Get serial number (host)",
+        description="Serial from adb client for the selected device",
+        command="get-serialno",
+    )
+    SHELL_GET_SERIAL_NO = AdbCommand(
+        name="Get serial number (shell)",
+        description="Serial from device shell get-serialno",
+        command="shell",
+        args=["get-serialno"],
+    )
+    GET_PRODUCT_MODEL = AdbCommand(
+        name="Get product model",
+        description="Commercial model string (ro.product.model)",
+        command="shell",
+        args=["getprop", "ro.product.model"],
+    )
+    GET_SDK_VERSION = AdbCommand(
+        name="Get SDK version",
+        description="Android API level (ro.build.version.sdk)",
+        command="shell",
+        args=["getprop", "ro.build.version.sdk"],
+    )
+    GET_LOCATION_MODE = AdbCommand(
+        name="Get location mode",
+        description="Secure settings location_mode (0 off, 3 high accuracy, etc.)",
+        command="shell",
+        args=["settings", "get", "secure", "location_mode"],
+    )
+    DUMPSYS_WINDOW = AdbCommand(
+        name="Dump window manager",
+        description="Large window manager dump (parse summary via ADBCommandParser)",
+        command="shell",
+        args=["dumpsys", "window"],
+    )
+    POST_CONNECTION_NOTIFICATION = AdbCommand(
+        name="Post connection notification",
+        description="Show a status notification on the device after connect",
+        command="shell",
+        args=[
+            "cmd",
+            "notification",
+            "post",
+            "-t",
+            "Connected with ARROW",
+            "-n",
+            "ARROW",
+        ],
     )
     SEND_LOCATION = AdbCommand()
+
+
+ADB_COMMAND_PARSERS: dict[AdbCommands, ADBCommandParser] = {
+    AdbCommands.GET_DEVICES: ADBCommandParser.GET_DEVICES,
+    AdbCommands.GET_ANDROID_VERSION: ADBCommandParser.GET_ANDROID_VERSION,
+    AdbCommands.GET_MANUFACTURER: ADBCommandParser.GET_MANUFACTURER,
+    AdbCommands.GET_DEVICE_NAME: ADBCommandParser.GET_DEVICE_NAME,
+    AdbCommands.GET_PRODUCT_MODEL: ADBCommandParser.GET_PRODUCT_MODEL,
+    AdbCommands.GET_SDK_VERSION: ADBCommandParser.GET_SDK_VERSION,
+    AdbCommands.GET_LOCATION_MODE: ADBCommandParser.GET_LOCATION_MODE,
+    AdbCommands.GET_SERIAL_NO: ADBCommandParser.GET_SERIAL_NO,
+    AdbCommands.SHELL_GET_SERIAL_NO: ADBCommandParser.SHELL_GET_SERIAL_NO,
+    AdbCommands.GET_BATTERY_INFOS: ADBCommandParser.GET_BATTERY_INFOS,
+    AdbCommands.DUMPSYS_WINDOW: ADBCommandParser.DUMPSYS_WINDOW,
+    AdbCommands.POST_CONNECTION_NOTIFICATION: ADBCommandParser.POST_CONNECTION_NOTIFICATION,
+}
 
 
 class AdbClient:
@@ -239,15 +434,7 @@ class AdbClient:
             result = self.execute(command, None)
         except AdbClientException as e:
             raise AdbClientException(f"Failed to get devices") from e
-        return (
-            [
-                Phone.from_string(line)
-                for line in result.output.splitlines()
-                if line.strip()
-            ]
-            if result.output
-            else []
-        )
+        return ADBCommandParser.GET_DEVICES.parse(result.output or "")
 
     def enable_location_services(self) -> None:
         pass
@@ -442,20 +629,7 @@ class AdbServer:
             result = self.execute(command)
         except AdbServerException as e:
             raise AdbClientException(f"Failed to get known devices: {e}") from e
-        if not result.output:
-            return []
-        phones: list[Phone] = []
-        for line in result.output.splitlines():
-            if not line.strip():
-                continue
-            parts = line.split()
-            if len(parts) < 6:
-                continue
-            try:
-                phones.append(Phone.from_string(line))
-            except (ValueError, TypeError):
-                continue
-        return phones
+        return ADBCommandParser.GET_DEVICES.parse(result.output or "")
 
     def execute(self, command: AdbCommand) -> AdbCommandResult:
         """
