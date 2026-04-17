@@ -1,24 +1,10 @@
-from dataclasses import dataclass
-
 from PySide6.QtCore import QObject, Signal
 
 
 class AppSignals(QObject):
     """Central signal hub for app-wide communication."""
 
-    @dataclass(frozen=True)
-    class Text:
-        pass
-
-    @dataclass
-    class UI:
-        pass
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.texts = AppSignals.Text()
-        self.ui = AppSignals.UI()
-
+    #### UI Signals ####
     UiConstraintsDisabled = Signal()
     UpdatePaletteSignal = Signal(str)
     LeftPanelsVisibilityRequested = Signal(bool)
@@ -27,6 +13,8 @@ class AppSignals(QObject):
     LocationPanelVisibilityRequested = Signal(bool)
     HostPanelVisibilityRequested = Signal(bool)
     LogPanelVisibilityRequested = Signal(bool)
+
+    #### Device Signals ####
     AddDeviceRequested = Signal()
     AuthentificationRequested = Signal()
     AuthentificationCancelled = Signal()
@@ -39,7 +27,11 @@ class AppSignals(QObject):
     DeviceConnectionCancelled = Signal()
     RefreshDeviceListRequested = Signal()
     DevicesUpdated = Signal(object)
+
+    #### Host Signals ####
     HostDeviceInformationUpdated = Signal(str, str, str)
+
+    #### Simulation Signals ####
     StartSimulationRequested = Signal()
     StopSimulationRequested = Signal()
     SimulationContextChanged = Signal(str, int)
