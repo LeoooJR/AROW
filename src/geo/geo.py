@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Literal
+from typing import Final, Literal
 
 import folium
 import geopandas
@@ -8,21 +8,35 @@ from datasets import DatasetManager
 from folium.plugins import Fullscreen, MarkerCluster, MousePosition
 from folium.utilities import JsCode
 from icons import Icons
-from shapely import Point
+from loguru import logger
+
+# Columns embedded in Folium GeoJSON for milestone layers (tooltip/popup only).
+_MILESTONE_GEOJSON_COLUMNS: tuple[str, ...] = (
+    "pk",
+    "ligne",
+    "code_ligne",
+    "type_reper",
+    "geometry",
+)
 
 
 class MapRenderer:
 
-    DEFAULT_LATITUDE: float = 46.232193
+    DEFAULT_LATITUDE: Final[float] = 46.232193
 
-    DEFAULT_LONGITUDE: float = 2.209667
+    DEFAULT_LONGITUDE: Final[float] = 2.209667
 
-    CRS_FRANCE: str = "EPSG:2154"
+    CRS_FRANCE: Final[str] = "EPSG:2154"
+
+    ZOOM_START: Final[int] = 6
 
     def __init__(self):
 
+        # Canvas renderer reduces DOM load for many CircleMarkers (milestones).
         self.map = folium.Map(
-            location=(self.DEFAULT_LATITUDE, self.DEFAULT_LONGITUDE), zoom_start=6
+            location=(self.DEFAULT_LATITUDE, self.DEFAULT_LONGITUDE),
+            zoom_start=self.ZOOM_START,
+            prefer_canvas=True,
         )
 
         self._load_datasets()
@@ -66,42 +80,43 @@ class MapRenderer:
             id="referentiel_pk_gps", encoding="latin-1"
         )
         milestones_dataset.columns = milestones_dataset.columns.map(lambda c: c.lower())
-        milestones_dataset: pd.DataFrame = milestones_dataset.astype(
+        milestones_dataset = milestones_dataset.astype(
             {"type_reper": "category", "ligne": "category", "code_ligne": "category"}
         )
-        milestones_dataset["geometry"] = milestones_dataset.apply(
-            lambda row: Point(
-                float(row.longitude.replace(",", ".")),
-                float(row.latitude.replace(",", ".")),
-            ),
-            axis=1,
+        # Vectorized WGS84: comma decimals in source CSV.
+        lon = pd.to_numeric(
+            milestones_dataset["longitude"]
+            .astype("string")
+            .str.replace(",", ".", regex=False),
+            errors="coerce",
         )
-        milestones_dataset: pd.DataFrame = milestones_dataset.drop(
-            columns=["latitude", "longitude"]
+        lat = pd.to_numeric(
+            milestones_dataset["latitude"]
+            .astype("string")
+            .str.replace(",", ".", regex=False),
+            errors="coerce",
         )
+        milestones_dataset["geometry"] = geopandas.GeoSeries.from_xy(
+            lon, lat, crs="EPSG:4326"
+        )
+        milestones_dataset = milestones_dataset.drop(columns=["latitude", "longitude"])
 
-        # Parse PK string (e.g. "001+000" -> 1.0 km, "012+500" -> 12.5 km)
-        def parse_milestones_code(milestone: str) -> float:
-            if pd.isna(milestone):
-                return float("nan")
-            parts = str(milestone).strip().split("+")
-            if len(parts) != 2:
-                return float("nan")
-            try:
-                km, m = int(parts[0]), int(parts[1])
-                return km + m / 1000.0
-            except ValueError:
-                return float("nan")
+        # PK string (e.g. "001+000" -> 1.0 km, "012+500" -> 12.5 km), vectorized.
+        _pk = milestones_dataset["pk"].astype("string")
+        _parts = _pk.str.strip().str.split("+", n=1, expand=True)
+        _km_part = pd.to_numeric(_parts[0], errors="coerce")
+        _m_part = pd.to_numeric(_parts[1], errors="coerce")
+        milestones_dataset["kilometers"] = _km_part + _m_part / 1000.0
 
-        milestones_dataset["kilometers"] = milestones_dataset["pk"].map(
-            parse_milestones_code
-        )
         milestones_dataset = milestones_dataset.dropna(
             subset=["geometry", "code_ligne", "kilometers"]
         )
         self.milestones_geodataset: geopandas.GeoDataFrame = geopandas.GeoDataFrame(
             milestones_dataset, crs="EPSG:4326"
         )
+        # Drop the intermediate frame to lower peak RAM once geometry lives in GeoDataFrame.
+        del milestones_dataset
+
         milestones_kilometer_geodataset: geopandas.GeoDataFrame = (
             self.milestones_geodataset[
                 self.milestones_geodataset["type_reper"] == "Kilomètre"
@@ -113,30 +128,31 @@ class MapRenderer:
             "MEDIUM": {"threshold": 14, "spacing": 1.0, "tolerance": 0.05},
         }
 
-        def at_distance(kilometer: float, settings: Literal["LOW", "MEDIUM"]) -> bool:
+        def _at_distance_mask(
+            kilometers: pd.Series, settings: Literal["LOW", "MEDIUM"]
+        ) -> pd.Series:
             spacing: float = self._milestones_visibility_settings[settings]["spacing"]
             tolerance: float = self._milestones_visibility_settings[settings][
                 "tolerance"
             ]
-            remainder = kilometer % spacing
-            return remainder <= tolerance or (spacing - remainder) <= tolerance
+            remainder = kilometers % spacing
+            return (remainder <= tolerance) | ((spacing - remainder) <= tolerance)
 
-        subset_indices = []
-        for _code_ligne, group in milestones_kilometer_geodataset.groupby(
-            "code_ligne", observed=True
-        ):
-            group = group.sort_values("kilometers")
-            if not group.empty:
-                for idx, row in group.iterrows():
-                    km = row["kilometers"]
-                    if at_distance(kilometer=km, settings="LOW"):
-                        subset_indices.append(idx)
+        # Low-zoom markers: rule LOW, without per-row Python loops.
+        low_mask = _at_distance_mask(
+            milestones_kilometer_geodataset["kilometers"], settings="LOW"
+        )
+        subset_indices: list[int] = milestones_kilometer_geodataset.index[
+            low_mask
+        ].tolist()
 
         self._milestones_low_zoom_geodataset: geopandas.GeoDataFrame = (
             milestones_kilometer_geodataset.loc[sorted(subset_indices)]
         )
         self._milestones_medium_zoom_geodataset: geopandas.GeoDataFrame = (
-            milestones_kilometer_geodataset.drop(index=subset_indices)
+            milestones_kilometer_geodataset.loc[
+                ~milestones_kilometer_geodataset.index.isin(subset_indices)
+            ]
         )
         self._milestone_high_zoom_geodataset: geopandas.GeoDataFrame = (
             self.milestones_geodataset[
@@ -144,7 +160,51 @@ class MapRenderer:
             ]
         )
 
+        # Slim GeoJSON payloads for Folium (only columns used by tooltip/popup).
+        self._milestones_low_zoom_for_map: geopandas.GeoDataFrame = (
+            self._milestones_low_zoom_geodataset.loc[
+                :, list(_MILESTONE_GEOJSON_COLUMNS)
+            ].copy()
+        )
+        self._milestones_medium_zoom_for_map: geopandas.GeoDataFrame = (
+            self._milestones_medium_zoom_geodataset.loc[
+                :, list(_MILESTONE_GEOJSON_COLUMNS)
+            ].copy()
+        )
+
+        _n_km = len(milestones_kilometer_geodataset)
+        _n_low = len(self._milestones_low_zoom_geodataset)
+        _n_med = len(self._milestones_medium_zoom_geodataset)
+        _n_hi = len(self._milestone_high_zoom_geodataset)
+        logger.info(
+            "Milestone layers built: kilometer_only={} low_zoom={} medium_zoom={} "
+            "high_zoom_non_km={}",
+            _n_km,
+            _n_low,
+            _n_med,
+            _n_hi,
+            kilometer_only_rows=_n_km,
+            low_zoom_rows=_n_low,
+            medium_zoom_rows=_n_med,
+            high_zoom_non_km_rows=_n_hi,
+        )
+        logger.opt(lazy=True).debug(
+            "Milestone slim GeoJSON serialized length (chars, for HTML weight): "
+            "low={low_len} medium={med_len}",
+            low_len=lambda: len(self._milestones_low_zoom_for_map.to_json()),
+            med_len=lambda: len(self._milestones_medium_zoom_for_map.to_json()),
+        )
+
     def _create_layers(self):
+
+        DEFAULT_LIGNE_COLOR = "#94a3b8"  # unknown – light slate
+
+        TYPE_LIGNE_COLOR = {
+            "Ligne proprement dite": "#1e3a5f",  # main line – dark blue
+            "Raccordement": "#64748b",  # siding/connection – slate
+            "Voie-mère d'embranchement": "#059669",  # branch – emerald
+            "Voie de desserte de voies ferrées de port": "#b45309",  # port access – amber
+        }
 
         STATION_ON_EACH_FEATURE = JsCode("""
         function(f, l) {
@@ -187,15 +247,6 @@ class MapRenderer:
 
         self.map.add_child(railways_features_group)
 
-        DEFAULT_LIGNE_COLOR = "#94a3b8"  # unknown – light slate
-
-        TYPE_LIGNE_COLOR = {
-            "Ligne proprement dite": "#1e3a5f",  # main line – dark blue
-            "Raccordement": "#64748b",  # siding/connection – slate
-            "Voie-mère d'embranchement": "#059669",  # branch – emerald
-            "Voie de desserte de voies ferrées de port": "#b45309",  # port access – amber
-        }
-
         def ligne_style(feature):
             t = feature.get("properties", {}).get("type_ligne") or ""
             color = TYPE_LIGNE_COLOR.get(t, DEFAULT_LIGNE_COLOR)
@@ -225,7 +276,7 @@ class MapRenderer:
         railways_layer.add_to(railways_features_group)
 
         milestones_low_zoom_layer = folium.GeoJson(
-            self._milestones_low_zoom_geodataset,
+            self._milestones_low_zoom_for_map,
             name="MilestonesOnLowZoom",
             zoom_on_click=True,
             marker=folium.CircleMarker(
@@ -264,7 +315,7 @@ class MapRenderer:
         milestones_low_zoom_layer.add_to(railways_features_group)
 
         milestones_medium_zoom_layer = folium.GeoJson(
-            self._milestones_medium_zoom_geodataset,
+            self._milestones_medium_zoom_for_map,
             name="MilestonesOnMediumZoom",
             zoom_on_click=True,
             marker=folium.CircleMarker(
@@ -408,7 +459,16 @@ class MapRenderer:
 
     def to_html(self, prefix: str = ""):
 
-        self.map.save(f"{prefix}.html")
+        path = f"{prefix}.html"
+        self.map.save(path)
+        try:
+            size_bytes = Path(path).stat().st_size
+        except OSError as e:
+            logger.warning(
+                "Saved map HTML but could not stat file", path=path, error=str(e)
+            )
+        else:
+            logger.info("Map HTML written", path=path, size_bytes=size_bytes)
 
 
 if __name__ == "__main__":
