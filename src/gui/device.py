@@ -242,6 +242,7 @@ class DeviceItem(QListWidgetItem):
         )
         right_wrap.setObjectName("device-item-right-wrap")
         right_wrap.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        right_wrap.hide()
 
         main_row = HorizontalLayoutWrapper(
             row,
@@ -358,13 +359,35 @@ class DeviceItem(QListWidgetItem):
                 w.deleteLater()
 
     def _sync_size_hint(self) -> None:
-        lay = self.ui.row.layout()
+        row = self.ui.row
+        lay = row.layout()
         if lay is not None:
+            lay.invalidate()
             lay.activate()
-        self.ui.row.updateGeometry()
-        sh = self.ui.row.sizeHint()
-        h = max(Settings.LIST.DEVICE_ITEM_ROW_MIN_HEIGHT, sh.height())
-        self.setSizeHint(QSize(sh.width(), h))
+        row.updateGeometry()
+
+        # Extended: keep current behavior (size hint tracks the laid-out row).
+        if self.ui.right_wrap.isVisible():
+            sh = row.sizeHint()
+            h = max(Settings.LIST.DEVICE_ITEM_ROW_MIN_HEIGHT, sh.height())
+            self.setSizeHint(QSize(sh.width(), h))
+        else:
+            # Shortened: do not carry over the row's stretched width from the extended
+            # state — width must match hidden right column so AdjustToContents can shrink.
+            mw = max(1, row.minimumSizeHint().width())
+            saved = QSize(row.width(), row.height())
+            row.resize(mw, saved.height())
+            if lay is not None:
+                lay.activate()
+            row.updateGeometry()
+            sh = row.sizeHint()
+            row.resize(saved)
+            if lay is not None:
+                lay.activate()
+            row.updateGeometry()
+            h = max(Settings.LIST.DEVICE_ITEM_ROW_MIN_HEIGHT, sh.height())
+            self.setSizeHint(QSize(mw, h))
+
         lw = self.listWidget()
         if lw is not None:
             lw.viewport().update()
@@ -502,6 +525,16 @@ class DeviceItem(QListWidgetItem):
         list_widget.setItemWidget(item, item.ui.row)
         QTimer.singleShot(0, item._sync_size_hint)
         return item
+
+    def extend_device_item(self) -> None:
+        """Extend the device item to show the last communication time and menu button."""
+        self.ui.right_wrap.show()
+        self._sync_size_hint()
+
+    def shorten_device_item(self) -> None:
+        """Shorten the device item to hide the last communication time and menu button."""
+        self.ui.right_wrap.hide()
+        self._sync_size_hint()
 
 
 class DeviceState(QGroupBox):
@@ -1164,3 +1197,15 @@ class DeviceSelectionPanel(QFrame):
             alert_highlight=True,
         )
         self._update_available_device_empty_state_visibility()
+
+    def extend_list_items(self) -> None:
+        """Extend the list items to show the last communication time and menu button."""
+        for item in self.ui.available_device_list.iter_items():
+            if isinstance(item, DeviceItem):
+                item.extend_device_item()
+
+    def shorten_list_items(self) -> None:
+        """Shorten the list items to hide the last communication time and menu button."""
+        for item in self.ui.available_device_list.iter_items():
+            if isinstance(item, DeviceItem):
+                item.shorten_device_item()

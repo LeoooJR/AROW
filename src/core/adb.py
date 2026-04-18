@@ -164,7 +164,6 @@ def _parse_battery(output: str) -> dict[str, int | bool | str]:
         if match:
             k = _normalize_kv_key(match.group(1))
             parsed[k] = _coerce_dumpsys_scalar(match.group(2))
-            continue
     return parsed
 
 

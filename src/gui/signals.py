@@ -14,6 +14,10 @@ class AppSignals(QObject):
     HostPanelVisibilityRequested = Signal(bool)
     LogPanelVisibilityRequested = Signal(bool)
 
+    #### ADB Server Signals ####
+    ADBServerStarted = Signal()
+    ADBServerStopped = Signal()
+
     #### Device Signals ####
     AddDeviceRequested = Signal()
     AuthentificationRequested = Signal()

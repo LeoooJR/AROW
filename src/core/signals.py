@@ -3,8 +3,10 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import StrEnum
+from pathlib import Path
 from typing import Protocol, TypeVar
 
+from core.adb import AdbBinary
 from core.devices import Phone
 from core.location import Location
 from logger import logger
@@ -20,6 +22,8 @@ class CoreSignal(StrEnum):
     - Names are domain-oriented (not UI-oriented) so controllers can adapt them.
     """
 
+    ADB_SERVER_STARTED = "adb.server.started"
+    ADB_SERVER_STOPPED = "adb.server.stopped"
     DEVICE_CONNECTION_REQUESTED = "device.connection.requested"
     DEVICE_CONNECTION_SUCCEEDED = "device.connection.succeeded"
     DEVICE_CONNECTION_FAILED = "device.connection.failed"
@@ -31,6 +35,20 @@ class CoreSignal(StrEnum):
     ADB_SERVER_STATE_CHANGED = "adb.server.state.changed"
     ERROR_RAISED = "error.raised"
     LOG_MESSAGE = "log.message"
+
+
+@dataclass(frozen=True, slots=True)
+class AdbServerStartedPayload:
+    """Payload emitted when the ADB server starts."""
+
+    adb_binary: AdbBinary
+
+
+@dataclass(frozen=True, slots=True)
+class AdbServerStoppedPayload:
+    """Payload emitted when the ADB server stops."""
+
+    adb_binary: AdbBinary
 
 
 @dataclass(frozen=True, slots=True)

@@ -6,6 +6,8 @@ from typing import Any, Callable
 from core.adb import AdbBinary, AdbClient, AdbClientException, AdbServer
 from core.devices import Computer, Phone
 from core.signals import (
+    AdbServerStartedPayload,
+    AdbServerStoppedPayload,
     CoreSignal,
     DevicePairingFailedPayload,
     DevicePairingSucceededPayload,
@@ -104,6 +106,10 @@ class CoreRuntimeModel(Model):
                 adb_path=str(adb_binary.path),
             )
             self._signal_bus.emit(
+                CoreSignal.ADB_SERVER_STARTED,
+                AdbServerStartedPayload(adb_binary=adb_binary),
+            )
+            self._signal_bus.emit(
                 CoreSignal.DEVICES_UPDATED,
                 DevicesUpdatedPayload(devices=self.get_known_devices()),
             )
@@ -121,7 +127,14 @@ class CoreRuntimeModel(Model):
         if self._adb_server is not None:
             self._adb_server.stop()
             self._adb_server = None
-            logger.info("CoreRuntimeModel: ADB server stopped")
+            self._signal_bus.emit(
+                CoreSignal.ADB_SERVER_STOPPED,
+                AdbServerStoppedPayload(adb_binary=self._adb_server.binary),
+            )
+            logger.info(
+                "CoreRuntimeModel: ADB server stopped",
+                adb_path=str(self._adb_server.binary.path),
+            )
         else:
             logger.warning(
                 "CoreRuntimeModel: ADB server stop skipped (not running)",
@@ -132,8 +145,19 @@ class CoreRuntimeModel(Model):
         Restart the ADB server and keep the instance in model state.
         """
         if self._adb_server is not None:
+            self._signal_bus.emit(
+                CoreSignal.ADB_SERVER_STOPPED,
+                AdbServerStoppedPayload(adb_binary=self._adb_server.binary),
+            )
             self._adb_server.restart()
-            logger.info("CoreRuntimeModel: ADB server restarted")
+            logger.info(
+                "CoreRuntimeModel: ADB server restarted",
+                adb_path=str(self._adb_server.binary.path),
+            )
+            self._signal_bus.emit(
+                CoreSignal.ADB_SERVER_STARTED,
+                AdbServerStartedPayload(adb_binary=self._adb_server.binary),
+            )
             self._signal_bus.emit(
                 CoreSignal.DEVICES_UPDATED,
                 DevicesUpdatedPayload(devices=self.get_known_devices()),

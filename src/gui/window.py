@@ -544,6 +544,10 @@ class Body(QWidget):
     def set_right_panels_visibility(self, visible: bool) -> None:
         """Set the right panels visibility."""
         self.ui.right_panels_wrapper.setVisible(visible)
+        if not visible:
+            self.ui.device_selection_panel.extend_list_items()
+        else:
+            self.ui.device_selection_panel.shorten_list_items()
 
     def set_device_selection_panel_visibility(self, visible: bool) -> None:
         """Set the device selection panel visibility."""
@@ -935,6 +939,12 @@ class MainWindow(QMainWindow):
         """Handle the idle state: run helper and highlight device lists to draw attention."""
         logger.info("MainWindow: idle state detected")
         self.ui.container.wake_up()
+
+    def on_adb_server_started(self) -> None:
+        app_signals.ADBServerStarted.emit()
+
+    def on_adb_server_stopped(self) -> None:
+        app_signals.ADBServerStopped.emit()
 
     def _on_device_selection(self, device: DeviceItem) -> None:
         """Handle the device selection."""

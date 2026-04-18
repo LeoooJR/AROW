@@ -7,6 +7,8 @@ from core.devices import Phone
 from core.location import Location
 from core.models import CoreRuntimeModel
 from core.signals import (
+    AdbServerStartedPayload,
+    AdbServerStoppedPayload,
     CoreSignal,
     DevicePairingFailedPayload,
     DevicePairingSucceededPayload,
@@ -120,6 +122,8 @@ class SimulationController(Controller):
         self.model.subscribe(
             CoreSignal.DEVICE_PAIRING_FAILED, self._on_device_pairing_failed
         )
+        self.model.subscribe(CoreSignal.ADB_SERVER_STARTED, self._on_adb_server_started)
+        self.model.subscribe(CoreSignal.ADB_SERVER_STOPPED, self._on_adb_server_stopped)
 
     @property
     def device(self) -> Phone | None:
@@ -158,6 +162,22 @@ class SimulationController(Controller):
 
     def resume(self):
         pass
+
+    def _on_adb_server_started(self, payload: AdbServerStartedPayload) -> None:
+        """Handle the ADB server started event."""
+        logger.info(
+            "SimulationController: ADB server started",
+            adb_binary=str(payload.adb_binary),
+        )
+        self.view.on_adb_server_started()
+
+    def _on_adb_server_stopped(self, payload: AdbServerStoppedPayload) -> None:
+        """Handle the ADB server stopped event."""
+        logger.info(
+            "SimulationController: ADB server stopped",
+            adb_binary=str(payload.adb_binary),
+        )
+        self.view.on_adb_server_stopped()
 
     def _on_authentification_confirmed(
         self, ip: str, port: str, association_code: str

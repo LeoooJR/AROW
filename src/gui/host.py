@@ -633,6 +633,9 @@ class HostPanel(QFrame):
             )
         )
 
+        app_signals.ADBServerStarted.connect(self._on_adb_server_started)
+        app_signals.ADBServerStopped.connect(self._on_adb_server_stopped)
+
         app_signals.HostDeviceInformationUpdated.connect(
             self._on_host_device_information_updated
         )
@@ -660,6 +663,14 @@ class HostPanel(QFrame):
             helper_note=self.texts.placeholder_helper_note,
             indicator_state="valid",
         )
+
+    def _on_adb_server_started(self) -> None:
+        """Handle the ADB server started event."""
+        self.set_adb_bridge_values(server_state="running", indicator_state="valid")
+
+    def _on_adb_server_stopped(self) -> None:
+        """Handle the ADB server stopped event."""
+        self.set_adb_bridge_values(server_state="stopped", indicator_state="error")
 
     def set_host_identity_values(
         self,
