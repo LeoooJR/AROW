@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Final, Literal
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QIcon, QResizeEvent, QShowEvent
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -206,6 +206,7 @@ class HostIdentitySection(QFrame):
 
         self.ui: HostIdentitySection.UI
         self.texts = HostIdentitySection.Text()
+        self._sync_height_in_progress: bool = False
         self.setObjectName("host-identity-section")
         self.setProperty("panel-section-compact", True)
 
@@ -270,11 +271,51 @@ class HostIdentitySection(QFrame):
         self.layout().setAlignment(self.ui.host_item, Qt.AlignmentFlag.AlignCenter)
         self.layout().setAlignment(
             self.ui.host_summary,
-            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop,
         )
 
     def _connect_signals(self) -> None:
         pass
+
+    def _content_height_for_width(self, width: int) -> int:
+        layout = self.layout()
+        assert layout is not None
+        margins = layout.contentsMargins()
+        spacing = layout.spacing()
+        summary_height = self.ui.host_summary.sizeHint().height()
+        if self.ui.host_summary.text():
+            summary_height = max(
+                summary_height,
+                self.ui.host_summary.heightForWidth(max(1, width)),
+            )
+
+        return (
+            margins.top()
+            + margins.bottom()
+            + self.ui.host_item.sizeHint().height()
+            + summary_height
+            + self.ui.ip_address_row.sizeHint().height()
+            + self.ui.platform_row.sizeHint().height()
+            + spacing * 3
+        )
+
+    def _sync_minimum_height_for_width(self) -> int:
+        if self._sync_height_in_progress:
+            return self.minimumHeight()
+
+        self._sync_height_in_progress = True
+        width = max(1, self.contentsRect().width())
+        try:
+            height = self._content_height_for_width(width)
+            self.setMinimumHeight(height)
+            self.updateGeometry()
+            return height
+        finally:
+            self._sync_height_in_progress = False
+
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        super().resizeEvent(event)
+        self._sync_minimum_height_for_width()
 
     def set_host_values(
         self,
@@ -294,9 +335,11 @@ class HostIdentitySection(QFrame):
             self.ui.platform_row.set_value_text(platform)
         if os_icon_path is not None:
             self.ui.host_item.set_icon(os_icon_path)
+        self._sync_minimum_height_for_width()
 
 
 class AdbBridgeSection(QFrame):
+    _COMPACT_HELPER_NOTE: Final[str] = "ADB link to Android devices."
 
     @dataclass(frozen=True)
     class Text:
@@ -326,6 +369,9 @@ class AdbBridgeSection(QFrame):
 
         self.ui: AdbBridgeSection.UI
         self.texts = AdbBridgeSection.Text()
+        self._compact_mode: bool = False
+        self._full_helper_note: str = self.texts.helper_note
+        self._sync_height_in_progress: bool = False
         self.setObjectName("adb-bridge-section")
         self.setProperty("panel-section-compact", True)
 
@@ -355,9 +401,7 @@ class AdbBridgeSection(QFrame):
         helper_note = QLabel(self.texts.helper_note, self)
         helper_note.setProperty("host-supporting-text", True)
         helper_note.setWordWrap(True)
-        helper_note.setAlignment(
-            Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft
-        )
+        helper_note.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
 
         layout.addWidget(android_svg)
         layout.addWidget(status_row)
@@ -403,11 +447,72 @@ class AdbBridgeSection(QFrame):
         self.layout().setAlignment(self.ui.android_svg, Qt.AlignmentFlag.AlignCenter)
         self.layout().setAlignment(
             self.ui.helper_note,
-            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop,
         )
 
     def _connect_signals(self) -> None:
         pass
+
+    def _set_compact_mode(self, enabled: bool) -> None:
+        if self._compact_mode == enabled:
+            return
+
+        self._compact_mode = enabled
+        self.ui.version_row.setVisible(not enabled)
+        self.ui.daemon_row.setVisible(not enabled)
+        self.ui.helper_note.setText(
+            self._COMPACT_HELPER_NOTE if enabled else self._full_helper_note
+        )
+        self.updateGeometry()
+
+    def _visible_metadata_rows(self) -> list[AdbBridgeMetadataRow]:
+        rows = [self.ui.status_row]
+        if self.ui.version_row.isVisible():
+            rows.append(self.ui.version_row)
+        if self.ui.daemon_row.isVisible():
+            rows.append(self.ui.daemon_row)
+        rows.append(self.ui.devices_row)
+        return rows
+
+    def _content_height_for_width(self, width: int) -> int:
+        layout = self.layout()
+        assert layout is not None
+        margins = layout.contentsMargins()
+        spacing = layout.spacing()
+        helper_height = self.ui.helper_note.sizeHint().height()
+        if self.ui.helper_note.isVisible() and self.ui.helper_note.text():
+            helper_height = max(
+                helper_height,
+                self.ui.helper_note.heightForWidth(max(1, width)),
+            )
+
+        visible_rows = self._visible_metadata_rows()
+        return (
+            margins.top()
+            + margins.bottom()
+            + self.ui.android_svg.sizeHint().height()
+            + sum(row.sizeHint().height() for row in visible_rows)
+            + helper_height
+            + spacing * (len(visible_rows) + 1)
+        )
+
+    def _sync_minimum_height_for_width(self) -> int:
+        if self._sync_height_in_progress:
+            return self.minimumHeight()
+
+        self._sync_height_in_progress = True
+        width = max(1, self.contentsRect().width())
+        try:
+            height = self._content_height_for_width(width)
+            self.setMinimumHeight(height)
+            self.updateGeometry()
+            return height
+        finally:
+            self._sync_height_in_progress = False
+
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        super().resizeEvent(event)
+        self._sync_minimum_height_for_width()
 
     def set_server_state(
         self, state: ADB_SERVER_STATE, text: str | None = None
@@ -436,10 +541,17 @@ class AdbBridgeSection(QFrame):
         if connected_devices is not None:
             self.ui.devices_row.set_value_text(connected_devices)
         if helper_note is not None:
-            self.ui.helper_note.setText(helper_note)
+            self._full_helper_note = helper_note
+            self.ui.helper_note.setText(
+                self._COMPACT_HELPER_NOTE if self._compact_mode else helper_note
+            )
+        self._sync_minimum_height_for_width()
 
 
 class HostPanel(QFrame):
+    _DISPLAY_EXTENDED: Final[str] = "extended"
+    _DISPLAY_COMPACT: Final[str] = "compact"
+    _COMPACT_WIDTH_THRESHOLD: Final[int] = 340
 
     @dataclass(frozen=True)
     class Text:
@@ -479,6 +591,8 @@ class HostPanel(QFrame):
 
         self.ui: HostPanel.UI
         self.texts = HostPanel.Text()
+        self._display_mode: str = self._DISPLAY_EXTENDED
+        self._sync_content_heights_in_progress: bool = False
 
         self.setObjectName("host-panel")
         self.setProperty("panel", True)
@@ -589,6 +703,7 @@ class HostPanel(QFrame):
         self._set_alignment()
         self._connect_signals()
         self._set_placeholder_values()
+        self._sync_content_heights()
 
     def _set_alignment(self) -> None:
         """Centralize layout alignment for the panel and its UI widgets."""
@@ -606,7 +721,9 @@ class HostPanel(QFrame):
 
     def _set_size_policy(self) -> None:
         """Centralize size policies for the panel and its UI widgets (window resizing)."""
-        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+        self.setSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.MinimumExpanding
+        )
         self.ui.header.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
         )
@@ -617,7 +734,7 @@ class HostPanel(QFrame):
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
         )
         self.ui.body.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.MinimumExpanding
         )
 
     def _connect_signals(self) -> None:
@@ -644,6 +761,117 @@ class HostPanel(QFrame):
         """Handle the UI constraints disabled event."""
         self._set_placeholder_values()
 
+    def _current_body_width(self) -> int:
+        body_layout = self.ui.body.get_layout()
+        margins = body_layout.contentsMargins()
+        return max(
+            1,
+            self.ui.body.contentsRect().width() - margins.left() - margins.right(),
+            self.ui.body.width() - margins.left() - margins.right(),
+        )
+
+    def _group_box_height(self, group_box: GroupBox) -> int:
+        group_box.layout().invalidate()
+        group_box.layout().activate()
+        return max(group_box.minimumSizeHint().height(), group_box.sizeHint().height())
+
+    def _body_height_for_mode(self, mode: str) -> int:
+        previous_mode = self._display_mode
+        if previous_mode != mode:
+            self._set_display_mode(mode)
+
+        self.ui.host_identity._sync_minimum_height_for_width()
+        self.ui.adb_bridge._sync_minimum_height_for_width()
+        identity_height = self._group_box_height(self.ui.identity_group_box)
+        adb_height = self._group_box_height(self.ui.adb_group_box)
+        spacing = self.ui.body.get_layout().spacing()
+        total = identity_height + adb_height + spacing
+
+        if previous_mode != mode:
+            self._set_display_mode(previous_mode)
+            self.ui.host_identity._sync_minimum_height_for_width()
+            self.ui.adb_bridge._sync_minimum_height_for_width()
+
+        return total
+
+    def _available_body_height(self) -> int:
+        if not self.ui.body.isVisible():
+            return 0
+        return max(0, self.ui.body.height())
+
+    def _choose_display_mode(self) -> str:
+        if not self.ui.body.isVisible():
+            return self._display_mode
+
+        body_width = self._current_body_width()
+        if body_width <= self._COMPACT_WIDTH_THRESHOLD:
+            return self._DISPLAY_COMPACT
+
+        available_body_height = self._available_body_height()
+        if available_body_height <= 0:
+            return self._DISPLAY_EXTENDED
+
+        extended_body_height = self._body_height_for_mode(self._DISPLAY_EXTENDED)
+        if extended_body_height > available_body_height:
+            return self._DISPLAY_COMPACT
+
+        return self._DISPLAY_EXTENDED
+
+    def _set_display_mode(self, mode: str) -> None:
+        if self._display_mode == mode:
+            return
+
+        self._display_mode = mode
+        self.ui.adb_bridge._set_compact_mode(mode == self._DISPLAY_COMPACT)
+        self.ui.adb_group_box.updateGeometry()
+        self.ui.body.updateGeometry()
+
+    def _sync_content_heights(self) -> None:
+        if self._sync_content_heights_in_progress:
+            return
+
+        self._sync_content_heights_in_progress = True
+        try:
+            if not hasattr(self, "ui") or not self.ui.body.isVisible():
+                self.setMinimumHeight(self._reduced_height())
+                return
+
+            mode = self._choose_display_mode()
+            self._set_display_mode(mode)
+
+            self.ui.host_identity._sync_minimum_height_for_width()
+            self.ui.adb_bridge._sync_minimum_height_for_width()
+
+            identity_height = self._group_box_height(self.ui.identity_group_box)
+            adb_height = self._group_box_height(self.ui.adb_group_box)
+            self.ui.identity_group_box.setMinimumHeight(identity_height)
+            self.ui.adb_group_box.setMinimumHeight(adb_height)
+            self.ui.identity_wrapper.setMinimumHeight(identity_height)
+            self.ui.adb_wrapper.setMinimumHeight(adb_height)
+
+            panel_layout = self.layout()
+            body_layout = self.ui.body.get_layout()
+            assert panel_layout is not None
+
+            minimum_height = (
+                panel_layout.contentsMargins().top()
+                + panel_layout.contentsMargins().bottom()
+                + self.ui.header.sizeHint().height()
+                + panel_layout.spacing()
+                + body_layout.contentsMargins().top()
+                + body_layout.contentsMargins().bottom()
+                + identity_height
+                + adb_height
+                + body_layout.spacing()
+            )
+            self.ui.body.setMinimumHeight(
+                identity_height + adb_height + body_layout.spacing()
+            )
+            self.setMinimumHeight(max(self._reduced_height(), minimum_height))
+            self.updateGeometry()
+        finally:
+            self._sync_content_heights_in_progress = False
+
     def _set_placeholder_values(self) -> None:
         """Populate placeholder values until controller/core wiring is implemented."""
         self.set_host_identity_values(
@@ -663,6 +891,7 @@ class HostPanel(QFrame):
             helper_note=self.texts.placeholder_helper_note,
             indicator_state="valid",
         )
+        self._sync_content_heights()
 
     def _on_adb_server_started(self) -> None:
         """Handle the ADB server started event."""
@@ -691,6 +920,7 @@ class HostPanel(QFrame):
         )
         if identity_state is not None:
             self.ui.identity_indicator.set_state(identity_state)
+        self._sync_content_heights()
 
     def set_adb_bridge_values(
         self,
@@ -713,6 +943,7 @@ class HostPanel(QFrame):
         )
         if indicator_state is not None:
             self.ui.adb_indicator.set_state(indicator_state)
+        self._sync_content_heights()
 
     def _on_host_device_information_updated(
         self, name: str, os: Literal["linux", "windows", "darwin"] | None, ip: str
@@ -748,6 +979,7 @@ class HostPanel(QFrame):
             self.ui.expand_button.setIcon(QIcon(GenericIcons.LAYOUT_TOPBAR_INSET.value))
             self.ui.body.setVisible(True)
             self.setMaximumHeight(Settings.PANEL.UNBOUNDED_HEIGHT)
+            self._sync_content_heights()
             self.updateGeometry()
 
     def hide_panel(self) -> None:
@@ -757,6 +989,7 @@ class HostPanel(QFrame):
             self.ui.expand_button.setIcon(QIcon(GenericIcons.LAYOUT_TOPBAR.value))
             self.ui.body.setVisible(False)
             self.setMaximumHeight(self._reduced_height())
+            self.setMinimumHeight(self._reduced_height())
             self.updateGeometry()
 
     def _reduced_height(self) -> int:
@@ -774,11 +1007,21 @@ class HostPanel(QFrame):
             self.ui.expand_button.setIcon(QIcon(GenericIcons.LAYOUT_TOPBAR.value))
             self.ui.body.setVisible(False)
             self.setMaximumHeight(self._reduced_height())
+            self.setMinimumHeight(self._reduced_height())
         else:
             # Expand: show body and allow it to grow.
             self.ui.expand_button.setProperty("toggle", True)
             self.ui.expand_button.setIcon(QIcon(GenericIcons.LAYOUT_TOPBAR_INSET.value))
             self.ui.body.setVisible(True)
             self.setMaximumHeight(Settings.PANEL.UNBOUNDED_HEIGHT)
+            self._sync_content_heights()
         # Notify parent layout so space is reallocated (panel below gets more height when reduced).
         self.updateGeometry()
+
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        super().resizeEvent(event)
+        self._sync_content_heights()
+
+    def showEvent(self, event: QShowEvent) -> None:
+        super().showEvent(event)
+        self._sync_content_heights()

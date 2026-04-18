@@ -420,6 +420,8 @@ class Body(QWidget):
         right_panels_wrapper = VerticalLayoutWrapper(
             self, widgets=[host_panel, log_panel], spacing=0, margins=(0, 0, 0, 0)
         )
+        right_panels_wrapper.get_layout().setStretchFactor(host_panel, 0)
+        right_panels_wrapper.get_layout().setStretchFactor(log_panel, 1)
         right_panels_wrapper.setObjectName("right-panels-wrapper")
         # Visibility are True by default, but set it explicitly to ensure the panels are visible at application start
         right_panels_wrapper.setVisible(True)
@@ -460,7 +462,9 @@ class Body(QWidget):
         app_signals.DeviceSelectionSucceeded.connect(self._on_device_connected)
 
     def _set_alignment(self) -> None:
-        pass
+        self.ui.right_panels_wrapper.get_layout().setAlignment(
+            Qt.AlignmentFlag.AlignTop
+        )
 
     def _set_size_policy(self) -> None:
         self.ui.tabs.setSizePolicy(

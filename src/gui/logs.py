@@ -89,6 +89,7 @@ class LogPanel(QFrame):
 
         logs_list = List(None)
         logs_list.setObjectName("logs-list")
+        logs_list.setMinimumHeight(0)
         self.add_list_items_placeholder(
             logs_list, items=list(self.texts.placeholder_items)
         )
@@ -168,10 +169,10 @@ class LogPanel(QFrame):
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
         self.ui.logs_wrapper.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.MinimumExpanding
         )
         self.ui.logs_group_box.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.MinimumExpanding
         )
         self.ui.logs_list_helper_text.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
@@ -180,8 +181,12 @@ class LogPanel(QFrame):
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
         )
         self.ui.body.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.MinimumExpanding
         )
+        self.setMinimumHeight(self._reduced_height())
+        self.ui.logs_group_box.setMinimumHeight(0)
+        self.ui.logs_wrapper.setMinimumHeight(0)
+        self.ui.body.setMinimumHeight(0)
 
     def _connect_signals(self) -> None:
         """Connect signals for the log panel and its UI widgets."""

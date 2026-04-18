@@ -132,6 +132,7 @@ class DeviceItem(QListWidgetItem):
         self._location: str = location
         self._last_communication: str = last_communication
         self._alert_highlight: bool = alert_highlight
+        self._sync_size_hint_in_progress: bool = False
 
         row = _DeviceItemRowWidget(self)
         row.setObjectName("device-item-row")
@@ -313,7 +314,7 @@ class DeviceItem(QListWidgetItem):
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.MinimumExpanding
         )
         self.ui.right_wrap.setSizePolicy(
-            QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum
+            QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Minimum
         )
         self.ui.name_label.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
@@ -328,7 +329,7 @@ class DeviceItem(QListWidgetItem):
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
         )
         self.ui.time_label.setSizePolicy(
-            QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.Preferred
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred
         )
         self.ui.menu_button.setSizePolicy(
             QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed
@@ -358,39 +359,87 @@ class DeviceItem(QListWidgetItem):
             if w is not None:
                 w.deleteLater()
 
+    def _measurement_row_width(self) -> int:
+        """Measure items against the current list viewport width when available."""
+        list_widget = self.listWidget()
+        if list_widget is not None:
+            viewport_width = list_widget.viewport().contentsRect().width()
+            if viewport_width > 0:
+                return viewport_width
+
+        row_width = self.ui.row.width()
+        if row_width > 0:
+            return row_width
+
+        return max(
+            1,
+            self.ui.row.sizeHint().width(),
+            self.ui.row.minimumSizeHint().width(),
+        )
+
+    def _minimum_row_width(self) -> int:
+        """Stable minimum width budget for the row in its current mode."""
+        main_layout = self.ui.main_row.get_layout()
+        margins = main_layout.contentsMargins()
+        width = margins.left() + margins.right()
+
+        icon_width = max(
+            self.ui.icon_frame.sizeHint().width(),
+            self.ui.icon_frame.minimumSizeHint().width(),
+        )
+        width += icon_width + 1
+
+        if self.ui.right_wrap.isVisible():
+            right_width = max(
+                self.ui.right_wrap.sizeHint().width(),
+                self.ui.right_wrap.minimumSizeHint().width(),
+            )
+            width += main_layout.spacing() * 2 + right_width
+        else:
+            width += main_layout.spacing()
+
+        return max(1, width)
+
+    def _height_for_row_width(self, row_width: int) -> int:
+        """Height-for-width measurement based on the current layout state."""
+        row = self.ui.row
+        layout = row.layout()
+
+        if layout is not None and layout.hasHeightForWidth():
+            return layout.totalHeightForWidth(row_width)
+        if row.hasHeightForWidth():
+            return row.heightForWidth(row_width)
+        return row.sizeHint().height()
+
     def _sync_size_hint(self) -> None:
+        if self._sync_size_hint_in_progress:
+            return
+
+        self._sync_size_hint_in_progress = True
+
         row = self.ui.row
         lay = row.layout()
-        if lay is not None:
-            lay.invalidate()
-            lay.activate()
-        row.updateGeometry()
-
-        # Extended: keep current behavior (size hint tracks the laid-out row).
-        if self.ui.right_wrap.isVisible():
-            sh = row.sizeHint()
-            h = max(Settings.LIST.DEVICE_ITEM_ROW_MIN_HEIGHT, sh.height())
-            self.setSizeHint(QSize(sh.width(), h))
-        else:
-            # Shortened: do not carry over the row's stretched width from the extended
-            # state — width must match hidden right column so AdjustToContents can shrink.
-            mw = max(1, row.minimumSizeHint().width())
-            saved = QSize(row.width(), row.height())
-            row.resize(mw, saved.height())
+        try:
             if lay is not None:
+                lay.invalidate()
                 lay.activate()
             row.updateGeometry()
-            sh = row.sizeHint()
-            row.resize(saved)
-            if lay is not None:
-                lay.activate()
-            row.updateGeometry()
-            h = max(Settings.LIST.DEVICE_ITEM_ROW_MIN_HEIGHT, sh.height())
-            self.setSizeHint(QSize(mw, h))
 
-        lw = self.listWidget()
-        if lw is not None:
-            lw.viewport().update()
+            row_width = max(self._minimum_row_width(), self._measurement_row_width())
+            measured_height = self._height_for_row_width(row_width)
+            target_hint = QSize(
+                row_width,
+                max(Settings.LIST.DEVICE_ITEM_ROW_MIN_HEIGHT, measured_height),
+            )
+
+            if self.sizeHint() != target_hint:
+                self.setSizeHint(target_hint)
+
+            lw = self.listWidget()
+            if lw is not None:
+                lw.viewport().update()
+        finally:
+            self._sync_size_hint_in_progress = False
 
     def _apply_badge(self) -> None:
         layout = self.ui.badge_container.layout()
