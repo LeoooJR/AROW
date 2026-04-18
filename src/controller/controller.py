@@ -1,5 +1,8 @@
+import importlib
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import Any
 
 from PySide6.QtWidgets import QWidget
 
@@ -16,6 +19,13 @@ from core.signals import (
 )
 from gui.signals import app_signals
 from logger import logger
+
+_async_mod = importlib.import_module("controller.async")
+AsyncRunner = _async_mod.AsyncRunner
+JobError = _async_mod.JobError
+JobHandler = _async_mod.JobHandler
+JobSpecification = _async_mod.JobSpecification
+ProgressEvent = _async_mod.ProgressEvent
 
 
 @dataclass
@@ -36,6 +46,7 @@ class Controller(ABC):
 
         self._model = model
         self._view = view
+        self._runner: AsyncRunner = AsyncRunner(view)
         self._connect_view_signals()
         self._connect_model_signals()
 
@@ -70,6 +81,69 @@ class Controller(ABC):
     def model(self, model: CoreRuntimeModel) -> None:
 
         self._model = model
+
+    @property
+    def runner(self) -> AsyncRunner:
+
+        return self._runner
+
+    def _submit_model_async_call(
+        self,
+        *,
+        name: str,
+        fn: Callable[..., Any],
+        description: str = "",
+        args: tuple[Any, ...] = (),
+        kwargs: dict[str, Any] | None = None,
+        on_completed: Callable[[object], None] | None = None,
+        on_failed: Callable[[JobError], None] | None = None,
+        on_cancelled: Callable[[], None] | None = None,
+        on_progress: Callable[[ProgressEvent], None] | None = None,
+        job_type: str = "auto",
+        timeout: int | None = None,
+        priority: int = 0,
+        coalesce_key: str | None = None,
+    ) -> JobHandler:
+        """
+        Submit a model-related async job and bind any provided callbacks.
+
+        Completed callbacks are invoked by AsyncRunner on the Qt main thread,
+        which makes this helper the standard entry point for future controller
+        -> model async orchestration.
+        """
+        job = JobSpecification(
+            name=name,
+            description=description or name,
+            fn=fn,
+            args=args,
+            kwargs={} if kwargs is None else kwargs,
+            timeout=timeout,
+            priority=priority,
+            coalesce_key=coalesce_key,
+            type=job_type,
+        )
+        handle = self.runner.submit(job)
+        handle_signals = self.runner.bind_handle_signals(handle)
+
+        if on_progress is not None:
+            handle_signals.Progress.connect(on_progress)
+        if on_completed is not None:
+            handle_signals.Completed.connect(on_completed)
+        if on_cancelled is not None:
+            handle_signals.Cancelled.connect(on_cancelled)
+        if on_failed is not None:
+            handle_signals.Failed.connect(on_failed)
+
+        logger.debug(
+            "Controller: async model job submitted",
+            controller_type=type(self).__name__,
+            model_type=type(self.model).__name__,
+            job_id=handle.job_id,
+            job_name=name,
+            job_type=job_type,
+            coalesce_key=coalesce_key,
+        )
+        return handle
 
 
 class SimulationController(Controller):

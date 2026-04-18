@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Literal, Optional
 
 from loguru import logger
-from PySide6.QtCore import QObject, QTimer, Signal
+from PySide6.QtCore import QObject, Qt, Signal
 
 jobtype = Literal["auto", "thread", "process"]
 jobstatus = Literal["pending", "running", "completed", "cancelled", "failed"]
@@ -346,6 +346,11 @@ class AsyncRunner(QObject):
     thread pool based on job specification; emits Qt signals on the main thread.
     """
 
+    _progress_ready = Signal(str, ProgressEvent)
+    _completed_ready = Signal(str, object)
+    _cancelled_ready = Signal(str)
+    _failed_ready = Signal(str, JobError)
+
     def __init__(self, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
         self._signals: RunnerSignals = RunnerSignals(self)
@@ -353,6 +358,22 @@ class AsyncRunner(QObject):
         self._thread_pool: ThreadPool = ThreadPool()
         self.history: dict[str, tuple[JobHandler, JobHandlerSignals]] = {}
         self._coalesce_latest: dict[str, str] = {}
+        self._progress_ready.connect(
+            self._emit_progress_safe,
+            Qt.ConnectionType.QueuedConnection,
+        )
+        self._completed_ready.connect(
+            self._emit_completed_safe,
+            Qt.ConnectionType.QueuedConnection,
+        )
+        self._cancelled_ready.connect(
+            self._emit_cancelled_safe,
+            Qt.ConnectionType.QueuedConnection,
+        )
+        self._failed_ready.connect(
+            self._emit_failed_safe,
+            Qt.ConnectionType.QueuedConnection,
+        )
 
     @property
     def signals(self) -> RunnerSignals:
@@ -389,16 +410,16 @@ class AsyncRunner(QObject):
             self._coalesce_latest[job.coalesce_key] = job_id
 
         def _marshal_progress(_job_id: str, _progress: ProgressEvent) -> None:
-            QTimer.singleShot(0, lambda: self._emit_progress_safe(_job_id, _progress))
+            self._progress_ready.emit(_job_id, _progress)
 
         def _marshal_completed(_job_id: str, _result: object) -> None:
-            QTimer.singleShot(0, lambda: self._emit_completed_safe(_job_id, _result))
+            self._completed_ready.emit(_job_id, _result)
 
         def _marshal_cancelled(_job_id: str) -> None:
-            QTimer.singleShot(0, lambda: self._emit_cancelled_safe(_job_id))
+            self._cancelled_ready.emit(_job_id)
 
         def _marshal_failed(_job_id: str, _error: JobError) -> None:
-            QTimer.singleShot(0, lambda: self._emit_failed_safe(_job_id, _error))
+            self._failed_ready.emit(_job_id, _error)
 
         job_type = self._resolve_job_type(job)
         logger.debug(
