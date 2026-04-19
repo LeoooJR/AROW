@@ -46,7 +46,7 @@ from gui.elements import (
 )
 from gui.event_filter import ActivityTracker
 from gui.host import HostPanel
-from gui.icons import ApplicationIcons, GenericIcons, OperatingSystemIcons
+from gui.icons import ApplicationIcons, GenericIcons
 from gui.location import LocationPanel
 from gui.logs import LogPanel
 from gui.map import MapPanel
@@ -69,6 +69,8 @@ class Header(QWidget):
 
     @dataclass(frozen=True)
     class Text:
+        """Text used in element across the header."""
+
         light_palette_button_tooltip: Final[str] = "Switch to light mode"
         dark_palette_button_tooltip: Final[str] = "Switch to dark mode"
         left_panel_visibility_button_tooltip: Final[str] = (
@@ -80,6 +82,8 @@ class Header(QWidget):
 
     @dataclass
     class UI:
+        """UI elements used in the header widgets."""
+
         name: SVG
         light_palette_button: ToolButton
         dark_palette_button: ToolButton
@@ -91,6 +95,11 @@ class Header(QWidget):
         layout_buttons_wrapper: GridLayoutWrapper
 
     def __init__(self, parent=None):
+        """Initialize the header widget.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+        """
         # Initialize parent QWidget
         super().__init__(parent)
 
@@ -194,12 +203,18 @@ class Header(QWidget):
             layout_buttons_wrapper=layout_buttons_wrapper,
         )
 
+        self._finalize_ui_hooks()
+
+    def _finalize_ui_hooks(self) -> None:
+        """Run the final UI setup hooks for the header."""
         self._connect_signals()
         self._set_alignment()
         self._set_size_policy()
 
     def _connect_signals(self) -> None:
-        """Connect signals for the header."""
+        """Connect signals for the header widgets."""
+
+        #### Signals for toggling the left and right panels visibility ####
         left_btn = self.ui.left_panel_visibility_request_button
         right_btn = self.ui.right_panel_visibility_request_button
         left_btn.clicked.connect(
@@ -212,12 +227,14 @@ class Header(QWidget):
                 not bool(right_btn.property("visibility"))
             )
         )
+
+        #### Signals for toggling the palette ####
         self.ui.palette_button_group.buttonClicked.connect(
             self._on_palette_button_clicked
         )
 
     def _set_alignment(self) -> None:
-        """Set the alignment of the header."""
+        """Set the alignment of the header widgets."""
         self.layout().setAlignment(self.ui.name, Qt.AlignmentFlag.AlignCenter)
         self.layout().setAlignment(
             self.ui.layout_buttons_wrapper,
@@ -229,7 +246,7 @@ class Header(QWidget):
         )
 
     def _set_size_policy(self) -> None:
-        """Set the size policy of the header."""
+        """Set the size policy of the header widgets."""
         self.ui.left_panel_visibility_request_button.setSizePolicy(
             QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed
         )
@@ -250,7 +267,14 @@ class Header(QWidget):
         )
 
     def toggle_left_panels_visibility_request_button(self) -> None:
-        """Update left panels button icon and properties to the toggled state (call after body left panels visibility has been set)."""
+        """Update left panels button icon and properties to the toggled state (call after body left panels visibility has been set).
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
         button = self.ui.left_panel_visibility_request_button
         if button.property("inset"):
             button.setProperty("inset", False)
@@ -262,7 +286,14 @@ class Header(QWidget):
             button.setIcon(QIcon(GenericIcons.LAYOUT_SIDEBAR_INSET.value))
 
     def toggle_right_panels_visibility_request_button(self) -> None:
-        """Update right panels button icon and properties to the toggled state (call after body right panels visibility has been set)."""
+        """Update right panels button icon and properties to the toggled state (call after body right panels visibility has been set).
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
         button = self.ui.right_panel_visibility_request_button
         if button.property("inset"):
             button.setProperty("inset", False)
@@ -272,6 +303,8 @@ class Header(QWidget):
             button.setProperty("inset", True)
             button.setProperty("visibility", True)
             button.setIcon(QIcon(GenericIcons.LAYOUT_SIDEBAR_INSET_REVERSE.value))
+
+    #### Private methods ####
 
     def _update_palette_thumb_geometry(self) -> None:
         """Position the palette thumb over the light button (initial or after layout)."""
@@ -319,12 +352,16 @@ class Body(QWidget):
 
     @dataclass(frozen=True)
     class Text:
+        """Text used in element across the body."""
+
         welcome_tab: Final[str] = "Welcome"
         map_tab: Final[str] = "Map"
         device_tab: Final[str] = "Device"
 
     @dataclass
     class UI:
+        """UI elements used in the body widgets."""
+
         device_selection_panel: DeviceSelectionPanel
         location_panel: LocationPanel
         map_panel: MapPanel
@@ -338,6 +375,11 @@ class Body(QWidget):
         right_panels_wrapper: VerticalLayoutWrapper
 
     def __init__(self, parent=None):
+        """Initialize the body widget.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+        """
         super().__init__(parent)
 
         self.ui: Body.UI
@@ -441,6 +483,10 @@ class Body(QWidget):
             tabs_wrapper=tabs_wrapper,
         )
 
+        self._finalize_ui_hooks()
+
+    def _finalize_ui_hooks(self) -> None:
+        """Run the final UI setup hooks for the body."""
         self._connect_signals()
         self._set_alignment()
         self._set_size_policy()
@@ -592,6 +638,8 @@ class MainContainer(QWidget):
 
     @dataclass(frozen=True)
     class Text:
+        """User-visible strings for dialogs and toasts in the main container."""
+
         add_device_dialog_title: Final[str] = "Adding a device"
         add_device_dialog_text: Final[str] = "Do you want to add a new device?"
         add_device_dialog_detailed_text: Final[str] = (
@@ -605,12 +653,18 @@ class MainContainer(QWidget):
 
     @dataclass
     class UI:
+        """Composed widgets for the main shell (header, body, optional toast)."""
 
         header: Header
         body: Body
         toast: Optional[Toast] = None
 
     def __init__(self, parent: QWidget = None):
+        """Build the main vertical layout with header and body.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+        """
 
         super().__init__()
 
@@ -648,6 +702,10 @@ class MainContainer(QWidget):
 
         self.ui = MainContainer.UI(header=header, body=body)
 
+        self._finalize_ui_hooks()
+
+    def _finalize_ui_hooks(self) -> None:
+        """Run the final UI setup hooks for the main container."""
         self._set_size_policy()
         self._set_alignment()
         self._connect_signals()
@@ -768,14 +826,23 @@ class AuthentificationOverlay(QWidget):
 
     @dataclass(frozen=True)
     class Text:
+        """Copy for the authentification overlay (title and supporting description)."""
+
         title: Final[str] = "Authentification"
         description: Final[str] = "Please enter your access credentials to continue."
 
     @dataclass
     class UI:
+        """Widgets shown on the authentification overlay."""
+
         authentification_card: AuthentificationCard
 
     def __init__(self, parent: QWidget = None):
+        """Lay out the centered authentification card over the main content.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+        """
         super().__init__(parent)
 
         self.texts = AuthentificationOverlay.Text()
@@ -806,6 +873,10 @@ class AuthentificationOverlay(QWidget):
             authentification_card=authentification_card
         )
 
+        self._finalize_ui_hooks()
+
+    def _finalize_ui_hooks(self) -> None:
+        """Run the final UI setup hooks for the authentification overlay."""
         self._set_size_policy()
         self._set_alignment()
         self._connect_signals()
@@ -829,6 +900,8 @@ class MainWindow(QMainWindow):
 
     @dataclass(frozen=True)
     class Text:
+        """Window title, dialogs, and toast templates for the main window."""
+
         window_title: Final[str] = f"{__application__} - Main Window"
         connect_device_dialog_title: Final[str] = "Connecting to device"
         connect_device_dialog_text: str = "Do you want to connect to {device} device?"
@@ -845,11 +918,17 @@ class MainWindow(QMainWindow):
 
     @dataclass
     class UI:
+        """Root widgets: main content container and optional authentification layer."""
 
         container: MainContainer
         authentification_overlay: AuthentificationOverlay
 
     def __init__(self, ui_constraints_disabled: bool = False):
+        """Create the main window, layout, and signal wiring.
+
+        Args:
+            ui_constraints_disabled: When True, skip UI sizing constraints used in tests or special modes.
+        """
         # Initialize parent QMainWindow
         super().__init__()
 

@@ -15,6 +15,8 @@ class WelcomePanel(QFrame):
 
     @dataclass(frozen=True)
     class Text:
+        """Copy for the welcome hero, sections, walkthrough buttons, and recent placeholders."""
+
         tagline: Final[str] = (
             "Connect your Android device and simulate GPS location from your computer."
         )
@@ -31,6 +33,8 @@ class WelcomePanel(QFrame):
 
     @dataclass
     class UI:
+        """Composed widgets for the welcome screen layout."""
+
         image: Image
         tagline: QLabel
         hero: VerticalLayoutWrapper
@@ -46,6 +50,11 @@ class WelcomePanel(QFrame):
         sections_wrapper: HorizontalLayoutWrapper
 
     def __init__(self, parent=None):
+        """Build hero, start/recent, and walkthrough sections.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+        """
 
         super().__init__(parent)
 
@@ -174,6 +183,10 @@ class WelcomePanel(QFrame):
             sections_wrapper=sections_wrapper,
         )
 
+        self._finalize_ui_hooks()
+
+    def _finalize_ui_hooks(self) -> None:
+        """Run the final UI setup hooks for the welcome panel."""
         self._set_alignment()
         self._set_size_policy()
         self._connect_signals()
@@ -188,6 +201,10 @@ class WelcomePanel(QFrame):
         """
         Visual-only placeholders shown under the "Recent" label.
         No selection/click logic is implemented for these placeholder elements.
+
+        Args:
+            recent_files_wrapper: Vertical wrapper that owns the placeholder rows.
+            count: Maximum number of placeholder file rows to add.
         """
         placeholder_items = self.texts.recent_files
         for i in range(min(count, len(placeholder_items))):

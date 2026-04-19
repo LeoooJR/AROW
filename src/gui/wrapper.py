@@ -8,10 +8,14 @@ class VerticalLayoutWrapper(QFrame):
 
     @dataclass(frozen=True)
     class Text:
+        """Reserved for future user-visible strings on this wrapper."""
+
         pass
 
     @dataclass
     class UI:
+        """Reserved for future explicit child references on this wrapper."""
+
         pass
 
     def __init__(
@@ -23,6 +27,16 @@ class VerticalLayoutWrapper(QFrame):
         stretch_at_beginning: bool = False,
         stretch_at_end: bool = False,
     ):
+        """Lay out one or more widgets in a vertical column.
+
+        Args:
+            parent: Qt parent for this frame.
+            widgets: Single widget or list of widgets to stack vertically.
+            spacing: Pixels between consecutive widgets.
+            margins: Layout contents margins (left, top, right, bottom).
+            stretch_at_beginning: When True, insert a stretch before the widgets.
+            stretch_at_end: When True, insert a stretch after the widgets.
+        """
 
         super().__init__(parent)
 
@@ -49,6 +63,11 @@ class VerticalLayoutWrapper(QFrame):
         self.setLayout(layout)
 
     def add_widget(self, widget: QWidget):
+        """Append a widget to the bottom of the vertical layout.
+
+        Args:
+            widget: Child widget to add.
+        """
         self.layout().addWidget(widget)
 
     def get_layout(self) -> QVBoxLayout:
@@ -62,10 +81,14 @@ class HorizontalLayoutWrapper(QFrame):
 
     @dataclass(frozen=True)
     class Text:
+        """Reserved for future user-visible strings on this wrapper."""
+
         pass
 
     @dataclass
     class UI:
+        """Reserved for future explicit child references on this wrapper."""
+
         pass
 
     def __init__(
@@ -77,6 +100,16 @@ class HorizontalLayoutWrapper(QFrame):
         stretch_at_beginning: bool = False,
         stretch_at_end: bool = False,
     ):
+        """Lay out one or more widgets in a horizontal row.
+
+        Args:
+            parent: Qt parent for this frame.
+            widgets: Single widget or list of widgets to place left-to-right.
+            spacing: Pixels between consecutive widgets.
+            margins: Layout contents margins (left, top, right, bottom).
+            stretch_at_beginning: When True, insert a stretch before the widgets.
+            stretch_at_end: When True, insert a stretch after the widgets.
+        """
 
         super().__init__(parent)
 
@@ -103,6 +136,11 @@ class HorizontalLayoutWrapper(QFrame):
         self.setLayout(layout)
 
     def add_widget(self, widget: QWidget):
+        """Append a widget to the right end of the horizontal layout.
+
+        Args:
+            widget: Child widget to add.
+        """
         self.layout().addWidget(widget)
 
     def get_layout(self) -> QHBoxLayout:
@@ -116,10 +154,14 @@ class GridLayoutWrapper(QFrame):
 
     @dataclass(frozen=True)
     class Text:
+        """Reserved for future user-visible strings on this wrapper."""
+
         pass
 
     @dataclass
     class UI:
+        """Reserved for future explicit child references on this wrapper."""
+
         pass
 
     def __init__(
@@ -130,6 +172,15 @@ class GridLayoutWrapper(QFrame):
         margins: tuple = (0, 0, 0, 0),
         alignment: Qt.AlignmentFlag = Qt.AlignmentFlag.AlignCenter,
     ):
+        """Lay out widgets on a grid with optional per-cell alignment.
+
+        Args:
+            parent: Qt parent for this frame.
+            widgets: Single widget or list of (widget, row, column) tuples.
+            spacing: Pixels between grid cells.
+            margins: Layout contents margins (left, top, right, bottom).
+            alignment: Alignment flag applied when adding each widget to the grid.
+        """
 
         super().__init__(parent)
 
@@ -156,6 +207,14 @@ class GridLayoutWrapper(QFrame):
         column: int,
         alignment: Qt.AlignmentFlag = Qt.AlignmentFlag.AlignCenter,
     ):
+        """Place a widget at the given grid cell.
+
+        Args:
+            widget: Child widget to add.
+            row: Zero-based grid row.
+            column: Zero-based grid column.
+            alignment: Alignment within the cell.
+        """
         self.layout().addWidget(widget, row, column, alignment=alignment)
 
     def get_layout(self) -> QGridLayout:

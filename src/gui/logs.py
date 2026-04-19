@@ -25,9 +25,12 @@ from gui.wrapper import HorizontalLayoutWrapper, VerticalLayoutWrapper
 
 
 class LogPanel(QFrame):
+    """Side panel listing activity logs and the log file summary."""
 
     @dataclass(frozen=True)
     class Text:
+        """Titles, placeholders, and helper copy for the log panel."""
+
         title: Final[str] = "Activity log"
         expand_button_tooltip: Final[str] = "Toggle panel visibility"
         placeholder_items: Final[tuple[str, ...]] = ("Log 1", "Log 2", "Log 3")
@@ -38,6 +41,8 @@ class LogPanel(QFrame):
 
     @dataclass
     class UI:
+        """Widgets for the log list, file row, and grouped layout."""
+
         title: PanelTitle
         expand_button: ToolButton
         header: QWidget
@@ -49,6 +54,11 @@ class LogPanel(QFrame):
         logs_group_box: GroupBox
 
     def __init__(self, parent=None):
+        """Build the log panel layout and wire expand behavior.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+        """
         super().__init__(parent)
 
         self.ui: LogPanel.UI
@@ -141,6 +151,10 @@ class LogPanel(QFrame):
 
         self.setLayout(layout)
 
+        self._finalize_ui_hooks()
+
+    def _finalize_ui_hooks(self) -> None:
+        """Run the final UI setup hooks for the log panel."""
         self._set_size_policy()
         self._set_alignment()
         self._connect_signals()
@@ -244,5 +258,10 @@ class LogPanel(QFrame):
         self.updateGeometry()
 
     def add_list_items_placeholder(self, list_widget: List, items: list[str]) -> None:
-        """Add placeholder items to the list widget."""
+        """Add placeholder items to the list widget.
+
+        Args:
+            list_widget: Target list widget.
+            items: String labels to insert as rows.
+        """
         list_widget.add_items([item for item in items])
