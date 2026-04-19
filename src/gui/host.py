@@ -38,15 +38,26 @@ class HostIdentityMetadataRow(QWidget):
 
     @dataclass(frozen=True)
     class Text:
+        """Left/right copy for a host identity metadata row."""
+
         key: str = ""
         value: str = ""
 
     @dataclass
     class UI:
+        """Labels backing the metadata row."""
+
         key: QLabel
         value: QLabel
 
     def __init__(self, key_text: str, value_text: str, parent: QWidget | None = None):
+        """Build a labeled key/value row.
+
+        Args:
+            key_text: Label shown on the left.
+            value_text: Value shown on the right.
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+        """
         super().__init__(parent)
 
         self.ui: HostIdentityMetadataRow.UI
@@ -97,9 +108,19 @@ class HostIdentityMetadataRow(QWidget):
         pass
 
     def set_key_text(self, text: str) -> None:
+        """Update the left label text.
+
+        Args:
+            text: New key label string.
+        """
         self.ui.key.setText(text)
 
     def set_value_text(self, text: str) -> None:
+        """Update the right label text.
+
+        Args:
+            text: New value string.
+        """
         self.ui.value.setText(text)
 
 
@@ -108,15 +129,26 @@ class AdbBridgeMetadataRow(QWidget):
 
     @dataclass(frozen=True)
     class Text:
+        """Left/right copy for an ADB bridge metadata row."""
+
         key: str = ""
         value: str = ""
 
     @dataclass
     class UI:
+        """Labels backing the ADB metadata row."""
+
         key: QLabel
         value: QLabel
 
     def __init__(self, key_text: str, value_text: str, parent: QWidget | None = None):
+        """Build a labeled key/value row with optional ADB state styling on the value.
+
+        Args:
+            key_text: Label shown on the left.
+            value_text: Value shown on the right.
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+        """
         super().__init__(parent)
 
         self.ui: AdbBridgeMetadataRow.UI
@@ -168,12 +200,27 @@ class AdbBridgeMetadataRow(QWidget):
         pass
 
     def set_key_text(self, text: str) -> None:
+        """Update the left label text.
+
+        Args:
+            text: New key label string.
+        """
         self.ui.key.setText(text)
 
     def set_value_text(self, text: str) -> None:
+        """Update the right label text.
+
+        Args:
+            text: New value string.
+        """
         self.ui.value.setText(text)
 
     def set_value_state(self, state: str = "default") -> None:
+        """Apply stylesheet state token on the value label (e.g. running/stopped).
+
+        Args:
+            state: Property value for ``adb-server-state`` on the value label.
+        """
         self.ui.value.setProperty("adb-server-state", state)
         self.ui.value.style().unpolish(self.ui.value)
         self.ui.value.style().polish(self.ui.value)
@@ -184,6 +231,8 @@ class HostIdentitySection(QFrame):
 
     @dataclass(frozen=True)
     class Text:
+        """Default copy for host title, summary, and identity rows."""
+
         host_name: Final[str] = "Leo-MacBook-Pro"
         host_summary: Final[str] = (
             "Primary workstation ready for location spoofing workflow."
@@ -195,6 +244,8 @@ class HostIdentitySection(QFrame):
 
     @dataclass
     class UI:
+        """Widgets for the host identity block."""
+
         host_name: QLabel
         host_summary: QLabel
         host_item: IconLabel
@@ -202,6 +253,11 @@ class HostIdentitySection(QFrame):
         platform_row: HostIdentityMetadataRow
 
     def __init__(self, parent: QWidget | None = None):
+        """Build the host identity section with placeholder data.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+        """
         super().__init__(parent)
 
         self.ui: HostIdentitySection.UI
@@ -284,6 +340,15 @@ class HostIdentitySection(QFrame):
         platform: str | None = None,
         os_icon_path: str | None = None,
     ) -> None:
+        """Update displayed host fields; omit arguments to leave them unchanged.
+
+        Args:
+            host_name: Machine or host display name.
+            summary: Short supporting description under the title.
+            ip_address: Local IP string for the IP row.
+            platform: Platform string for the platform row.
+            os_icon_path: Filesystem path to the OS icon asset.
+        """
         if host_name is not None:
             self.ui.host_name.setText(host_name)
         if summary is not None:
@@ -300,6 +365,8 @@ class AdbBridgeSection(QFrame):
 
     @dataclass(frozen=True)
     class Text:
+        """Labels and default values for the ADB status block."""
+
         status_key: Final[str] = "Server state"
         status_value: Final[str] = "Running"
         version_key: Final[str] = "ADB version"
@@ -314,6 +381,8 @@ class AdbBridgeSection(QFrame):
 
     @dataclass
     class UI:
+        """Widgets for the ADB bridge summary and helper note."""
+
         android_svg: SVG
         status_row: AdbBridgeMetadataRow
         version_row: AdbBridgeMetadataRow
@@ -322,6 +391,11 @@ class AdbBridgeSection(QFrame):
         helper_note: QLabel
 
     def __init__(self, parent: QWidget | None = None):
+        """Build the ADB bridge section with placeholder metrics.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+        """
         super().__init__(parent)
 
         self.ui: AdbBridgeSection.UI
@@ -412,6 +486,12 @@ class AdbBridgeSection(QFrame):
     def set_server_state(
         self, state: ADB_SERVER_STATE, text: str | None = None
     ) -> None:
+        """Show ADB server state with optional custom label text.
+
+        Args:
+            state: Logical server state token for styling.
+            text: Optional override for the displayed status string.
+        """
         display_text = text if text is not None else state.capitalize()
         self.ui.status_row.set_value_text(display_text)
         self.ui.status_row.set_value_state(state)
@@ -425,6 +505,16 @@ class AdbBridgeSection(QFrame):
         connected_devices: str | None = None,
         helper_note: str | None = None,
     ) -> None:
+        """Update ADB-related rows; omit arguments to leave values unchanged.
+
+        Args:
+            server_state: When set, drives status row text and state styling.
+            server_state_text: Optional status label when not using ``server_state``.
+            adb_version: ADB client version string.
+            daemon: Daemon endpoint description (e.g. tcp:5037).
+            connected_devices: Count or summary of connected devices.
+            helper_note: Footnote under the metrics block.
+        """
         if server_state is not None:
             self.set_server_state(server_state, text=server_state_text)
         elif server_state_text is not None:
@@ -443,6 +533,8 @@ class HostPanel(QFrame):
 
     @dataclass(frozen=True)
     class Text:
+        """Titles, tooltips, and placeholder copy for the host panel."""
+
         title: Final[str] = "Host device"
         expand_button_tooltip: Final[str] = "Toggle panel visibility"
         identity_group_title: Final[str] = "Host identity"
@@ -461,6 +553,8 @@ class HostPanel(QFrame):
 
     @dataclass
     class UI:
+        """Composed widgets for host identity, ADB status, and panel chrome."""
+
         title: PanelTitle
         expand_button: ToolButton
         header: QWidget
@@ -475,6 +569,11 @@ class HostPanel(QFrame):
         adb_wrapper: GridLayoutWrapper
 
     def __init__(self, parent=None):
+        """Build the host panel with grouped identity and ADB sections.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+        """
         super().__init__(parent)
 
         self.ui: HostPanel.UI

@@ -40,13 +40,22 @@ class Canvas(QWebEngineView):
 
     @dataclass(frozen=True)
     class Text:
+        """Reserved for future user-visible strings on the map canvas."""
+
         pass
 
     @dataclass
     class UI:
+        """Reserved for future explicit child references on the map canvas."""
+
         pass
 
     def __init__(self, parent: QWidget = None):
+        """Create the web engine view used to render the map.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+        """
         super().__init__(parent)
         self.texts = Canvas.Text()
         self.ui = Canvas.UI()
@@ -77,12 +86,16 @@ class Legend(QFrame):
 
     @dataclass(frozen=True)
     class Text:
+        """Legend labels for real, simulated, and kilometric map cues."""
+
         location_label: Final[str] = "Real position"
         simulated_location_label: Final[str] = "Simulated position"
         kilometric_point_label: Final[str] = "Kilometric point"
 
     @dataclass
     class UI:
+        """Icon+label rows composing the map legend."""
+
         location_label_icon: IconLabel
         simulated_location_label_icon: IconLabel
         legend_first_row: HorizontalLayoutWrapper
@@ -90,6 +103,11 @@ class Legend(QFrame):
         legend_second_row: HorizontalLayoutWrapper
 
     def __init__(self, parent: QWidget = None):
+        """Lay out legend rows for map symbology.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+        """
         super().__init__(parent)
 
         self.ui: Legend.UI
@@ -180,12 +198,16 @@ class Location(QWidget):
 
     @dataclass(frozen=True)
     class Text:
+        """Coordinate field labels and control tooltips."""
+
         latitude_label: Final[str] = "Latitude"
         longitude_label: Final[str] = "Longitude"
         crosshair_button_tooltip: Final[str] = "Center map on current location"
 
     @dataclass
     class UI:
+        """Latitude/longitude stacks and recenter control."""
+
         latitude_widget: QWidget
         latitude_label: QLabel
         longitude_widget: QWidget
@@ -193,6 +215,12 @@ class Location(QWidget):
         crosshair_button: ToolButton
 
     def __init__(self, parent: QWidget = None, icon_path: str = None):
+        """Build a coordinate readout row with optional leading icon.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+            icon_path: Asset path shown beside the coordinate stack.
+        """
         super().__init__(parent)
 
         self.ui: Location.UI
@@ -319,10 +347,20 @@ class Location(QWidget):
         )
 
     def set_latitude(self, latitude: float):
+        """Append a latitude value label inside the latitude stack.
+
+        Args:
+            latitude: Latitude value to display as text.
+        """
         logger.info(f"Setting latitude to {latitude}.")
         self.ui.latitude_widget.layout().addWidget(QLabel(str(latitude)))
 
     def set_longitude(self, longitude: float):
+        """Append a longitude value label inside the longitude stack.
+
+        Args:
+            longitude: Longitude value to display as text.
+        """
         logger.info(f"Setting longitude to {longitude}.")
         self.ui.longitude_widget.layout().addWidget(QLabel(str(longitude)))
 
@@ -337,6 +375,8 @@ class Coordinates(QFrame):
 
     @dataclass(frozen=True)
     class Text:
+        """Simulation state labels and transport control tooltips."""
+
         simulation_state_off: Final[str] = "Simulation inactive"
         simulation_state_on: Final[str] = "Simulation active"
         play_button_tooltip: Final[str] = "Start simulation"
@@ -344,6 +384,8 @@ class Coordinates(QFrame):
 
     @dataclass
     class UI:
+        """Simulation toggle visuals, coordinate rows, and play control."""
+
         simulation_state_container: QWidget
         simulation_state_off: IconLabel
         simulation_state_on: IconLabel
@@ -352,6 +394,11 @@ class Coordinates(QFrame):
         play_button: ToolButton
 
     def __init__(self, parent: QWidget = None):
+        """Build the coordinates bar with simulation state and play/pause control.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+        """
         super().__init__(parent)
 
         self.ui: Coordinates.UI
@@ -452,6 +499,11 @@ class Coordinates(QFrame):
         )
 
     def set_simulation_state(self, state: bool) -> None:
+        """Animate and reflect active vs inactive simulation in the UI.
+
+        Args:
+            state: True when simulation is active (show on-state, pause affordance).
+        """
         duration = Settings.ANIMATION.SIMULATION_STATE_TRANSITION_DURATION
         easing = QEasingCurve.Type.OutCubic
 
@@ -517,15 +569,24 @@ class Map(QWidget):
 
     @dataclass(frozen=True)
     class Text:
+        """Placeholder copy when the map cannot load yet."""
+
         placeholder: Final[str] = "Select a device to get started..."
 
     @dataclass
     class UI:
+        """Canvas, coordinates strip, and empty-state placeholder."""
+
         canvas: Canvas
         coordinates: Coordinates
         placeholder: PlaceHolder
 
     def __init__(self, parent=None):
+        """Lay out placeholder, hidden canvas, and coordinates bar.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+        """
         super().__init__(parent)
 
         self.ui: Map.UI
@@ -591,7 +652,12 @@ class Map(QWidget):
         return self.ui.canvas.isVisible()
 
     def update_placeholder(self, text: str, icon_path: str) -> None:
-        """Update the placeholder text and icon."""
+        """Update the placeholder text and icon.
+
+        Args:
+            text: Message shown in the empty state.
+            icon_path: Asset path for the placeholder illustration.
+        """
         self.ui.placeholder.set_text(text)
         self.ui.placeholder.set_icon(icon_path)
 
@@ -642,17 +708,25 @@ class MapPanel(QFrame):
 
     @dataclass(frozen=True)
     class Text:
+        """Panel title and loading placeholder for the map tab."""
+
         title: Final[str] = "Map"
         loading_placeholder: Final[str] = "Map is being loaded..."
 
     @dataclass
     class UI:
+        """Title, optional legend, and embedded map widget."""
 
         title: PanelTitle
         legend: Legend
         map: Map
 
     def __init__(self, parent=None):
+        """Build the framed map panel with title and legend hook.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+        """
         super().__init__(parent)
 
         self.ui: MapPanel.UI

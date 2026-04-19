@@ -42,6 +42,8 @@ class LocationPanel(QFrame):
 
     @dataclass(frozen=True)
     class Text:
+        """Labels, tooltips, and dialog copy for the location panel."""
+
         title: Final[str] = "Location"
         expand_button_tooltip: Final[str] = "Toggle panel visibility"
         railway_label: Final[str] = "Railway"
@@ -61,6 +63,7 @@ class LocationPanel(QFrame):
 
     @dataclass
     class UI:
+        """Widgets for the location panel header and form body."""
 
         title: PanelTitle
         expand_button: ToolButton
@@ -79,6 +82,11 @@ class LocationPanel(QFrame):
         start_simulation_button: Button
 
     def __init__(self, parent=None):
+        """Build the location panel with inputs and simulation action.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+        """
         super().__init__(parent)
 
         self.ui: LocationPanel.UI

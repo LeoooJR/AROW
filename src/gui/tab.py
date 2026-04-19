@@ -12,14 +12,23 @@ class Tab(QFrame):
 
     @dataclass(frozen=True)
     class Text:
+        """Tab labels and related copy for the tab frame."""
+
         map_tab: Final[str] = "Map"
 
     @dataclass
     class UI:
+        """Widgets that make up the tabbed map area."""
+
         tabs: QTabWidget
         map_panel: MapPanel
 
     def __init__(self, parent: QWidget = None):
+        """Build the tab widget with a single Map tab.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+        """
 
         super().__init__(parent)
 

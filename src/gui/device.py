@@ -42,13 +42,22 @@ class _DeviceItemRowWidget(QWidget):
 
     @dataclass(frozen=True)
     class Text:
+        """Reserved for future user-visible strings on the device row widget."""
+
         pass
 
     @dataclass
     class UI:
+        """Reserved for future explicit child references on the device row widget."""
+
         pass
 
     def __init__(self, device_item: "DeviceItem"):
+        """Attach resize tracking to a device list item row.
+
+        Args:
+            device_item: Owning list item whose size hint should stay in sync.
+        """
         super().__init__()
         self.texts = _DeviceItemRowWidget.Text()
         self.ui = _DeviceItemRowWidget.UI()
@@ -71,6 +80,8 @@ class DeviceItem(QListWidgetItem):
 
     @dataclass(frozen=True)
     class Text:
+        """Default labels, badges, and affordances for a device list row."""
+
         default_name: Final[str] = "Unknown Device"
         menu_button: Final[str] = "⋮"
         menu_button_tooltip: Final[str] = "Device actions"
@@ -81,6 +92,8 @@ class DeviceItem(QListWidgetItem):
 
     @dataclass
     class UI:
+        """Widgets that render the rich device list row."""
+
         row: QWidget
         main_row: HorizontalLayoutWrapper
         icon_frame: HorizontalLayoutWrapper
@@ -109,6 +122,19 @@ class DeviceItem(QListWidgetItem):
         last_communication: str = "",
         alert_highlight: bool = False,
     ):
+        """Create a styled device entry for embedding in a ``QListWidget``.
+
+        Args:
+            parent: Optional list widget or owner passed to ``QListWidgetItem``.
+            text: Primary device name; falls back to default when omitted.
+            type: Device category label used in helper/status copy.
+            device_kind: Fixed literal for supported device kinds (currently mobile).
+            badge: Visual trust/activity badge variant.
+            operating_system: OS line shown in the subtitle stack.
+            location: Location line shown in the subtitle stack.
+            last_communication: Right-side recency label when extended.
+            alert_highlight: When True, apply attention styling to the row.
+        """
         super().__init__(parent)
 
         self.texts = DeviceItem.Text()
@@ -132,6 +158,8 @@ class DeviceItem(QListWidgetItem):
         self._location: str = location
         self._last_communication: str = last_communication
         self._alert_highlight: bool = alert_highlight
+        self._is_extended: bool = False
+        self._sync_size_hint_in_progress: bool = False
 
         row = _DeviceItemRowWidget(self)
         row.setObjectName("device-item-row")
@@ -328,7 +356,7 @@ class DeviceItem(QListWidgetItem):
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
         )
         self.ui.time_label.setSizePolicy(
-            QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.Preferred
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred
         )
         self.ui.menu_button.setSizePolicy(
             QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed
@@ -359,35 +387,40 @@ class DeviceItem(QListWidgetItem):
                 w.deleteLater()
 
     def _sync_size_hint(self) -> None:
-        row = self.ui.row
-        lay = row.layout()
-        if lay is not None:
-            lay.invalidate()
-            lay.activate()
-        row.updateGeometry()
-
-        # Extended: keep current behavior (size hint tracks the laid-out row).
-        if self.ui.right_wrap.isVisible():
-            sh = row.sizeHint()
-            h = max(Settings.LIST.DEVICE_ITEM_ROW_MIN_HEIGHT, sh.height())
-            self.setSizeHint(QSize(sh.width(), h))
-        else:
-            # Shortened: do not carry over the row's stretched width from the extended
-            # state — width must match hidden right column so AdjustToContents can shrink.
-            mw = max(1, row.minimumSizeHint().width())
-            saved = QSize(row.width(), row.height())
-            row.resize(mw, saved.height())
+        if self._sync_size_hint_in_progress:
+            return
+        try:
+            self._sync_size_hint_in_progress = True
+            row = self.ui.row
+            lay = row.layout()
             if lay is not None:
+                lay.invalidate()
                 lay.activate()
             row.updateGeometry()
-            sh = row.sizeHint()
-            row.resize(saved)
-            if lay is not None:
-                lay.activate()
-            row.updateGeometry()
-            h = max(Settings.LIST.DEVICE_ITEM_ROW_MIN_HEIGHT, sh.height())
-            self.setSizeHint(QSize(mw, h))
 
+            # Extended: keep current behavior (size hint tracks the laid-out row).
+            if self._is_extended:
+                sh = row.sizeHint()
+                h = max(Settings.LIST.DEVICE_ITEM_ROW_MIN_HEIGHT, sh.height())
+                self.setSizeHint(QSize(sh.width(), h))
+            else:
+                # Shortened: do not carry over the row's stretched width from the extended
+                # state — width must match hidden right column so AdjustToContents can shrink.
+                mw = max(1, row.minimumSizeHint().width())
+                saved = QSize(row.width(), row.height())
+                row.resize(mw, saved.height())
+                if lay is not None:
+                    lay.activate()
+                row.updateGeometry()
+                sh = row.sizeHint()
+                row.resize(saved)
+                if lay is not None:
+                    lay.activate()
+                row.updateGeometry()
+                h = max(Settings.LIST.DEVICE_ITEM_ROW_MIN_HEIGHT, sh.height())
+                self.setSizeHint(QSize(mw, h))
+        finally:
+            self._sync_size_hint_in_progress = False
         lw = self.listWidget()
         if lw is not None:
             lw.viewport().update()
@@ -528,11 +561,17 @@ class DeviceItem(QListWidgetItem):
 
     def extend_device_item(self) -> None:
         """Extend the device item to show the last communication time and menu button."""
+        if self._is_extended:
+            return
+        self._is_extended = True
         self.ui.right_wrap.show()
         self._sync_size_hint()
 
     def shorten_device_item(self) -> None:
         """Shorten the device item to hide the last communication time and menu button."""
+        if not self._is_extended:
+            return
+        self._is_extended = False
         self.ui.right_wrap.hide()
         self._sync_size_hint()
 
@@ -541,6 +580,8 @@ class DeviceState(QGroupBox):
 
     @dataclass(frozen=True)
     class Text:
+        """Template strings for the device state summary group."""
+
         title: Final[str] = "About device"
         state: Final[str] = "State: <state>"
         operating_system: Final[str] = "Operating system: <operating_system>"
@@ -548,12 +589,18 @@ class DeviceState(QGroupBox):
 
     @dataclass
     class UI:
+        """State lines inside the about-device group box."""
 
         state: QLabel
         operating_system: QLabel
         last_communication: QLabel
 
     def __init__(self, parent=None):
+        """Build the grouped device state labels.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+        """
         self.texts = DeviceState.Text()
         super().__init__(
             parent, title=self.texts.title, alignment=Qt.AlignmentFlag.AlignLeft
@@ -629,16 +676,24 @@ class DevicePairingPanel(QFrame):
 
     @dataclass(frozen=True)
     class Text:
+        """Copy for the device pairing side panel."""
+
         title: Final[str] = "Pairing Device"
 
     @dataclass
     class UI:
+        """Chrome and body regions for pairing-specific content."""
 
         title: PanelTitle
         header: HorizontalLayoutWrapper
         body: HorizontalLayoutWrapper
 
     def __init__(self, parent: QWidget = None):
+        """Create the pairing panel shell (title + expandable body host).
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+        """
         super().__init__(parent)
 
         self.ui: DevicePairingPanel.UI
@@ -714,6 +769,8 @@ class DeviceSelectionPanel(QFrame):
 
     @dataclass(frozen=True)
     class Text:
+        """Titles, tooltips, empty states, and placeholder device copy."""
+
         title: Final[str] = "Linked Devices"
         expand_button_tooltip: Final[str] = "Toggle panel visibility"
         empty_state: Final[str] = "No device found"
@@ -734,6 +791,7 @@ class DeviceSelectionPanel(QFrame):
 
     @dataclass
     class UI:
+        """Full device selection UI: list, actions, helper text, and state box."""
 
         title: PanelTitle
         expand_button: ToolButton
@@ -751,6 +809,11 @@ class DeviceSelectionPanel(QFrame):
         device_state: DeviceState
 
     def __init__(self, parent: QWidget = None):
+        """Build the device list panel with toolbar and state summary.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+        """
         super().__init__(parent)
 
         self.ui: DeviceSelectionPanel.UI

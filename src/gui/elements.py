@@ -99,13 +99,23 @@ class Logo(QLabel, Element):
 
     @dataclass(frozen=True)
     class Text:
+        """Reserved for future user-visible strings on the logo."""
+
         pass
 
     @dataclass
     class UI:
+        """Reserved for future explicit child references on the logo."""
+
         pass
 
     def __init__(self, parent: QWidget | None, file: str):
+        """Load and display a pixmap scaled to the configured logo size.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+            file: Path to the raster image file for the logo.
+        """
         # Initialize parent QLabel
         super().__init__(parent)
         self.texts = Logo.Text()
@@ -145,15 +155,27 @@ class GradientText(QLabel, Element):
 
     @dataclass(frozen=True)
     class Text:
+        """Initial label text mirrored for styling hooks."""
+
         text: str = ""
 
     @dataclass
     class UI:
+        """Reserved for future explicit child references on gradient text."""
+
         pass
 
     def __init__(
         self, parent: QWidget | None, text="", start_color=None, end_color=None
     ):
+        """Paint the label text with a horizontal linear gradient.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+            text: String shown as the label content.
+            start_color: Gradient start color; defaults to theme white.
+            end_color: Gradient end color; defaults to theme black.
+        """
         super().__init__(text, parent)
         self.texts = GradientText.Text(text=text)
         self.ui = GradientText.UI()
@@ -176,7 +198,12 @@ class GradientText(QLabel, Element):
         pass
 
     def set_gradient_colors(self, start_color, end_color):
-        """Set the gradient colors for the text"""
+        """Set the gradient colors for the text.
+
+        Args:
+            start_color: Color at the left edge of the gradient.
+            end_color: Color at the right edge of the gradient.
+        """
         self.gradient_start = QColor(start_color)
         self.gradient_end = QColor(end_color)
         self.update()
@@ -243,10 +270,14 @@ class IconLabel(QWidget, Element):
 
     @dataclass(frozen=True)
     class Text:
+        """Optional plain-text snapshot when the label is a string."""
+
         text: str | None = None
 
     @dataclass
     class UI:
+        """Reserved for future explicit child references on the icon row."""
+
         pass
 
     def __init__(
@@ -258,6 +289,16 @@ class IconLabel(QWidget, Element):
         spacing: int = 0,
         margins: tuple = (0, 0, 0, 0),
     ):
+        """Lay out an SVG icon beside a string or external ``QLabel``.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+            icon_path: Path to the SVG asset for the lead icon.
+            text: Caption string or pre-built label widget.
+            font_weight: Font weight applied when ``text`` is a string.
+            spacing: Pixels between icon and text.
+            margins: Outer layout margins (left, top, right, bottom).
+        """
         # Initialize parent QWidget
         super().__init__(parent)
         self.texts = IconLabel.Text(text=text if isinstance(text, str) else None)
@@ -339,10 +380,14 @@ class PanelTitle(QFrame, Element):
 
     @dataclass(frozen=True)
     class Text:
+        """Title string used for styling and dataclass symmetry."""
+
         title: str = ""
 
     @dataclass
     class UI:
+        """Reserved for future explicit child references on the title row."""
+
         pass
 
     def __init__(
@@ -354,6 +399,16 @@ class PanelTitle(QFrame, Element):
         icon_path=None,
         icon_size=None,
     ):
+        """Build a horizontal title with optional leading icon.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+            text: Title string.
+            font_size: Point size for the title label.
+            font_weight: Qt font weight for the title label.
+            icon_path: Optional SVG path; omitted hides the icon.
+            icon_size: Fixed icon size; derived from font when omitted.
+        """
         super().__init__(parent)
         self.texts = PanelTitle.Text(title=text)
         self.ui = PanelTitle.UI()
@@ -411,13 +466,24 @@ class Button(QPushButton, Element):
 
     @dataclass(frozen=True)
     class Text:
+        """Primary action label for the button."""
+
         label: str = ""
 
     @dataclass
     class UI:
+        """Reserved for future explicit child references on the button."""
+
         pass
 
     def __init__(self, parent: QWidget | None, text: str, icon_path: str | None = None):
+        """Create a styled primary button with optional icon.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+            text: Button label text.
+            icon_path: Optional icon asset path shown before the label.
+        """
         self.texts = Button.Text(label=text)
         self.ui = Button.UI()
 
@@ -455,10 +521,14 @@ class WalkthroughButton(QPushButton, Element):
 
     @dataclass(frozen=True)
     class Text:
+        """Walkthrough row label text."""
+
         label: str = ""
 
     @dataclass
     class UI:
+        """Reserved for future explicit child references on the walkthrough button."""
+
         pass
 
     def __init__(
@@ -468,6 +538,14 @@ class WalkthroughButton(QPushButton, Element):
         lead_icon_path: str,
         trailing_icon_path: str,
     ):
+        """Build the custom walkthrough card button layout.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+            text: Main descriptive label (word-wrapped).
+            lead_icon_path: Left column SVG asset.
+            trailing_icon_path: Top-right hint SVG asset.
+        """
         super().__init__(parent)
         self.texts = WalkthroughButton.Text(label=text)
         self.ui = WalkthroughButton.UI()
@@ -543,10 +621,14 @@ class ToolButton(QToolButton):
 
     @dataclass(frozen=True)
     class Text:
+        """Tooltip copy associated with the tool button."""
+
         tooltip: str | None = None
 
     @dataclass
     class UI:
+        """Reserved for future explicit child references on the tool button."""
+
         pass
 
     def __init__(
@@ -556,6 +638,14 @@ class ToolButton(QToolButton):
         icon_size: QSize | None = None,
         tooltip: str | None = None,
     ):
+        """Create a compact icon button with optional tooltip.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+            icon_path: Optional SVG or pixmap path for the button face.
+            icon_size: Fixed icon dimensions; derived when omitted.
+            tooltip: Hover tooltip string.
+        """
         super().__init__(parent)
         self.texts = ToolButton.Text(tooltip=tooltip)
         self.ui = ToolButton.UI()
@@ -582,6 +672,12 @@ class ToolButton(QToolButton):
     def set_icon(
         self, icon_path: str | None = None, icon_size: QSize | int | None = None
     ):
+        """Apply a new icon and optional size to the tool button.
+
+        Args:
+            icon_path: Asset path for the icon; does nothing when omitted.
+            icon_size: QSize or point-size hint for ``get_svg_size`` when sizing SVGs.
+        """
         if icon_path is None:
             return
         if icon_size is None:
@@ -597,13 +693,23 @@ class ButtonGroup(QButtonGroup, Element):
 
     @dataclass(frozen=True)
     class Text:
+        """Reserved for future user-visible strings on the button group."""
+
         pass
 
     @dataclass
     class UI:
+        """Reserved for future explicit child references on the button group."""
+
         pass
 
     def __init__(self, parent: QWidget | None, buttons: list[QAbstractButton] = []):
+        """Create an exclusive button group and optionally register buttons.
+
+        Args:
+            parent: Optional Qt parent object for the group.
+            buttons: Initial member buttons added with ``addButton``.
+        """
         super().__init__(parent)
         self.texts = ButtonGroup.Text()
         self.ui = ButtonGroup.UI()
@@ -629,13 +735,23 @@ class SelectionField(QComboBox, Element):
 
     @dataclass(frozen=True)
     class Text:
+        """Placeholder string for the non-editable combo field."""
+
         placeholder: str = ""
 
     @dataclass
     class UI:
+        """Reserved for future explicit child references on the selection field."""
+
         pass
 
     def __init__(self, parent: QWidget | None, placeholder: str):
+        """Configure a styled combo box with placeholder text.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+            placeholder: Shown when no item is selected meaningfully.
+        """
 
         super().__init__(parent)
         self.texts = SelectionField.Text(placeholder=placeholder)
@@ -671,13 +787,23 @@ class RegularText(QLabel, Element):
 
     @dataclass(frozen=True)
     class Text:
+        """Body text content for the label."""
+
         label: str = ""
 
     @dataclass
     class UI:
+        """Reserved for future explicit child references on regular text."""
+
         pass
 
     def __init__(self, parent: QWidget | None, text: str):
+        """Create a default-weight body label.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+            text: Label string.
+        """
         super().__init__(text, parent)
         self.texts = RegularText.Text(label=text)
         self.ui = RegularText.UI()
@@ -705,13 +831,23 @@ class DemiBoldText(QLabel, Element):
 
     @dataclass(frozen=True)
     class Text:
+        """Demi-bold label content."""
+
         label: str = ""
 
     @dataclass
     class UI:
+        """Reserved for future explicit child references on demi-bold text."""
+
         pass
 
     def __init__(self, parent: QWidget | None, text: str):
+        """Create a demi-bold emphasis label.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+            text: Label string.
+        """
         super().__init__(text, parent)
         self.texts = DemiBoldText.Text(label=text)
         self.ui = DemiBoldText.UI()
@@ -741,13 +877,23 @@ class HelperText(QLabel, Element):
 
     @dataclass(frozen=True)
     class Text:
+        """Helper or secondary caption text."""
+
         label: str = ""
 
     @dataclass
     class UI:
+        """Reserved for future explicit child references on helper text."""
+
         pass
 
     def __init__(self, parent: QWidget | None, text: str):
+        """Create smaller helper-colored explanatory text.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+            text: Helper string.
+        """
 
         super().__init__(text, parent)
         self.texts = HelperText.Text(label=text)
@@ -776,10 +922,14 @@ class List(QListWidget, Element):
 
     @dataclass(frozen=True)
     class Text:
+        """Reserved for future user-visible strings on the list widget."""
+
         pass
 
     @dataclass
     class UI:
+        """Reserved for future explicit child references on the list widget."""
+
         pass
 
     def __init__(
@@ -794,6 +944,18 @@ class List(QListWidget, Element):
         item_alignment: Qt.AlignmentFlag = Qt.AlignmentFlag.AlignVCenter
         | Qt.AlignmentFlag.AlignLeft,
     ):
+        """Create a styled list with initial items and interaction policies.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+            items: Initial row contents as strings or items.
+            minimum_width: Minimum widget width in pixels.
+            minimum_height: Minimum widget height in pixels.
+            selection_mode: Qt selection mode for the view.
+            selection_behavior: Row vs item selection behavior.
+            edit_triggers: Which user actions may start editing.
+            item_alignment: Default alignment for new text items.
+        """
         super().__init__(parent)
         self.texts = List.Text()
         self.ui = List.UI()
@@ -829,6 +991,11 @@ class List(QListWidget, Element):
         pass
 
     def add_items(self, items: list[QListWidgetItem | str]):
+        """Append multiple items, accepting raw strings or concrete items.
+
+        Args:
+            items: Iterable of strings or ``QListWidgetItem`` instances.
+        """
         for item in items:
             if isinstance(item, str):
                 self.addItem(item)
@@ -852,13 +1019,23 @@ class SVG(QLabel, Element):
 
     @dataclass(frozen=True)
     class Text:
+        """Reserved for future user-visible strings on the SVG label."""
+
         pass
 
     @dataclass
     class UI:
+        """Reserved for future explicit child references on the SVG label."""
+
         pass
 
     def __init__(self, svg_path: str, parent: QWidget | None = None):
+        """Load an SVG from disk and paint it in ``paintEvent``.
+
+        Args:
+            svg_path: Filesystem path to the SVG asset.
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+        """
         super().__init__(parent)
         self.texts = SVG.Text()
         self.ui = SVG.UI()
@@ -890,6 +1067,11 @@ class SVG(QLabel, Element):
         painter.end()
 
     def set_path(self, path: str):
+        """Replace the SVG source and refresh rendering.
+
+        Args:
+            path: New filesystem path to an SVG asset.
+        """
         self.path = path
         try:
             self.renderer = QSvgRenderer(self.path)
@@ -907,10 +1089,14 @@ class PlaceHolder(QFrame, Element):
 
     @dataclass(frozen=True)
     class Text:
+        """Optional plain-text snapshot when the body is a string."""
+
         text: str | None = None
 
     @dataclass
     class UI:
+        """Primary text label and optional top icon."""
+
         text: QLabel
         icon: SVG
 
@@ -923,6 +1109,16 @@ class PlaceHolder(QFrame, Element):
         stretch_widgets: bool = False,
         icon_path: str | None = None,
     ):
+        """Build a vertically centered empty-state block.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+            text: Centered message as string or external label widget.
+            minimum_width: Minimum width before default placeholder sizing applies.
+            minimum_height: Minimum height before default placeholder sizing applies.
+            stretch_widgets: Layout stretch factor for the text row when True.
+            icon_path: Optional SVG shown above the text.
+        """
         super().__init__(parent)
         self.texts = PlaceHolder.Text(text=text if isinstance(text, str) else None)
         self.ui: PlaceHolder.UI
@@ -981,9 +1177,19 @@ class PlaceHolder(QFrame, Element):
         pass
 
     def set_text(self, text: str) -> None:
+        """Update the placeholder message.
+
+        Args:
+            text: New body string for the label.
+        """
         self.ui.text.setText(text)
 
     def set_icon(self, icon_path: str) -> None:
+        """Swap the illustration above the text.
+
+        Args:
+            icon_path: Path to the replacement SVG asset.
+        """
         self.ui.icon.set_path(icon_path)
 
 
@@ -991,14 +1197,23 @@ class FileOpenDialog(QFileDialog, Element):
 
     @dataclass(frozen=True)
     class Text:
+        """Default window title and name filter for spreadsheet open."""
+
         window_title: Final[str] = "Open a file"
         name_filter: Final[str] = "Tablesheet files (*.xlsx, *.xls, *.csv)"
 
     @dataclass
     class UI:
+        """Reserved for future explicit child references on the open dialog."""
+
         pass
 
     def __init__(self, parent: QWidget = None):
+        """Configure a read-only open dialog for tabular files.
+
+        Args:
+            parent: Optional parent window for modality placement.
+        """
 
         super().__init__(parent)
         self.texts = FileOpenDialog.Text()
@@ -1031,15 +1246,24 @@ class FileSaveDialog(QFileDialog, Element):
 
     @dataclass(frozen=True)
     class Text:
+        """Default window title, filter, and suffix for log save."""
+
         window_title: Final[str] = "Save a file"
         name_filter: Final[str] = "Plain text files (*.log)"
         default_suffix: Final[str] = "log"
 
     @dataclass
     class UI:
+        """Reserved for future explicit child references on the save dialog."""
+
         pass
 
     def __init__(self, parent: QWidget = None):
+        """Configure a save dialog targeting plain log files.
+
+        Args:
+            parent: Optional parent window for modality placement.
+        """
 
         super().__init__(parent)
         self.texts = FileSaveDialog.Text()
@@ -1071,6 +1295,8 @@ class WarningDialog(QMessageBox, Element):
 
     @dataclass(frozen=True)
     class Text:
+        """Primary, detailed, and informative strings for the warning box."""
+
         title: str = ""
         text: str = ""
         detailed_text: str = ""
@@ -1080,9 +1306,19 @@ class WarningDialog(QMessageBox, Element):
 
     @dataclass
     class UI:
+        """Reserved for future explicit child references on the warning dialog."""
+
         pass
 
     def __init__(self, parent: QWidget = None, title=str, text=str, detailed_text=str):
+        """Show a warning message with Yes/Cancel actions.
+
+        Args:
+            parent: Optional parent window for modality placement.
+            title: Window title string.
+            text: Primary message body.
+            detailed_text: Expanded explanation shown in the details area.
+        """
 
         super().__init__(parent)
         self.texts = WarningDialog.Text(
@@ -1124,6 +1360,8 @@ class QuestionDialog(QMessageBox, Element):
 
     @dataclass(frozen=True)
     class Text:
+        """Primary, detailed, and informative strings for the question box."""
+
         title: str = ""
         text: str = ""
         detailed_text: str = ""
@@ -1133,9 +1371,19 @@ class QuestionDialog(QMessageBox, Element):
 
     @dataclass
     class UI:
+        """Reserved for future explicit child references on the question dialog."""
+
         pass
 
     def __init__(self, parent: QWidget = None, title=str, text=str, detailed_text=str):
+        """Show a question message with Yes/Cancel actions.
+
+        Args:
+            parent: Optional parent window for modality placement.
+            title: Window title string.
+            text: Primary message body.
+            detailed_text: Expanded explanation shown in the details area.
+        """
 
         super().__init__(parent)
         self.texts = QuestionDialog.Text(
@@ -1177,16 +1425,28 @@ class Toast(QWidget, Element):
 
     @dataclass(frozen=True)
     class Text:
+        """Toast body and severity level token."""
+
         message: str = ""
         level: str = "info"
 
     @dataclass
     class UI:
+        """Reserved for future explicit child references on the toast."""
+
         pass
 
     def __init__(
         self, parent: QWidget, message: str, level: str = "info", duration: int = 3000
     ):
+        """Create a short-lived top-level toast (parent is ignored for window flags).
+
+        Args:
+            parent: Logical owner used only for context; toast is top-level.
+            message: Body text shown in the banner.
+            level: Visual style token such as info, success, warning, or error.
+            duration: Auto-close delay in milliseconds.
+        """
         # Ignore parent completely - create as completely independent top-level window
         # This prevents any layout interference with parent widgets
         super().__init__(None)
@@ -1359,13 +1619,23 @@ class ProgressBar(QProgressBar, Element):
 
     @dataclass(frozen=True)
     class Text:
+        """Reserved for future user-visible strings on the progress bar."""
+
         pass
 
     @dataclass
     class UI:
+        """Reserved for future explicit child references on the progress bar."""
+
         pass
 
     def __init__(self, parent: QWidget | None, step_labels: list[str] | None = None):
+        """Create a four-step horizontal progress indicator.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+            step_labels: Custom labels per step index; defaults to built-in list.
+        """
         super().__init__(parent)
         self.texts = ProgressBar.Text()
         self.ui = ProgressBar.UI()
@@ -1411,13 +1681,23 @@ class Image(QLabel, Element):
 
     @dataclass(frozen=True)
     class Text:
+        """Reserved for future user-visible strings on the image label."""
+
         pass
 
     @dataclass
     class UI:
+        """Reserved for future explicit child references on the image label."""
+
         pass
 
     def __init__(self, parent: QWidget | None, image_path: str):
+        """Load a pixmap from disk and enable scaled contents.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+            image_path: Path to the raster image asset.
+        """
         super().__init__(parent)
         self.texts = Image.Text()
         self.ui = Image.UI()
@@ -1445,10 +1725,14 @@ class GroupBox(QGroupBox, Element):
 
     @dataclass(frozen=True)
     class Text:
+        """Group title string mirrored for dataclass symmetry."""
+
         title: str = ""
 
     @dataclass
     class UI:
+        """Reserved for future explicit child references on the group box."""
+
         pass
 
     def __init__(
@@ -1458,6 +1742,14 @@ class GroupBox(QGroupBox, Element):
         widgets: list[QWidget] | None = None,
         title: str = "",
     ):
+        """Create a titled group with optional pre-built layout and children.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+            layout: Inner layout to attach before adding widgets.
+            widgets: Optional child widgets appended to the inner layout.
+            title: Group box title text.
+        """
         super().__init__(parent, title=title, alignment=Qt.AlignmentFlag.AlignLeft)
         self.texts = GroupBox.Text(title=title)
         self.ui = GroupBox.UI()
@@ -1496,15 +1788,25 @@ class ConditionIndicator(QFrame, Element):
 
     @dataclass(frozen=True)
     class Text:
+        """Reserved for future user-visible strings on the indicator."""
+
         pass
 
     @dataclass
     class UI:
+        """Reserved for future explicit child references on the indicator."""
+
         pass
 
     def __init__(
         self, parent: QWidget | None = None, object_name: str = "condition-indicator"
     ):
+        """Create a small circular state indicator.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+            object_name: Qt object name used for stylesheet targeting.
+        """
         super().__init__(parent)
         self.texts = ConditionIndicator.Text()
         self.ui = ConditionIndicator.UI()
@@ -1614,12 +1916,16 @@ class File(QWidget, Element):
 
     @dataclass(frozen=True)
     class Text:
+        """File row labels and save-as tooltip."""
+
         file_name: str = ""
         file_type: str = ""
         save_as_tooltip: Final[str] = "Save as"
 
     @dataclass
     class UI:
+        """Reserved for future explicit child references on the file row."""
+
         pass
 
     def __init__(
@@ -1629,6 +1935,14 @@ class File(QWidget, Element):
         file_type: str,
         file_save: bool = False,
     ):
+        """Render a file summary row with optional save-as affordance.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+            file_name: Display name for the file.
+            file_type: Short type label (e.g. extension category).
+            file_save: When True, show a save-as tool button.
+        """
         super().__init__(parent)
         self.texts = File.Text(file_name=file_name, file_type=file_type)
         self.ui = File.UI()
@@ -1779,13 +2093,25 @@ class OTPLineEdit(QLineEdit, Element):
 
     @dataclass(frozen=True)
     class Text:
+        """Reserved for future user-visible strings on a single OTP cell."""
+
         pass
 
     @dataclass
     class UI:
+        """Reserved for future explicit child references on the OTP cell."""
+
         pass
 
     def __init__(self, owner, index, *args, **kwargs):
+        """Single OTP digit field wired to a parent ``OTPInput``.
+
+        Args:
+            owner: Parent ``OTPInput`` coordinating focus and paste.
+            index: Zero-based cell index within the OTP sequence.
+            *args: Forwarded to ``QLineEdit`` (typically parent).
+            **kwargs: Forwarded to ``QLineEdit``.
+        """
         super().__init__(*args, **kwargs)
         self.texts = OTPLineEdit.Text()
         self.ui = OTPLineEdit.UI()
@@ -1848,10 +2174,14 @@ class OTPInput(QWidget, Element):
 
     @dataclass(frozen=True)
     class Text:
+        """Reserved for future user-visible strings on the OTP composite."""
+
         pass
 
     @dataclass
     class UI:
+        """Reserved for future explicit child references on the OTP composite."""
+
         pass
 
     def __init__(
@@ -1862,6 +2192,15 @@ class OTPInput(QWidget, Element):
         max_length: list[int] = [1, 1, 1, 1, 1, 1],
         echo_mode: QLineEdit.EchoMode = QLineEdit.EchoMode.Normal,
     ):
+        """Lay out a row of validated OTP cells.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+            otp_type: Validation and grouping mode (IP, port, or association code).
+            otp_length: Number of digit boxes.
+            max_length: Per-cell max lengths; length must match ``otp_length``.
+            echo_mode: Echo mode forwarded to each ``QLineEdit``.
+        """
         assert (
             len(max_length) == otp_length
         ), "Max length list must be the same length as the OTP length"
@@ -1964,6 +2303,8 @@ class AuthentificationCard(QFrame, Element):
 
     @dataclass(frozen=True)
     class Text:
+        """Titles, descriptions, helper labels, and action copy for the card."""
+
         title: str | None = None
         description: str | None = None
         close_button_tooltip: Final[str] = "Close"
@@ -1974,6 +2315,8 @@ class AuthentificationCard(QFrame, Element):
 
     @dataclass
     class UI:
+        """Composed widgets for credentials, OTP inputs, and confirm."""
+
         close_button: ToolButton
         icon: SVG
         icon_center_row: HorizontalLayoutWrapper
@@ -1999,6 +2342,14 @@ class AuthentificationCard(QFrame, Element):
         icon_path: str = None,
         description: str = None,
     ):
+        """Build the authentification card with OTP rows and confirm action.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+            title: Card heading text.
+            icon_path: Optional hero icon asset above the title.
+            description: Supporting text under the title.
+        """
         super().__init__(parent)
 
         self.texts = AuthentificationCard.Text(title=title, description=description)
