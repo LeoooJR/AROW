@@ -65,6 +65,10 @@ class Canvas(QWebEngineView):
             Settings.DIMENSION.CANVAS_SIZE, Settings.DIMENSION.CANVAS_SIZE
         )
 
+        self._finalize_ui_hooks()
+
+    def _finalize_ui_hooks(self) -> None:
+        """Run the final UI setup hooks for the canvas."""
         self._set_size_policy()
         self._set_alignment()
         self._connect_signals()
@@ -312,6 +316,10 @@ class Location(QWidget):
             longitude_label=longitude_label,
             crosshair_button=crosshair_button,
         )
+        self._finalize_ui_hooks()
+
+    def _finalize_ui_hooks(self) -> None:
+        """Run the final UI setup hooks for the location widget."""
         self._set_alignment()
         self._set_size_policy()
         self._connect_signals()
@@ -473,6 +481,10 @@ class Coordinates(QFrame):
             simulated_location_widget=simulated_location_widget,
             play_button=play_button,
         )
+        self._finalize_ui_hooks()
+
+    def _finalize_ui_hooks(self) -> None:
+        """Run the final UI setup hooks for the coordinates section."""
         self._set_alignment()
         self._set_size_policy()
         self._connect_signals()
@@ -625,6 +637,10 @@ class Map(QWidget):
         )
         self._placeholder_helper_anim: QSequentialAnimationGroup | None = None
 
+        self._finalize_ui_hooks()
+
+    def _finalize_ui_hooks(self) -> None:
+        """Run the final UI setup hooks for the map view."""
         self._set_size_policy()
         self._set_alignment()
         self._connect_signals()
@@ -764,6 +780,10 @@ class MapPanel(QFrame):
 
         self.ui: MapPanel.UI = MapPanel.UI(title=title, legend=legend, map=map)
 
+        self._finalize_ui_hooks()
+
+    def _finalize_ui_hooks(self) -> None:
+        """Run the final UI setup hooks for the map panel."""
         self._set_alignment()
         self._set_size_policy()
         self._connect_signals()

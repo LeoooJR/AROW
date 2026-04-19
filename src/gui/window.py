@@ -203,6 +203,10 @@ class Header(QWidget):
             layout_buttons_wrapper=layout_buttons_wrapper,
         )
 
+        self._finalize_ui_hooks()
+
+    def _finalize_ui_hooks(self) -> None:
+        """Run the final UI setup hooks for the header."""
         self._connect_signals()
         self._set_alignment()
         self._set_size_policy()
@@ -479,6 +483,10 @@ class Body(QWidget):
             tabs_wrapper=tabs_wrapper,
         )
 
+        self._finalize_ui_hooks()
+
+    def _finalize_ui_hooks(self) -> None:
+        """Run the final UI setup hooks for the body."""
         self._connect_signals()
         self._set_alignment()
         self._set_size_policy()
@@ -694,6 +702,10 @@ class MainContainer(QWidget):
 
         self.ui = MainContainer.UI(header=header, body=body)
 
+        self._finalize_ui_hooks()
+
+    def _finalize_ui_hooks(self) -> None:
+        """Run the final UI setup hooks for the main container."""
         self._set_size_policy()
         self._set_alignment()
         self._connect_signals()
@@ -861,6 +873,10 @@ class AuthentificationOverlay(QWidget):
             authentification_card=authentification_card
         )
 
+        self._finalize_ui_hooks()
+
+    def _finalize_ui_hooks(self) -> None:
+        """Run the final UI setup hooks for the authentification overlay."""
         self._set_size_policy()
         self._set_alignment()
         self._connect_signals()

@@ -313,10 +313,14 @@ class DeviceItem(QListWidgetItem):
         self._refresh_subtitle()
         self.set_last_communication(last_communication)
         self.set_alert_highlight(alert_highlight)
+        self._finalize_ui_hooks()
+        self._sync_size_hint()
+
+    def _finalize_ui_hooks(self) -> None:
+        """Run the final UI setup hooks for the device item."""
         self._set_size_policy()
         self._set_alignment()
         self._connect_signals()
-        self._sync_size_hint()
 
     @staticmethod
     def _configure_wrapped_line_label(
@@ -639,6 +643,10 @@ class DeviceState(QGroupBox):
             operating_system=operating_system,
             last_communication=last_communication,
         )
+        self._finalize_ui_hooks()
+
+    def _finalize_ui_hooks(self) -> None:
+        """Run the final UI setup hooks for the device state section."""
         self._set_size_policy()
         self._set_alignment()
         self._connect_signals()
@@ -740,6 +748,10 @@ class DevicePairingPanel(QFrame):
             title=title, header=header, body=body
         )
 
+        self._finalize_ui_hooks()
+
+    def _finalize_ui_hooks(self) -> None:
+        """Run the final UI setup hooks for the device pairing panel."""
         self._set_alignment()
         self._set_size_policy()
         self._connect_signals()
@@ -968,10 +980,14 @@ class DeviceSelectionPanel(QFrame):
         self._highlight_stop_timer.timeout.connect(self.stop_highlight_attention)
         self._highlight_elapsed = QElapsedTimer()
 
+        self._finalize_ui_hooks()
+        self._update_available_device_empty_state_visibility()
+
+    def _finalize_ui_hooks(self) -> None:
+        """Run the final UI setup hooks for the device selection panel."""
         self._set_size_policy()
         self._set_alignment()
         self._connect_signals()
-        self._update_available_device_empty_state_visibility()
 
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:
         if watched is self.ui.available_device_list.viewport() and event.type() in (

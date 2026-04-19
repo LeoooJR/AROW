@@ -83,6 +83,10 @@ class HostIdentityMetadataRow(QWidget):
 
         self.setLayout(layout)
         self.ui = HostIdentityMetadataRow.UI(key=key, value=value)
+        self._finalize_ui_hooks()
+
+    def _finalize_ui_hooks(self) -> None:
+        """Run the final UI setup hooks for the host identity metadata row."""
         self._set_size_policy()
         self._set_alignment()
         self._connect_signals()
@@ -175,6 +179,10 @@ class AdbBridgeMetadataRow(QWidget):
         self.setLayout(layout)
         self.ui = AdbBridgeMetadataRow.UI(key=key, value=value)
         self.set_value_state("default")
+        self._finalize_ui_hooks()
+
+    def _finalize_ui_hooks(self) -> None:
+        """Run the final UI setup hooks for the ADB bridge metadata row."""
         self._set_size_policy()
         self._set_alignment()
         self._connect_signals()
@@ -303,6 +311,10 @@ class HostIdentitySection(QFrame):
             ip_address_row=ip_address_row,
             platform_row=platform_row,
         )
+        self._finalize_ui_hooks()
+
+    def _finalize_ui_hooks(self) -> None:
+        """Run the final UI setup hooks for the host identity section."""
         self._set_size_policy()
         self._set_alignment()
         self._connect_signals()
@@ -451,6 +463,10 @@ class AdbBridgeSection(QFrame):
         )
         self.set_server_state("running")
 
+        self._finalize_ui_hooks()
+
+    def _finalize_ui_hooks(self) -> None:
+        """Run the final UI setup hooks for the ADB bridge section."""
         self._set_size_policy()
         self._set_alignment()
         self._connect_signals()
@@ -684,10 +700,14 @@ class HostPanel(QFrame):
             adb_wrapper=adb_wrapper,
         )
 
+        self._finalize_ui_hooks()
+        self._set_placeholder_values()
+
+    def _finalize_ui_hooks(self) -> None:
+        """Run the final UI setup hooks for the host panel."""
         self._set_size_policy()
         self._set_alignment()
         self._connect_signals()
-        self._set_placeholder_values()
 
     def _set_alignment(self) -> None:
         """Centralize layout alignment for the panel and its UI widgets."""

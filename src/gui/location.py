@@ -221,6 +221,10 @@ class LocationPanel(QFrame):
             start_simulation_button=start_simulation_button,
         )
 
+        self._finalize_ui_hooks()
+
+    def _finalize_ui_hooks(self) -> None:
+        """Run the final UI setup hooks for the location panel."""
         self._set_size_policy()
         self._set_alignment()
         self._connect_signals()

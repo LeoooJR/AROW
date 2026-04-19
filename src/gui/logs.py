@@ -151,6 +151,10 @@ class LogPanel(QFrame):
 
         self.setLayout(layout)
 
+        self._finalize_ui_hooks()
+
+    def _finalize_ui_hooks(self) -> None:
+        """Run the final UI setup hooks for the log panel."""
         self._set_size_policy()
         self._set_alignment()
         self._connect_signals()

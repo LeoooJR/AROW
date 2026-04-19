@@ -79,6 +79,12 @@ class Element(ABC, metaclass=QtABCMeta):
     Abstract base for all graphical elements in this module.
     """
 
+    def _finalize_ui_hooks(self) -> None:
+        """Run the standard UI hook sequence after widget construction."""
+        self._set_size_policy()
+        self._set_alignment()
+        self._connect_signals()
+
     @abstractmethod
     def _set_size_policy(self) -> None:
         pass
@@ -133,9 +139,7 @@ class Logo(QLabel, Element):
         )
 
         self.setPixmap(scaled_pixmap)
-        self._set_size_policy()
-        self._set_alignment()
-        self._connect_signals()
+        self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
         pass
@@ -184,9 +188,7 @@ class GradientText(QLabel, Element):
         self.set_gradient_colors(
             start_color or palette.WHITE, end_color or palette.BLACK
         )
-        self._set_size_policy()
-        self._set_alignment()
-        self._connect_signals()
+        self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
         pass
@@ -314,9 +316,7 @@ class IconLabel(QWidget, Element):
         self.set_icon(icon_path)
 
         self.set_text(text)
-        self._set_size_policy()
-        self._set_alignment()
-        self._connect_signals()
+        self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
         pass
@@ -448,9 +448,7 @@ class PanelTitle(QFrame, Element):
 
         self.setLayout(layout)
         self.setMaximumSize(layout.sizeHint())
-        self._set_size_policy()
-        self._set_alignment()
-        self._connect_signals()
+        self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
         pass
@@ -498,9 +496,7 @@ class Button(QPushButton, Element):
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         # Set minimum width based on content, but allow horizontal expansion
         self.setMinimumWidth(self.sizeHint().width())
-        self._set_size_policy()
-        self._set_alignment()
-        self._connect_signals()
+        self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
         pass
@@ -603,9 +599,7 @@ class WalkthroughButton(QPushButton, Element):
         self.setMinimumHeight(Settings.DIMENSION.WELCOME_WALKTHROUGH_CARD_MIN_HEIGHT)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         self.setMinimumWidth(self.sizeHint().width())
-        self._set_size_policy()
-        self._set_alignment()
-        self._connect_signals()
+        self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
         pass
@@ -656,9 +650,7 @@ class ToolButton(QToolButton):
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         if tooltip is not None:
             self.setToolTip(tooltip)
-        self._set_size_policy()
-        self._set_alignment()
-        self._connect_signals()
+        self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
         pass
@@ -717,9 +709,7 @@ class ButtonGroup(QButtonGroup, Element):
         self.setExclusive(True)
         for button in buttons:
             self.addButton(button)
-        self._set_size_policy()
-        self._set_alignment()
-        self._connect_signals()
+        self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
         pass
@@ -769,9 +759,7 @@ class SelectionField(QComboBox, Element):
 
         self.setPlaceholderText(placeholder)
         self.setCurrentIndex(0)
-        self._set_size_policy()
-        self._set_alignment()
-        self._connect_signals()
+        self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
         pass
@@ -813,9 +801,7 @@ class RegularText(QLabel, Element):
             QFont(Settings.FONT.FAMILY, Settings.FONT.SIZE_DEFAULT, QFont.Weight.Normal)
         )
         self.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignHCenter)
-        self._set_size_policy()
-        self._set_alignment()
-        self._connect_signals()
+        self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
         pass
@@ -859,9 +845,7 @@ class DemiBoldText(QLabel, Element):
             )
         )
         self.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignHCenter)
-        self._set_size_policy()
-        self._set_alignment()
-        self._connect_signals()
+        self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
         pass
@@ -904,9 +888,7 @@ class HelperText(QLabel, Element):
             QFont(Settings.FONT.FAMILY, Settings.FONT.SIZE_HELPER, QFont.Weight.Normal)
         )
         self.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignHCenter)
-        self._set_size_policy()
-        self._set_alignment()
-        self._connect_signals()
+        self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
         pass
@@ -977,9 +959,7 @@ class List(QListWidget, Element):
         self.setEditTriggers(edit_triggers)
         self.setItemAlignment(item_alignment)
         self.setAlternatingRowColors(True)
-        self._set_size_policy()
-        self._set_alignment()
-        self._connect_signals()
+        self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
         pass
@@ -1043,9 +1023,7 @@ class SVG(QLabel, Element):
         self.path = svg_path
         self.renderer: QSvgRenderer | None = None
         self.set_path(svg_path)
-        self._set_size_policy()
-        self._set_alignment()
-        self._connect_signals()
+        self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
         pass
@@ -1162,9 +1140,7 @@ class PlaceHolder(QFrame, Element):
 
         self.ui = PlaceHolder.UI(text=label, icon=svg)
 
-        self._set_size_policy()
-        self._set_alignment()
-        self._connect_signals()
+        self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
         pass
@@ -1228,9 +1204,7 @@ class FileOpenDialog(QFileDialog, Element):
         self.setOptions(
             QFileDialog.Option.ReadOnly | QFileDialog.Option.DontUseCustomDirectoryIcons
         )
-        self._set_size_policy()
-        self._set_alignment()
-        self._connect_signals()
+        self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
         pass
@@ -1277,9 +1251,7 @@ class FileSaveDialog(QFileDialog, Element):
         self.setFilter(QDir.Filter.Files | QDir.Filter.Readable)
         self.setOptions(QFileDialog.Option.DontUseCustomDirectoryIcons)
         self.setDefaultSuffix(self.texts.default_suffix)
-        self._set_size_policy()
-        self._set_alignment()
-        self._connect_signals()
+        self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
         pass
@@ -1342,9 +1314,7 @@ class WarningDialog(QMessageBox, Element):
                 label.setProperty("messagebox-informative-text", True)
             elif label.text() == self.detailedText():
                 label.setProperty("messagebox-detailed-text", True)
-        self._set_size_policy()
-        self._set_alignment()
-        self._connect_signals()
+        self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
         pass
@@ -1407,9 +1377,7 @@ class QuestionDialog(QMessageBox, Element):
                 label.setProperty("messagebox-informative-text", True)
             elif label.text() == self.detailedText():
                 label.setProperty("messagebox-detailed-text", True)
-        self._set_size_policy()
-        self._set_alignment()
-        self._connect_signals()
+        self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
         pass
@@ -1571,9 +1539,7 @@ class Toast(QWidget, Element):
         self._auto_close_timer.setSingleShot(True)
         self._auto_close_timer.timeout.connect(self.close)
         self._auto_close_timer.start(duration)
-        self._set_size_policy()
-        self._set_alignment()
-        self._connect_signals()
+        self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
         pass
@@ -1654,9 +1620,7 @@ class ProgressBar(QProgressBar, Element):
             else list(ProgressBar.DEFAULT_STEP_LABELS)
         )
         self._update_format(self.value())
-        self._set_size_policy()
-        self._set_alignment()
-        self._connect_signals()
+        self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
         pass
@@ -1704,9 +1668,7 @@ class Image(QLabel, Element):
         self.setProperty("image", True)
         self.setPixmap(QPixmap(image_path))
         self.setScaledContents(True)
-        self._set_size_policy()
-        self._set_alignment()
-        self._connect_signals()
+        self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
         pass
@@ -1760,9 +1722,7 @@ class GroupBox(QGroupBox, Element):
         if widgets is not None:
             for widget in widgets:
                 self.layout().addWidget(widget)
-        self._set_size_policy()
-        self._set_alignment()
-        self._connect_signals()
+        self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
         pass
@@ -1820,9 +1780,7 @@ class ConditionIndicator(QFrame, Element):
         self._opacity_effect = QGraphicsOpacityEffect(self)
         self.setGraphicsEffect(self._opacity_effect)
         self._pulse_group: QSequentialAnimationGroup | None = None
-        self._set_size_policy()
-        self._set_alignment()
-        self._connect_signals()
+        self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
         pass
@@ -2007,9 +1965,7 @@ class File(QWidget, Element):
         self._file_name_label = file_name_label
         self.setLayout(layout)
         self._pending_name_elide_update: bool = False
-        self._set_size_policy()
-        self._set_alignment()
-        self._connect_signals()
+        self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
         pass
@@ -2117,9 +2073,7 @@ class OTPLineEdit(QLineEdit, Element):
         self.ui = OTPLineEdit.UI()
         self._otp_parent = owner
         self._otp_index = index
-        self._set_size_policy()
-        self._set_alignment()
-        self._connect_signals()
+        self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
         pass
@@ -2246,9 +2200,7 @@ class OTPInput(QWidget, Element):
 
         self.setLayout(layout)
 
-        self._set_size_policy()
-        self._set_alignment()
-        self._connect_signals()
+        self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
         pass
@@ -2491,9 +2443,7 @@ class AuthentificationCard(QFrame, Element):
         self._invalid_highlight_elapsed = QElapsedTimer()
         self._invalid_targets: dict[OTPInput, set[int]] = {}
 
-        self._set_size_policy()
-        self._set_alignment()
-        self._connect_signals()
+        self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)

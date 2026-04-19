@@ -183,6 +183,10 @@ class WelcomePanel(QFrame):
             sections_wrapper=sections_wrapper,
         )
 
+        self._finalize_ui_hooks()
+
+    def _finalize_ui_hooks(self) -> None:
+        """Run the final UI setup hooks for the welcome panel."""
         self._set_alignment()
         self._set_size_policy()
         self._connect_signals()
