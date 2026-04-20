@@ -21,9 +21,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from gui.animation import apply_highlight_level, compute_sine_pulse_level
 from gui.elements import GroupBox, HelperText, List, PanelTitle, PlaceHolder, ToolButton
 from gui.icons import GenericIcons
-from gui.pulse import apply_highlight_level, compute_sine_pulse_level
 from gui.settings import Settings
 from gui.signals import app_signals
 from gui.wrapper import (
@@ -342,28 +342,31 @@ class DeviceItem(QListWidgetItem):
             QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed
         )
         self.ui.center.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.MinimumExpanding
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.MinimumExpanding
         )
         self.ui.right_wrap.setSizePolicy(
             QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum
         )
         self.ui.name_label.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred
         )
         self.ui.badge_container.setSizePolicy(
             QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Preferred
         )
         self.ui.subtitle_host.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred
         )
         self.ui.subtitle_label.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred
         )
         self.ui.time_label.setSizePolicy(
             QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred
         )
         self.ui.menu_button.setSizePolicy(
             QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed
+        )
+        self.ui.title_row.setSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred
         )
 
     def _set_alignment(self) -> None:

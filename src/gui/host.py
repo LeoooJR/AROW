@@ -241,14 +241,14 @@ class HostIdentitySection(QFrame):
     class Text:
         """Default copy for host title, summary, and identity rows."""
 
-        host_name: Final[str] = "Leo-MacBook-Pro"
+        host_name: Final[str] = "Unknown Host"
         host_summary: Final[str] = (
             "Primary workstation ready for location spoofing workflow."
         )
         ip_address_key: Final[str] = "Local IP"
-        ip_address_value: Final[str] = "192.168.1.26"
+        ip_address_value: Final[str] = "N/A"
         platform_key: Final[str] = "Platform"
-        platform_value: Final[str] = "macOS 14.5"
+        platform_value: Final[str] = "N/A"
 
     @dataclass
     class UI:
@@ -380,13 +380,13 @@ class AdbBridgeSection(QFrame):
         """Labels and default values for the ADB status block."""
 
         status_key: Final[str] = "Server state"
-        status_value: Final[str] = "Running"
+        status_value: Final[str] = "unknown"
         version_key: Final[str] = "ADB version"
-        version_value: Final[str] = "1.0.41"
+        version_value: Final[str] = "N/A"
         daemon_key: Final[str] = "Daemon"
-        daemon_value: Final[str] = "tcp:5037"
+        daemon_value: Final[str] = "N/A"
         devices_key: Final[str] = "Connected devices"
-        devices_value: Final[str] = "0"
+        devices_value: Final[str] = "N/A"
         helper_note: Final[str] = (
             "Binary allowing communication between Android devices and the host computer."
         )
@@ -555,6 +555,9 @@ class HostPanel(QFrame):
         expand_button_tooltip: Final[str] = "Toggle panel visibility"
         identity_group_title: Final[str] = "Host identity"
         adb_group_title: Final[str] = "Android Debug Bridge"
+        placeholder_host_name: Final[str] = "John Doe"
+        placeholder_ip_address: Final[str] = "192.168.1.26"
+        placeholder_platform: Final[str] = "macOS 14.5"
         placeholder_summary: Final[str] = (
             "Primary workstation ready for location spoofing workflow."
         )
@@ -768,18 +771,18 @@ class HostPanel(QFrame):
         self._set_placeholder_values()
 
     def _set_placeholder_values(self) -> None:
-        """Populate placeholder values until controller/core wiring is implemented."""
+        """Populate placeholder values for the host identity and ADB bridge sections."""
         self.set_host_identity_values(
-            host_name=self.ui.host_identity.texts.host_name,
+            host_name=self.texts.placeholder_host_name,
             summary=self.texts.placeholder_summary,
-            ip_address=self.ui.host_identity.texts.ip_address_value,
+            ip_address=self.texts.placeholder_ip_address,
             platform=self.texts.placeholder_platform,
             os_icon_path=OperatingSystemIcons.MACOS.value,
             identity_state="valid",
         )
         self.set_adb_bridge_values(
             server_state="running",
-            server_state_text=self.texts.placeholder_server_state_text,
+            server_state_text=self.texts.placeholder_server_state_text.capitalize(),
             adb_version=self.texts.placeholder_adb_version,
             daemon=self.texts.placeholder_daemon,
             connected_devices=self.texts.placeholder_connected_devices,

@@ -13,6 +13,7 @@ class AppSignals(QObject):
     LocationPanelVisibilityRequested = Signal(bool)
     HostPanelVisibilityRequested = Signal(bool)
     LogPanelVisibilityRequested = Signal(bool)
+    RunHelperAnimationRequested = Signal()
 
     #### ADB Server Signals ####
     ADBServerStarted = Signal()

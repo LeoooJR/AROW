@@ -494,6 +494,8 @@ class Body(QWidget):
 
     def _connect_signals(self) -> None:
         """Connect body signals. Right sidebar: when one panel is reduced, expand the other. Left sidebar: same."""
+
+        #### Signals for handling the panel visibility requests ####
         app_signals.LogPanelVisibilityRequested.connect(self._on_log_panel_toggled)
         app_signals.HostPanelVisibilityRequested.connect(self._on_host_panel_toggled)
         app_signals.DeviceSelectionPanelVisibilityRequested.connect(
@@ -502,9 +504,16 @@ class Body(QWidget):
         app_signals.LocationPanelVisibilityRequested.connect(
             self._on_location_panel_toggled
         )
+
+        #### Signals for handling the tab changes ####
         self.ui.tabs.currentChanged.connect(self._on_tab_changed)
+
+        #### Signals for handling the step transition from authentification to map display ####
         app_signals.AuthentificationSucceeded.connect(self._on_device_connected)
         app_signals.DeviceSelectionSucceeded.connect(self._on_device_connected)
+
+        #### Signals for handling the helper animation ####
+        app_signals.RunHelperAnimationRequested.connect(self._on_run_helper_animation)
 
     def _set_alignment(self) -> None:
         pass
@@ -529,7 +538,7 @@ class Body(QWidget):
                 elif self.ui.progress_bar.value() == 1:
                     pass
 
-    def run_helper(self) -> None:
+    def _on_run_helper_animation(self) -> None:
         """Run application helper animation."""
         if self.ui.progress_bar.value() == 0:
             if self.ui.tabs.currentIndex() == 1:
@@ -824,9 +833,9 @@ class MainContainer(QWidget):
         self.ui.toast = None
         QTimer.singleShot(0, self._show_next_toast)
 
-    def wake_up(self) -> None:
-        """Wake up the application."""
-        self.ui.body.run_helper()
+    # def wake_up(self) -> None:
+    #     """Wake up the application."""
+    #     self.ui.body.run_helper_animation()
 
 
 class AuthentificationOverlay(QWidget):
@@ -1027,7 +1036,8 @@ class MainWindow(QMainWindow):
     def _on_idle(self) -> None:
         """Handle the idle state: run helper and highlight device lists to draw attention."""
         logger.info("MainWindow: idle state detected")
-        self.ui.container.wake_up()
+        # self.ui.container.wake_up()
+        app_signals.RunHelperAnimationRequested.emit()
 
     def on_adb_server_started(self) -> None:
         app_signals.ADBServerStarted.emit()

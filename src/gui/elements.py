@@ -59,9 +59,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from gui.animation import apply_highlight_level, compute_sine_pulse_level
 from gui.colors import get_current_palette
 from gui.icons import GenericIcons
-from gui.pulse import apply_highlight_level, compute_sine_pulse_level
 from gui.settings import Settings
 from gui.signals import app_signals
 from gui.svg import get_svg_size

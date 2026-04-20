@@ -1,5 +1,5 @@
 """
-Shared helpers for GUI pulse-style highlight animations.
+Shared helpers for GUI animations.
 """
 
 import math
