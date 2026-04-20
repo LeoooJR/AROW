@@ -30,7 +30,7 @@ from gui.signals import app_signals
 from gui.svg import get_svg_size
 from gui.wrapper import GridLayoutWrapper, VerticalLayoutWrapper
 
-ADB_SERVER_STATE = str  # "running" | "stopped" | "starting" | "error" | "unknown"
+ADB_SERVER_STATE = Literal["running", "stopped", "starting", "error", "unknown"]
 
 
 class HostIdentityMetadataRow(QWidget):
@@ -595,6 +595,8 @@ class HostPanel(QFrame):
         self.ui: HostPanel.UI
         self.texts = HostPanel.Text()
 
+        self._is_extended = False
+
         self.setObjectName("host-panel")
         self.setProperty("panel", True)
 
@@ -674,6 +676,7 @@ class HostPanel(QFrame):
         adb_wrapper.add_widget(
             adb_indicator, 0, 0, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight
         )
+        adb_wrapper.setVisible(False)
 
         body = VerticalLayoutWrapper(
             self,
@@ -681,7 +684,7 @@ class HostPanel(QFrame):
             spacing=Settings.HOST_PANEL.SECTION_SPACING,
             margins=Settings.SPACING.MARGIN_NONE,
         )
-        layout.addWidget(body, 1)
+        layout.addWidget(body)
 
         self.setLayout(layout)
 
@@ -735,8 +738,9 @@ class HostPanel(QFrame):
         self.ui.adb_group_box.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
         )
+        # Preferred vertically so the panel can shrink when adb_wrapper is hidden;
         self.ui.body.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
         )
 
     def _connect_signals(self) -> None:
@@ -901,3 +905,17 @@ class HostPanel(QFrame):
             self.setMaximumHeight(Settings.PANEL.UNBOUNDED_HEIGHT)
         # Notify parent layout so space is reallocated (panel below gets more height when reduced).
         self.updateGeometry()
+
+    def extend_panel(self) -> None:
+        """Extend the host panel."""
+        if not self._is_extended:
+            self._is_extended = True
+            self.ui.adb_wrapper.setVisible(True)
+            self.updateGeometry()
+
+    def shorten_panel(self) -> None:
+        """Shorten the host panel."""
+        if self._is_extended:
+            self._is_extended = False
+            self.ui.adb_wrapper.setVisible(False)
+            self.updateGeometry()

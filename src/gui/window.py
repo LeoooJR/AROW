@@ -434,11 +434,12 @@ class Body(QWidget):
         tabs.setTabIcon(1, QIcon(GenericIcons.MAP.value))
 
         device_pairing_panel = DevicePairingPanel(None)
-        device_pairing_panel.setVisible(False)
 
         tabs.addTab(device_pairing_panel, self.texts.device_tab)
 
         tabs.setTabIcon(2, QIcon(GenericIcons.DEVICE.value))
+
+        tabs.setTabVisible(2, False)
 
         progress_bar = ProgressBar(None)
 
@@ -512,6 +513,12 @@ class Body(QWidget):
         self.ui.tabs.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
+        self.ui.host_panel.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+        )
+        self.ui.log_panel.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+        )
 
     def _on_tab_changed(self, index: int) -> None:
         if index == 1:  # Map tab
@@ -537,6 +544,9 @@ class Body(QWidget):
             self.set_host_panel_visibility(
                 True
             )  # Show host panel when log panel is hidden, one panel must be visible at all times in UI
+            self.ui.host_panel.extend_panel()
+        else:
+            self.ui.host_panel.shorten_panel()
 
     def _on_host_panel_toggled(self, visible: bool) -> None:
         """Handle the host panel visibility request."""
@@ -631,7 +641,7 @@ class Body(QWidget):
         """Handle post-connection UI updates for any successful connection flow."""
         self.ui.progress_bar.setValue(1)
         self.ui.tabs.setCurrentIndex(1)
-        self.ui.device_pairing_panel.setVisible(True)
+        self.ui.tabs.setTabVisible(2, True)
 
 
 class MainContainer(QWidget):

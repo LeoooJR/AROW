@@ -611,7 +611,7 @@ class WalkthroughButton(QPushButton, Element):
         pass
 
 
-class ToolButton(QToolButton):
+class ToolButton(QToolButton, Element):
 
     @dataclass(frozen=True)
     class Text:

@@ -941,7 +941,6 @@ class DeviceSelectionPanel(QFrame):
             spacing=Settings.SPACING.XS,
             margins=Settings.SPACING.MARGIN_NONE,
         )
-        body.setProperty("section-divider-bottom", True)
         body.get_layout().setStretchFactor(available_device_group_box, 1)
         layout.addWidget(body, 1)
 
@@ -1118,7 +1117,6 @@ class DeviceSelectionPanel(QFrame):
             alert_highlight=True,
         )
         self.ui.available_device_list.setCurrentItem(item)
-        self.ui.device_state.setVisible(True)
         self.ui.available_device_list.sortItems()
         self._update_available_device_empty_state_visibility()
 
