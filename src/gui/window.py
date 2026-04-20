@@ -33,6 +33,7 @@ from shiboken6 import isValid
 
 import gui.ressources_rc
 from gui.__init__ import __application__
+from gui.animation import animate_widget_visibility
 from gui.colors import Theme, get_current_palette
 from gui.device import DeviceItem, DevicePairingPanel, DeviceSelectionPanel
 from gui.elements import (
@@ -604,11 +605,21 @@ class Body(QWidget):
 
     def set_left_panels_visibility(self, visible: bool) -> None:
         """Set the left panels visibility."""
-        self.ui.left_panels_wrapper.setVisible(visible)
+        animate_widget_visibility(
+            self.ui.left_panels_wrapper,
+            visible=visible,
+            axis="horizontal",
+            hide_widget_when_collapsed=True,
+        )
 
     def set_right_panels_visibility(self, visible: bool) -> None:
         """Set the right panels visibility."""
-        self.ui.right_panels_wrapper.setVisible(visible)
+        animate_widget_visibility(
+            self.ui.right_panels_wrapper,
+            visible=visible,
+            axis="horizontal",
+            hide_widget_when_collapsed=True,
+        )
         if not visible:
             self.ui.device_selection_panel.extend_list_items()
         else:

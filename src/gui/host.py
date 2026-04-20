@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from gui.animation import animate_widget_visibility
 from gui.elements import (
     SVG,
     ConditionIndicator,
@@ -865,25 +866,33 @@ class HostPanel(QFrame):
 
     def is_panel_visible(self) -> bool:
         """Check if the host panel is visible."""
-        return self.ui.body.isVisible()
+        return bool(self.ui.expand_button.property("toggle"))
 
     def show_panel(self) -> None:
         """Show the host panel."""
         if not self.is_panel_visible():
             self.ui.expand_button.setProperty("toggle", True)
             self.ui.expand_button.setIcon(QIcon(GenericIcons.LAYOUT_TOPBAR_INSET.value))
-            self.ui.body.setVisible(True)
-            self.setMaximumHeight(Settings.PANEL.UNBOUNDED_HEIGHT)
-            self.updateGeometry()
+            animate_widget_visibility(
+                self,
+                visible=True,
+                axis="vertical",
+                collapsed_size=self._reduced_height(),
+                content_widget=self.ui.body,
+            )
 
     def hide_panel(self) -> None:
         """Hide the host panel."""
         if self.is_panel_visible():
             self.ui.expand_button.setProperty("toggle", False)
             self.ui.expand_button.setIcon(QIcon(GenericIcons.LAYOUT_TOPBAR.value))
-            self.ui.body.setVisible(False)
-            self.setMaximumHeight(self._reduced_height())
-            self.updateGeometry()
+            animate_widget_visibility(
+                self,
+                visible=False,
+                axis="vertical",
+                collapsed_size=self._reduced_height(),
+                content_widget=self.ui.body,
+            )
 
     def _reduced_height(self) -> int:
         """Height of the panel when reduced (header only): layout padding + header size."""
@@ -898,14 +907,24 @@ class HostPanel(QFrame):
             # Reduce: hide body and constrain height so the panel under can grow.
             self.ui.expand_button.setProperty("toggle", False)
             self.ui.expand_button.setIcon(QIcon(GenericIcons.LAYOUT_TOPBAR.value))
-            self.ui.body.setVisible(False)
-            self.setMaximumHeight(self._reduced_height())
+            animate_widget_visibility(
+                self,
+                visible=False,
+                axis="vertical",
+                collapsed_size=self._reduced_height(),
+                content_widget=self.ui.body,
+            )
         else:
             # Expand: show body and allow it to grow.
             self.ui.expand_button.setProperty("toggle", True)
             self.ui.expand_button.setIcon(QIcon(GenericIcons.LAYOUT_TOPBAR_INSET.value))
-            self.ui.body.setVisible(True)
-            self.setMaximumHeight(Settings.PANEL.UNBOUNDED_HEIGHT)
+            animate_widget_visibility(
+                self,
+                visible=True,
+                axis="vertical",
+                collapsed_size=self._reduced_height(),
+                content_widget=self.ui.body,
+            )
         # Notify parent layout so space is reallocated (panel below gets more height when reduced).
         self.updateGeometry()
 
