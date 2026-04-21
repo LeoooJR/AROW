@@ -102,6 +102,11 @@ Apply these rules whenever you touch `src/gui`.
 - Keep styling in `src/gui/stylesheet.py`.
 - Do not embed inline style strings in other Python files; extend the stylesheet module instead.
 
+### Animations
+
+- Implement common or generic animation helpers in `src/gui/animation.py`.
+- Reuse helpers from `src/gui/animation.py` instead of duplicating shared animation logic in panel or widget modules.
+
 ### Qt resources
 
 When adding, removing, renaming, or updating GUI assets referenced by the Qt resource file:
