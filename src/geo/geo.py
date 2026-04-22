@@ -1,17 +1,19 @@
 from pathlib import Path
-from typing import Final, Literal
+from typing import Dict, Final, Literal, Tuple
 
 import folium
 import geopandas
 import pandas as pd
-from datasets import DatasetManager
+import xyzservices.providers as xyz
 from folium.plugins import Fullscreen, MarkerCluster, MousePosition
 from folium.utilities import JsCode
-from icons import Icons
 from loguru import logger
 
+from geo.datasets import DatasetManager
+from geo.icons import Icons
+
 # Columns embedded in Folium GeoJSON for milestone layers (tooltip/popup only).
-_MILESTONE_GEOJSON_COLUMNS: tuple[str, ...] = (
+_MILESTONE_GEOJSON_COLUMNS: Final[Tuple[str, ...]] = (
     "pk",
     "ligne",
     "code_ligne",
@@ -34,6 +36,7 @@ class MapRenderer:
 
         # Canvas renderer reduces DOM load for many CircleMarkers (milestones).
         self.map = folium.Map(
+            tiles="OpenStreetMap",
             location=(self.DEFAULT_LATITUDE, self.DEFAULT_LONGITUDE),
             zoom_start=self.ZOOM_START,
             prefer_canvas=True,
@@ -48,17 +51,25 @@ class MapRenderer:
         manager: DatasetManager = DatasetManager()
 
         stations_geodataset: geopandas.GeoDataFrame = manager.read("gares-de-voyageurs")
+
+        # Drop columns that are not needed for the map
         stations_geodataset: geopandas.GeoDataFrame = stations_geodataset.drop(
             columns="position_geographique"
         )
+
+        # Convert columns to categorical types for better performance
         self.stations_geodataset: geopandas.GeoDataFrame = stations_geodataset.astype(
             {"segment_drg": "category"}
         )
 
-        railways_geodataset = manager.read(id="lignes-par-type")
+        railways_geodataset: geopandas.GeoDataFrame = manager.read(id="lignes-par-type")
+
+        # Convert columns to categorical types for better performance
         railways_geodataset: geopandas.GeoDataFrame = railways_geodataset.astype(
             {"type_ligne": "category"}
         )
+
+        # Drop columns that are not needed for the map
         self.railways_geodataset: geopandas.GeoDataFrame = railways_geodataset.drop(
             columns=[
                 "idgaia",
@@ -76,39 +87,42 @@ class MapRenderer:
             ]
         )
 
-        milestones_dataset: pd.DataFrame = manager.read(
-            id="referentiel_pk_gps", encoding="latin-1"
-        )
+        milestones_dataset: pd.DataFrame = manager.read("referentiel_pk_gps")
+
+        # Convert columns names to lowercarse for consistency
         milestones_dataset.columns = milestones_dataset.columns.map(lambda c: c.lower())
-        milestones_dataset = milestones_dataset.astype(
+
+        # Convert columns to categorical types for better performance
+        milestones_dataset: pd.DataFrame = milestones_dataset.astype(
             {"type_reper": "category", "ligne": "category", "code_ligne": "category"}
         )
         # Vectorized WGS84: comma decimals in source CSV.
-        lon = pd.to_numeric(
+        lon: pd.Series = pd.to_numeric(
             milestones_dataset["longitude"]
             .astype("string")
             .str.replace(",", ".", regex=False),
             errors="coerce",
         )
-        lat = pd.to_numeric(
+        lat: pd.Series = pd.to_numeric(
             milestones_dataset["latitude"]
             .astype("string")
             .str.replace(",", ".", regex=False),
             errors="coerce",
         )
-        milestones_dataset["geometry"] = geopandas.GeoSeries.from_xy(
-            lon, lat, crs="EPSG:4326"
+        milestones_dataset["geometry"]: geopandas.GeoSeries = (
+            geopandas.GeoSeries.from_xy(lon, lat, crs="EPSG:4326")
         )
         milestones_dataset = milestones_dataset.drop(columns=["latitude", "longitude"])
 
         # PK string (e.g. "001+000" -> 1.0 km, "012+500" -> 12.5 km), vectorized.
-        _pk = milestones_dataset["pk"].astype("string")
+        _pk: pd.Series = milestones_dataset["pk"].astype("string")
         _parts = _pk.str.strip().str.split("+", n=1, expand=True)
-        _km_part = pd.to_numeric(_parts[0], errors="coerce")
-        _m_part = pd.to_numeric(_parts[1], errors="coerce")
-        milestones_dataset["kilometers"] = _km_part + _m_part / 1000.0
+        _km_part: pd.Series = pd.to_numeric(_parts[0], errors="coerce")
+        _m_part: pd.Series = pd.to_numeric(_parts[1], errors="coerce")
+        milestones_dataset["kilometers"]: pd.Series = _km_part + _m_part / 1000.0
 
-        milestones_dataset = milestones_dataset.dropna(
+        # Ensure that the geometry, code_ligne, and kilometers columns are not null, even if must not happen.
+        milestones_dataset: pd.DataFrame = milestones_dataset.dropna(
             subset=["geometry", "code_ligne", "kilometers"]
         )
         self.milestones_geodataset: geopandas.GeoDataFrame = geopandas.GeoDataFrame(
@@ -123,7 +137,9 @@ class MapRenderer:
             ]
         )
 
-        self._milestones_visibility_settings: dict = {
+        self._milestones_visibility_settings: Final[
+            Dict[str, Dict[str, int | float]]
+        ] = {
             "LOW": {"threshold": 10, "spacing": 10.0, "tolerance": 0.5},
             "MEDIUM": {"threshold": 14, "spacing": 1.0, "tolerance": 0.05},
         }
@@ -131,15 +147,24 @@ class MapRenderer:
         def _at_distance_mask(
             kilometers: pd.Series, settings: Literal["LOW", "MEDIUM"]
         ) -> pd.Series:
+            """Check if the distance between two milestones is within the tolerance for the given settings.
+
+            Args:
+                kilometers: The kilometers of the milestones.
+                settings: The settings for the milestones.
+
+            Returns:
+                A boolean series indicating if the distance between two milestones is within the tolerance for the given settings.
+            """
             spacing: float = self._milestones_visibility_settings[settings]["spacing"]
             tolerance: float = self._milestones_visibility_settings[settings][
                 "tolerance"
             ]
-            remainder = kilometers % spacing
+            remainder: pd.Series = kilometers % spacing
             return (remainder <= tolerance) | ((spacing - remainder) <= tolerance)
 
         # Low-zoom markers: rule LOW, without per-row Python loops.
-        low_mask = _at_distance_mask(
+        low_mask: pd.Series = _at_distance_mask(
             milestones_kilometer_geodataset["kilometers"], settings="LOW"
         )
         subset_indices: list[int] = milestones_kilometer_geodataset.index[
@@ -172,10 +197,10 @@ class MapRenderer:
             ].copy()
         )
 
-        _n_km = len(milestones_kilometer_geodataset)
-        _n_low = len(self._milestones_low_zoom_geodataset)
-        _n_med = len(self._milestones_medium_zoom_geodataset)
-        _n_hi = len(self._milestone_high_zoom_geodataset)
+        _n_km: int = len(milestones_kilometer_geodataset)
+        _n_low: int = len(self._milestones_low_zoom_geodataset)
+        _n_med: int = len(self._milestones_medium_zoom_geodataset)
+        _n_hi: int = len(self._milestone_high_zoom_geodataset)
         logger.info(
             "Milestone layers built: kilometer_only={} low_zoom={} medium_zoom={} "
             "high_zoom_non_km={}",
