@@ -3,7 +3,9 @@ import platform
 import socket
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Iterator, Optional, Self
+from typing import Any, Optional, Self
+
+from collection import Repository
 
 
 @dataclass
@@ -233,7 +235,7 @@ class Computer(Device):
     ) -> None:
         resolved_name = name or platform.node()
         resolved_os = os or platform.system()
-        resolved_ip = ip if ip is not None else self._get_ip()
+        resolved_ip = ip if ip is not None else self._resolve_ip()
         super().__init__(
             id=id,
             name=resolved_name,
@@ -251,7 +253,25 @@ class Computer(Device):
             last_communication=last_communication,
         )
 
-    def _get_ip(self) -> str:
+    def get_name(self) -> str:
+        return self._descriptor.name
+
+    def get_os(self) -> str:
+        return self._descriptor.os
+
+    def get_ip(self) -> str:
+        return self._descriptor.ip
+
+    def get_port(self) -> int:
+        return self._descriptor.port
+
+    def get_state(self) -> str:
+        return self._descriptor.state
+
+    def get_last_communication(self) -> datetime.datetime:
+        return self._descriptor.last_communication
+
+    def _resolve_ip(self) -> str:
         ip = socket.gethostbyname(socket.gethostname())
         if ip.startswith("127."):
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -272,105 +292,57 @@ def connect_to_device(ip: str, port: int, association_code: str) -> Phone:
     return Phone(id="", name="", os="", ip=ip, port=port, state="")
 
 
-class DeviceRepository(ABC):
+class PhoneRepository(Repository[Phone]):
     """
-    Device repository
+    Phone repository. Tracks a working device: the first added phone is selected until cleared.
     """
 
-    def __init__(self):
-        self._devices: dict[str, Device] = {}
-        self._working_device: Device | None = None
+    def __init__(self) -> None:
+        super().__init__()
+        self._working_device: Phone | None = None
 
     @property
-    def working_device(self) -> Device | None:
+    def working_device(self) -> Phone | None:
         return self.__dict__.get("_working_device", None)
 
     @working_device.setter
-    def working_device(self, device: Device) -> None:
+    def working_device(self, device: Phone) -> None:
         self._working_device = device
 
-    def add_device(self, device: Device) -> None:
-        if device.descriptor.id in self._devices:
-            raise ValueError(f"Device with id {device.descriptor.id} already exists")
-        self._devices[device.descriptor.id] = device
+    def add(self, item: Phone) -> None:
+        super().add(item)
         if self._working_device is None:
-            self._working_device = device
+            self._working_device = item
 
-    def remove_device(self, device: Device) -> None:
-        self._devices.pop(device.descriptor.id)
-        if self._working_device == device:
+    def remove(self, item: Phone) -> None:
+        super().remove(item)
+        if self._working_device == item:
             self._working_device = None
 
-    def get_all_devices(self) -> dict[str, Device]:
-        return self._devices
 
-    def get_device(self, id: str) -> Device | None:
-        return self._devices.get(id, None)
-
-    def __iter__(self) -> Iterator[Device]:
-        return iter(self._devices.values())
-
-    def __len__(self) -> int:
-        return len(self._devices)
-
-    def __contains__(self, device: Device) -> bool:
-        return device.descriptor.id in self._devices
-
-    def __getitem__(self, id: str) -> Device:
-        return self._devices[id]
-
-    def __setitem__(self, id: str, device: Device) -> None:
-        self._devices[id] = device
-
-    def __delitem__(self, id: str) -> None:
-        self._devices.pop(id)
-
-
-class PhoneRepository(DeviceRepository):
+class ComputerRepository(Repository[Computer]):
     """
-    Phone repository
+    Computer repository. Tracks a working device: the first added computer is selected until cleared.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
+        self._working_device: Computer | None = None
 
-    def add_phone(self, phone: Phone) -> None:
-        super().add_device(phone)
+    @property
+    def working_device(self) -> Computer | None:
+        return self.__dict__.get("_working_device", None)
 
-    def remove_phone(self, phone: Phone) -> None:
-        super().remove_device(phone)
+    @working_device.setter
+    def working_device(self, device: Computer) -> None:
+        self._working_device = device
 
-    def get_all_phones(self) -> dict[str, Phone]:
-        return {
-            k: v for k, v in super().get_all_devices().items() if isinstance(v, Phone)
-        }
+    def add(self, item: Computer) -> None:
+        super().add(item)
+        if self._working_device is None:
+            self._working_device = item
 
-    def get_phone(self, id: str) -> Phone | None:
-        device = super().get_device(id)
-        return device if isinstance(device, Phone) else None
-
-
-class ComputerRepository(DeviceRepository):
-    """
-    Computer repository
-    """
-
-    def __init__(self):
-        super().__init__()
-
-    def add_computer(self, computer: Computer) -> None:
-        super().add_device(computer)
-
-    def remove_computer(self, computer: Computer) -> None:
-        super().remove_device(computer)
-
-    def get_all_computers(self) -> dict[str, Computer]:
-        return {
-            k: v
-            for k, v in super().get_all_devices().items()
-            if isinstance(v, Computer)
-        }
-
-    def get_computer(self, id: str) -> Computer | None:
-        device = super().get_device(id)
-        return device if isinstance(device, Computer) else None
+    def remove(self, item: Computer) -> None:
+        super().remove(item)
+        if self._working_device == item:
+            self._working_device = None

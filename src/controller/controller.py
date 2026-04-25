@@ -1,11 +1,12 @@
 import importlib
+import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any
+from pathlib import Path
+from typing import Any, Iterator
 
-from PySide6.QtWidgets import QWidget
-
+from collection import Repository
 from core.devices import Phone
 from core.location import Location
 from core.models import CoreRuntimeModel
@@ -13,11 +14,12 @@ from core.signals import (
     AdbServerStartedPayload,
     AdbServerStoppedPayload,
     CoreSignal,
-    DevicePairingFailedPayload,
-    DevicePairingSucceededPayload,
+    DeviceConnectionFailedPayload,
+    DeviceConnectionSucceededPayload,
     DevicesUpdatedPayload,
 )
 from gui.signals import app_signals
+from gui.window import MainWindow
 from logger import logger
 
 _async_mod = importlib.import_module("controller.async")
@@ -28,24 +30,95 @@ JobSpecification = _async_mod.JobSpecification
 ProgressEvent = _async_mod.ProgressEvent
 
 
+def validate_model(function: Callable[..., Any]) -> Callable[..., Any]:
+    """Validate the model for the function.
+
+    Args:
+        function: Function to validate the model for.
+
+    Returns:
+        Function: Function with the model validated.
+    """
+
+    def wrapper(self, *args: Any, **kwargs: Any) -> Any:
+        if not isinstance(self.model, CoreRuntimeModel):
+            logger.warning(
+                "Controller: model type mismatch",
+                model_type=type(self.model).__name__,
+            )
+            return
+        return function(self, *args, **kwargs)
+
+    return wrapper
+
+
+def validate_view(function: Callable[..., Any]) -> Callable[..., Any]:
+    """Validate the view for the function.
+
+    Args:
+        function: Function to validate the view for.
+
+    Returns:
+        Function: Function with the view validated.
+    """
+
+    def wrapper(self, *args: Any, **kwargs: Any) -> Any:
+        if not isinstance(self.view, MainWindow):
+            logger.warning(
+                "Controller: view type mismatch",
+                view_type=type(self.view).__name__,
+            )
+            return
+        return function(self, *args, **kwargs)
+
+    return wrapper
+
+
 @dataclass
-class SimulationState:
+class Simulation:
+    """Simulation."""
+
+    id: str = field(
+        default=uuid.uuid4().hex, metadata={"description": "The id of the simulation"}
+    )
     real_location: Location = field(
-        default_factory=lambda: Location(lat=0.0, lon=0.0, label=None)
+        default_factory=lambda: Location(lat=0.0, lon=0.0, label=None),
+        metadata={"description": "The real location of the device"},
     )
     fake_location: Location = field(
-        default_factory=lambda: Location(lat=0.0, lon=0.0, label=None)
+        default_factory=lambda: Location(lat=0.0, lon=0.0, label=None),
+        metadata={"description": "The fake location to simulate on the device"},
     )
-    device: Phone = field(default=None)
-    active: bool = field(default=False)
+    device: Phone = field(
+        default=None, metadata={"description": "The device of the simulation"}
+    )
+    log_file: Path = field(
+        default=None, metadata={"description": "The log file of the simulation"}
+    )
+    active: bool = field(
+        default=False, metadata={"description": "Whether the simulation is active"}
+    )
+
+
+class SimulationRepository(Repository[Simulation]):
+    """Repository for the simulations."""
+
+    def __init__(self):
+        super().__init__()
 
 
 class Controller(ABC):
+    """Controller for the application."""
 
-    def __init__(self, model, view):
+    def __init__(self, model: CoreRuntimeModel, view: MainWindow):
+        """Initialize the controller.
 
-        self._model = model
-        self._view = view
+        Args:
+            model: Model for the application.
+            view: View for the application.
+        """
+        self._model: CoreRuntimeModel = model
+        self._view: MainWindow = view
         self._runner: AsyncRunner = AsyncRunner(view)
         self._connect_view_signals()
         self._connect_model_signals()
@@ -62,29 +135,31 @@ class Controller(ABC):
         Connect model signals to controller methods
         """
 
-    @property
-    def view(self) -> QWidget:
+    #### Getters / Setters ####
 
+    @property
+    def view(self) -> MainWindow:
+        """Get the view for the application."""
         return self._view
 
     @view.setter
-    def view(self, view: QWidget) -> None:
-
+    def view(self, view: MainWindow) -> None:
+        """Set the view for the application."""
         self._view = view
 
     @property
     def model(self) -> CoreRuntimeModel:
-
+        """Get the model for the application."""
         return self._model
 
     @model.setter
     def model(self, model: CoreRuntimeModel) -> None:
-
+        """Set the model for the application."""
         self._model = model
 
     @property
     def runner(self) -> AsyncRunner:
-
+        """Get the asynchronous runner for the application."""
         return self._runner
 
     def _submit_model_async_call(
@@ -110,6 +185,24 @@ class Controller(ABC):
         Completed callbacks are invoked by AsyncRunner on the Qt main thread,
         which makes this helper the standard entry point for future controller
         -> model async orchestration.
+
+        Args:
+            name: Name of the job.
+            fn: Function to execute.
+            description: Description of the job.
+            args: Arguments to pass to the function.
+            kwargs: Keyword arguments to pass to the function.
+            on_completed: Callback to execute when the job is completed.
+            on_failed: Callback to execute when the job fails.
+            on_cancelled: Callback to execute when the job is cancelled.
+            on_progress: Callback to execute when the job progresses.
+            job_type: Type of the job (auto, thread, process).
+            timeout: Timeout for the job.
+            priority: Priority of the job (0-100).
+            coalesce_key: Key to coalesce the job (none, location, network, device).
+
+        Returns:
+            JobHandler: JobHandler for the job. This can be used to cancel the job.
         """
         job = JobSpecification(
             name=name,
@@ -147,37 +240,31 @@ class Controller(ABC):
 
 
 class SimulationController(Controller):
+    """Controller for the simulation."""
 
     def __init__(self, model, view):
+        """Initialize the simulation controller.
+
+        Args:
+            model: Model for the simulation.
+            view: View for the simulation.
+        """
         super().__init__(model, view)
 
-        self._state: SimulationState = SimulationState()
+        self._simulation: Simulation = Simulation()
         self._send_host_device_information()
         self._startup_core_runtime()
 
-    def _send_host_device_information(self) -> None:
-        """
-        Send the host device information to the view.
-        """
-        self.view.on_host_device_information_updated(
-            self.model.host.descriptor.name,
-            self.model.host.descriptor.os,
-            self.model.host.descriptor.ip,
-        )
-
-    def _startup_core_runtime(self) -> None:
-        """
-        Ask the core model to initialize runtime services at startup.
-        """
-        if not isinstance(self.model, CoreRuntimeModel):
-            logger.warning(
-                "SimulationController: core runtime startup skipped (model type)",
-                model_type=type(self.model).__name__,
-            )
-            return
-        self.model.startup()
-
+    @validate_view
     def _connect_view_signals(self) -> None:
+        """Connect view signals to controller methods.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
         app_signals.AuthentificationConfirmed.connect(
             self._on_authentification_confirmed
         )
@@ -188,55 +275,110 @@ class SimulationController(Controller):
             self._on_refresh_device_list_requested
         )
 
+    @validate_model
     def _connect_model_signals(self) -> None:
-        self.model.subscribe(CoreSignal.DEVICES_UPDATED, self._on_devices_updated)
-        self.model.subscribe(
-            CoreSignal.DEVICE_PAIRING_SUCCEEDED, self._on_device_pairing_succeeded
-        )
-        self.model.subscribe(
-            CoreSignal.DEVICE_PAIRING_FAILED, self._on_device_pairing_failed
-        )
+        """Connect model signals to controller methods.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
+
+        #### ADB Server Signals ####
         self.model.subscribe(CoreSignal.ADB_SERVER_STARTED, self._on_adb_server_started)
         self.model.subscribe(CoreSignal.ADB_SERVER_STOPPED, self._on_adb_server_stopped)
 
+        #### Device Signals ####
+        self.model.subscribe(CoreSignal.DEVICES_UPDATED, self._on_devices_updated)
+        self.model.subscribe(
+            CoreSignal.DEVICE_CONNECTION_SUCCEEDED, self._on_device_connection_succeeded
+        )
+        self.model.subscribe(
+            CoreSignal.DEVICE_CONNECTION_FAILED, self._on_device_connection_failed
+        )
+
+    #### Getters / Setters ####
+
     @property
     def device(self) -> Phone | None:
+        """Get the device for the simulation."""
 
-        return self.__dict__.get("_device", None)
+        return self._simulation.device
 
     @device.setter
-    def device(self, device: str) -> None:
-
-        self._device = device
+    def device(self, device: Phone) -> None:
+        """Set the device for the simulation."""
+        self._simulation.device = device
 
     @property
     def real_location(self) -> Location | None:
-        return self.__dict__.get("_real_location", None)
+        """Get the real location for the simulation."""
+        return self._simulation.real_location
 
     @real_location.setter
-    def real_location(self, real_location: tuple[float, float]) -> None:
-        self._real_location = real_location
+    def real_location(self, real_location: Location) -> None:
+        """Set the real location for the simulation."""
+        self._simulation.real_location = real_location
 
     @property
     def fake_location(self) -> Location | None:
-        return self.__dict__.get("_fake_location", None)
+        """Get the fake location for the simulation."""
+        return self._simulation.fake_location
 
     @fake_location.setter
-    def fake_location(self, fake_location: tuple[float, float]) -> None:
-        self._fake_location = fake_location
+    def fake_location(self, fake_location: Location) -> None:
+        """Set the fake location for the simulation."""
+        self._simulation.fake_location = fake_location
 
-    def run(self):
+    @validate_view
+    def _send_host_device_information(self) -> None:
+        """
+        Send the host device information to the view.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
+        self.view.on_host_device_information_updated(
+            self.model.host.get_name(),
+            self.model.host.get_os(),
+            self.model.host.get_ip(),
+        )
+
+    @validate_model
+    def _startup_core_runtime(self) -> None:
+        """
+        Ask the core model to initialize runtime services at startup.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
+        self.model.startup()
+
+    def run(self) -> None:
+        """Run the simulation."""
         pass
 
-    def stop(self):
+    def stop(self) -> None:
+        """Stop the simulation."""
         pass
 
-    def pause(self):
+    def pause(self) -> None:
+        """Pause the simulation."""
         pass
 
-    def resume(self):
+    def resume(self) -> None:
+        """Resume the simulation."""
         pass
 
+    @validate_view
     def _on_adb_server_started(self, payload: AdbServerStartedPayload) -> None:
         """Handle the ADB server started event."""
         logger.info(
@@ -245,6 +387,7 @@ class SimulationController(Controller):
         )
         self.view.on_adb_server_started()
 
+    @validate_view
     def _on_adb_server_stopped(self, payload: AdbServerStoppedPayload) -> None:
         """Handle the ADB server stopped event."""
         logger.info(
@@ -253,6 +396,7 @@ class SimulationController(Controller):
         )
         self.view.on_adb_server_stopped()
 
+    @validate_model
     def _on_authentification_confirmed(
         self, ip: str, port: str, association_code: str
     ) -> None:
@@ -265,6 +409,7 @@ class SimulationController(Controller):
         )
         self.model.pair_device(ip, port, association_code)
 
+    @validate_view
     def _on_devices_updated(self, payload: DevicesUpdatedPayload) -> None:
         """Handle the devices updated event."""
         device_ids = [d.descriptor.id for d in payload.devices]
@@ -275,28 +420,35 @@ class SimulationController(Controller):
         )
         self.view.on_devices_updated(device_ids)
 
-    def _on_device_pairing_succeeded(
-        self, payload: DevicePairingSucceededPayload
+    @validate_view
+    def _on_device_connection_succeeded(
+        self, payload: DeviceConnectionSucceededPayload
     ) -> None:
-        """Handle the device pairing succeeded event."""
-        desc = payload.device.descriptor
+        """Handle the device connection succeeded event."""
+        desc = payload.phone.descriptor
         logger.success(
-            "SimulationController: device pairing succeeded",
+            "SimulationController: device connection succeeded",
             device_id=desc.id,
             device_name=desc.name,
         )
-        # TODO: Retrieve device informations
-        self.view.on_device_pairing_succeeded(desc.id)
+        self.view.on_device_pairing_succeeded(
+            desc.id
+        )  # TODO: Rename to on_device_connection_succeeded
 
-    def _on_device_pairing_failed(self, payload: DevicePairingFailedPayload) -> None:
-        """Handle the device pairing failed event."""
+    @validate_view
+    def _on_device_connection_failed(
+        self, payload: DeviceConnectionFailedPayload
+    ) -> None:
+        """Handle the device connection failed event."""
         logger.warning(
-            "SimulationController: device pairing failed",
+            "SimulationController: device connection failed",
             ip=payload.ip,
             port=payload.port,
             association_code=payload.association_code,
         )
+        # TODO: Handle the device connection failed event
 
+    @validate_model
     def _on_device_connection_requested(self, device_id: str) -> None:
         """Handle the device connection requested event."""
         logger.info(
@@ -318,6 +470,7 @@ class SimulationController(Controller):
             device_name=desc.name,
         )
 
+    @validate_view
     def _on_refresh_device_list_requested(self) -> None:
         """Handle the refresh device list requested event."""
         logger.info("SimulationController: refresh device list requested")

@@ -99,14 +99,14 @@ def test_optional_int_empty() -> None:
     assert ADBCommandParser.GET_SDK_VERSION.parse("   \n") is None
 
 
-def test_notification_post_confirmation() -> None:
+def test_send_notification_post_confirmation() -> None:
     assert (
-        ADBCommandParser.POST_CONNECTION_NOTIFICATION.parse(
+        ADBCommandParser.SEND_NOTIFICATION.parse(
             "posting:\n  Notification(channel=*** shortcut=null"
         )
         is True
     )
-    assert ADBCommandParser.POST_CONNECTION_NOTIFICATION.parse("") is False
+    assert ADBCommandParser.SEND_NOTIFICATION.parse("") is False
 
 
 def test_adb_command_parsers_registry() -> None:
@@ -122,7 +122,7 @@ def test_adb_command_parsers_registry() -> None:
         AdbCommands.SHELL_GET_SERIAL_NO,
         AdbCommands.GET_BATTERY_INFOS,
         AdbCommands.DUMPSYS_WINDOW,
-        AdbCommands.POST_CONNECTION_NOTIFICATION,
+        AdbCommands.SEND_NOTIFICATION,
     }
     assert set(ADB_COMMAND_PARSERS.keys()) == expected
     for cmd, parser in ADB_COMMAND_PARSERS.items():

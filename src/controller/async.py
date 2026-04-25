@@ -152,8 +152,21 @@ class ProcessPool:
     __slots__ = ("_executor",)
 
     def __init__(self, max_workers: Optional[int] = None) -> None:
-        self._executor: ProcessPoolExecutor = ProcessPoolExecutor(
-            max_workers=max_workers
+        try:
+            self._executor: ProcessPoolExecutor = ProcessPoolExecutor(
+                max_workers=max_workers
+            )
+        except (NotImplementedError, OSError, PermissionError) as e:
+            logger.error(
+                "Process pool: failed to initialize",
+                error=e,
+            )
+            raise RuntimeError(
+                f"Failed to initialize process pool on this system"
+            ) from e
+        logger.debug(
+            "Process pool: initialized",
+            max_workers=max_workers,
         )
 
     def submit(
@@ -247,7 +260,22 @@ class ThreadPool:
     __slots__ = ("_executor",)
 
     def __init__(self, max_workers: Optional[int] = None) -> None:
-        self._executor: ThreadPoolExecutor = ThreadPoolExecutor(max_workers=max_workers)
+        try:
+            self._executor: ThreadPoolExecutor = ThreadPoolExecutor(
+                max_workers=max_workers
+            )
+        except (NotImplementedError, OSError, PermissionError) as e:
+            logger.error(
+                "Thread pool: failed to initialize",
+                error=e,
+            )
+            raise RuntimeError(
+                f"Failed to initialize thread pool on this system"
+            ) from e
+        logger.debug(
+            "Thread pool: initialized",
+            max_workers=max_workers,
+        )
 
     def submit(
         self,
@@ -354,8 +382,31 @@ class AsyncRunner(QObject):
     def __init__(self, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
         self._signals: RunnerSignals = RunnerSignals(self)
-        self._process_pool: ProcessPool = ProcessPool()
-        self._thread_pool: ThreadPool = ThreadPool()
+        try:
+            self._thread_pool: ThreadPool = ThreadPool()
+        except RuntimeError as e:
+            logger.error(
+                "Async runner: failed to initialize thread pool",
+                error=e,
+            )
+            raise RuntimeError(
+                f"Failed to initialize async runner on this system"
+            ) from e
+        try:
+            self._process_pool: ProcessPool = ProcessPool()
+        except RuntimeError as e:
+            logger.error(
+                "Async runner: process pool unavailable, falling back to thread pool",
+                error=e,
+            )
+            self._process_pool = (
+                ThreadPool()
+            )  # Process pool unavailable, falling back to thread pool, post thread pool (in try/catch block) is successfully initialized, so this initialization should succeed
+        logger.debug(
+            "Async runner: initialized",
+            process_pool=self._process_pool,
+            thread_pool=self._thread_pool,
+        )
         self.history: dict[str, tuple[JobHandler, JobHandlerSignals]] = {}
         self._coalesce_latest: dict[str, str] = {}
         self._progress_ready.connect(

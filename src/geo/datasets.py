@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Final, Literal
+from typing import Dict, Final, Literal, Optional
 
 import geopandas
 import numpy as np
@@ -172,39 +172,39 @@ class LignesParTypeSchema(pg.GeoDataFrameModel):
         str_matches=r"^[\dA-Z]+[+\-][\dA-Z+]+$",
         description="PK fin (SNCF kilometric point, + or - separator).",
     )
-    x_d_l93: Series[Float] = pg.Field(
+    x_d_l93: Optional[Series[Float]] = pg.Field(
         nullable=False, description="Début X Lambert 93 (m)."
     )
-    y_d_l93: Series[Float] = pg.Field(
+    y_d_l93: Optional[Series[Float]] = pg.Field(
         nullable=False, description="Début Y Lambert 93 (m)."
     )
-    x_f_l93: Series[Float] = pg.Field(
+    x_f_l93: Optional[Series[Float]] = pg.Field(
         nullable=False, description="Fin X Lambert 93 (m)."
     )
-    y_f_l93: Series[Float] = pg.Field(
+    y_f_l93: Optional[Series[Float]] = pg.Field(
         nullable=False, description="Fin Y Lambert 93 (m)."
     )
-    x_d_wgs84: Series[Float] = pg.Field(
+    x_d_wgs84: Optional[Series[Float]] = pg.Field(
         nullable=False, description="Début longitude WGS84 (deg)."
     )
-    y_d_wgs84: Series[Float] = pg.Field(
+    y_d_wgs84: Optional[Series[Float]] = pg.Field(
         nullable=False, description="Début latitude WGS84 (deg)."
     )
-    x_f_wgs84: Series[Float] = pg.Field(
+    x_f_wgs84: Optional[Series[Float]] = pg.Field(
         nullable=False, description="Fin longitude WGS84 (deg)."
     )
-    y_f_wgs84: Series[Float] = pg.Field(
+    y_f_wgs84: Optional[Series[Float]] = pg.Field(
         nullable=False, description="Fin latitude WGS84 (deg)."
     )
-    c_geo_d: Series[String] = pg.Field(
+    c_geo_d: Optional[Series[String]] = pg.Field(
         nullable=False,
         description="Coordinates as comma-separated string (lat,lon order in source).",
     )
-    c_geo_f: Series[Object] = pg.Field(
+    c_geo_f: Optional[Series[Object]] = pg.Field(
         nullable=False,
         description="Fin point as {lon, lat} dict (GeoJSON-style).",
     )
-    geo_point_2d: Series[Object] = pg.Field(
+    geo_point_2d: Optional[Series[Object]] = pg.Field(
         nullable=False,
         description="Representative point of the line as {lon, lat} dict.",
     )

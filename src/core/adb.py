@@ -214,7 +214,7 @@ class ADBCommandParser(Enum):
     SHELL_GET_SERIAL_NO = member(_make_strip_parser())
     GET_BATTERY_INFOS = member(_parse_battery)
     DUMPSYS_WINDOW = member(_parse_window_summary)
-    POST_CONNECTION_NOTIFICATION = member(_parse_notification_post)
+    SEND_NOTIFICATION = member(_parse_notification_post)
 
     def parse(self, output: str) -> Any:
         """Parse raw adb stdout (or stderr if piped) using this command's rules."""
@@ -330,7 +330,7 @@ class AdbCommands(Enum):
         command="shell",
         args=["dumpsys", "window"],
     )
-    POST_CONNECTION_NOTIFICATION = AdbCommand(
+    SEND_NOTIFICATION = AdbCommand(
         name="Post connection notification",
         description="Show a status notification on the device after connect",
         command="shell",
@@ -338,8 +338,6 @@ class AdbCommands(Enum):
             "cmd",
             "notification",
             "post",
-            "-t",
-            "Connected with ARROW",
             "-n",
             "ARROW",
         ],
@@ -359,7 +357,7 @@ ADB_COMMAND_PARSERS: dict[AdbCommands, ADBCommandParser] = {
     AdbCommands.SHELL_GET_SERIAL_NO: ADBCommandParser.SHELL_GET_SERIAL_NO,
     AdbCommands.GET_BATTERY_INFOS: ADBCommandParser.GET_BATTERY_INFOS,
     AdbCommands.DUMPSYS_WINDOW: ADBCommandParser.DUMPSYS_WINDOW,
-    AdbCommands.POST_CONNECTION_NOTIFICATION: ADBCommandParser.POST_CONNECTION_NOTIFICATION,
+    AdbCommands.SEND_NOTIFICATION: ADBCommandParser.SEND_NOTIFICATION,
 }
 
 
@@ -419,7 +417,7 @@ class AdbClient:
         """
         command = AdbCommands.PAIR.value
         try:
-            result = self.execute(command, None, [f"{ip}:{port}", association_code])
+            result = self._execute(command, None, [f"{ip}:{port}", association_code])
         except AdbClientException as e:
             raise AdbClientException(f"Failed to pair with {ip}:{port}") from e
         return Phone.from_string(result.output) if result.output else None
@@ -430,10 +428,32 @@ class AdbClient:
         """
         command = AdbCommands.GET_DEVICES.value
         try:
-            result = self.execute(command, None)
+            result = self._execute(command, None)
         except AdbClientException as e:
             raise AdbClientException(f"Failed to get devices") from e
         return ADBCommandParser.GET_DEVICES.parse(result.output or "")
+
+    def send_notification(self, title: str, message: str) -> bool:
+        """
+        Send a notification to the device
+
+        Args:
+            title: The title of the notification
+            message: The message of the notification
+
+        Returns:
+            bool: True if the notification was sent successfully, False otherwise
+        """
+        command = AdbCommands.SEND_NOTIFICATION.value
+        try:
+            result = self._execute(
+                command, None, ["-t", shlex.quote(title), "-m", shlex.quote(message)]
+            )
+        except AdbClientException as e:
+            raise AdbClientException(
+                f"Failed to send notification: {title} {message}"
+            ) from e
+        return ADBCommandParser.SEND_NOTIFICATION.parse(result.output or "")
 
     def enable_location_services(self) -> None:
         pass
@@ -447,7 +467,7 @@ class AdbClient:
         """
         pass
 
-    def execute(
+    def _execute(
         self,
         command: AdbCommand,
         phone: Phone | None = None,
@@ -584,19 +604,19 @@ class AdbServer:
         Start the adb server
         """
         command = AdbCommands.START_SERVER.value
-        result = self.execute(command)
+        result = self._execute(command)
         if result.status != AdbCommandResultStatus.SUCCESS:
             raise AdbServerException(f"Failed to start adb server: {result}")
         # Get known devices
         for device in self.get_known_devices():
-            self.paired_devices.add_phone(device)
+            self.paired_devices.add(device)
 
     def stop(self) -> None:
         """
         Stop the adb server
         """
         command = AdbCommands.KILL_SERVER.value
-        result = self.execute(command)
+        result = self._execute(command)
         if result.status != AdbCommandResultStatus.SUCCESS:
             raise AdbServerException(f"Failed to stop adb server: {result}")
 
@@ -615,7 +635,7 @@ class AdbServer:
         Get the status of the adb server
         """
         command = AdbCommands.STATUS.value
-        result = self.execute(command)
+        result = self._execute(command)
         if result.status != AdbCommandResultStatus.SUCCESS:
             raise AdbServerException(f"Failed to get status of adb server: {result}")
 
@@ -625,12 +645,12 @@ class AdbServer:
         """
         command = AdbCommands.GET_DEVICES.value
         try:
-            result = self.execute(command)
+            result = self._execute(command)
         except AdbServerException as e:
             raise AdbClientException(f"Failed to get known devices: {e}") from e
         return ADBCommandParser.GET_DEVICES.parse(result.output or "")
 
-    def execute(self, command: AdbCommand) -> AdbCommandResult:
+    def _execute(self, command: AdbCommand) -> AdbCommandResult:
         """
         Execute a command
         """

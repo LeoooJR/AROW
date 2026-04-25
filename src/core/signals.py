@@ -24,15 +24,12 @@ class CoreSignal(StrEnum):
 
     ADB_SERVER_STARTED = "adb.server.started"
     ADB_SERVER_STOPPED = "adb.server.stopped"
-    DEVICE_CONNECTION_REQUESTED = "device.connection.requested"
+    ADB_SERVER_STATE_CHANGED = "adb.server.state.changed"
     DEVICE_CONNECTION_SUCCEEDED = "device.connection.succeeded"
     DEVICE_CONNECTION_FAILED = "device.connection.failed"
-    DEVICE_PAIRING_SUCCEEDED = "device.pairing.succeeded"
-    DEVICE_PAIRING_FAILED = "device.pairing.failed"
     DEVICES_UPDATED = "devices.updated"
     SIMULATION_STATE_CHANGED = "simulation.state.changed"
     SIMULATION_POSITION_CHANGED = "simulation.position.changed"
-    ADB_SERVER_STATE_CHANGED = "adb.server.state.changed"
     ERROR_RAISED = "error.raised"
     LOG_MESSAGE = "log.message"
 
@@ -52,30 +49,6 @@ class AdbServerStoppedPayload:
 
 
 @dataclass(frozen=True, slots=True)
-class DeviceConnectionRequestedPayload:
-    """Payload used when a connection to a phone is requested."""
-
-    ip: str
-    port: int
-    association_code: str
-
-
-@dataclass(frozen=True, slots=True)
-class DeviceConnectionSucceededPayload:
-    """Payload emitted when a connection to a phone succeeds."""
-
-    phone: Phone
-
-
-@dataclass(frozen=True, slots=True)
-class DeviceConnectionFailedPayload:
-    """Payload emitted when a connection to a phone fails."""
-
-    message: str
-    error: Exception | None = None
-
-
-@dataclass(frozen=True, slots=True)
 class DevicesUpdatedPayload:
     """Payload emitted when the known/connected devices list changes."""
 
@@ -83,15 +56,15 @@ class DevicesUpdatedPayload:
 
 
 @dataclass(frozen=True, slots=True)
-class DevicePairingSucceededPayload:
-    """Payload emitted when a device is paired successfully."""
+class DeviceConnectionSucceededPayload:
+    """Payload emitted when a device is connected successfully."""
 
-    device: Phone
+    phone: Phone
 
 
 @dataclass(frozen=True, slots=True)
-class DevicePairingFailedPayload:
-    """Payload emitted when a device pairing fails."""
+class DeviceConnectionFailedPayload:
+    """Payload emitted when a device connection fails."""
 
     ip: str
     port: int

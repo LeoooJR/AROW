@@ -1,7 +1,6 @@
 import platform
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Callable
 
 from core.adb import AdbBinary, AdbClient, AdbClientException, AdbServer
 from core.devices import Computer, Phone
@@ -9,8 +8,8 @@ from core.signals import (
     AdbServerStartedPayload,
     AdbServerStoppedPayload,
     CoreSignal,
-    DevicePairingFailedPayload,
-    DevicePairingSucceededPayload,
+    DeviceConnectionFailedPayload,
+    DeviceConnectionSucceededPayload,
     DevicesUpdatedPayload,
     InMemoryCoreSignalBus,
     SignalHandler,
@@ -171,7 +170,7 @@ class CoreRuntimeModel(Model):
         """
         Get a device from the ADB server.
         """
-        return self._adb_server.paired_devices.get_device(device_id)
+        return self._adb_server.paired_devices.get(device_id)
 
     def get_known_devices(self) -> list[Phone]:
         """
@@ -197,8 +196,8 @@ class CoreRuntimeModel(Model):
         try:
             phone = adb_client.pair(ip, port, association_code)
             self._signal_bus.emit(
-                CoreSignal.DEVICE_PAIRING_SUCCEEDED,
-                DevicePairingSucceededPayload(device=phone),
+                CoreSignal.DEVICE_CONNECTION_SUCCEEDED,
+                DeviceConnectionSucceededPayload(phone=phone),
             )
             return
         except AdbClientException as error:
@@ -224,8 +223,8 @@ class CoreRuntimeModel(Model):
                     )
                     phone = adb_client.pair(ip, port, association_code)
                     self._signal_bus.emit(
-                        CoreSignal.DEVICE_PAIRING_SUCCEEDED,
-                        DevicePairingSucceededPayload(device=phone),
+                        CoreSignal.DEVICE_CONNECTION_SUCCEEDED,
+                        DeviceConnectionSucceededPayload(phone=phone),
                     )
                     return
                 except AdbClientException as retry_error:
@@ -236,8 +235,8 @@ class CoreRuntimeModel(Model):
                         error=str(retry_error),
                     )
             self._signal_bus.emit(
-                CoreSignal.DEVICE_PAIRING_FAILED,
-                DevicePairingFailedPayload(
+                CoreSignal.DEVICE_CONNECTION_FAILED,
+                DeviceConnectionFailedPayload(
                     ip=ip, port=port, association_code=association_code
                 ),
             )

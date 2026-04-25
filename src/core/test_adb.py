@@ -8,12 +8,12 @@ from __future__ import annotations
 import subprocess
 from collections import OrderedDict
 from pathlib import Path
-from typing import Any
 
 import pytest
 
 from core.adb import (
     AdbBinary,
+    AdbCommand,
     AdbCommandResult,
     AdbCommandResultStatus,
     AdbCommands,
@@ -82,7 +82,7 @@ class TestAdbServerStartSuccess:
         """start() records the command result and stores known devices."""
         phone = Phone(id="abc123", name="device:Pixel", state="device")
 
-        def fake_execute(command: Any) -> AdbCommandResult:
+        def fake_execute(command: AdbCommand) -> AdbCommandResult:
             result = AdbCommandResult(
                 status=AdbCommandResultStatus.SUCCESS,
                 output="",
@@ -92,10 +92,10 @@ class TestAdbServerStartSuccess:
             server.add_to_history(command, result)
             return result
 
-        monkeypatch.setattr(server, "execute", fake_execute)
+        monkeypatch.setattr(server, "_execute", fake_execute)
         monkeypatch.setattr(server, "get_known_devices", lambda: [phone])
         server.start()
-        assert server.paired_devices.get_phone("abc123") is phone
+        assert server.paired_devices.get("abc123") is phone
         last_result = server.get_last_command_result()
         assert last_result.status == AdbCommandResultStatus.SUCCESS
 
@@ -111,7 +111,7 @@ class TestAdbServerKillSuccess:
     ) -> None:
         """Killing the ADB server with a valid binary succeeds."""
 
-        def fake_execute(command: Any) -> AdbCommandResult:
+        def fake_execute(command: AdbCommand) -> AdbCommandResult:
             result = AdbCommandResult(
                 status=AdbCommandResultStatus.SUCCESS,
                 output="",
@@ -121,7 +121,7 @@ class TestAdbServerKillSuccess:
             server.add_to_history(command, result)
             return result
 
-        monkeypatch.setattr(server, "execute", fake_execute)
+        monkeypatch.setattr(server, "_execute", fake_execute)
         server.stop()
         last_cmd, last_result = server.get_last_from_history()
         assert last_cmd == AdbCommands.KILL_SERVER.value
@@ -138,7 +138,7 @@ class TestAdbServerKillSuccess:
             return _completed_process(argv, returncode=0)
 
         monkeypatch.setattr(subprocess, "run", fake_run)
-        result = server.execute(AdbCommands.KILL_SERVER.value)
+        result = server._execute(AdbCommands.KILL_SERVER.value)
         assert result.status == AdbCommandResultStatus.SUCCESS
         assert result.return_code == 0
 
@@ -164,11 +164,11 @@ class TestAdbServerStartError:
         server = object.__new__(AdbServer)
         server.binary = invalid_adb_binary
         server._history = OrderedDict()
-        server.paired_devices = []
+        server.paired_devices = PhoneRepository()
         with pytest.raises(
             AdbServerException, match="Failed to run ADB binary|Failed to execute"
         ):
-            server.execute(AdbCommands.START_SERVER.value)
+            server._execute(AdbCommands.START_SERVER.value)
 
 
 # --- Kill server: error ---
@@ -184,18 +184,18 @@ class TestAdbServerKillError:
         server = object.__new__(AdbServer)
         server.binary = invalid_adb_binary
         server._history = OrderedDict()
-        server.paired_devices = []
+        server.paired_devices = PhoneRepository()
         with pytest.raises(
             AdbServerException, match="Failed to run ADB binary|Failed to execute"
         ):
-            server.execute(AdbCommands.KILL_SERVER.value)
+            server._execute(AdbCommands.KILL_SERVER.value)
 
 
 # --- Execute result shape ---
 
 
 class TestAdbServerExecuteResult:
-    """ADB server execute() return value and history."""
+    """ADB server _execute() return value and history."""
 
     def test_execute_start_server_returns_result_with_output(
         self, server: AdbServer, monkeypatch: pytest.MonkeyPatch
@@ -213,7 +213,7 @@ class TestAdbServerExecuteResult:
             )
 
         monkeypatch.setattr(subprocess, "run", fake_run)
-        result = server.execute(AdbCommands.START_SERVER.value)
+        result = server._execute(AdbCommands.START_SERVER.value)
         assert result.status == AdbCommandResultStatus.SUCCESS
         assert result.return_code == 0
         assert result.phone is None
@@ -231,9 +231,9 @@ class TestAdbServerExecuteResult:
             return _completed_process(argv, returncode=0)
 
         monkeypatch.setattr(subprocess, "run", fake_run)
-        server.execute(AdbCommands.KILL_SERVER.value)
+        server._execute(AdbCommands.KILL_SERVER.value)
         assert len(server.history) >= 1
-        server.execute(AdbCommands.START_SERVER.value)
+        server._execute(AdbCommands.START_SERVER.value)
         assert len(server.history) >= 2
 
     def test_get_known_devices_skips_malformed_output(
@@ -249,7 +249,7 @@ class TestAdbServerExecuteResult:
             ]
         )
 
-        def fake_execute(_command: Any) -> AdbCommandResult:
+        def fake_execute(_command: AdbCommand) -> AdbCommandResult:
             return AdbCommandResult(
                 status=AdbCommandResultStatus.SUCCESS,
                 output=output,
@@ -257,6 +257,6 @@ class TestAdbServerExecuteResult:
                 return_code=0,
             )
 
-        monkeypatch.setattr(server, "execute", fake_execute)
+        monkeypatch.setattr(server, "_execute", fake_execute)
         devices = server.get_known_devices()
         assert [device.descriptor.id for device in devices] == ["abc123"]
