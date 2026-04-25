@@ -144,6 +144,7 @@ class AnimationSettings:
 
     TOAST_FADE_IN_DURATION: int = 200  # milliseconds
     TOAST_DISPLAY_DURATION: int = 3000  # milliseconds
+    PANEL_VISIBILITY_DURATION: int = 180  # milliseconds for panel collapse/expand
     SIMULATION_STATE_TRANSITION_DURATION: int = (
         220  # milliseconds for state label crossfade
     )

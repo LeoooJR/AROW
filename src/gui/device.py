@@ -21,7 +21,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from gui.animation import apply_highlight_level, compute_sine_pulse_level
+from gui.animation import (
+    animate_widget_visibility,
+    apply_highlight_level,
+    compute_sine_pulse_level,
+)
 from gui.elements import GroupBox, HelperText, List, PanelTitle, PlaceHolder, ToolButton
 from gui.icons import GenericIcons
 from gui.settings import Settings
@@ -1171,7 +1175,7 @@ class DeviceSelectionPanel(QFrame):
 
     def is_panel_visible(self) -> bool:
         """Check if the device panel is visible."""
-        return self.ui.body.isVisible()
+        return bool(self.ui.expand_button.property("toggle"))
 
     def _reduced_height(self) -> int:
         """Height of the panel when reduced (header only): layout padding + header size."""
@@ -1185,18 +1189,26 @@ class DeviceSelectionPanel(QFrame):
         if not self.is_panel_visible():
             self.ui.expand_button.setProperty("toggle", True)
             self.ui.expand_button.setIcon(QIcon(GenericIcons.LAYOUT_TOPBAR_INSET.value))
-            self.ui.body.setVisible(True)
-            self.setMaximumHeight(Settings.PANEL.UNBOUNDED_HEIGHT)
-            self.updateGeometry()
+            animate_widget_visibility(
+                self,
+                visible=True,
+                axis="vertical",
+                collapsed_size=self._reduced_height(),
+                content_widget=self.ui.body,
+            )
 
     def hide_panel(self) -> None:
         """Hide the device panel."""
         if self.is_panel_visible():
             self.ui.expand_button.setProperty("toggle", False)
             self.ui.expand_button.setIcon(QIcon(GenericIcons.LAYOUT_TOPBAR.value))
-            self.ui.body.setVisible(False)
-            self.setMaximumHeight(self._reduced_height())
-            self.updateGeometry()
+            animate_widget_visibility(
+                self,
+                visible=False,
+                axis="vertical",
+                collapsed_size=self._reduced_height(),
+                content_widget=self.ui.body,
+            )
 
     def toggle_panel_visibility(self) -> None:
         """Toggle the visibility of the device panel."""
@@ -1204,14 +1216,24 @@ class DeviceSelectionPanel(QFrame):
             # Reduce: hide body and constrain height so the panel under can grow.
             self.ui.expand_button.setProperty("toggle", False)
             self.ui.expand_button.setIcon(QIcon(GenericIcons.LAYOUT_TOPBAR.value))
-            self.ui.body.setVisible(False)
-            self.setMaximumHeight(self._reduced_height())
+            animate_widget_visibility(
+                self,
+                visible=False,
+                axis="vertical",
+                collapsed_size=self._reduced_height(),
+                content_widget=self.ui.body,
+            )
         else:
             # Expand: show body and allow panel to grow again.
             self.ui.expand_button.setProperty("toggle", True)
             self.ui.expand_button.setIcon(QIcon(GenericIcons.LAYOUT_TOPBAR_INSET.value))
-            self.ui.body.setVisible(True)
-            self.setMaximumHeight(Settings.PANEL.UNBOUNDED_HEIGHT)
+            animate_widget_visibility(
+                self,
+                visible=True,
+                axis="vertical",
+                collapsed_size=self._reduced_height(),
+                content_widget=self.ui.body,
+            )
         # Notify parent layout so space is reallocated (panel below gets more height when reduced).
         self.updateGeometry()
 
