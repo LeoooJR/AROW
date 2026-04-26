@@ -1,30 +1,9 @@
 import importlib
-import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any
 
-from collection import Repository
-from controller.simulation_job_handlers import (
-    PairDeviceJob,
-    RefreshDeviceListJob,
-    StartupCoreRuntimeJob,
-)
-from core.devices import Phone
-from core.location import Location
 from core.models import CoreRuntimeModel
-from core.pair_device_work import run as run_pair_device
-from core.signals import (
-    AdbServerStartedPayload,
-    AdbServerStoppedPayload,
-    CoreSignal,
-    DeviceConnectionFailedPayload,
-    DeviceConnectionSucceededPayload,
-    DevicesUpdatedPayload,
-)
-from gui.signals import app_signals
 from gui.window import MainWindow
 from logger import logger
 
@@ -36,98 +15,34 @@ JobSpecification = _async_mod.JobSpecification
 ProgressEvent = _async_mod.ProgressEvent
 
 
-def validate_model(function: Callable[..., Any]) -> Callable[..., Any]:
-    """Validate the model for the function.
-
-    Args:
-        function: Function to validate the model for.
-
-    Returns:
-        Function: Function with the model validated.
-    """
-
-    def wrapper(self, *args: Any, **kwargs: Any) -> Any:
-        if not isinstance(self.model, CoreRuntimeModel):
-            logger.warning(
-                "Controller: model type mismatch",
-                model_type=type(self.model).__name__,
-            )
-            return
-        return function(self, *args, **kwargs)
-
-    return wrapper
-
-
-def validate_view(function: Callable[..., Any]) -> Callable[..., Any]:
-    """Validate the view for the function.
-
-    Args:
-        function: Function to validate the view for.
-
-    Returns:
-        Function: Function with the view validated.
-    """
-
-    def wrapper(self, *args: Any, **kwargs: Any) -> Any:
-        if not isinstance(self.view, MainWindow):
-            logger.warning(
-                "Controller: view type mismatch",
-                view_type=type(self.view).__name__,
-            )
-            return
-        return function(self, *args, **kwargs)
-
-    return wrapper
-
-
-@dataclass
-class Simulation:
-    """Simulation."""
-
-    id: str = field(
-        default=uuid.uuid4().hex, metadata={"description": "The id of the simulation"}
-    )
-    real_location: Location = field(
-        default_factory=lambda: Location(lat=0.0, lon=0.0, label=None),
-        metadata={"description": "The real location of the device"},
-    )
-    fake_location: Location = field(
-        default_factory=lambda: Location(lat=0.0, lon=0.0, label=None),
-        metadata={"description": "The fake location to simulate on the device"},
-    )
-    device: Phone = field(
-        default=None, metadata={"description": "The device of the simulation"}
-    )
-    log_file: Path = field(
-        default=None, metadata={"description": "The log file of the simulation"}
-    )
-    active: bool = field(
-        default=False, metadata={"description": "Whether the simulation is active"}
-    )
-
-
-class SimulationRepository(Repository[Simulation]):
-    """Repository for the simulations."""
-
-    def __init__(self):
-        super().__init__()
-
-
 class Controller(ABC):
     """Controller for the application."""
 
-    def __init__(self, model: CoreRuntimeModel, view: MainWindow):
+    def __init__(
+        self,
+        model: CoreRuntimeModel,
+        view: MainWindow,
+        *,
+        runner: AsyncRunner | None = None,
+        defer_signal_connect: bool = False,
+    ) -> None:
         """Initialize the controller.
 
         Args:
             model: Model for the application.
             view: View for the application.
+            runner: If provided, use this :class:`AsyncRunner` (e.g. single shared
+                instance from the application controller). If omitted, create one.
+            defer_signal_connect: If True, do not call ``_connect_view_signals`` /
+                ``_connect_model_signals`` here so a subclass can construct child
+                objects first, then call those hooks (see :class:`AppController`).
         """
         self._model: CoreRuntimeModel = model
         self._view: MainWindow = view
-        self._runner: AsyncRunner = AsyncRunner(view)
-        self._connect_view_signals()
-        self._connect_model_signals()
+        self._runner: AsyncRunner = runner if runner is not None else AsyncRunner(view)
+        if not defer_signal_connect:
+            self._connect_view_signals()
+            self._connect_model_signals()
 
     @abstractmethod
     def _connect_view_signals(self):
@@ -243,280 +158,3 @@ class Controller(ABC):
             coalesce_key=coalesce_key,
         )
         return handle
-
-
-class SimulationController(Controller):
-    """Controller for the simulation."""
-
-    def __init__(self, model: CoreRuntimeModel, view: MainWindow):
-        """Initialize the simulation controller.
-
-        Args:
-            model: Model for the simulation.
-            view: View for the simulation.
-        """
-        super().__init__(model, view)
-
-        self._simulation: Simulation = Simulation()
-        self._startup_core_runtime_job: StartupCoreRuntimeJob = StartupCoreRuntimeJob(
-            self
-        )
-        self._pair_device_job: PairDeviceJob = PairDeviceJob(self)
-        self._refresh_device_list_job: RefreshDeviceListJob = RefreshDeviceListJob(self)
-        self._send_host_device_information()
-        self._startup_core_runtime()
-
-    @validate_view
-    def _connect_view_signals(self) -> None:
-        """Connect view signals to controller methods.
-
-        Args:
-            None
-
-        Returns:
-            None
-        """
-        app_signals.AuthentificationConfirmed.connect(
-            self._on_authentification_confirmed
-        )
-        app_signals.DeviceConnectionRequested.connect(
-            self._on_device_connection_requested
-        )
-        app_signals.RefreshDeviceListRequested.connect(
-            self._on_refresh_device_list_requested
-        )
-
-    @validate_model
-    def _connect_model_signals(self) -> None:
-        """Connect model signals to controller methods.
-
-        Args:
-            None
-
-        Returns:
-            None
-        """
-
-        #### ADB Server Signals ####
-        self.model.subscribe(CoreSignal.ADB_SERVER_STARTED, self._on_adb_server_started)
-        self.model.subscribe(CoreSignal.ADB_SERVER_STOPPED, self._on_adb_server_stopped)
-
-        #### Device Signals ####
-        self.model.subscribe(CoreSignal.DEVICES_UPDATED, self._on_devices_updated)
-        self.model.subscribe(
-            CoreSignal.DEVICE_CONNECTION_SUCCEEDED, self._on_device_connection_succeeded
-        )
-        self.model.subscribe(
-            CoreSignal.DEVICE_CONNECTION_FAILED, self._on_device_connection_failed
-        )
-
-    #### Getters / Setters ####
-
-    @property
-    def device(self) -> Phone | None:
-        """Get the device for the simulation."""
-
-        return self._simulation.device
-
-    @device.setter
-    def device(self, device: Phone) -> None:
-        """Set the device for the simulation."""
-        self._simulation.device = device
-
-    @property
-    def real_location(self) -> Location | None:
-        """Get the real location for the simulation."""
-        return self._simulation.real_location
-
-    @real_location.setter
-    def real_location(self, real_location: Location) -> None:
-        """Set the real location for the simulation."""
-        self._simulation.real_location = real_location
-
-    @property
-    def fake_location(self) -> Location | None:
-        """Get the fake location for the simulation."""
-        return self._simulation.fake_location
-
-    @fake_location.setter
-    def fake_location(self, fake_location: Location) -> None:
-        """Set the fake location for the simulation."""
-        self._simulation.fake_location = fake_location
-
-    @validate_view
-    def _send_host_device_information(self) -> None:
-        """
-        Send the host device information to the view.
-
-        Args:
-            None
-
-        Returns:
-            None
-        """
-        self.view.on_host_device_information_updated(
-            self.model.host.get_name(),
-            self.model.host.get_os(),
-            self.model.host.get_ip(),
-        )
-
-    @validate_model
-    def _startup_core_runtime(self) -> None:
-        """
-        Ask the core model to initialize runtime services at startup.
-
-        Args:
-            None
-
-        Returns:
-            None
-        """
-
-        self._submit_model_async_call(
-            name="startup_core_runtime",
-            fn=self.model.startup,
-            description="Startup the core runtime",
-            job_type="thread",
-            coalesce_key="none",
-            on_completed=self._startup_core_runtime_job.on_completed,
-            on_failed=self._startup_core_runtime_job.on_failed,
-        )
-
-    def run(self) -> None:
-        """Run the simulation."""
-        pass
-
-    def stop(self) -> None:
-        """Stop the simulation."""
-        pass
-
-    def pause(self) -> None:
-        """Pause the simulation."""
-        pass
-
-    def resume(self) -> None:
-        """Resume the simulation."""
-        pass
-
-    @validate_view
-    def _on_adb_server_started(self, payload: AdbServerStartedPayload) -> None:
-        """Handle the ADB server started event."""
-        logger.info(
-            "SimulationController: ADB server started",
-            adb_binary=str(payload.adb_binary),
-        )
-        self.view.on_adb_server_started()
-
-    @validate_view
-    def _on_adb_server_stopped(self, payload: AdbServerStoppedPayload) -> None:
-        """Handle the ADB server stopped event."""
-        logger.info(
-            "SimulationController: ADB server stopped",
-            adb_binary=str(payload.adb_binary),
-        )
-        self.view.on_adb_server_stopped()
-
-    @validate_view
-    @validate_model
-    def _on_authentification_confirmed(
-        self, ip: str, port: str, association_code: str
-    ) -> None:
-        """Handle the authentification confirmation (pairing runs on a worker thread)."""
-        logger.info(
-            "SimulationController: pair_device requested (auth confirmed)",
-            ip=ip,
-            port=port,
-            association_code=association_code,
-        )
-        port_i = int(port)
-        self._submit_model_async_call(
-            name="pair_device",
-            fn=lambda: run_pair_device(self.model, ip, port_i, association_code),
-            description="Pair device over ADB",
-            job_type="thread",
-            coalesce_key="device",
-            on_completed=self._pair_device_job.on_completed,
-            on_failed=self._pair_device_job.on_failed,
-        )
-
-    @validate_view
-    def _on_devices_updated(self, payload: DevicesUpdatedPayload) -> None:
-        """Handle the devices updated event."""
-        device_ids = [d.descriptor.id for d in payload.devices]
-        logger.info(
-            "SimulationController: devices updated",
-            device_count=len(device_ids),
-            device_ids=device_ids,
-        )
-        self.view.on_devices_updated(device_ids)
-
-    @validate_view
-    def _on_device_connection_succeeded(
-        self, payload: DeviceConnectionSucceededPayload
-    ) -> None:
-        """Handle the device connection succeeded event."""
-        desc = payload.phone.descriptor
-        logger.success(
-            "SimulationController: device connection succeeded",
-            device_id=desc.id,
-            device_name=desc.name,
-        )
-        self.view.on_device_pairing_succeeded(
-            desc.id
-        )  # TODO: Rename to on_device_connection_succeeded
-
-    @validate_view
-    def _on_device_connection_failed(
-        self, payload: DeviceConnectionFailedPayload
-    ) -> None:
-        """Handle the device connection failed event."""
-        logger.warning(
-            "SimulationController: device connection failed",
-            ip=payload.ip,
-            port=payload.port,
-            association_code=payload.association_code,
-        )
-        # TODO: Handle the device connection failed event
-
-    @validate_model
-    def _on_device_connection_requested(self, device_id: str) -> None:
-        """Handle the device connection requested event (in-memory; stays on the UI thread)."""
-        logger.info(
-            "SimulationController: device connection requested",
-            device_id=device_id,
-        )
-        device: Phone | None = self.model.get_device(device_id)
-        if device is None:
-            logger.warning(
-                "SimulationController: device not found",
-                device_id=device_id,
-            )
-            return
-        self._simulation.device = device
-        desc = device.descriptor
-        logger.info(
-            "SimulationController: active device set",
-            device_id=desc.id,
-            device_name=desc.name,
-        )
-
-    @validate_view
-    @validate_model
-    def _on_refresh_device_list_requested(self) -> None:
-        """Handle the refresh device list requested event (ADB list query on a worker)."""
-        logger.info("SimulationController: refresh device list requested")
-        self._submit_model_async_call(
-            name="refresh_device_list",
-            fn=self.model.get_known_devices,
-            description="Refresh device list from ADB",
-            job_type="thread",
-            coalesce_key="device",
-            on_completed=self._refresh_device_list_job.on_completed,
-            on_failed=self._refresh_device_list_job.on_failed,
-        )
-
-
-class MapController(Controller):
-
-    def __init__(self, model, view):
-        super().__init__(model, view)

@@ -124,7 +124,7 @@ class TestComputer:
         )
         assert computer.descriptor.id == "host-1"
         assert computer.descriptor.name == "Workstation"
-        assert computer.descriptor.os == "macOS"
+        assert computer.descriptor.os == "macos"
         assert computer.descriptor.ip == "192.168.1.10"
         assert computer.descriptor.port is None
         assert computer.descriptor.state == "online"

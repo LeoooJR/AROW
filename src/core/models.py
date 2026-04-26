@@ -14,7 +14,7 @@ from core.signals import (
     InMemoryCoreSignalBus,
     SignalHandler,
 )
-from core.startup_work import StartupResult, apply_main_thread
+from core.startup_work import StartupResult
 from core.startup_work import run as run_startup_work
 from logger import logger
 
@@ -112,12 +112,6 @@ class CoreRuntimeModel(Model):
                 error=str(error),
             )
             raise RuntimeError("Failed to start ADB server") from error
-
-    def apply_adb_server_startup_result(self, result: StartupResult) -> None:
-        """
-        Apply startup work completed on a worker (call from the Qt main thread).
-        """
-        apply_main_thread(self, result)
 
     def stop_adb_server(self) -> None:
         """

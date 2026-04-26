@@ -1,0 +1,159 @@
+"""
+Simulation state and lifecycle (active device, locations, start/stop/resume/pause).
+"""
+
+from __future__ import annotations
+
+import uuid
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+from collection import Repository
+from controller.helper import validate_model, validate_view
+from core.devices import Phone
+from core.location import Location
+from core.models import CoreRuntimeModel
+from gui.signals import app_signals
+from gui.window import MainWindow
+from logger import logger
+
+if TYPE_CHECKING:
+    from controller.app_controller import AppController
+
+
+@dataclass
+class Simulation:
+    """Simulation."""
+
+    id: str = field(
+        default_factory=lambda: uuid.uuid4().hex,
+        metadata={"description": "The id of the simulation"},
+    )
+    real_location: Location = field(
+        default_factory=lambda: Location(lat=0.0, lon=0.0, label=None),
+        metadata={"description": "The real location of the device"},
+    )
+    fake_location: Location = field(
+        default_factory=lambda: Location(lat=0.0, lon=0.0, label=None),
+        metadata={"description": "The fake location to simulate on the device"},
+    )
+    device: Phone = field(
+        default=None, metadata={"description": "The device of the simulation"}
+    )
+    log_file: Path = field(
+        default=None, metadata={"description": "The log file of the simulation"}
+    )
+    active: bool = field(
+        default=False, metadata={"description": "Whether the simulation is active"}
+    )
+
+
+class SimulationRepository(Repository[Simulation]):
+    """Repository for the simulations."""
+
+    def __init__(self) -> None:
+        super().__init__()
+
+
+class SimulationSubController:
+    """Subcontroller for the current simulation model state (no own AsyncRunner)."""
+
+    def __init__(self, app: AppController) -> None:
+        self._app = app
+        self._session: Simulation = Simulation()
+
+    @property
+    def model(self) -> CoreRuntimeModel:
+        return self._app.model
+
+    @property
+    def view(self) -> MainWindow:
+        return self._app.view
+
+    def connect_view_signals(self) -> None:
+        app_signals.DeviceConnectionRequested.connect(
+            self._on_device_connection_requested
+        )
+
+    def connect_model_signals(self) -> None:
+        # Simulation-specific model subscriptions (none yet) — extension point.
+        return
+
+    def send_host_device_information(self) -> None:
+        """
+        Send the host device information to the view.
+
+        Run once after the main window is wired.
+        """
+        self._send_host_device_information()
+
+    @validate_view
+    def _send_host_device_information(self) -> None:
+        self.view.on_host_device_information_updated(
+            self.model.host.get_name(),
+            self.model.host.get_os(),
+            self.model.host.get_ip(),
+        )
+
+    @property
+    def device(self) -> Phone | None:
+        return self._session.device
+
+    @device.setter
+    def device(self, device: Phone) -> None:
+        self._session.device = device
+
+    @property
+    def real_location(self) -> Location | None:
+        return self._session.real_location
+
+    @real_location.setter
+    def real_location(self, real_location: Location) -> None:
+        self._session.real_location = real_location
+
+    @property
+    def fake_location(self) -> Location | None:
+        return self._session.fake_location
+
+    @fake_location.setter
+    def fake_location(self, fake_location: Location) -> None:
+        self._session.fake_location = fake_location
+
+    def run(self) -> None:
+        """Run the simulation."""
+        pass
+
+    def stop(self) -> None:
+        """Stop the simulation."""
+        pass
+
+    def pause(self) -> None:
+        """Pause the simulation."""
+        pass
+
+    def resume(self) -> None:
+        """Resume the simulation."""
+        pass
+
+    @validate_model
+    def _on_device_connection_requested(self, device_id: str) -> None:
+        """In-memory selection of the active device (UI thread)."""
+        logger.info(
+            "SimulationSubController: device connection requested",
+            device_id=device_id,
+        )
+        device: Phone | None = self.model.get_device(device_id)
+        if device is None:
+            logger.warning(
+                "SimulationSubController: device not found",
+                device_id=device_id,
+            )
+            return
+        self._session.device = device
+        desc = device.descriptor
+        logger.info(
+            "SimulationSubController: active device set",
+            device_id=desc.id,
+            device_name=desc.name,
+        )

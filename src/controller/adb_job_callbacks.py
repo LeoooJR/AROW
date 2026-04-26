@@ -1,13 +1,13 @@
 """
-Per-async-job outcome handlers (success / fail) for SimulationController.
+Per-async-job outcome callbacks for AdbSubController (startup, pair, list refresh).
 
-Keep AsyncRunner callbacks out of the large controller class so each job is
-debuggable in one place.
+Keep AsyncRunner callbacks out of the subcontroller so each job is easy to read.
 """
 
 from __future__ import annotations
 
 import importlib
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import core.pair_device_work as pair_device_work
@@ -18,7 +18,7 @@ from core.startup_work import StartupResult, apply_main_thread
 from logger import logger
 
 if TYPE_CHECKING:
-    from controller.controller import SimulationController
+    from controller.adb_sub_controller import AdbSubController
 
 _async = importlib.import_module("controller.async")
 JobError = _async.JobError
@@ -30,25 +30,25 @@ def log_startup_job_failure(error: JobError) -> None:
     for this scenario aside from AsyncRunner's generic job failure log).
     """
     logger.error(
-        "SimulationController: core runtime startup job failed",
+        "AdbSubController: core runtime startup job failed",
         message=error.message,
         return_code=error.return_code,
         traceback=error.traceback or None,
     )
 
 
-class StartupCoreRuntimeJob:
-    """Async job: model.startup() on a worker, apply on the main thread."""
+class StartupCoreRuntimeCallback:
+    """Callback for the startup core runtime job."""
 
     # __weakref__ required so Qt can weak-ref bound methods used as signal slots.
-    __slots__ = ("_controller", "__weakref__")
+    __slots__ = ("_subcontroller", "__weakref__")
 
-    def __init__(self, controller: SimulationController) -> None:
-        self._controller = controller
+    def __init__(self, subcontroller: AdbSubController) -> None:
+        self._subcontroller = subcontroller
 
     def on_completed(self, result: object) -> None:
         """Handle completion (Qt main thread, from AsyncRunner)."""
-        model = self._controller.model
+        model = self._subcontroller.model
         if not isinstance(model, CoreRuntimeModel):
             logger.warning(
                 "Controller: model type mismatch",
@@ -57,12 +57,12 @@ class StartupCoreRuntimeJob:
             return
         if not isinstance(result, StartupResult):
             logger.error(
-                "SimulationController: unexpected startup result type",
+                "AdbSubController: unexpected startup result type",
                 result_type=type(result).__name__,
             )
             return
         logger.info(
-            "SimulationController: startup core runtime completed",
+            "AdbSubController: startup core runtime completed",
             adb_server=result.adb_server is not None,
         )
         apply_main_thread(model, result)
@@ -74,23 +74,23 @@ class StartupCoreRuntimeJob:
 def log_pair_device_job_failure(error: JobError) -> None:
     """Log a failed pair-device async job (aside from AsyncRunner's generic log)."""
     logger.error(
-        "SimulationController: pair_device job failed",
+        "AdbSubController: pair_device job failed",
         message=error.message,
         return_code=error.return_code,
         traceback=error.traceback or None,
     )
 
 
-class PairDeviceJob:
-    """Async job: pairing I/O on a worker, bus emit on the main thread."""
+class PairDeviceCallback:
+    """Callback for the pair device job."""
 
-    __slots__ = ("_controller", "__weakref__")
+    __slots__ = ("_subcontroller", "__weakref__")
 
-    def __init__(self, controller: SimulationController) -> None:
-        self._controller = controller
+    def __init__(self, subcontroller: AdbSubController) -> None:
+        self._subcontroller = subcontroller
 
     def on_completed(self, result: object) -> None:
-        model = self._controller.model
+        model = self._subcontroller.model
         if not isinstance(model, CoreRuntimeModel):
             logger.warning(
                 "Controller: model type mismatch",
@@ -99,7 +99,7 @@ class PairDeviceJob:
             return
         if not isinstance(result, PairDeviceOutcome):
             logger.error(
-                "SimulationController: unexpected pair_device result type",
+                "AdbSubController: unexpected pair_device result type",
                 result_type=type(result).__name__,
             )
             return
@@ -112,44 +112,44 @@ class PairDeviceJob:
 def log_refresh_device_list_job_failure(error: JobError) -> None:
     """Log a failed refresh-device-list async job."""
     logger.error(
-        "SimulationController: refresh_device_list job failed",
+        "AdbSubController: refresh_device_list job failed",
         message=error.message,
         return_code=error.return_code,
         traceback=error.traceback or None,
     )
 
 
-class RefreshDeviceListJob:
-    """Async job: ADB list query on a worker, view update on the main thread."""
+class RefreshDeviceListCallback:
+    """Callback for the refresh device list job."""
 
-    __slots__ = ("_controller", "__weakref__")
+    __slots__ = ("_subcontroller", "__weakref__")
 
-    def __init__(self, controller: SimulationController) -> None:
-        self._controller = controller
+    def __init__(self, subcontroller: AdbSubController) -> None:
+        self._subcontroller = subcontroller
 
     def on_completed(self, result: object) -> None:
-        if not isinstance(self._controller.model, CoreRuntimeModel):
+        if not isinstance(self._subcontroller.model, CoreRuntimeModel):
             logger.warning(
                 "Controller: model type mismatch",
-                model_type=type(self._controller.model).__name__,
+                model_type=type(self._subcontroller.model).__name__,
             )
             return
         if not isinstance(result, list):
             logger.error(
-                "SimulationController: unexpected refresh_device_list result type",
+                "AdbSubController: unexpected refresh_device_list result type",
                 result_type=type(result).__name__,
             )
             return
         for item in result:
             if not isinstance(item, Phone):
                 logger.error(
-                    "SimulationController: refresh list contained non-Phone",
+                    "AdbSubController: refresh list contained non-Phone",
                     item_type=type(item).__name__,
                 )
                 return
         from gui.window import MainWindow
 
-        view = self._controller.view
+        view = self._subcontroller.view
         if not isinstance(view, MainWindow):
             logger.warning(
                 "Controller: view type mismatch",
@@ -158,7 +158,7 @@ class RefreshDeviceListJob:
             return
         device_ids = [d.descriptor.id for d in result]
         logger.info(
-            "SimulationController: known devices listed (async)",
+            "AdbSubController: known devices listed (async)",
             device_count=len(device_ids),
             device_ids=device_ids,
         )
@@ -166,3 +166,33 @@ class RefreshDeviceListJob:
 
     def on_failed(self, error: JobError) -> None:
         log_refresh_device_list_job_failure(error)
+
+
+# AdbSubController method (async entry) -> attribute on :class:`AdbAsyncJobCallbacks`.
+ADB_SUBCONTROLLER_METHOD_TO_CALLBACK_ATTR: dict[str, str] = {
+    "_startup_core_runtime": "startup",
+    "_on_authentification_confirmed": "pair_device",
+    "_on_refresh_device_list_requested": "refresh_device_list",
+}
+
+
+@dataclass(frozen=True, slots=True)
+class AdbAsyncJobCallbacks:
+    """
+    Single holder for AsyncRunner outcome callbacks on :class:`AdbSubController`.
+
+    See :data:`ADB_SUBCONTROLLER_METHOD_TO_CALLBACK_ATTR` for which subcontroller
+    method uses which field.
+    """
+
+    startup: StartupCoreRuntimeCallback
+    pair_device: PairDeviceCallback
+    refresh_device_list: RefreshDeviceListCallback
+
+    @classmethod
+    def for_subcontroller(cls, subcontroller: AdbSubController) -> AdbAsyncJobCallbacks:
+        return cls(
+            startup=StartupCoreRuntimeCallback(subcontroller),
+            pair_device=PairDeviceCallback(subcontroller),
+            refresh_device_list=RefreshDeviceListCallback(subcontroller),
+        )

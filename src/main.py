@@ -5,7 +5,7 @@ import typer
 from PySide6 import QtWidgets
 
 from __init__ import __application__, __version__
-from controller.controller import SimulationController
+from controller.app_controller import AppController
 from core.models import CoreRuntimeModel
 from gui.window import MainWindow
 from logger import setup_logger
@@ -40,7 +40,7 @@ def main(
 
         simulation_model: CoreRuntimeModel = CoreRuntimeModel()
 
-        simulation_controller: SimulationController = SimulationController(
+        app_controller: AppController = AppController(
             model=simulation_model, view=main_window
         )
 
