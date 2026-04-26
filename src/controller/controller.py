@@ -4,12 +4,18 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 from collection import Repository
+from controller.simulation_job_handlers import (
+    PairDeviceJob,
+    RefreshDeviceListJob,
+    StartupCoreRuntimeJob,
+)
 from core.devices import Phone
 from core.location import Location
 from core.models import CoreRuntimeModel
+from core.pair_device_work import run as run_pair_device
 from core.signals import (
     AdbServerStartedPayload,
     AdbServerStoppedPayload,
@@ -242,7 +248,7 @@ class Controller(ABC):
 class SimulationController(Controller):
     """Controller for the simulation."""
 
-    def __init__(self, model, view):
+    def __init__(self, model: CoreRuntimeModel, view: MainWindow):
         """Initialize the simulation controller.
 
         Args:
@@ -252,6 +258,11 @@ class SimulationController(Controller):
         super().__init__(model, view)
 
         self._simulation: Simulation = Simulation()
+        self._startup_core_runtime_job: StartupCoreRuntimeJob = StartupCoreRuntimeJob(
+            self
+        )
+        self._pair_device_job: PairDeviceJob = PairDeviceJob(self)
+        self._refresh_device_list_job: RefreshDeviceListJob = RefreshDeviceListJob(self)
         self._send_host_device_information()
         self._startup_core_runtime()
 
@@ -360,7 +371,16 @@ class SimulationController(Controller):
         Returns:
             None
         """
-        self.model.startup()
+
+        self._submit_model_async_call(
+            name="startup_core_runtime",
+            fn=self.model.startup,
+            description="Startup the core runtime",
+            job_type="thread",
+            coalesce_key="none",
+            on_completed=self._startup_core_runtime_job.on_completed,
+            on_failed=self._startup_core_runtime_job.on_failed,
+        )
 
     def run(self) -> None:
         """Run the simulation."""
@@ -396,18 +416,28 @@ class SimulationController(Controller):
         )
         self.view.on_adb_server_stopped()
 
+    @validate_view
     @validate_model
     def _on_authentification_confirmed(
         self, ip: str, port: str, association_code: str
     ) -> None:
-        """Handle the authentification confirmation."""
+        """Handle the authentification confirmation (pairing runs on a worker thread)."""
         logger.info(
             "SimulationController: pair_device requested (auth confirmed)",
             ip=ip,
             port=port,
             association_code=association_code,
         )
-        self.model.pair_device(ip, port, association_code)
+        port_i = int(port)
+        self._submit_model_async_call(
+            name="pair_device",
+            fn=lambda: run_pair_device(self.model, ip, port_i, association_code),
+            description="Pair device over ADB",
+            job_type="thread",
+            coalesce_key="device",
+            on_completed=self._pair_device_job.on_completed,
+            on_failed=self._pair_device_job.on_failed,
+        )
 
     @validate_view
     def _on_devices_updated(self, payload: DevicesUpdatedPayload) -> None:
@@ -450,7 +480,7 @@ class SimulationController(Controller):
 
     @validate_model
     def _on_device_connection_requested(self, device_id: str) -> None:
-        """Handle the device connection requested event."""
+        """Handle the device connection requested event (in-memory; stays on the UI thread)."""
         logger.info(
             "SimulationController: device connection requested",
             device_id=device_id,
@@ -462,7 +492,7 @@ class SimulationController(Controller):
                 device_id=device_id,
             )
             return
-        self._state.device = device
+        self._simulation.device = device
         desc = device.descriptor
         logger.info(
             "SimulationController: active device set",
@@ -471,17 +501,19 @@ class SimulationController(Controller):
         )
 
     @validate_view
+    @validate_model
     def _on_refresh_device_list_requested(self) -> None:
-        """Handle the refresh device list requested event."""
+        """Handle the refresh device list requested event (ADB list query on a worker)."""
         logger.info("SimulationController: refresh device list requested")
-        known_devices: list[Phone] = self.model.get_known_devices()
-        device_ids = [d.descriptor.id for d in known_devices]
-        logger.info(
-            "SimulationController: known devices listed",
-            device_count=len(device_ids),
-            device_ids=device_ids,
+        self._submit_model_async_call(
+            name="refresh_device_list",
+            fn=self.model.get_known_devices,
+            description="Refresh device list from ADB",
+            job_type="thread",
+            coalesce_key="device",
+            on_completed=self._refresh_device_list_job.on_completed,
+            on_failed=self._refresh_device_list_job.on_failed,
         )
-        self.view.on_devices_updated(device_ids)
 
 
 class MapController(Controller):

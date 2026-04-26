@@ -2,18 +2,20 @@ import platform
 from abc import ABC, abstractmethod
 from pathlib import Path
 
-from core.adb import AdbBinary, AdbClient, AdbClientException, AdbServer
+from core.adb import AdbBinary, AdbClient, AdbServer
 from core.devices import Computer, Phone
+from core.pair_device_work import apply_main_thread as apply_pair_device_main_thread
+from core.pair_device_work import run as run_pair_device
 from core.signals import (
     AdbServerStartedPayload,
     AdbServerStoppedPayload,
     CoreSignal,
-    DeviceConnectionFailedPayload,
-    DeviceConnectionSucceededPayload,
     DevicesUpdatedPayload,
     InMemoryCoreSignalBus,
     SignalHandler,
 )
+from core.startup_work import StartupResult, apply_main_thread
+from core.startup_work import run as run_startup_work
 from logger import logger
 
 
@@ -86,53 +88,53 @@ class CoreRuntimeModel(Model):
             )
         return adb_path
 
-    def startup(self) -> None:
+    def startup(self) -> StartupResult:
         """
-        Initialize runtime core services at application startup.
+        Initialize runtime core services at application startup (worker thread).
         """
-        self.start_adb_server()
-        self.get_adb_client()
+        return run_startup_work(self)
 
-    def start_adb_server(self) -> None:
+    def start_adb_server(self) -> AdbServer:
         """
         Start or restart the ADB server and keep the instance in model state.
         """
         try:
             adb_binary: AdbBinary = AdbBinary(path=self._resolve_adb_binary_path())
-            self._adb_server: AdbServer = AdbServer(binary=adb_binary)
+            adb_server: AdbServer = AdbServer(binary=adb_binary)
             logger.info(
                 "CoreRuntimeModel: ADB server started",
                 adb_path=str(adb_binary.path),
             )
-            self._signal_bus.emit(
-                CoreSignal.ADB_SERVER_STARTED,
-                AdbServerStartedPayload(adb_binary=adb_binary),
-            )
-            self._signal_bus.emit(
-                CoreSignal.DEVICES_UPDATED,
-                DevicesUpdatedPayload(devices=self.get_known_devices()),
-            )
+            return adb_server
         except Exception as error:
-            self._adb_server = None
             logger.exception(
                 "CoreRuntimeModel: failed to start ADB server",
                 error=str(error),
             )
+            raise RuntimeError("Failed to start ADB server") from error
+
+    def apply_adb_server_startup_result(self, result: StartupResult) -> None:
+        """
+        Apply startup work completed on a worker (call from the Qt main thread).
+        """
+        apply_main_thread(self, result)
 
     def stop_adb_server(self) -> None:
         """
         Stop the ADB server and remove the instance from model state.
         """
         if self._adb_server is not None:
+            stopped_binary = self._adb_server.binary
+            adb_path = str(stopped_binary.path)
             self._adb_server.stop()
             self._adb_server = None
             self._signal_bus.emit(
                 CoreSignal.ADB_SERVER_STOPPED,
-                AdbServerStoppedPayload(adb_binary=self._adb_server.binary),
+                AdbServerStoppedPayload(adb_binary=stopped_binary),
             )
             logger.info(
                 "CoreRuntimeModel: ADB server stopped",
-                adb_path=str(self._adb_server.binary.path),
+                adb_path=adb_path,
             )
         else:
             logger.warning(
@@ -170,73 +172,45 @@ class CoreRuntimeModel(Model):
         """
         Get a device from the ADB server.
         """
+        if self._adb_server is None:
+            return None
         return self._adb_server.paired_devices.get(device_id)
 
-    def get_known_devices(self) -> list[Phone]:
+    def get_known_devices(self, server: AdbServer | None = None) -> list[Phone]:
         """
-        Get the known devices from the ADB server.
+        List devices from a server instance, or from the current model server when
+        ``server`` is omitted (e.g. after startup has been applied on the main thread).
         """
-        return self._adb_server.get_known_devices()
+        resolved: AdbServer | None = server if server is not None else self._adb_server
+        if resolved is None:
+            return []
+        return resolved.get_known_devices()
 
     def get_adb_client(self) -> AdbClient:
         """
-        Get the ADB client.
+        Return the ADB client, creating and caching one if startup has not run yet.
         """
         if self._adb_client is None:
-            logger.debug("CoreRuntimeModel: creating ADB client")
-            adb_binary: AdbBinary = AdbBinary(path=self._resolve_adb_binary_path())
-            self._adb_client = AdbClient(binary=adb_binary)
+            self._adb_client = self.create_adb_client()
         return self._adb_client
+
+    def create_adb_client(self) -> AdbClient:
+        """
+        Get the ADB client.
+        """
+        logger.debug("CoreRuntimeModel: creating ADB client")
+        adb_binary: AdbBinary = AdbBinary(path=self._resolve_adb_binary_path())
+        adb_client: AdbClient = AdbClient(binary=adb_binary)
+        return adb_client
 
     def pair_device(self, ip: str, port: int, association_code: str) -> None:
         """
-        Pair a device with the ADB server.
+        Pair a device with the ADB server (synchronous: worker + main-thread apply).
+
+        For UI-initiated pairing off the main thread, prefer submitting ``run`` /
+        ``apply_main_thread`` from ``core.pair_device_work`` via AsyncRunner and
+        calling ``apply_pair_device_main_thread`` only in the job completion callback.
         """
-        adb_client: AdbClient = self.get_adb_client()
-        try:
-            phone = adb_client.pair(ip, port, association_code)
-            self._signal_bus.emit(
-                CoreSignal.DEVICE_CONNECTION_SUCCEEDED,
-                DeviceConnectionSucceededPayload(phone=phone),
-            )
-            return
-        except AdbClientException as error:
-            error_message: str = str(error)
-            logger.warning(
-                "CoreRuntimeModel: device pairing failed (first attempt)",
-                ip=ip,
-                port=port,
-                error=error_message,
-            )
-            # ADB can return protocol-fault errors when the daemon is in a stale state.
-            # Restarting the daemon and retrying once reproduces the manual workaround.
-            if "protocol fault" in error_message.lower():
-                try:
-                    if self._adb_server is not None:
-                        self._adb_server.restart()
-                    else:
-                        self.start_adb_server()
-                    logger.info(
-                        "CoreRuntimeModel: ADB server restarted after protocol fault",
-                        ip=ip,
-                        port=port,
-                    )
-                    phone = adb_client.pair(ip, port, association_code)
-                    self._signal_bus.emit(
-                        CoreSignal.DEVICE_CONNECTION_SUCCEEDED,
-                        DeviceConnectionSucceededPayload(phone=phone),
-                    )
-                    return
-                except AdbClientException as retry_error:
-                    logger.warning(
-                        "CoreRuntimeModel: pairing retry failed after restart",
-                        ip=ip,
-                        port=port,
-                        error=str(retry_error),
-                    )
-            self._signal_bus.emit(
-                CoreSignal.DEVICE_CONNECTION_FAILED,
-                DeviceConnectionFailedPayload(
-                    ip=ip, port=port, association_code=association_code
-                ),
-            )
+        apply_pair_device_main_thread(
+            self, run_pair_device(self, ip, port, association_code)
+        )

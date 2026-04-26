@@ -1,9 +1,9 @@
-
 # Geo and map stack
 folium==0.20.0
 geopandas==1.1.2
 loguru==0.7.3
 pandas==3.0.0
+pandera==0.31.1
 pre-commit==4.5.1
 
 # GUI

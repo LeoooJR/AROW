@@ -26,6 +26,35 @@ Follow the project MVC split:
 - Keep device methods, device metadata, and related dataclasses in `src/gui/device.py`.
 - Do not move model work into the GUI or controller just for convenience.
 
+## Geo and dataset standards
+
+Apply these rules whenever you touch `src/geo`.
+
+### Tabular and spatial data operations
+
+- Treat `pandas.DataFrame`, `geopandas.GeoDataFrame`, and related structures as columnar data.
+- Prefer vectorized APIs, joins, concatenation, groupby aggregations, and spatial joins over row-wise Python loops.
+- Avoid `iterrows`, per-row `apply` with Python callables, and manual index loops in geo data paths unless there is no practical alternative.
+- If a scalar loop is truly required for a third-party API, isolate it, document why, and keep the hot path as small as possible.
+
+### Dataset validation
+
+- Express dataset shape, dtype, column, and value constraints for geo codepaths with `pandera`.
+- Validate data at clear boundaries such as after load, before export, or before handing data to the map pipeline.
+- Reuse or extend schema definitions in `src/geo/datasets.py` or nearby schema modules instead of scattering ad-hoc checks through `src/geo`.
+- Handle schema failures with explicit project exceptions, following the `src/geo/exceptions.py` and `SchemaValidationError` pattern, rather than silent coercion.
+
+### Map rendering
+
+- Build server-side map HTML with `folium`; do not replace the map stack with ad-hoc Leaflet-only string generation unless the project explicitly decides to migrate.
+- Keep first paint fast: simplify or decimate display geometry when appropriate, avoid redundant layers, and limit inline GeoJSON, plugins, and embedded JS/CSS that slow initial load.
+- Prefer doing data preparation in Python before handing results to Folium so the browser has less work to do.
+
+### Geo dependencies
+
+- Keep `pandera` and `folium` in project dependencies when extending schemas or map features.
+- Align geo-related imports and usage with the versions pinned in `requirements.txt`.
+
 ## Async model work
 
 - Create and run model-side heavy work, map creation, and I/O through `src/controller/async.py`.

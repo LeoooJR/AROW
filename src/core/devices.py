@@ -239,14 +239,14 @@ class Computer(Device):
         super().__init__(
             id=id,
             name=resolved_name,
-            os=resolved_os,
+            os=resolved_os.lower(),
             ip=resolved_ip,
             port=port,
         )
         self.descriptor = ComputerDescriptor(
             id=id,
             name=resolved_name,
-            os=resolved_os,
+            os=resolved_os.lower(),
             ip=resolved_ip,
             port=port,
             state=state,
