@@ -1164,6 +1164,17 @@ class MainWindow(QMainWindow):
         )
         app_signals.HostDeviceInformationUpdated.emit(name, os, ip)
 
+    def on_simulation_log_file_updated(
+        self, simulation_id: str, log_file_path: str
+    ) -> None:
+        """Forward default simulation log path to the log panel (via app signals)."""
+        logger.info(
+            "MainWindow: simulation log file path updated",
+            simulation_id=simulation_id,
+            log_file_path=log_file_path,
+        )
+        app_signals.SimulationLogFileUpdated.emit(simulation_id, log_file_path)
+
     def resizeEvent(self, event) -> None:
         """Keep authentication overlay covering the full main container."""
         super().resizeEvent(event)

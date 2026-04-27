@@ -3,6 +3,7 @@ This file contains all graphical elements related to the logs panel.
 """
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Final
 
 from PySide6.QtCore import Qt
@@ -67,6 +68,7 @@ class LogPanel(QFrame):
 
         self.setObjectName("log-panel")
         self.setProperty("panel", True)
+        self._active_simulation_id: str | None = None
 
         layout = QVBoxLayout()
         layout.setContentsMargins(
@@ -207,10 +209,26 @@ class LogPanel(QFrame):
                 self.is_panel_visible()
             )
         )
+        app_signals.SimulationLogFileUpdated.connect(
+            self._on_simulation_log_file_updated
+        )
 
     def is_panel_visible(self) -> bool:
         """Check if the log panel is visible."""
         return bool(self.ui.expand_button.property("toggle"))
+
+    def _on_simulation_log_file_updated(
+        self, simulation_id: str, log_file_path: str
+    ) -> None:
+        """Set the file row from the active simulation's default log path."""
+        if not log_file_path:
+            return
+        path = Path(log_file_path)
+        file_name = path.name
+        ext = path.suffix.lstrip(".").lower()
+        file_type = ext.upper() if ext else "LOG"
+        self.ui.file_display_widget.set_file_display(file_name, file_type)
+        self._active_simulation_id = simulation_id
 
     def _reduced_height(self) -> int:
         """Height of the panel when reduced (header only): layout padding + header size."""

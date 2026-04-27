@@ -41,6 +41,7 @@ class AppSignals(QObject):
     StopSimulationRequested = Signal()
     SimulationContextChanged = Signal(str, int)
     SimulationPositionChanged = Signal(float, float)
+    SimulationLogFileUpdated = Signal(str, str)
 
 
 app_signals: AppSignals = AppSignals()

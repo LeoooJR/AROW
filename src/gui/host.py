@@ -846,12 +846,11 @@ class HostPanel(QFrame):
     ) -> None:
         """Handle the host device information updated."""
         assert os in ["linux", "windows", "darwin"]
-        _os = os.lower()
-        if _os == "linux":
+        if os == "linux":
             os_icon_path = OperatingSystemIcons.LINUX.value
-        elif _os == "windows":
+        elif os == "windows":
             os_icon_path = OperatingSystemIcons.WINDOWS.value
-        elif _os == "darwin":
+        elif os == "darwin":
             os_icon_path = OperatingSystemIcons.MACOS.value
         else:
             os_icon_path = GenericIcons.LAPTOP.value

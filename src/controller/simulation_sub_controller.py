@@ -7,10 +7,11 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final
 
 from collection import Repository
 from controller.helper import validate_model, validate_view
+from controller.utils import get_or_create_config_dir
 from core.devices import Phone
 from core.location import Location
 from core.models import CoreRuntimeModel
@@ -26,7 +27,7 @@ if TYPE_CHECKING:
 class Simulation:
     """Simulation."""
 
-    id: str = field(
+    id: Final[str] = field(
         default_factory=lambda: uuid.uuid4().hex,
         metadata={"description": "The id of the simulation"},
     )
@@ -38,7 +39,7 @@ class Simulation:
         default_factory=lambda: Location(lat=0.0, lon=0.0, label=None),
         metadata={"description": "The fake location to simulate on the device"},
     )
-    device: Phone = field(
+    device: Final[Phone] = field(
         default=None, metadata={"description": "The device of the simulation"}
     )
     log_file: Path = field(
@@ -47,6 +48,24 @@ class Simulation:
     active: bool = field(
         default=False, metadata={"description": "Whether the simulation is active"}
     )
+    # When True, ``__setattr__`` logs changes to the public simulation fields.
+    _fields_ready: bool = field(init=False, repr=False, compare=False, default=False)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "_fields_ready", True)
+
+    def __setattr__(self, name: str, value: object) -> None:
+        if name in self.__class__.__dataclass_fields__ and name != "_fields_ready":
+            if self._fields_ready and hasattr(self, name):
+                old = getattr(self, name)
+                if old != value:
+                    logger.info(
+                        f"Simulation {self.id}: field updated",
+                        field=name,
+                        old=old,
+                        new=value,
+                    )
+        object.__setattr__(self, name, value)
 
 
 class SimulationRepository(Repository[Simulation]):
@@ -61,7 +80,11 @@ class SimulationSubController:
 
     def __init__(self, app: AppController) -> None:
         self._app = app
-        self._session: Simulation = Simulation()
+        sim_id = uuid.uuid4().hex
+        self._session: Simulation = Simulation(
+            id=sim_id,
+            log_file=get_or_create_config_dir() / "simulations" / f"{sim_id}.log",
+        )
 
     @property
     def model(self) -> CoreRuntimeModel:
@@ -88,6 +111,14 @@ class SimulationSubController:
         """
         self._send_host_device_information()
 
+    def send_simulation_log_file_to_view(self) -> None:
+        """
+        Send the default log file path for the current simulation to the view.
+
+        Run once after the main window is wired.
+        """
+        self._send_simulation_log_file_to_view()
+
     @validate_view
     def _send_host_device_information(self) -> None:
         self.view.on_host_device_information_updated(
@@ -95,6 +126,12 @@ class SimulationSubController:
             self.model.host.get_os(),
             self.model.host.get_ip(),
         )
+
+    @validate_view
+    def _send_simulation_log_file_to_view(self) -> None:
+        log = self._session.log_file
+        path_str = str(log) if log is not None else ""
+        self.view.on_simulation_log_file_updated(self._session.id, path_str)
 
     @property
     def device(self) -> Phone | None:

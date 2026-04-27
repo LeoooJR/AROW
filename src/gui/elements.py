@@ -986,6 +986,9 @@ class List(QListWidget, Element):
         for i in range(self.count()):
             yield self.item(i)
 
+    def is_empty(self) -> bool:
+        return self.count() == 0
+
 
 ########################################################################################################################
 # ELEMENTS RELATED TO THE SVG
@@ -1947,6 +1950,7 @@ class File(QWidget, Element):
         file_description.layout().setAlignment(
             file_type_label, Qt.AlignmentFlag.AlignLeft
         )
+        self._file_type_label = file_type_label
         layout.addWidget(file_description, 1)
         layout.setAlignment(
             file_description, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft
@@ -2020,6 +2024,13 @@ class File(QWidget, Element):
         )
         if self._file_name_label.text() != elided:
             self._file_name_label.setText(elided)
+
+    def set_file_display(self, file_name: str, file_type: str) -> None:
+        """Update the displayed file name and type (labels and elision state)."""
+        self._file_name = file_name
+        self.texts = File.Text(file_name=file_name, file_type=file_type)
+        self._file_type_label.setText(file_type.upper())
+        self._update_file_name_display()
 
 
 class OTPType(Enum):
