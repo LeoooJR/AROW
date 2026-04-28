@@ -272,13 +272,21 @@ class Computer(Device):
         return self._descriptor.last_communication
 
     def _resolve_ip(self) -> str:
-        ip = socket.gethostbyname(socket.gethostname())
-        if ip.startswith("127."):
+        try:
+            ip = socket.gethostbyname(socket.gethostname())
+            if not ip.startswith("127."):  # 127.0.0.1 is the loopback address
+                return ip
+        except OSError:
+            pass
+
+        try:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.connect(("8.8.8.8", 80))
+            s.connect(("8.8.8.8", 80))  # 8.8.8.8 is a public DNS server
             ip = s.getsockname()[0]
             s.close()
-        return ip
+            return ip
+        except OSError:
+            return "127.0.0.1"  # fallback to loopback address
 
     @classmethod
     def from_string(cls, string: str) -> Self:

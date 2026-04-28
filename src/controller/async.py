@@ -149,10 +149,11 @@ class ProcessPool:
     Process pool to execute jobs (CPU-heavy work, e.g. map creation).
     """
 
-    __slots__ = ("_executor",)
+    __slots__ = ("_max_workers", "_executor")
 
     def __init__(self, max_workers: Optional[int] = None) -> None:
         try:
+            self._max_workers: int = max_workers
             self._executor: ProcessPoolExecutor = ProcessPoolExecutor(
                 max_workers=max_workers
             )
@@ -249,7 +250,14 @@ class ProcessPool:
         Shutdown the process pool
         """
         logger.info("Process pool: shutdown requested (cancel_futures=True)")
-        self._executor.shutdown(wait=False, cancel_futures=True)
+        if self._executor is not None:  # check if the executor is initialized
+            self._executor.shutdown(wait=False, cancel_futures=True)
+        else:
+            logger.warning("Process pool: shutdown requested but no executor found")
+        logger.debug(
+            "Process pool: shutdown completed",
+            max_workers=self._max_workers,
+        )
 
 
 class ThreadPool:
@@ -257,10 +265,11 @@ class ThreadPool:
     Thread pool to execute jobs (I/O or quick tasks; same callback contract as ProcessPool).
     """
 
-    __slots__ = ("_executor",)
+    __slots__ = ("_max_workers", "_executor")
 
     def __init__(self, max_workers: Optional[int] = None) -> None:
         try:
+            self._max_workers: int = max_workers
             self._executor: ThreadPoolExecutor = ThreadPoolExecutor(
                 max_workers=max_workers
             )
@@ -354,7 +363,14 @@ class ThreadPool:
     def shutdown(self) -> None:
         """Shutdown the thread pool."""
         logger.info("Thread pool: shutdown requested (cancel_futures=True)")
-        self._executor.shutdown(wait=False, cancel_futures=True)
+        if self._executor is not None:  # check if the executor is initialized
+            self._executor.shutdown(wait=False, cancel_futures=True)
+        else:
+            logger.warning("Thread pool: shutdown requested but no executor found")
+        logger.debug(
+            "Thread pool: shutdown completed",
+            max_workers=self._max_workers,
+        )
 
 
 class RunnerSignals(QObject):
