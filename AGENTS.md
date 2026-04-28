@@ -123,7 +123,7 @@ Apply these rules whenever you touch `src/gui`.
 
 ### Signals
 
-- Use app-wide signals from `src/gui/signals.py` (`AppSignals` / `app_signals`) for cross-component communication.
+- Use view-originating signals from `src/gui/signals.py` (`ViewSignals` / `view_signals`) for cross-component communication.
 - Do not define new global GUI signals elsewhere unless there is a compelling architectural reason.
 
 ### Stylesheets

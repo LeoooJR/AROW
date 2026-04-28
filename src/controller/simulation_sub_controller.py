@@ -15,7 +15,7 @@ from controller.utils import get_or_create_config_dir
 from core.devices import Phone
 from core.location import Location
 from core.models import CoreRuntimeModel
-from gui.signals import app_signals
+from gui.signals import view_signals
 from gui.window import MainWindow
 from logger import logger
 
@@ -95,7 +95,7 @@ class SimulationSubController:
         return self._app.view
 
     def connect_view_signals(self) -> None:
-        app_signals.DeviceConnectionRequested.connect(
+        view_signals.DeviceConnectionRequested.connect(
             self._on_device_connection_requested
         )
 
@@ -121,7 +121,7 @@ class SimulationSubController:
 
     @validate_view
     def _send_host_device_information(self) -> None:
-        self.view.on_host_device_information_updated(
+        self.view.forward_host_device_information_updated(
             self.model.host.get_name(),
             self.model.host.get_os(),
             self.model.host.get_ip(),
@@ -131,7 +131,7 @@ class SimulationSubController:
     def _send_simulation_log_file_to_view(self) -> None:
         log = self._session.log_file
         path_str = str(log) if log is not None else ""
-        self.view.on_simulation_log_file_updated(self._session.id, path_str)
+        self.view.forward_simulation_log_file_updated(self._session.id, path_str)
 
     @property
     def device(self) -> Phone | None:

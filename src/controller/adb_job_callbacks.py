@@ -162,7 +162,7 @@ class RefreshDeviceListCallback:
             device_count=len(device_ids),
             device_ids=device_ids,
         )
-        view.on_devices_updated(device_ids)
+        view.forward_devices_updated(device_ids)
 
     def on_failed(self, error: JobError) -> None:
         log_refresh_device_list_job_failure(error)

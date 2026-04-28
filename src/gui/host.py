@@ -27,7 +27,7 @@ from gui.elements import (
 )
 from gui.icons import GenericIcons, OperatingSystemIcons
 from gui.settings import Settings
-from gui.signals import app_signals
+from gui.signals import view_signals
 from gui.svg import get_svg_size
 from gui.wrapper import GridLayoutWrapper, VerticalLayoutWrapper
 
@@ -750,20 +750,20 @@ class HostPanel(QFrame):
     def _connect_signals(self) -> None:
         """Connect signals for the host panel and its UI widgets."""
         #### Debugging signals ####
-        app_signals.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
+        view_signals.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
 
         #### Signals for toggling the host panel visibility ####
         self.ui.expand_button.clicked.connect(self.toggle_panel_visibility)
         self.ui.expand_button.clicked.connect(
-            lambda: app_signals.HostPanelVisibilityRequested.emit(
+            lambda: view_signals.HostPanelVisibilityRequested.emit(
                 self.is_panel_visible()
             )
         )
 
-        app_signals.ADBServerStarted.connect(self._on_adb_server_started)
-        app_signals.ADBServerStopped.connect(self._on_adb_server_stopped)
+        view_signals.ADBServerStarted.connect(self._on_adb_server_started)
+        view_signals.ADBServerStopped.connect(self._on_adb_server_stopped)
 
-        app_signals.HostDeviceInformationUpdated.connect(
+        view_signals.HostDeviceInformationUpdated.connect(
             self._on_host_device_information_updated
         )
 

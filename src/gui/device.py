@@ -29,7 +29,7 @@ from gui.animation import (
 from gui.elements import GroupBox, HelperText, List, PanelTitle, PlaceHolder, ToolButton
 from gui.icons import GenericIcons
 from gui.settings import Settings
-from gui.signals import app_signals
+from gui.signals import view_signals
 from gui.wrapper import (
     GridLayoutWrapper,
     HorizontalLayoutWrapper,
@@ -1046,25 +1046,25 @@ class DeviceSelectionPanel(QFrame):
         """Connect signals for the device selection panel and its UI widgets."""
 
         #### Debugging signals ####
-        app_signals.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
+        view_signals.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
 
         #### Signals for selecting a device workflow (pairing, selection, connection) ####
-        self.ui.add_device_button.clicked.connect(app_signals.AddDeviceRequested.emit)
-        app_signals.AuthentificationSucceeded.connect(
+        self.ui.add_device_button.clicked.connect(view_signals.AddDeviceRequested.emit)
+        view_signals.AuthentificationSucceeded.connect(
             self._on_authentification_succeeded
         )
         self.ui.available_device_list.itemClicked.connect(self._on_device_selected)
-        app_signals.DeviceSelectionSucceeded.connect(
+        view_signals.DeviceSelectionSucceeded.connect(
             self._on_device_selection_succeeded
         )
-        app_signals.DevicesUpdated.connect(self._on_devices_updated)
+        view_signals.DevicesUpdated.connect(self._on_devices_updated)
         self.ui.refresh_button.clicked.connect(self._on_refresh_button_clicked)
         self.ui.trash_button.clicked.connect(self._on_trash_button_clicked)
 
         #### Signals for toggling the device selection panel visibility ####
         self.ui.expand_button.clicked.connect(self.toggle_panel_visibility)
         self.ui.expand_button.clicked.connect(
-            lambda: app_signals.DeviceSelectionPanelVisibilityRequested.emit(
+            lambda: view_signals.DeviceSelectionPanelVisibilityRequested.emit(
                 self.is_panel_visible()
             )
         )
@@ -1131,7 +1131,7 @@ class DeviceSelectionPanel(QFrame):
         """Handle the device selected event."""
         if item is None:
             return
-        app_signals.DeviceSelected.emit(item)
+        view_signals.DeviceSelected.emit(item)
 
     def _on_device_selection_succeeded(self, device: str) -> None:
         """
@@ -1157,7 +1157,7 @@ class DeviceSelectionPanel(QFrame):
     def _on_refresh_button_clicked(self) -> None:
         """Handle the refresh button click event."""
         logger.info("Available device list refresh requested.")
-        app_signals.RefreshDeviceListRequested.emit()
+        view_signals.RefreshDeviceListRequested.emit()
 
     def _on_trash_button_clicked(self) -> None:
         """Handle the trash button click event."""

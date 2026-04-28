@@ -22,7 +22,7 @@ from gui.elements import (
 )
 from gui.icons import GenericIcons
 from gui.settings import Settings
-from gui.signals import app_signals
+from gui.signals import view_signals
 from gui.wrapper import HorizontalLayoutWrapper, VerticalLayoutWrapper
 
 
@@ -205,11 +205,11 @@ class LogPanel(QFrame):
         #### Signals for toggling the log panel visibility ####
         self.ui.expand_button.clicked.connect(self.toggle_panel_visibility)
         self.ui.expand_button.clicked.connect(
-            lambda: app_signals.LogPanelVisibilityRequested.emit(
+            lambda: view_signals.LogPanelVisibilityRequested.emit(
                 self.is_panel_visible()
             )
         )
-        app_signals.SimulationLogFileUpdated.connect(
+        view_signals.SimulationLogFileUpdated.connect(
             self._on_simulation_log_file_updated
         )
 

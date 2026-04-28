@@ -63,7 +63,7 @@ from gui.animation import apply_highlight_level, compute_sine_pulse_level
 from gui.colors import get_current_palette
 from gui.icons import GenericIcons
 from gui.settings import Settings
-from gui.signals import app_signals
+from gui.signals import view_signals
 from gui.svg import get_svg_size
 from gui.wrapper import HorizontalLayoutWrapper, VerticalLayoutWrapper
 
@@ -2539,7 +2539,7 @@ class AuthentificationCard(QFrame, Element):
 
     def _on_close_button_clicked(self) -> None:
         """Handle the close button clicked event."""
-        app_signals.AuthentificationCancelled.emit()
+        view_signals.AuthentificationCancelled.emit()
 
     def _is_ip_otp_input_valid(self) -> bool:
         return self.ui.ip_otp_input.is_valid()
@@ -2573,7 +2573,7 @@ class AuthentificationCard(QFrame, Element):
             raise_signal = False
 
         if raise_signal:
-            app_signals.AuthentificationConfirmed.emit(
+            view_signals.AuthentificationConfirmed.emit(
                 self.ui.ip_otp_input.text(),
                 self.ui.port_otp_input.text(),
                 self.ui.association_code_otp_input.text(),

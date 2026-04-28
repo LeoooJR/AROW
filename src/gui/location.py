@@ -32,7 +32,7 @@ from gui.elements import (
 )
 from gui.icons import GenericIcons
 from gui.settings import Settings
-from gui.signals import app_signals
+from gui.signals import view_signals
 from gui.wrapper import VerticalLayoutWrapper
 
 
@@ -298,7 +298,7 @@ class LocationPanel(QFrame):
         self.ui.start_simulation_button.clicked.connect(self._on_simulation_start)
         self.ui.expand_button.clicked.connect(self.toggle_panel_visibility)
         self.ui.expand_button.clicked.connect(
-            lambda: app_signals.LocationPanelVisibilityRequested.emit(
+            lambda: view_signals.LocationPanelVisibilityRequested.emit(
                 self.is_panel_visible()
             )
         )

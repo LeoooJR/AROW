@@ -29,7 +29,7 @@ from gui.colors import get_current_palette
 from gui.elements import SVG, IconLabel, PanelTitle, PlaceHolder, ToolButton
 from gui.icons import GenericIcons
 from gui.settings import Settings
-from gui.signals import app_signals
+from gui.signals import view_signals
 from gui.svg import get_svg_size
 from gui.wrapper import GridLayoutWrapper, HorizontalLayoutWrapper
 from logger import logger
@@ -795,9 +795,9 @@ class MapPanel(QFrame):
     def _connect_signals(self) -> None:
         """Connect signals for the map panel and its UI widgets."""
         #### Signals for handling the step transition from authentification to map display ####
-        app_signals.AuthentificationSucceeded.connect(self._on_device_connected)
-        app_signals.DeviceSelectionSucceeded.connect(self._on_device_connected)
-        app_signals.AuthentificationFailed.connect(self._on_authentification_failed)
+        view_signals.AuthentificationSucceeded.connect(self._on_device_connected)
+        view_signals.DeviceSelectionSucceeded.connect(self._on_device_connected)
+        view_signals.AuthentificationFailed.connect(self._on_authentification_failed)
 
     def _on_device_connected(self, device: str) -> None:
         """Handle map UI updates for any successful connection flow."""

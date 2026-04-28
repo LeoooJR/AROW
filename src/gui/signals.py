@@ -1,8 +1,8 @@
 from PySide6.QtCore import QObject, Signal
 
 
-class AppSignals(QObject):
-    """Central signal hub for app-wide communication."""
+class ViewSignals(QObject):
+    """Central hub for GUI-originating signals (cross-component wiring)."""
 
     #### UI Signals ####
     UiConstraintsDisabled = Signal()
@@ -44,4 +44,4 @@ class AppSignals(QObject):
     SimulationLogFileUpdated = Signal(str, str)
 
 
-app_signals: AppSignals = AppSignals()
+view_signals: ViewSignals = ViewSignals()

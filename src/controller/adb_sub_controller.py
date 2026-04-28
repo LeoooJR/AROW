@@ -18,7 +18,7 @@ from core.signals import (
     DeviceConnectionSucceededPayload,
     DevicesUpdatedPayload,
 )
-from gui.signals import app_signals
+from gui.signals import view_signals
 from gui.window import MainWindow
 from logger import logger
 
@@ -48,10 +48,10 @@ class AdbSubController:
 
     def connect_view_signals(self) -> None:
         """Connect view signals for ADB and pairing (called from AppController)."""
-        app_signals.AuthentificationConfirmed.connect(
+        view_signals.AuthentificationConfirmed.connect(
             self._on_authentification_confirmed
         )
-        app_signals.RefreshDeviceListRequested.connect(
+        view_signals.RefreshDeviceListRequested.connect(
             self._on_refresh_device_list_requested
         )
 
@@ -131,7 +131,7 @@ class AdbSubController:
             "AdbSubController: ADB server started",
             adb_binary=str(payload.adb_binary),
         )
-        self.view.on_adb_server_started()
+        self.view.forward_adb_server_started()
 
     @validate_view
     def _on_adb_server_stopped(self, payload: AdbServerStoppedPayload) -> None:
@@ -139,7 +139,7 @@ class AdbSubController:
             "AdbSubController: ADB server stopped",
             adb_binary=str(payload.adb_binary),
         )
-        self.view.on_adb_server_stopped()
+        self.view.forward_adb_server_stopped()
 
     @validate_view
     def _on_devices_updated(self, payload: DevicesUpdatedPayload) -> None:
@@ -149,7 +149,7 @@ class AdbSubController:
             device_count=len(device_ids),
             device_ids=device_ids,
         )
-        self.view.on_devices_updated(device_ids)
+        self.view.forward_devices_updated(device_ids)
 
     @validate_view
     def _on_device_connection_succeeded(
@@ -161,7 +161,7 @@ class AdbSubController:
             device_id=desc.id,
             device_name=desc.name,
         )
-        self.view.on_device_pairing_succeeded(
+        self.view.forward_device_pairing_succeeded(
             desc.id
         )  # TODO: Rename to on_device_connection_succeeded
 
