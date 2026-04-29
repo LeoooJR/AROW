@@ -87,10 +87,7 @@ def test_scalar_parsers_match_capture_file() -> None:
     assert ADBCommandParser.GET_LOCATION_MODE.parse("3") == 3
     assert ADBCommandParser.GET_DEVICE_NAME.parse("") == ""
     assert (
-        ADBCommandParser.GET_SERIAL_NO.parse(
-            "adb-AYLVBB5220900344-bReb3a._adb-tls-connect._tcp"
-        )
-        == "adb-AYLVBB5220900344-bReb3a._adb-tls-connect._tcp"
+        ADBCommandParser.GET_SERIAL_NO.parse("AYLVBB5220900344\n") == "AYLVBB5220900344"
     )
 
 
@@ -119,7 +116,6 @@ def test_adb_command_parsers_registry() -> None:
         AdbCommands.GET_SDK_VERSION,
         AdbCommands.GET_LOCATION_MODE,
         AdbCommands.GET_SERIAL_NO,
-        AdbCommands.SHELL_GET_SERIAL_NO,
         AdbCommands.GET_BATTERY_INFOS,
         AdbCommands.DUMPSYS_WINDOW,
         AdbCommands.SEND_NOTIFICATION,

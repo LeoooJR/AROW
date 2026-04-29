@@ -8,7 +8,14 @@ import datetime
 
 import pytest
 
-from core.devices import Computer, DeviceDescriptor, Phone, connect_to_device
+from core.devices import (
+    Computer,
+    DeviceDescriptor,
+    Phone,
+    apply_phone_ro_serial_enrichment,
+    compute_phone_stable_key,
+    connect_to_device,
+)
 
 pytestmark = [pytest.mark.devices]
 
@@ -60,6 +67,7 @@ class TestPhone:
         assert phone.descriptor.model == "model:pixel"
         assert phone.descriptor.state == "device"
         assert phone.transport_id == ""
+        assert phone.stable_key == ""
 
     def test_phone_from_string_six_token_line_is_parsed_positionally(self) -> None:
         """Phone.from_string uses the current six-token positional parser."""
@@ -103,6 +111,77 @@ class TestPhone:
         assert phone.descriptor.ip == "192.168.1.20"
         assert phone.descriptor.port == 5555
         assert phone.descriptor.state == ""
+        assert phone.stable_key == ""
+
+    def test_phone_hardware_serial_derives_stable_key_tier_one(self) -> None:
+        """Explicit hardware_serial produces hw:v1: Tier-1 stable_key."""
+        phone = Phone(
+            id="x",
+            name="n",
+            product="prod",
+            model="mod",
+            hardware_serial="  SN999  ",
+            manufacturer="",
+        )
+        assert phone.hardware_serial == "SN999"
+        assert phone.stable_key == "hw:v1:SN999"
+
+    def test_apply_phone_ro_serial_enrichment_updates_stable_key(self) -> None:
+        phone = Phone(
+            id="dev",
+            name="Pixel",
+            product="prod",
+            model="mod",
+            state="device",
+        )
+        apply_phone_ro_serial_enrichment(phone, "ABC123DEVICE\n")
+        assert phone.hardware_serial == "ABC123DEVICE"
+        assert phone.stable_key == "hw:v1:ABC123DEVICE"
+
+
+class TestComputePhoneStableKey:
+    """Tests for stable key derivation."""
+
+    def test_tier_one_known_serial(self) -> None:
+        assert (
+            compute_phone_stable_key(hardware_serial="SN1", product="x", model="y")
+            == "hw:v1:SN1"
+        )
+
+    def test_unknown_serial_falls_through(self) -> None:
+        """unknown (any case) is not treated as Tier-1."""
+
+        fp = compute_phone_stable_key(
+            hardware_serial="unknown",
+            product="prod",
+            model="mod",
+            fingerprint_when_no_serial=True,
+        )
+        assert fp.startswith("fp:v1:")
+        fp2 = compute_phone_stable_key(
+            hardware_serial="unknown",
+            product="prod",
+            model="mod",
+            fingerprint_when_no_serial=False,
+        )
+        assert fp2 == ""
+
+    def test_fingerprint_stable_for_same_inputs(self) -> None:
+        a = compute_phone_stable_key(
+            hardware_serial=None,
+            product=" Prod ",
+            model=" Mod ",
+            manufacturer="Fab",
+            fingerprint_when_no_serial=True,
+        )
+        b = compute_phone_stable_key(
+            hardware_serial="",
+            product=" Prod ",
+            model=" Mod ",
+            manufacturer="Fab ",
+            fingerprint_when_no_serial=True,
+        )
+        assert a == b and a.startswith("fp:v1:")
 
 
 # --- Computer ---

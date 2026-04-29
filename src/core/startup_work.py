@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from core.adb import AdbClient, AdbServer
+from core.device_serial_work import enrich_phones_with_serial
 from core.devices import Phone
 from core.signals import (
     AdbServerStartedPayload,
@@ -48,6 +49,7 @@ def run(model: CoreRuntimeModel) -> StartupResult:
     adb_server = model.start_adb_server()
     adb_client = model.create_adb_client()
     devices = model.get_known_devices(adb_server)
+    enrich_phones_with_serial(adb_client, devices)
     return StartupResult(
         adb_server=adb_server,
         adb_client=adb_client,

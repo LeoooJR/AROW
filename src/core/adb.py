@@ -211,7 +211,6 @@ class ADBCommandParser(Enum):
     GET_SDK_VERSION = member(_parse_optional_int_line)
     GET_LOCATION_MODE = member(_parse_optional_int_line)
     GET_SERIAL_NO = member(_make_strip_parser())
-    SHELL_GET_SERIAL_NO = member(_make_strip_parser())
     GET_BATTERY_INFOS = member(_parse_battery)
     DUMPSYS_WINDOW = member(_parse_window_summary)
     SEND_NOTIFICATION = member(_parse_notification_post)
@@ -296,15 +295,10 @@ class AdbCommands(Enum):
         args=["getprop", "ro.product.manufacturer"],
     )
     GET_SERIAL_NO = AdbCommand(
-        name="Get serial number (host)",
-        description="Serial from adb client for the selected device",
-        command="get-serialno",
-    )
-    SHELL_GET_SERIAL_NO = AdbCommand(
-        name="Get serial number (shell)",
-        description="Serial from device shell get-serialno",
+        name="Serial (ro.serialno)",
+        description="Hardware serial via ro.serialno (adb shell getprop ro.serialno)",
         command="shell",
-        args=["get-serialno"],
+        args=["getprop", "ro.serialno"],
     )
     GET_PRODUCT_MODEL = AdbCommand(
         name="Get product model",
@@ -354,7 +348,6 @@ ADB_COMMAND_PARSERS: dict[AdbCommands, ADBCommandParser] = {
     AdbCommands.GET_SDK_VERSION: ADBCommandParser.GET_SDK_VERSION,
     AdbCommands.GET_LOCATION_MODE: ADBCommandParser.GET_LOCATION_MODE,
     AdbCommands.GET_SERIAL_NO: ADBCommandParser.GET_SERIAL_NO,
-    AdbCommands.SHELL_GET_SERIAL_NO: ADBCommandParser.SHELL_GET_SERIAL_NO,
     AdbCommands.GET_BATTERY_INFOS: ADBCommandParser.GET_BATTERY_INFOS,
     AdbCommands.DUMPSYS_WINDOW: ADBCommandParser.DUMPSYS_WINDOW,
     AdbCommands.SEND_NOTIFICATION: ADBCommandParser.SEND_NOTIFICATION,
@@ -466,6 +459,35 @@ class AdbClient:
         Define a fake GPS location
         """
         pass
+
+    def get_ro_serialno(self, phone: Phone) -> str:
+        """
+        Read ``ro.serialno`` on the device: ``adb -s <id> shell getprop ro.serialno``.
+
+        Returns stripped stdout or empty string on failure.
+        """
+        command = AdbCommands.GET_SERIAL_NO.value
+        try:
+            result = self._execute(command, phone)
+        except AdbClientException as exc:
+            logger.warning(
+                "AdbClient: failed to read ro.serialno",
+                device_id=phone.descriptor.id,
+                error=str(exc),
+            )
+            return ""
+        parsed = ADBCommandParser.GET_SERIAL_NO.parse(result.output or "")
+        if not parsed:
+            return ""
+        out = parsed.strip()
+        if not out:
+            return ""
+        logger.debug(
+            "AdbClient: ro.serialno read",
+            device_id=phone.descriptor.id,
+            serial_len=len(out),
+        )
+        return out
 
     def _execute(
         self,

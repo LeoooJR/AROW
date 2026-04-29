@@ -1,4 +1,5 @@
 import datetime
+import hashlib
 import platform
 import socket
 from abc import ABC, abstractmethod
@@ -6,6 +7,62 @@ from dataclasses import dataclass, field
 from typing import Any, Optional, Self
 
 from collection import Repository
+
+# Prefixes so stored keys remain version-migratable and distinguish Tier 1 vs Tier 2.
+_STABLE_HW_PREFIX = "hw:v1:"
+_STABLE_FP_PREFIX = "fp:v1:"
+_FINGERPRINT_V1_MARKER = "|fp|v1|"
+
+
+def _tier1_stable_key_from_serial(normalized_serial: str) -> str:
+    """Build Tier-1 stable key from ro.serialno text (caller validates)."""
+    return f"{_STABLE_HW_PREFIX}{normalized_serial}"
+
+
+def _tier2_stable_key(product: str, model: str, manufacturer: Optional[str]) -> str:
+    """
+    deterministic fingerprint when ro.serialno is unavailable; collisions possible across
+    identical devices (documented limitation).
+    """
+    man = manufacturer or ""
+    payload = (
+        _FINGERPRINT_V1_MARKER
+        + (man.strip().lower())
+        + "|"
+        + product.strip().lower()
+        + "|"
+        + model.strip().lower()
+    )
+    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    return f"{_STABLE_FP_PREFIX}{digest}"
+
+
+def compute_phone_stable_key(
+    *,
+    hardware_serial: Optional[str],
+    product: str,
+    model: str,
+    manufacturer: Optional[str] = None,
+    fingerprint_when_no_serial: bool = False,
+) -> str:
+    """
+    Stable logical identity for stats / reconciliation across ADB reconnects.
+
+    **Tier 1:** ``ro.serialno`` from ``adb shell getprop ro.serialno`` (non-empty, not ``unknown``).
+    **Tier 2:** Only when ``fingerprint_when_no_serial`` is True and Tier 1 is unavailable:
+    salted SHA-256 over manufacturer + product + model (may collide for identical SKUs).
+
+    From ``devices -l`` only (before enrichment), omit fingerprint so the key stays empty until serial is fetched.
+    """
+    if hardware_serial:
+        cand = hardware_serial.strip()
+        if cand and cand.casefold() != "unknown":
+            return _tier1_stable_key_from_serial(cand)
+    if fingerprint_when_no_serial and (
+        product.strip() or model.strip() or (manufacturer or "").strip()
+    ):
+        return _tier2_stable_key(product, model, manufacturer)
+    return ""
 
 
 @dataclass
@@ -43,14 +100,42 @@ class PhoneDescriptor(DeviceDescriptor):
     state: str = field(metadata={"description": "The state of the phone"}, default="")
     last_communication: datetime.datetime = field(
         metadata={"description": "The last communication time of the phone"},
-        default=datetime.datetime.now(),
+        default_factory=datetime.datetime.now,
+    )
+    hardware_serial: str = field(
+        metadata={
+            "description": "ro.serialno from the device after enrichment (not the ADB connection id)"
+        },
+        default="",
+    )
+    stable_key: str = field(
+        metadata={
+            "description": "Stable logical identity across ADB reconnects (hw or fingerprint Tier)"
+        },
+        default="",
+    )
+    manufacturer: str = field(
+        metadata={
+            "description": "Hardware manufacturer label if filled (optional; improves Tier-2 fingerprints)"
+        },
+        default="",
     )
 
     def __str__(self):
-        return f"{self.id} - {self.name} - {self.os} - {self.ip}:{self.port} - {self.product} - {self.model} - {self.transport_id} - {self.state} - {self.last_communication}"
+        return (
+            f"{self.id} - {self.name} - {self.os} - {self.ip}:{self.port} - "
+            f"{self.product} - {self.model} - {self.transport_id} - {self.state} - "
+            f"{self.hardware_serial} - {self.stable_key} - {self.last_communication}"
+        )
 
     def __repr__(self):
-        return f"{self.__class__.__name__}(id={self.id}, name={self.name}, os={self.os}, ip={self.ip}, port={self.port}, product={self.product}, model={self.model}, transport_id={self.transport_id}, state={self.state}, last_communication={self.last_communication})"
+        return (
+            f"{self.__class__.__name__}(id={self.id}, name={self.name}, os={self.os}, "
+            f"ip={self.ip}, port={self.port}, product={self.product}, model={self.model}, "
+            f"transport_id={self.transport_id}, state={self.state}, "
+            f"hardware_serial={self.hardware_serial!r}, stable_key={self.stable_key!r}, "
+            f"last_communication={self.last_communication})"
+        )
 
 
 @dataclass
@@ -150,6 +235,8 @@ class Phone(Device):
         product: str | None = None,
         model: str | None = None,
         state: str | None = None,
+        hardware_serial: str | None = None,
+        manufacturer: str | None = None,
     ) -> None:
         super().__init__(
             id=id,
@@ -158,16 +245,30 @@ class Phone(Device):
             ip=ip or "",
             port=port,
         )
+        prod = product or ""
+        mod = model or ""
+        man_u = manufacturer or ""
+        hs = (hardware_serial.strip() if hardware_serial else "") or ""
+        stable = compute_phone_stable_key(
+            hardware_serial=hs if hs else None,
+            product=prod,
+            model=mod,
+            manufacturer=man_u if man_u.strip() else None,
+            fingerprint_when_no_serial=False,
+        )
         self._descriptor: PhoneDescriptor = PhoneDescriptor(
             id=id,
             name=name,
             os=os or "",
             ip=ip or "",
             port=port,
-            product=product or "",
-            model=model or "",
+            product=prod,
+            model=mod,
             state=state or "",
             last_communication=datetime.datetime.now(),
+            hardware_serial=hs if hs else "",
+            stable_key=stable,
+            manufacturer=man_u,
         )
 
     @property
@@ -212,10 +313,39 @@ class Phone(Device):
     def transport_id(self) -> str:
         return self._descriptor.transport_id
 
+    @property
+    def stable_key(self) -> str:
+        return self._descriptor.stable_key
+
+    @property
+    def hardware_serial(self) -> str:
+        return self._descriptor.hardware_serial
+
     @classmethod
     def from_string(cls, string: str) -> Self:
         id, state, product, model, device, transport_id = string.strip().split()
         return cls(id=id, name=device, product=product, model=model, state=state)
+
+
+def apply_phone_ro_serial_enrichment(phone: Phone, ro_serial_stdout: str) -> None:
+    """
+    After ``adb shell getprop ro.serialno``, update ``hardware_serial`` and ``stable_key``.
+
+    When stdout is blank or unusable (or ``unknown``), keeps prior ``hardware_serial`` if set;
+    recomputes ``stable_key`` with Tier 2 fingerprint if Tier 1 is still unavailable.
+    """
+    raw = (ro_serial_stdout or "").strip()
+    if raw and raw.casefold() != "unknown":
+        phone.descriptor.hardware_serial = raw
+    man = (phone.descriptor.manufacturer or "").strip()
+    hs = (phone.descriptor.hardware_serial or "").strip()
+    phone.descriptor.stable_key = compute_phone_stable_key(
+        hardware_serial=hs if hs else None,
+        product=phone.descriptor.product,
+        model=phone.descriptor.model,
+        manufacturer=man or None if man else None,
+        fingerprint_when_no_serial=True,
+    )
 
 
 class Computer(Device):

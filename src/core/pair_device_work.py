@@ -7,8 +7,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from core.adb import AdbClientException
-from core.devices import Phone
+from core.adb import AdbClient, AdbClientException
+from core.devices import Phone, apply_phone_ro_serial_enrichment
 from core.signals import (
     CoreSignal,
     DeviceConnectionFailedPayload,
@@ -24,10 +24,24 @@ if TYPE_CHECKING:
 class PairDeviceOutcome:
     """
     Result of ``run`` (worker). Apply on the main thread with ``apply_main_thread`` only.
+
+    ``paired_ro_serialno`` is raw stdout from ``adb shell getprop ro.serialno`` on the
+    worker; ``apply_main_thread`` applies ``hardware_serial`` / ``stable_key`` there.
     """
 
     success_phone: Phone | None = None
     failure: DeviceConnectionFailedPayload | None = None
+    ro_serialno: str = ""
+
+
+def _ro_serial_after_pair(adb_client: AdbClient, phone: Phone | None) -> str:
+    """Read ``ro.serialno`` on the worker when the handset is usable for shell I/O."""
+    if phone is None:
+        return ""
+    state = (phone.descriptor.state or "").strip().casefold()
+    if state != "device":
+        return ""
+    return adb_client.get_ro_serialno(phone)
 
 
 def run(
@@ -46,7 +60,10 @@ def run(
     adb_client = model.get_adb_client()
     try:
         phone = adb_client.pair(ip, port, association_code)
-        return PairDeviceOutcome(success_phone=phone, failure=None)
+        ro_serial = _ro_serial_after_pair(adb_client, phone)
+        return PairDeviceOutcome(
+            success_phone=phone, failure=None, ro_serialno=ro_serial
+        )
     except AdbClientException as error:
         error_message: str = str(error)
         logger.warning(
@@ -67,7 +84,12 @@ def run(
                     port=port,
                 )
                 phone = adb_client.pair(ip, port, association_code)
-                return PairDeviceOutcome(success_phone=phone, failure=None)
+                ro_serial = _ro_serial_after_pair(adb_client, phone)
+                return PairDeviceOutcome(
+                    success_phone=phone,
+                    failure=None,
+                    ro_serialno=ro_serial,
+                )
             except AdbClientException as retry_error:
                 logger.warning(
                     "CoreRuntimeModel: pairing retry failed after restart",
@@ -92,6 +114,10 @@ def apply_main_thread(model: CoreRuntimeModel, outcome: PairDeviceOutcome) -> No
     if not isinstance(model, _CoreRuntimeModel):
         raise TypeError("apply_main_thread() requires CoreRuntimeModel")
     if outcome.success_phone is not None:
+        apply_phone_ro_serial_enrichment(
+            outcome.success_phone,
+            outcome.ro_serialno,
+        )
         model._signal_bus.emit(
             CoreSignal.DEVICE_CONNECTION_SUCCEEDED,
             DeviceConnectionSucceededPayload(phone=outcome.success_phone),

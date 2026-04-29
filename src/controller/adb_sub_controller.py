@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 from controller.adb_job_callbacks import AdbAsyncJobCallbacks
 from controller.helper import validate_model, validate_view
+from core.device_serial_work import refresh_known_devices_with_serial
 from core.models import CoreRuntimeModel
 from core.pair_device_work import run as run_pair_device
 from core.signals import (
@@ -117,7 +118,7 @@ class AdbSubController:
         logger.info("AdbSubController: refresh device list requested")
         self._submit_model_async_call(
             name="refresh_device_list",
-            fn=self.model.get_known_devices,
+            fn=lambda: refresh_known_devices_with_serial(self.model),
             description="Refresh device list from ADB",
             job_type="thread",
             coalesce_key="device",
