@@ -1,10 +1,11 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Final
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QFrame, QLabel, QSizePolicy, QVBoxLayout
 
+from gui import faker as ui_faker
 from gui.elements import DemiBoldText, File, Image, WalkthroughButton
 from gui.icons import ApplicationIcons, GenericIcons, OperatingSystemIcons
 from gui.settings import Settings
@@ -25,10 +26,8 @@ class WelcomePanel(QFrame):
         walkthrough_label: Final[str] = "Walkthrough"
         walkthrough_wifi_button: Final[str] = "Connect phone over Wi-Fi (Android >= 11)"
         walkthrough_usb_button: Final[str] = "Connect phone with USB (Android < 11)"
-        recent_files: Final[tuple[tuple[str, str], ...]] = (
-            ("text.txt", "txt"),
-            ("readme.md", "md"),
-            ("map.html", "html"),
+        recent_files: tuple[tuple[str, str], tuple[str, str], tuple[str, str]] = field(
+            default_factory=ui_faker.generate_recent_file_triples
         )
 
     @dataclass

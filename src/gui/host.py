@@ -2,7 +2,7 @@
 This file contains all graphical elements related to the host panel.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Final, Literal
 
 from PySide6.QtCore import Qt
@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from gui import faker as ui_faker
 from gui.animation import animate_widget_visibility
 from gui.elements import (
     SVG,
@@ -556,19 +557,30 @@ class HostPanel(QFrame):
         expand_button_tooltip: Final[str] = "Toggle panel visibility"
         identity_group_title: Final[str] = "Host identity"
         adb_group_title: Final[str] = "Android Debug Bridge"
-        placeholder_host_name: Final[str] = "John Doe"
-        placeholder_ip_address: Final[str] = "192.168.1.26"
-        placeholder_platform: Final[str] = "macOS 14.5"
-        placeholder_summary: Final[str] = (
-            "Primary workstation ready for location spoofing workflow."
+        placeholder_host_name: str = field(default_factory=ui_faker.generate_host_name)
+        placeholder_ip_address: str = field(
+            default_factory=ui_faker.generate_private_ipv4
         )
-        placeholder_platform: Final[str] = "macOS 14.5"
-        placeholder_server_state_text: Final[str] = "Running"
-        placeholder_adb_version: Final[str] = "1.0.41"
-        placeholder_daemon: Final[str] = "tcp:5037"
-        placeholder_connected_devices: Final[str] = "0"
-        placeholder_helper_note: Final[str] = (
-            "Binary allowing communication between Android devices and the host computer."
+        placeholder_platform: str = field(
+            default_factory=ui_faker.generate_desktop_platform_label
+        )
+        placeholder_summary: str = field(
+            default_factory=ui_faker.generate_host_identity_summary
+        )
+        placeholder_server_state_text: str = field(
+            default_factory=ui_faker.generate_server_state_label
+        )
+        placeholder_adb_version: str = field(
+            default_factory=ui_faker.generate_adb_version_string
+        )
+        placeholder_daemon: str = field(
+            default_factory=ui_faker.generate_adb_daemon_endpoint
+        )
+        placeholder_connected_devices: str = field(
+            default_factory=ui_faker.generate_connected_device_count_str
+        )
+        placeholder_helper_note: str = field(
+            default_factory=ui_faker.generate_adb_bridge_helper_note
         )
 
     @dataclass

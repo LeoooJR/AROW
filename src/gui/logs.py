@@ -2,7 +2,7 @@
 This file contains all graphical elements related to the logs panel.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Final
 
@@ -10,6 +10,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QSizePolicy, QVBoxLayout, QWidget
 
+from gui import faker as ui_faker
 from gui.animation import animate_widget_visibility
 from gui.elements import (
     File,
@@ -35,10 +36,12 @@ class LogPanel(QFrame):
 
         title: Final[str] = "Activity log"
         expand_button_tooltip: Final[str] = "Toggle panel visibility"
-        placeholder_items: Final[tuple[str, ...]] = ("Log 1", "Log 2", "Log 3")
+        placeholder_items: tuple[str, str, str] = field(
+            default_factory=ui_faker.generate_log_labels
+        )
         helper_text: Final[str] = "Logs are saved in the following file"
-        file_name: Final[str] = "test.log"
-        file_type: Final[str] = "TXT"
+        file_name: str = field(default_factory=ui_faker.generate_activity_log_filename)
+        file_type: str = field(default_factory=ui_faker.generate_activity_log_file_type)
         group_title: Final[str] = "Logs"
 
     @dataclass
