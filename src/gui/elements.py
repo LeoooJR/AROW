@@ -1983,12 +1983,11 @@ class File(QWidget, Element):
 
     def _on_save_as_button_clicked(self) -> None:
         """Handle the save as button click event."""
-        print("Saving as...")
         dialog = FileSaveDialog(self)
         if dialog.exec():
-            filename = dialog.selectedFiles()
+            filename: list[str] = dialog.selectedFiles()
             if filename:
-                print(filename)
+                view_signals.SimulationLogFileUpdateRequested.emit(filename[0])
 
     def resizeEvent(self, event):
         super().resizeEvent(event)

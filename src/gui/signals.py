@@ -41,6 +41,7 @@ class ViewSignals(QObject):
     StopSimulationRequested = Signal()
     SimulationContextChanged = Signal(str, int)
     SimulationPositionChanged = Signal(float, float)
+    SimulationLogFileUpdateRequested = Signal(str)
     SimulationLogFileUpdated = Signal(str, str)
 
 

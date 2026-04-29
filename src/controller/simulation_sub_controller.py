@@ -98,6 +98,9 @@ class SimulationSubController:
         view_signals.DeviceConnectionRequested.connect(
             self._on_device_connection_requested
         )
+        view_signals.SimulationLogFileUpdateRequested.connect(
+            self._on_simulation_log_file_update_requested
+        )
 
     def connect_model_signals(self) -> None:
         # Simulation-specific model subscriptions (none yet) — extension point.
@@ -194,3 +197,13 @@ class SimulationSubController:
             device_id=desc.id,
             device_name=desc.name,
         )
+
+    @validate_view
+    def _on_simulation_log_file_update_requested(self, filename: str) -> None:
+        """In-memory selection of the active device (UI thread)."""
+        logger.info(
+            "SimulationSubController: simulation log file update requested",
+            filename=filename,
+        )
+        self._session.log_file = Path(filename)
+        self._send_simulation_log_file_to_view()
