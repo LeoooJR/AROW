@@ -1,5 +1,5 @@
 """
-Per-async-job outcome callbacks for AdbSubController (startup, pair, list refresh).
+Per-async-job outcome callbacks for AdbSubController (startup, authentificate, list refresh).
 
 Keep AsyncRunner callbacks out of the subcontroller so each job is easy to read.
 """
@@ -10,11 +10,10 @@ import importlib
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-import core.pair_device_work as pair_device_work
+from controller.helper import validate_model, validate_view
+from core.authentificate_device_work import AuthentificateDeviceOutcome
 from core.devices import Phone
-from core.models import CoreRuntimeModel
-from core.pair_device_work import PairDeviceOutcome
-from core.startup_work import StartupResult, apply_main_thread
+from core.startup_work import StartupResult
 from logger import logger
 
 if TYPE_CHECKING:
@@ -46,15 +45,10 @@ class StartupCoreRuntimeCallback:
     def __init__(self, subcontroller: AdbSubController) -> None:
         self._subcontroller = subcontroller
 
+    @validate_model
     def on_completed(self, result: object) -> None:
         """Handle completion (Qt main thread, from AsyncRunner)."""
         model = self._subcontroller.model
-        if not isinstance(model, CoreRuntimeModel):
-            logger.warning(
-                "Controller: model type mismatch",
-                model_type=type(model).__name__,
-            )
-            return
         if not isinstance(result, StartupResult):
             logger.error(
                 "AdbSubController: unexpected startup result type",
@@ -65,48 +59,43 @@ class StartupCoreRuntimeCallback:
             "AdbSubController: startup core runtime completed",
             adb_server=result.adb_server is not None,
         )
-        apply_main_thread(model, result)
+        model.apply_result(result)
 
     def on_failed(self, error: JobError) -> None:
         log_startup_job_failure(error)
 
 
-def log_pair_device_job_failure(error: JobError) -> None:
-    """Log a failed pair-device async job (aside from AsyncRunner's generic log)."""
+def log_authentificate_device_job_failure(error: JobError) -> None:
+    """Log a failed authentificate device async job (aside from AsyncRunner's generic log)."""
     logger.error(
-        "AdbSubController: pair_device job failed",
+        "AdbSubController: authentificate device job failed",
         message=error.message,
         return_code=error.return_code,
         traceback=error.traceback or None,
     )
 
 
-class PairDeviceCallback:
-    """Callback for the pair device job."""
+class AuthentificateDeviceCallback:
+    """Callback for the authentificate device job."""
 
     __slots__ = ("_subcontroller", "__weakref__")
 
     def __init__(self, subcontroller: AdbSubController) -> None:
         self._subcontroller = subcontroller
 
+    @validate_model
     def on_completed(self, result: object) -> None:
         model = self._subcontroller.model
-        if not isinstance(model, CoreRuntimeModel):
-            logger.warning(
-                "Controller: model type mismatch",
-                model_type=type(model).__name__,
-            )
-            return
-        if not isinstance(result, PairDeviceOutcome):
+        if not isinstance(result, AuthentificateDeviceOutcome):
             logger.error(
-                "AdbSubController: unexpected pair_device result type",
+                "AdbSubController: unexpected authentificate device result type",
                 result_type=type(result).__name__,
             )
             return
-        pair_device_work.apply_main_thread(model, result)
+        model.apply_result(result)
 
     def on_failed(self, error: JobError) -> None:
-        log_pair_device_job_failure(error)
+        log_authentificate_device_job_failure(error)
 
 
 def log_refresh_device_list_job_failure(error: JobError) -> None:
@@ -127,13 +116,8 @@ class RefreshDeviceListCallback:
     def __init__(self, subcontroller: AdbSubController) -> None:
         self._subcontroller = subcontroller
 
+    @validate_view
     def on_completed(self, result: object) -> None:
-        if not isinstance(self._subcontroller.model, CoreRuntimeModel):
-            logger.warning(
-                "Controller: model type mismatch",
-                model_type=type(self._subcontroller.model).__name__,
-            )
-            return
         if not isinstance(result, list):
             logger.error(
                 "AdbSubController: unexpected refresh_device_list result type",
@@ -147,15 +131,8 @@ class RefreshDeviceListCallback:
                     item_type=type(item).__name__,
                 )
                 return
-        from gui.window import MainWindow
 
         view = self._subcontroller.view
-        if not isinstance(view, MainWindow):
-            logger.warning(
-                "Controller: view type mismatch",
-                view_type=type(view).__name__,
-            )
-            return
         device_ids = [d.descriptor.id for d in result]
         logger.info(
             "AdbSubController: known devices listed (async)",
@@ -171,7 +148,7 @@ class RefreshDeviceListCallback:
 # AdbSubController method (async entry) -> attribute on :class:`AdbAsyncJobCallbacks`.
 ADB_SUBCONTROLLER_METHOD_TO_CALLBACK_ATTR: dict[str, str] = {
     "_startup_core_runtime": "startup",
-    "_on_authentification_confirmed": "pair_device",
+    "_on_authentification_confirmed": "authentificate_device",
     "_on_refresh_device_list_requested": "refresh_device_list",
 }
 
@@ -186,13 +163,13 @@ class AdbAsyncJobCallbacks:
     """
 
     startup: StartupCoreRuntimeCallback
-    pair_device: PairDeviceCallback
+    authentificate_device: AuthentificateDeviceCallback
     refresh_device_list: RefreshDeviceListCallback
 
     @classmethod
     def for_subcontroller(cls, subcontroller: AdbSubController) -> AdbAsyncJobCallbacks:
         return cls(
             startup=StartupCoreRuntimeCallback(subcontroller),
-            pair_device=PairDeviceCallback(subcontroller),
+            authentificate_device=AuthentificateDeviceCallback(subcontroller),
             refresh_device_list=RefreshDeviceListCallback(subcontroller),
         )

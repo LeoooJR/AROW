@@ -25,8 +25,8 @@ class CoreSignal(StrEnum):
     ADB_SERVER_STARTED = "adb.server.started"
     ADB_SERVER_STOPPED = "adb.server.stopped"
     ADB_SERVER_STATE_CHANGED = "adb.server.state.changed"
-    DEVICE_CONNECTION_SUCCEEDED = "device.connection.succeeded"
-    DEVICE_CONNECTION_FAILED = "device.connection.failed"
+    DEVICE_AUTHENTIFICATION_SUCCEEDED = "device.authentification.succeeded"
+    DEVICE_AUTHENTIFICATION_FAILED = "device.authentification.failed"
     DEVICES_UPDATED = "devices.updated"
     SIMULATION_STATE_CHANGED = "simulation.state.changed"
     SIMULATION_POSITION_CHANGED = "simulation.position.changed"
@@ -56,15 +56,15 @@ class DevicesUpdatedPayload:
 
 
 @dataclass(frozen=True, slots=True)
-class DeviceConnectionSucceededPayload:
+class DeviceAuthentificationSucceededPayload:
     """Payload emitted when a device is connected successfully."""
 
     phone: Phone
 
 
 @dataclass(frozen=True, slots=True)
-class DeviceConnectionFailedPayload:
-    """Payload emitted when a device connection fails."""
+class DeviceAuthentificationFailedPayload:
+    """Payload emitted when a device authentification fails."""
 
     ip: str
     port: int

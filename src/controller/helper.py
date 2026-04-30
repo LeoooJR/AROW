@@ -19,12 +19,22 @@ def validate_model(function: Callable[..., Any]) -> Callable[..., Any]:
     """
 
     def wrapper(self, *args: Any, **kwargs: Any) -> Any:
-        if not isinstance(self.model, CoreRuntimeModel):
-            logger.warning(
-                "Controller: model type mismatch",
-                model_type=type(self.model).__name__,
-            )
-            return
+        if hasattr(self, "model"):
+            if not isinstance(self.model, CoreRuntimeModel):
+                logger.warning(
+                    "Controller: model type mismatch",
+                    model_type=type(self.model).__name__,
+                )
+                return
+        elif hasattr(self, "_subcontroller"):
+            if not isinstance(self._subcontroller.model, CoreRuntimeModel):
+                logger.warning(
+                    "Controller: model type mismatch",
+                    model_type=type(self._subcontroller.model).__name__,
+                )
+                return
+        else:
+            raise ValueError("Model not found")
         return function(self, *args, **kwargs)
 
     return wrapper
@@ -41,12 +51,22 @@ def validate_view(function: Callable[..., Any]) -> Callable[..., Any]:
     """
 
     def wrapper(self, *args: Any, **kwargs: Any) -> Any:
-        if not isinstance(self.view, MainWindow):
-            logger.warning(
-                "Controller: view type mismatch",
-                view_type=type(self.view).__name__,
-            )
-            return
+        if hasattr(self, "view"):
+            if not isinstance(self.view, MainWindow):
+                logger.warning(
+                    "Controller: view type mismatch",
+                    view_type=type(self.view).__name__,
+                )
+                return
+        elif hasattr(self, "_subcontroller"):
+            if not isinstance(self._subcontroller.view, MainWindow):
+                logger.warning(
+                    "Controller: view type mismatch",
+                    view_type=type(self._subcontroller.view).__name__,
+                )
+                return
+        else:
+            raise ValueError("View not found")
         return function(self, *args, **kwargs)
 
     return wrapper

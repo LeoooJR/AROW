@@ -556,7 +556,7 @@ class AdbServer:
         self._history: OrderedDict[
             datetime.datetime, tuple[AdbCommand, AdbCommandResult]
         ] = OrderedDict()
-        self.paired_devices: PhoneRepository = PhoneRepository()
+        self._paired_devices: PhoneRepository = PhoneRepository()
         self.restart()
 
     @property
@@ -621,6 +621,27 @@ class AdbServer:
         """
         return self.get_last_from_history()[1]
 
+    @property
+    def paired_devices(self) -> PhoneRepository:
+        """
+        Get the paired devices
+        """
+        return self._paired_devices
+
+    @paired_devices.setter
+    def paired_devices(self, paired_devices: PhoneRepository) -> None:
+        """
+        Set the paired devices
+        """
+        self._paired_devices = paired_devices
+
+    @paired_devices.deleter
+    def paired_devices(self) -> None:
+        """
+        Delete the paired devices
+        """
+        self._paired_devices.clear()
+
     def start(self) -> None:
         """
         Start the adb server
@@ -631,7 +652,7 @@ class AdbServer:
             raise AdbServerException(f"Failed to start adb server: {result}")
         # Get known devices
         for device in self.get_known_devices():
-            self.paired_devices.add(device)
+            self._paired_devices.add(device)
 
     def stop(self) -> None:
         """

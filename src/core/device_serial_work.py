@@ -6,7 +6,7 @@ Workers only: call from AsyncRunner/off-main jobs that already do blocking ADB I
 
 from __future__ import annotations
 
-from core.adb import AdbClient
+from core.adb import AdbClient, AdbServer
 from core.devices import Phone, apply_phone_ro_serial_enrichment
 
 # Only states where ``adb -s … shell …`` reliably targets the handset.
@@ -27,19 +27,14 @@ def enrich_phones_with_serial(adb_client: AdbClient, phones: list[Phone]) -> Non
         apply_phone_ro_serial_enrichment(phone, raw_serial)
 
 
-def refresh_known_devices_with_serial(model: object) -> list[Phone]:
+def refresh_known_devices_with_serial(
+    adb_server: AdbServer, adb_client: AdbClient
+) -> list[Phone]:
     """
-    List devices using the bound server, enrich with hardware serial.
+    List devices using the ADB server, enrich with hardware serial.
 
     Intended as the AsyncRunner ``fn`` for manual refresh (see ``AdbSubController``).
-
-    Raises:
-        TypeError: if ``model`` is not :class:`~core.models.CoreRuntimeModel`.
     """
-    from core.models import CoreRuntimeModel as _CoreRuntimeModel
-
-    if not isinstance(model, _CoreRuntimeModel):
-        raise TypeError("refresh_known_devices_with_serial requires CoreRuntimeModel")
-    phones = model.get_known_devices()
-    enrich_phones_with_serial(model.get_adb_client(), phones)
+    phones = adb_server.get_known_devices()
+    enrich_phones_with_serial(adb_client, phones)
     return phones

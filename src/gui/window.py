@@ -941,9 +941,11 @@ class MainWindow(QMainWindow):
             "You must own full ownership of the device to use it with this software."
         )
         demo_device_name: Final[str] = "Samsung Galaxy"
-        pairing_success_toast: str = "Successfully connected to device: {device}."
-        pairing_failed_toast: str = (
-            "Failed to connect to device: {ip}:{port} with association code: {association_code}."
+        authentification_success_toast: str = (
+            "Successfully connected to device: {device}."
+        )
+        authentification_failed_toast: str = (
+            "Failed to authentificate device: {ip}:{port} with association code: {association_code}."
         )
 
     @dataclass
@@ -1109,14 +1111,15 @@ class MainWindow(QMainWindow):
         logger.info("MainWindow: authentification confirmed")
         self.ui.authentification_overlay.hide()
         if self._ui_constraints_disabled:
-            self.forward_device_pairing_succeeded(self.texts.demo_device_name)
+            self.forward_device_authentification_succeeded(self.texts.demo_device_name)
 
-    def forward_device_pairing_succeeded(self, device: str) -> None:
-        """Handle the device pairing succeeded."""
-        logger.info("MainWindow: device pairing succeeded", device=device)
+    def forward_device_authentification_succeeded(self, device: str) -> None:
+        """Handle the device authentification succeeded."""
+        logger.info("MainWindow: device authentification succeeded", device=device)
         view_signals.AuthentificationSucceeded.emit(device)
         self.ui.container.post_toast(
-            self.texts.pairing_success_toast.format(device=device), level="success"
+            self.texts.authentification_success_toast.format(device=device),
+            level="success",
         )
 
     def forward_device_selection_succeeded(self, device: str) -> None:
@@ -1124,22 +1127,23 @@ class MainWindow(QMainWindow):
         logger.info("MainWindow: device selection succeeded", device=device)
         view_signals.DeviceSelectionSucceeded.emit(device)
         self.ui.container.post_toast(
-            self.texts.pairing_success_toast.format(device=device), level="success"
+            self.texts.pairing_authentification_toast.format(device=device),
+            level="success",
         )
 
-    def forward_device_pairing_failed(
+    def forward_device_authentification_failed(
         self, ip: str, port: int, association_code: str
     ) -> None:
-        """Handle the device pairing failed."""
+        """Handle the device authentification failed."""
         logger.warning(
-            "MainWindow: device pairing failed",
+            "MainWindow: device authentification failed",
             ip=ip,
             port=port,
             association_code=association_code,
         )
         view_signals.AuthentificationFailed.emit(ip, port, association_code)
         self.ui.container.post_toast(
-            self.texts.pairing_failed_toast.format(
+            self.texts.authentification_failed_toast.format(
                 ip=ip, port=port, association_code=association_code
             ),
             level="error",

@@ -1,11 +1,16 @@
-import platform
-from abc import ABC, abstractmethod
-from pathlib import Path
+from abc import ABC
+from typing import Callable
 
-from core.adb import AdbBinary, AdbClient, AdbServer
+from core.adb import AdbClient, AdbServer
+from core.authentificate_device_work import (
+    AuthentificateDeviceOutcome,
+)
+from core.authentificate_device_work import (
+    apply_main_thread as apply_authentificate_main_thread,
+)
+from core.authentificate_device_work import run as run_authentificate_device
+from core.device_serial_work import refresh_known_devices_with_serial
 from core.devices import Computer, Phone
-from core.pair_device_work import apply_main_thread as apply_pair_device_main_thread
-from core.pair_device_work import run as run_pair_device
 from core.signals import (
     AdbServerStartedPayload,
     AdbServerStoppedPayload,
@@ -14,9 +19,29 @@ from core.signals import (
     InMemoryCoreSignalBus,
     SignalHandler,
 )
-from core.startup_work import StartupResult
+from core.startup_work import (
+    StartupResult,
+    _create_adb_client,
+)
+from core.startup_work import apply_main_thread as apply_startup_main_thread
 from core.startup_work import run as run_startup_work
 from logger import logger
+
+# Main-thread appliers keyed by exact worker result type (AsyncRunner completion).
+CoreRuntimeResultApplier = Callable[["CoreRuntimeModel", object], None]
+
+_CORE_RUNTIME_RESULT_APPLIERS: dict[type[object], CoreRuntimeResultApplier] = {
+    StartupResult: apply_startup_main_thread,
+    AuthentificateDeviceOutcome: apply_authentificate_main_thread,
+}
+
+
+def register_core_runtime_result_applier(
+    result_type: type[object],
+    applier: CoreRuntimeResultApplier,
+) -> None:
+    """Register or replace the main-thread applier for ``result_type`` outcomes."""
+    _CORE_RUNTIME_RESULT_APPLIERS[result_type] = applier
 
 
 class Model(ABC):
@@ -56,62 +81,29 @@ class CoreRuntimeModel(Model):
         """Return the active ADB server instance if available."""
         return self._adb_server
 
-    @staticmethod
-    def _resolve_adb_binary_path() -> Path:
-        """
-        Resolve the OS-specific ADB binary path shipped with the project.
-        """
-        src_root: Path = Path(__file__).resolve().parents[1]
-        system: str = platform.system().lower()
-        platform_folder: str
-        binary_name: str
-        if system == "darwin":
-            platform_folder = "macos"
-            binary_name = "adb"
-        elif system == "linux":
-            platform_folder = "linux"
-            binary_name = "adb"
-        elif system == "windows":
-            platform_folder = "win"
-            binary_name = "adb.exe"
-        else:
-            raise RuntimeError(
-                f"Unsupported operating system for ADB startup: {system}"
-            )
-
-        adb_path: Path = (
-            src_root / "assets" / platform_folder / "platform-tools" / binary_name
-        )
-        if not adb_path.exists():
-            raise FileNotFoundError(
-                f"ADB binary not found at expected path: {adb_path}"
-            )
-        return adb_path
-
     def startup(self) -> StartupResult:
         """
         Initialize runtime core services at application startup (worker thread).
         """
-        return run_startup_work(self)
+        return run_startup_work()
 
-    def start_adb_server(self) -> AdbServer:
+    def authentificate_device(
+        self, ip: str, port: int, association_code: str
+    ) -> AuthentificateDeviceOutcome:
         """
-        Start or restart the ADB server and keep the instance in model state.
+        Pair the device over ADB (worker thread). Does not emit on the core bus;
+        controllers apply outcomes on the main thread after AsyncRunner completes.
         """
-        try:
-            adb_binary: AdbBinary = AdbBinary(path=self._resolve_adb_binary_path())
-            adb_server: AdbServer = AdbServer(binary=adb_binary)
-            logger.info(
-                "CoreRuntimeModel: ADB server started",
-                adb_path=str(adb_binary.path),
-            )
-            return adb_server
-        except Exception as error:
-            logger.exception(
-                "CoreRuntimeModel: failed to start ADB server",
-                error=str(error),
-            )
-            raise RuntimeError("Failed to start ADB server") from error
+        return run_authentificate_device(
+            self._adb_server, self._adb_client, ip, port, association_code
+        )
+
+    def refresh_known_devices(self) -> list[Phone]:
+        """
+        List devices from the bound server and enrich ``ro.serialno`` via ADB.
+        Blocking; intended for AsyncRunner / worker-thread use only.
+        """
+        return refresh_known_devices_with_serial(self._adb_server, self._adb_client)
 
     def stop_adb_server(self) -> None:
         """
@@ -185,26 +177,20 @@ class CoreRuntimeModel(Model):
         Return the ADB client, creating and caching one if startup has not run yet.
         """
         if self._adb_client is None:
-            self._adb_client = self.create_adb_client()
+            self._adb_client = _create_adb_client()
         return self._adb_client
 
-    def create_adb_client(self) -> AdbClient:
+    def apply_result(self, result: object) -> None:
         """
-        Get the ADB client.
-        """
-        logger.debug("CoreRuntimeModel: creating ADB client")
-        adb_binary: AdbBinary = AdbBinary(path=self._resolve_adb_binary_path())
-        adb_client: AdbClient = AdbClient(binary=adb_binary)
-        return adb_client
+        Dispatch worker results to the matching ``apply_main_thread`` helper (Qt main thread).
 
-    def pair_device(self, ip: str, port: int, association_code: str) -> None:
+        Unknown types are logged; callbacks may validate before calling for clearer context.
         """
-        Pair a device with the ADB server (synchronous: worker + main-thread apply).
-
-        For UI-initiated pairing off the main thread, prefer submitting ``run`` /
-        ``apply_main_thread`` from ``core.pair_device_work`` via AsyncRunner and
-        calling ``apply_pair_device_main_thread`` only in the job completion callback.
-        """
-        apply_pair_device_main_thread(
-            self, run_pair_device(self, ip, port, association_code)
-        )
+        applier = _CORE_RUNTIME_RESULT_APPLIERS.get(type(result))
+        if applier is None:
+            logger.error(
+                "CoreRuntimeModel.apply_result: unsupported result type",
+                result_type=type(result).__name__,
+            )
+            return
+        applier(self, result)

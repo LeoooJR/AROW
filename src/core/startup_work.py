@@ -7,10 +7,12 @@ startup async flow is easy to find and update.
 
 from __future__ import annotations
 
+import platform
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING
 
-from core.adb import AdbClient, AdbServer
+from core.adb import AdbBinary, AdbClient, AdbServer
 from core.device_serial_work import enrich_phones_with_serial
 from core.devices import Phone
 from core.signals import (
@@ -18,9 +20,68 @@ from core.signals import (
     CoreSignal,
     DevicesUpdatedPayload,
 )
+from logger import logger
 
 if TYPE_CHECKING:
     from core.models import CoreRuntimeModel
+
+
+def _resolve_adb_binary_path() -> Path:
+    """
+    Resolve the OS-specific ADB binary path shipped with the project.
+    """
+    src_root: Path = Path(__file__).resolve().parents[1]
+    system: str = platform.system().lower()
+    platform_folder: str
+    binary_name: str
+    if system == "darwin":
+        platform_folder = "macos"
+        binary_name = "adb"
+    elif system == "linux":
+        platform_folder = "linux"
+        binary_name = "adb"
+    elif system == "windows":
+        platform_folder = "win"
+        binary_name = "adb.exe"
+    else:
+        raise RuntimeError(f"Unsupported operating system for ADB startup: {system}")
+
+    adb_path: Path = (
+        src_root / "assets" / platform_folder / "platform-tools" / binary_name
+    )
+    if not adb_path.exists():
+        raise FileNotFoundError(f"ADB binary not found at expected path: {adb_path}")
+    return adb_path
+
+
+def _start_adb_server() -> AdbServer:
+    """
+    Instantiate an ADB server bound to the shipped binary (blocking I/O on process start).
+
+    Does not update :class:`~core.models.CoreRuntimeModel` state; the startup job
+    ``apply_main_thread`` path assigns ``_adb_server`` on the Qt main thread.
+    """
+    try:
+        adb_binary: AdbBinary = AdbBinary(path=_resolve_adb_binary_path())
+        adb_server: AdbServer = AdbServer(binary=adb_binary)
+        logger.info(
+            "startup_work: ADB server started",
+            adb_path=str(adb_binary.path),
+        )
+        return adb_server
+    except Exception as error:
+        logger.exception(
+            "startup_work: failed to start ADB server",
+            error=str(error),
+        )
+        raise RuntimeError("Failed to start ADB server") from error
+
+
+def _create_adb_client() -> AdbClient:
+    """Build an :class:`~core.adb.AdbClient` using the project's ADB binary path."""
+    logger.debug("startup_work: creating ADB client")
+    adb_binary: AdbBinary = AdbBinary(path=_resolve_adb_binary_path())
+    return AdbClient(binary=adb_binary)
 
 
 @dataclass
@@ -38,17 +99,13 @@ class StartupResult:
     )
 
 
-def run(model: CoreRuntimeModel) -> StartupResult:
+def run() -> StartupResult:
     """
     Execute startup steps that may block (called from an AsyncRunner worker thread).
     """
-    from core.models import CoreRuntimeModel as _CoreRuntimeModel
-
-    if not isinstance(model, _CoreRuntimeModel):
-        raise TypeError("run() requires CoreRuntimeModel")
-    adb_server = model.start_adb_server()
-    adb_client = model.create_adb_client()
-    devices = model.get_known_devices(adb_server)
+    adb_server = _start_adb_server()
+    adb_client = _create_adb_client()
+    devices = adb_server.get_known_devices()
     enrich_phones_with_serial(adb_client, devices)
     return StartupResult(
         adb_server=adb_server,
