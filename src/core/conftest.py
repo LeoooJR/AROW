@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pytest
 
+from core.startup_work import _resolve_adb_binary_path
+
 
 def pytest_configure(config: pytest.Config) -> None:
     """Register custom markers."""
@@ -38,9 +40,6 @@ def repo_root() -> Path:
 
 
 @pytest.fixture(scope="session")
-def adb_binary_path(repo_root: Path) -> Path:
-    """Path to the ADB binary for the current platform (macos by default in assets)."""
-    base = repo_root / "src" / "assets" / "macos" / "platform-tools" / "adb"
-    if not base.exists():
-        base = repo_root / "src" / "assets" / "macos" / "adb"
-    return base
+def adb_binary_path() -> Path:
+    """Path to the ADB binary shipped under ``src/assets/{macos,linux,win}/platform-tools``."""
+    return _resolve_adb_binary_path()

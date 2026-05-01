@@ -1,8 +1,8 @@
 """
 Paired worker output and main-thread application for core runtime startup.
 
-Worker-side ``run`` and UI-thread ``apply_main_thread`` live here so the full
-startup async flow is easy to find and update.
+:class:`StartupCoreRuntimeWork` implements :class:`~core.core_runtime_work.CoreRuntimeWork`
+so startup matches the project-wide paired worker / apply convention.
 """
 
 from __future__ import annotations
@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from core.adb import AdbBinary, AdbClient, AdbServer
+from core.core_runtime_work import CoreRuntimeWork
 from core.device_serial_work import enrich_phones_with_serial
 from core.devices import Phone
 from core.signals import (
@@ -99,40 +100,45 @@ class StartupResult:
     )
 
 
-def run() -> StartupResult:
+class StartupCoreRuntimeWork(CoreRuntimeWork[StartupResult]):
     """
-    Execute startup steps that may block (called from an AsyncRunner worker thread).
-    """
-    adb_server = _start_adb_server()
-    adb_client = _create_adb_client()
-    devices = adb_server.get_known_devices()
-    enrich_phones_with_serial(adb_client, devices)
-    return StartupResult(
-        adb_server=adb_server,
-        adb_client=adb_client,
-        devices=devices,
-    )
+    Worker job: start ADB server/client, list devices, enrich serials.
 
-
-def apply_main_thread(model: CoreRuntimeModel, result: StartupResult) -> None:
+    Apply path owns model server/client fields and emits on the core bus.
     """
-    Own server/client state and emit on the bus (call from the Qt main thread;
-    AsyncRunner job completion runs there).
-    """
-    from core.models import CoreRuntimeModel as _CoreRuntimeModel
 
-    if not isinstance(model, _CoreRuntimeModel):
-        raise TypeError("apply_main_thread() requires CoreRuntimeModel")
-    if result.adb_server is not None:
-        model._adb_server = result.adb_server
-    if result.adb_client is not None:
-        model._adb_client = result.adb_client
-    if result.adb_server is not None:
-        model._signal_bus.emit(
-            CoreSignal.ADB_SERVER_STARTED,
-            AdbServerStartedPayload(adb_binary=result.adb_server.binary),
+    def run(self) -> StartupResult:
+        """Execute startup steps that may block (AsyncRunner worker thread)."""
+        adb_server = _start_adb_server()
+        adb_client = _create_adb_client()
+        devices = adb_server.get_known_devices()
+        enrich_phones_with_serial(adb_client, devices)
+        return StartupResult(
+            adb_server=adb_server,
+            adb_client=adb_client,
+            devices=devices,
         )
-        model._signal_bus.emit(
-            CoreSignal.DEVICES_UPDATED,
-            DevicesUpdatedPayload(devices=result.devices),
-        )
+
+    @staticmethod
+    def apply_main_thread(model: CoreRuntimeModel, result: StartupResult) -> None:
+        """
+        Own server/client state and emit on the bus (Qt main thread; AsyncRunner
+        completion runs there).
+        """
+        from core.models import CoreRuntimeModel as _CoreRuntimeModel
+
+        if not isinstance(model, _CoreRuntimeModel):
+            raise TypeError("apply_main_thread() requires CoreRuntimeModel")
+        if result.adb_server is not None:
+            model._adb_server = result.adb_server
+        if result.adb_client is not None:
+            model._adb_client = result.adb_client
+        if result.adb_server is not None:
+            model._signal_bus.emit(
+                CoreSignal.ADB_SERVER_STARTED,
+                AdbServerStartedPayload(adb_binary=result.adb_server.binary),
+            )
+            model._signal_bus.emit(
+                CoreSignal.DEVICES_UPDATED,
+                DevicesUpdatedPayload(devices=result.devices),
+            )

@@ -1127,7 +1127,7 @@ class MainWindow(QMainWindow):
         logger.info("MainWindow: device selection succeeded", device=device)
         view_signals.DeviceSelectionSucceeded.emit(device)
         self.ui.container.post_toast(
-            self.texts.pairing_authentification_toast.format(device=device),
+            self.texts.authentification_success_toast.format(device=device),
             level="success",
         )
 

@@ -3,12 +3,9 @@ from typing import Callable
 
 from core.adb import AdbClient, AdbServer
 from core.authentificate_device_work import (
+    AuthenticateDeviceWork,
     AuthentificateDeviceOutcome,
 )
-from core.authentificate_device_work import (
-    apply_main_thread as apply_authentificate_main_thread,
-)
-from core.authentificate_device_work import run as run_authentificate_device
 from core.device_serial_work import refresh_known_devices_with_serial
 from core.devices import Computer, Phone
 from core.signals import (
@@ -20,19 +17,18 @@ from core.signals import (
     SignalHandler,
 )
 from core.startup_work import (
+    StartupCoreRuntimeWork,
     StartupResult,
     _create_adb_client,
 )
-from core.startup_work import apply_main_thread as apply_startup_main_thread
-from core.startup_work import run as run_startup_work
 from logger import logger
 
 # Main-thread appliers keyed by exact worker result type (AsyncRunner completion).
 CoreRuntimeResultApplier = Callable[["CoreRuntimeModel", object], None]
 
 _CORE_RUNTIME_RESULT_APPLIERS: dict[type[object], CoreRuntimeResultApplier] = {
-    StartupResult: apply_startup_main_thread,
-    AuthentificateDeviceOutcome: apply_authentificate_main_thread,
+    StartupResult: StartupCoreRuntimeWork.apply_main_thread,
+    AuthentificateDeviceOutcome: AuthenticateDeviceWork.apply_main_thread,
 }
 
 
@@ -85,7 +81,7 @@ class CoreRuntimeModel(Model):
         """
         Initialize runtime core services at application startup (worker thread).
         """
-        return run_startup_work()
+        return StartupCoreRuntimeWork().run()
 
     def authentificate_device(
         self, ip: str, port: int, association_code: str
@@ -94,9 +90,13 @@ class CoreRuntimeModel(Model):
         Pair the device over ADB (worker thread). Does not emit on the core bus;
         controllers apply outcomes on the main thread after AsyncRunner completes.
         """
-        return run_authentificate_device(
-            self._adb_server, self._adb_client, ip, port, association_code
-        )
+        return AuthenticateDeviceWork(
+            adb_server=self._adb_server,
+            adb_client=self._adb_client,
+            ip=ip,
+            port=port,
+            association_code=association_code,
+        ).run()
 
     def refresh_known_devices(self) -> list[Phone]:
         """
@@ -104,28 +104,6 @@ class CoreRuntimeModel(Model):
         Blocking; intended for AsyncRunner / worker-thread use only.
         """
         return refresh_known_devices_with_serial(self._adb_server, self._adb_client)
-
-    def stop_adb_server(self) -> None:
-        """
-        Stop the ADB server and remove the instance from model state.
-        """
-        if self._adb_server is not None:
-            stopped_binary = self._adb_server.binary
-            adb_path = str(stopped_binary.path)
-            self._adb_server.stop()
-            self._adb_server = None
-            self._signal_bus.emit(
-                CoreSignal.ADB_SERVER_STOPPED,
-                AdbServerStoppedPayload(adb_binary=stopped_binary),
-            )
-            logger.info(
-                "CoreRuntimeModel: ADB server stopped",
-                adb_path=adb_path,
-            )
-        else:
-            logger.warning(
-                "CoreRuntimeModel: ADB server stop skipped (not running)",
-            )
 
     def restart_adb_server(self) -> None:
         """
@@ -171,14 +149,6 @@ class CoreRuntimeModel(Model):
         if resolved is None:
             return []
         return resolved.get_known_devices()
-
-    def get_adb_client(self) -> AdbClient:
-        """
-        Return the ADB client, creating and caching one if startup has not run yet.
-        """
-        if self._adb_client is None:
-            self._adb_client = _create_adb_client()
-        return self._adb_client
 
     def apply_result(self, result: object) -> None:
         """
