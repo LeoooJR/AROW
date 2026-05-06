@@ -13,9 +13,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from core.application_paths import get_or_create_application_dir
-from core.core_runtime_work import CoreRuntimeWork
 from core.devices import compute_computer_stable_key
 from core.signals import CoreSignal, HostComputerIdentityPayload
+from core.work.core_runtime_work import CoreRuntimeWork
 from logger import logger
 
 if TYPE_CHECKING:

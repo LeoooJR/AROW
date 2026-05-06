@@ -59,7 +59,7 @@ class Simulation:
             if self._fields_ready and hasattr(self, name):
                 old = getattr(self, name)
                 if old != value:
-                    logger.info(
+                    logger.debug(
                         f"Simulation {self.id}: field updated",
                         field=name,
                         old=old,
@@ -179,7 +179,7 @@ class SimulationSubController:
     @validate_model
     def _on_device_selection_requested(self, device_id: str) -> None:
         """In-memory selection of the active device (UI thread)."""
-        logger.info(
+        logger.debug(
             "SimulationSubController: device connection requested",
             device_id=device_id,
         )
@@ -194,7 +194,7 @@ class SimulationSubController:
             return
         self._session.device = device
         desc = device.descriptor
-        logger.info(
+        logger.success(
             "SimulationSubController: active device set",
             device_id=desc.id,
             device_name=desc.name,
@@ -203,7 +203,7 @@ class SimulationSubController:
     @validate_view
     def _on_simulation_log_file_update_requested(self, filename: str) -> None:
         """In-memory selection of the active device (UI thread)."""
-        logger.info(
+        logger.debug(
             "SimulationSubController: simulation log file update requested",
             filename=filename,
         )

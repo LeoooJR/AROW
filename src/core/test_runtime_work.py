@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from core.close_work import CloseCoreRuntimeWork, CloseResult
 from core.models import CoreRuntimeModel
+from core.work.close_work import CloseCoreRuntimeWork, CloseResult
 
 pytestmark = [pytest.mark.async_jobs]
 

@@ -153,7 +153,10 @@ class TestAdbServerStartError:
         self, invalid_adb_binary: AdbBinary
     ) -> None:
         """Starting the server with a non-existent binary raises AdbServerException."""
-        with pytest.raises(AdbServerException, match="Failed to restart adb server"):
+        with pytest.raises(
+            AdbServerException,
+            match="Failed to run ADB binary /nonexistent/path/to/adb",
+        ):
             AdbServer(invalid_adb_binary)
 
     def test_execute_start_server_fails_when_binary_missing(

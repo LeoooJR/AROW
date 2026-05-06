@@ -4,8 +4,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from core.adb import AdbServer, AdbServerException
-from core.core_runtime_work import CoreRuntimeWork
 from core.signals import AdbServerStoppedPayload, CoreSignal
+from core.work.core_runtime_work import CoreRuntimeWork
 from logger import logger
 
 if TYPE_CHECKING:

@@ -8,13 +8,13 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from core.adb import AdbClient, AdbClientException, AdbServer, AdbServerException
-from core.core_runtime_work import CoreRuntimeWork
 from core.devices import Phone, apply_phone_ro_serial_enrichment
 from core.signals import (
     CoreSignal,
     DeviceAuthentificationFailedPayload,
     DeviceAuthentificationSucceededPayload,
 )
+from core.work.core_runtime_work import CoreRuntimeWork
 from logger import logger
 
 if TYPE_CHECKING:

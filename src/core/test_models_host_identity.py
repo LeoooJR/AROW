@@ -5,9 +5,9 @@ from __future__ import annotations
 import pytest
 
 from core.devices import compute_computer_stable_key
-from core.host_install_identity_work import HostInstallIdentityOutcome
 from core.models import CoreRuntimeModel
 from core.signals import CoreSignal, HostComputerIdentityPayload
+from core.work.host_install_identity_work import HostInstallIdentityOutcome
 
 pytestmark = [pytest.mark.devices]
 

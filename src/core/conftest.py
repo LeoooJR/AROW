@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from core.startup_work import _resolve_adb_binary_path
+from core.work.startup_work import _resolve_adb_binary_path
 
 
 def pytest_configure(config: pytest.Config) -> None:

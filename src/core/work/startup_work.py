@@ -13,14 +13,14 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from core.adb import AdbBinary, AdbClient, AdbServer
-from core.core_runtime_work import CoreRuntimeWork
-from core.device_serial_work import enrich_phones_with_serial
 from core.devices import Phone
 from core.signals import (
     AdbServerStartedPayload,
     CoreSignal,
     DevicesUpdatedPayload,
 )
+from core.work.core_runtime_work import CoreRuntimeWork
+from core.work.device_serial_work import enrich_phones_with_serial
 from logger import logger
 
 if TYPE_CHECKING:
@@ -31,7 +31,7 @@ def _resolve_adb_binary_path() -> Path:
     """
     Resolve the OS-specific ADB binary path shipped with the project.
     """
-    src_root: Path = Path(__file__).resolve().parents[1]
+    src_root: Path = Path(__file__).resolve().parents[2]
     system: str = platform.system().lower()
     platform_folder: str
     binary_name: str

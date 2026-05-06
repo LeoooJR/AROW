@@ -83,7 +83,7 @@ class AdbSubController:
             fn=self.model.startup,
             description="Startup the core runtime",
             job_type="thread",
-            coalesce_key="none",
+            coalesce_key="startup",
             on_completed=self._async_job_callbacks.startup.on_completed,
             on_failed=self._async_job_callbacks.startup.on_failed,
         )
@@ -99,7 +99,7 @@ class AdbSubController:
             fn=self.model.run_host_install_identity,
             description="Load or create persisted host install UUID",
             job_type="thread",
-            coalesce_key="none",
+            coalesce_key=None,
             on_completed=self._async_job_callbacks.host_install_identity.on_completed,
             on_failed=self._async_job_callbacks.host_install_identity.on_failed,
         )
@@ -109,7 +109,7 @@ class AdbSubController:
         self, ip: str, port: str, association_code: str
     ) -> None:
         """Authentification workflow runs on a worker thread."""
-        logger.info(
+        logger.debug(
             "AdbSubController: authentification workflow confirmed",
             ip=ip,
             port=port,
@@ -130,7 +130,7 @@ class AdbSubController:
     @validate_model
     def _on_refresh_device_list_requested(self) -> None:
         """ADB list query on a worker."""
-        logger.info("AdbSubController: refresh device list requested")
+        logger.debug("AdbSubController: refresh device list requested")
         self._submit_model_async_call(
             name="refresh_device_list",
             fn=self.model.refresh_known_devices,

@@ -118,7 +118,7 @@ Apply these rules whenever you touch `src/gui`.
 
 ### Icons
 
-- Use `src/gui/icon.py` for GUI Qt resource icons.
+- Use `src/gui/icons.py` for GUI Qt resource icons.
 - Use `src/geo/icons.py` for folium or Leaflet map icons.
 
 ### Signals

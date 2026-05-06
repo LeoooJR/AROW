@@ -8,16 +8,7 @@ from core.application_paths import (
     get_or_create_application_dir,
     get_or_create_config_dir,
 )
-from core.authentificate_device_work import (
-    AuthenticateDeviceWork,
-    AuthentificateDeviceOutcome,
-)
-from core.device_serial_work import refresh_known_devices_with_serial
 from core.devices import Computer, Phone
-from core.host_install_identity_work import (
-    HostInstallIdentityOutcome,
-    HostInstallIdentityWork,
-)
 from core.signals import (
     AdbServerStartedPayload,
     AdbServerStoppedPayload,
@@ -27,10 +18,18 @@ from core.signals import (
     InMemoryCoreSignalBus,
     SignalHandler,
 )
-from core.startup_work import (
+from core.work.authentificate_device_work import (
+    AuthenticateDeviceWork,
+    AuthentificateDeviceOutcome,
+)
+from core.work.device_serial_work import refresh_known_devices_with_serial
+from core.work.host_install_identity_work import (
+    HostInstallIdentityOutcome,
+    HostInstallIdentityWork,
+)
+from core.work.startup_work import (
     StartupCoreRuntimeWork,
     StartupResult,
-    _create_adb_client,
 )
 from logger import logger
 

@@ -11,10 +11,10 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from controller.helper import validate_model, validate_view
-from core.authentificate_device_work import AuthentificateDeviceOutcome
 from core.devices import Phone
-from core.host_install_identity_work import HostInstallIdentityOutcome
-from core.startup_work import StartupResult
+from core.work.authentificate_device_work import AuthentificateDeviceOutcome
+from core.work.host_install_identity_work import HostInstallIdentityOutcome
+from core.work.startup_work import StartupResult
 from logger import logger
 
 if TYPE_CHECKING:
@@ -56,7 +56,7 @@ class StartupCoreRuntimeCallback:
                 result_type=type(result).__name__,
             )
             return
-        logger.info(
+        logger.success(
             "AdbSubController: startup core runtime completed",
             adb_server=result.adb_server is not None,
         )
@@ -136,7 +136,7 @@ class RefreshDeviceListCallback:
 
         view = self._subcontroller.view
         device_ids = [d.descriptor.id for d in result]
-        logger.info(
+        logger.success(
             "AdbSubController: known devices listed (async)",
             device_count=len(device_ids),
             device_ids=device_ids,
@@ -175,6 +175,9 @@ class HostInstallIdentityCallback:
             )
             return
         model.apply_result(result)
+        logger.success(
+            "AdbSubController: host install identity completed",
+        )
 
     def on_failed(self, error: JobError) -> None:
         log_host_install_identity_job_failure(error)

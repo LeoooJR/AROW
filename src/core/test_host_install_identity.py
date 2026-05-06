@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-import core.host_install_identity_work as host_install_identity_work
-from core.host_install_identity_work import HostInstallIdentityWork
+import core.work.host_install_identity_work as host_install_identity_work
+from core.work.host_install_identity_work import HostInstallIdentityWork
 
 pytestmark = [pytest.mark.devices]
 
