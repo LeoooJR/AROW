@@ -100,6 +100,13 @@ def _make_strip_parser() -> ParserFn:
     return _fn
 
 
+def _parse_pair(output: str) -> Phone | None:
+    """Parse `adb pair` stdout into `Phone` row; skip header and malformed lines."""
+    raise NotImplementedError(
+        "Not implemented"
+    )  # TODO: implement the parsing of the pair command
+
+
 def _parse_devices(output: str) -> list[Phone]:
     """Parse `adb devices -l` stdout into `Phone` rows; skip header and malformed lines."""
     phones: list[Phone] = []
@@ -203,6 +210,7 @@ class ADBCommandParser(Enum):
     """Structured parsing for stdout shapes documented in adb-commands-output."""
 
     # Callables must be wrapped with enum.member() or Enum treats them as methods.
+    PAIR = member(_parse_pair)
     GET_DEVICES = member(_parse_devices)
     GET_ANDROID_VERSION = member(_make_strip_parser())
     GET_MANUFACTURER = member(_make_strip_parser())
@@ -412,8 +420,10 @@ class AdbClient:
         try:
             result = self._execute(command, None, [f"{ip}:{port}", association_code])
         except AdbClientException as e:
-            raise AdbClientException(f"Failed to pair with {ip}:{port}") from e
-        return Phone.from_string(result.output) if result.output else None
+            raise
+        return ADBCommandParser.PAIR.parse(
+            result.output or ""
+        )  # TODO: implement the parsing of the pair command
 
     def devices(self) -> list[Phone]:
         """
@@ -423,7 +433,7 @@ class AdbClient:
         try:
             result = self._execute(command, None)
         except AdbClientException as e:
-            raise AdbClientException(f"Failed to get devices") from e
+            raise
         return ADBCommandParser.GET_DEVICES.parse(result.output or "")
 
     def send_notification(self, title: str, message: str) -> bool:
@@ -443,9 +453,7 @@ class AdbClient:
                 command, None, ["-t", shlex.quote(title), "-m", shlex.quote(message)]
             )
         except AdbClientException as e:
-            raise AdbClientException(
-                f"Failed to send notification: {title} {message}"
-            ) from e
+            raise
         return ADBCommandParser.SEND_NOTIFICATION.parse(result.output or "")
 
     def enable_location_services(self) -> None:
@@ -671,7 +679,7 @@ class AdbServer:
             self.stop()
             self.start()
         except AdbServerException as e:
-            raise AdbServerException(f"Failed to restart adb server") from e
+            raise
 
     def status(self) -> None:
         """

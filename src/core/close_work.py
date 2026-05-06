@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -72,6 +74,11 @@ class CloseCoreRuntimeWork(CoreRuntimeWork[CloseResult]):
 
         if not isinstance(model, _CoreRuntimeModel):
             raise TypeError("apply_main_thread() requires CoreRuntimeModel")
+        if result.adb_server is None:
+            logger.warning(
+                "CoreRuntimeModel: close apply skipped stop signal (no stopped server)",
+            )
+            return
         model._adb_server = None
         model._signal_bus.emit(
             CoreSignal.ADB_SERVER_STOPPED,

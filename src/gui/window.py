@@ -945,7 +945,7 @@ class MainWindow(QMainWindow):
             "Successfully connected to device: {device}."
         )
         authentification_failed_toast: str = (
-            "Failed to authentificate device: {ip}:{port} with association code: {association_code}."
+            "Failed to authentificate device: {ip}:{port} with association code: {association_code}: {reason}."
         )
 
     @dataclass
@@ -1026,10 +1026,18 @@ class MainWindow(QMainWindow):
 
     def _connect_signals(self) -> None:
         """Connect signals for the main window."""
+
+        #### Debugging signals ####
         if self._ui_constraints_disabled:
             view_signals.UiConstraintsDisabled.emit()
+
+        #### Signals for handling the palette update ####
         view_signals.UpdatePaletteSignal.connect(self._on_palette_update)
+
+        #### Signals for handling the idle state ####
         self._activity_tracker.became_idle.connect(self._on_idle)
+
+        #### Signals for handling the authentification workflow ####
         view_signals.AuthentificationRequested.connect(
             self._on_authentification_requested
         )
@@ -1039,7 +1047,11 @@ class MainWindow(QMainWindow):
         view_signals.AuthentificationCancelled.connect(
             self._on_authentification_cancelled
         )
-        view_signals.DeviceSelected.connect(self._on_device_selection)
+
+        #### Signals for handling the device selection workflow ####
+        view_signals.DeviceSelectionRequested.connect(
+            self._on_device_selection_requested
+        )
 
     def _on_palette_update(self, theme: Theme) -> None:
         """Handle the palette update."""
@@ -1053,14 +1065,16 @@ class MainWindow(QMainWindow):
         view_signals.RunHelperAnimationRequested.emit()
 
     def forward_adb_server_started(self) -> None:
+        """Forward the ADB server started signal."""
         view_signals.ADBServerStarted.emit()
 
     def forward_adb_server_stopped(self) -> None:
+        """Forward the ADB server stopped signal."""
         view_signals.ADBServerStopped.emit()
 
-    def _on_device_selection(self, device: DeviceItem) -> None:
-        """Handle the device selection."""
-        if device is None:
+    def _on_device_selection_requested(self, device_name: str) -> None:
+        """Handle the device selection request."""
+        if device_name is None:
             return
         if self._device_selection_dialog_open:
             logger.debug(
@@ -1070,14 +1084,14 @@ class MainWindow(QMainWindow):
         self._device_selection_dialog_open = True
         logger.info(
             "MainWindow: device selection requested",
-            device_label=device.get_text(),
+            device_label=device_name,
         )
         dialog = QuestionDialog(
             self,
             title=self.texts.connect_device_dialog_title,
-            text=self.texts.connect_device_dialog_text.format(device=device.get_text()),
+            text=self.texts.connect_device_dialog_text.format(device=device_name),
             detailed_text=self.texts.connect_device_dialog_detailed_text.format(
-                device=device.get_text()
+                device=device_name
             ),
         )
         try:
@@ -1086,12 +1100,11 @@ class MainWindow(QMainWindow):
             if button == QMessageBox.StandardButton.Yes:
                 if self._ui_constraints_disabled:
                     logger.warning(
-                        "MainWindow: device connection request skipped (UI constraints disabled)",
+                        "MainWindow: device selection request skipped (UI constraints disabled)",
                     )
-                    self.forward_device_selection_succeeded(device.get_text())
-                view_signals.DeviceConnectionRequested.emit(device.get_text())
+                    self.forward_device_selection_succeeded(device_name)
             else:
-                view_signals.DeviceConnectionCancelled.emit()
+                self.forward_device_selection_cancelled()
         finally:
             self._device_selection_dialog_open = False
 
@@ -1131,8 +1144,22 @@ class MainWindow(QMainWindow):
             level="success",
         )
 
+    def forward_device_selection_failed(self, device: str) -> None:
+        """Handle the device selection failed."""
+        logger.warning("MainWindow: device selection failed", device=device)
+        view_signals.DeviceSelectionFailed.emit(device)
+        self.ui.container.post_toast(
+            self.texts.device_selection_failed_toast.format(device=device),
+            level="error",
+        )
+
+    def forward_device_selection_cancelled(self) -> None:
+        """Handle the device selection cancelled."""
+        logger.info("MainWindow: device selection cancelled")
+        view_signals.DeviceSelectionCancelled.emit()
+
     def forward_device_authentification_failed(
-        self, ip: str, port: int, association_code: str
+        self, ip: str, port: int, association_code: str, reason: str
     ) -> None:
         """Handle the device authentification failed."""
         logger.warning(
@@ -1140,11 +1167,12 @@ class MainWindow(QMainWindow):
             ip=ip,
             port=port,
             association_code=association_code,
+            reason=reason,
         )
         view_signals.AuthentificationFailed.emit(ip, port, association_code)
         self.ui.container.post_toast(
             self.texts.authentification_failed_toast.format(
-                ip=ip, port=port, association_code=association_code
+                ip=ip, port=port, association_code=association_code, reason=reason
             ),
             level="error",
         )

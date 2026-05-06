@@ -32,6 +32,14 @@ class CoreSignal(StrEnum):
     SIMULATION_POSITION_CHANGED = "simulation.position.changed"
     ERROR_RAISED = "error.raised"
     LOG_MESSAGE = "log.message"
+    HOST_COMPUTER_IDENTITY_UPDATED = "host.computer.identity.updated"
+
+
+@dataclass(frozen=True, slots=True)
+class HostComputerIdentityPayload:
+    """Emitted when persisted install identity has been applied to the host descriptor."""
+
+    stable_key: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,6 +77,7 @@ class DeviceAuthentificationFailedPayload:
     ip: str
     port: int
     association_code: str
+    reason: str
 
 
 @dataclass(frozen=True, slots=True)

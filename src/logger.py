@@ -4,6 +4,7 @@ Application loguru setup: sinks and a format that prints all bound keyword / ext
 
 from __future__ import annotations
 
+import re
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -36,7 +37,67 @@ _SRC_CHILD_TO_ORIGIN: dict[str, LogOrigin] = {
 
 _RESERVED_EXTRA_KEYS = frozenset({"origin"})
 
+# Extra keys matching these patterns have values replaced in log output (identifiers, pairing codes, secrets).
+_SENSITIVE_EXTRA_KEYS_EXACT = frozenset(
+    {
+        "stable_key",
+        "hardware_serial",
+        "install_token",
+        "install_identity",
+        "association_code",
+        "password",
+        "secret",
+        "api_key",
+        "authorization",
+        "auth_token",
+        "access_token",
+        "refresh_token",
+    }
+)
+_SENSITIVE_EXTRA_KEY_SUFFIXES = (
+    "_token",
+    "_secret",
+    "_key",
+    "_password",
+)
+
+_UUID_RE = re.compile(
+    r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
+    r"[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b"
+)
+
 _ORIGIN_COL_WIDTH = 9
+
+
+def redact_stable_identifier(text: str) -> str:
+    """
+    Replace RFC4122-shaped UUID tokens in unstructured log text.
+
+    Intended for explicit use when interpolating identifiers into ``message``.
+    Structured ``logger.info(..., key=…)`` extras are sanitized via ``maybe_redact_extra_value``.
+    """
+    return _UUID_RE.sub("<redacted:uuid>", text)
+
+
+def maybe_redact_extra_value(key: str, value: Any) -> str:
+    """
+    Stringify one bound ``extra`` field for serialization, masking sensitive keys and
+    UUID-shaped / host-stable-key patterns in repr output.
+    """
+    kl = key.lower()
+    if kl in _SENSITIVE_EXTRA_KEYS_EXACT:
+        return "<redacted>"
+    if any(kl.endswith(suf) for suf in _SENSITIVE_EXTRA_KEY_SUFFIXES):
+        return "<redacted>"
+    try:
+        raw = repr(value)
+    except Exception:
+        return "<??>"
+    if _UUID_RE.search(raw):
+        raw = redact_stable_identifier(raw)
+    if "pc:v1:install:" in raw.lower():
+        return "<redacted:host_key>"
+    return raw
 
 
 def logger_for(origin: LogOrigin) -> Any:
@@ -102,7 +163,7 @@ def _serialize_extras(record: dict[str, Any]) -> str:
             continue
         value = extra[key]
         try:
-            parts.append(f"{key}={value!r}")
+            parts.append(f"{key}={maybe_redact_extra_value(key, value)}")
         except Exception:
             parts.append(f"{key}=<?>")
     return f" | {' '.join(parts)}"
@@ -116,12 +177,22 @@ def _escape_braces_for_loguru_format_fragment(text: str) -> str:
     return text.replace("{", "{{").replace("}", "}}")
 
 
+def _escape_loguru_markup_literals(text: str) -> str:
+    """
+    Dynamic fragments are concatenated into the format string; loguru otherwise parses ``<name>``
+    as color/markup (e.g. redaction placeholders like ``<redacted>``).
+    """
+    return text.replace("\\", "\\\\").replace("<", "\\<")
+
+
 def _loguru_format(record: dict[str, Any]) -> str:
     """
     Format template for loguru: standard fields plus any keyword/extra context appended literally.
     """
     suffix = _escape_braces_for_loguru_format_fragment(_serialize_extras(record))
     origin = _escape_braces_for_loguru_format_fragment(_origin_column(record))
+    suffix = _escape_loguru_markup_literals(suffix)
+    origin = _escape_loguru_markup_literals(origin)
     return (
         "{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | "
         + origin

@@ -5,13 +5,10 @@ composed of *SubController domain objects.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from controller.adb_sub_controller import AdbSubController
 from controller.controller import Controller
 from controller.map_sub_controller import MapSubController
 from controller.simulation_sub_controller import SimulationSubController
-from controller.utils import get_or_create_config_dir
 from core.models import CoreRuntimeModel
 from gui.window import MainWindow
 
@@ -29,7 +26,6 @@ class AppController(Controller):
         self._simulation: SimulationSubController = SimulationSubController(self)
         self._adb: AdbSubController = AdbSubController(self)
         self._map: MapSubController = MapSubController(self)
-        self._config_dir: Path = get_or_create_config_dir()
         self._connect_view_signals()
         self._connect_model_signals()
         self._simulation.send_host_device_information()

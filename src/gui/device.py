@@ -501,7 +501,7 @@ class DeviceItem(QListWidgetItem):
         )
 
     def get_text(self) -> str:
-        return self.ui.name_label.text()
+        return self.ui.name_label.text().strip()
 
     def set_text(self, text: str) -> None:
         self.ui.name_label.setText(text)
@@ -1142,7 +1142,7 @@ class DeviceSelectionPanel(QFrame):
         """Handle the device selected event."""
         if item is None:
             return
-        view_signals.DeviceSelected.emit(item)
+        view_signals.DeviceSelectionRequested.emit(item.get_text())
 
     def _on_device_selection_succeeded(self, device: str) -> None:
         """

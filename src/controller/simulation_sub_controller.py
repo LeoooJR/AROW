@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING, Final
 
 from collection import Repository
 from controller.helper import validate_model, validate_view
-from controller.utils import get_or_create_config_dir
 from core.devices import Phone
 from core.location import Location
 from core.models import CoreRuntimeModel
@@ -23,13 +22,14 @@ if TYPE_CHECKING:
     from controller.app_controller import AppController
 
 
-@dataclass
+@dataclass(unsafe_hash=True, match_args=True)
 class Simulation:
     """Simulation."""
 
     id: Final[str] = field(
         default_factory=lambda: uuid.uuid4().hex,
         metadata={"description": "The id of the simulation"},
+        hash=True,
     )
     real_location: Location = field(
         default_factory=lambda: Location(lat=0.0, lon=0.0, label=None),
@@ -83,7 +83,7 @@ class SimulationSubController:
         sim_id = uuid.uuid4().hex
         self._session: Simulation = Simulation(
             id=sim_id,
-            log_file=get_or_create_config_dir() / "simulations" / f"{sim_id}.log",
+            log_file=self._app.model.config_dir / "simulations" / f"{sim_id}.log",
         )
 
     @property
@@ -95,8 +95,8 @@ class SimulationSubController:
         return self._app.view
 
     def connect_view_signals(self) -> None:
-        view_signals.DeviceConnectionRequested.connect(
-            self._on_device_connection_requested
+        view_signals.DeviceSelectionRequested.connect(
+            self._on_device_selection_requested
         )
         view_signals.SimulationLogFileUpdateRequested.connect(
             self._on_simulation_log_file_update_requested
@@ -177,16 +177,18 @@ class SimulationSubController:
         pass
 
     @validate_model
-    def _on_device_connection_requested(self, device_id: str) -> None:
+    def _on_device_selection_requested(self, device_id: str) -> None:
         """In-memory selection of the active device (UI thread)."""
         logger.info(
             "SimulationSubController: device connection requested",
             device_id=device_id,
         )
-        device: Phone | None = self.model.get_device(device_id)
-        if device is None:
-            logger.warning(
-                "SimulationSubController: device not found",
+        try:
+            device: Phone = self.model.get_device(device_id)
+        except AttributeError as e:
+            logger.error(
+                "SimulationSubController: failed to get device",
+                error=str(e),
                 device_id=device_id,
             )
             return

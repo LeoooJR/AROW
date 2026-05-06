@@ -89,6 +89,22 @@ class AdbSubController:
         )
 
     @validate_model
+    def _enqueue_host_install_identity_job(self) -> None:
+        """
+        After startup apply finishes, persist/load install UUID off the main thread and
+        attach ``stable_key`` on completion (serialized after core runtime startup).
+        """
+        self._submit_model_async_call(
+            name="host_install_identity",
+            fn=self.model.run_host_install_identity,
+            description="Load or create persisted host install UUID",
+            job_type="thread",
+            coalesce_key="none",
+            on_completed=self._async_job_callbacks.host_install_identity.on_completed,
+            on_failed=self._async_job_callbacks.host_install_identity.on_failed,
+        )
+
+    @validate_model
     def _on_authentification_confirmed(
         self, ip: str, port: str, association_code: str
     ) -> None:
@@ -99,12 +115,12 @@ class AdbSubController:
             port=port,
             association_code=association_code,
         )
-        port_i = int(port)
+        _port = int(port)
         self._submit_model_async_call(
             name="authentification_workflow",
             fn=self.model.authentificate_device,
-            args=(ip, port_i, association_code),
-            description="Autehntificate a device over ADB",
+            args=(ip, _port, association_code),
+            description="Authenticate a device over ADB",
             job_type="thread",
             coalesce_key="device",
             on_completed=self._async_job_callbacks.authentificate_device.on_completed,
@@ -172,7 +188,11 @@ class AdbSubController:
             ip=payload.ip,
             port=payload.port,
             association_code=payload.association_code,
+            reason=payload.reason,
         )
         self.view.forward_device_authentification_failed(
-            payload.ip, payload.port, payload.association_code
+            ip=payload.ip,
+            port=payload.port,
+            association_code=payload.association_code,
+            reason=payload.reason,
         )

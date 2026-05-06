@@ -10,9 +10,12 @@ import pytest
 
 from core.devices import (
     Computer,
+    ComputerDescriptor,
     DeviceDescriptor,
     Phone,
+    PhoneDescriptor,
     apply_phone_ro_serial_enrichment,
+    compute_computer_stable_key,
     compute_phone_stable_key,
     connect_to_device,
 )
@@ -184,6 +187,77 @@ class TestComputePhoneStableKey:
         assert a == b and a.startswith("fp:v1:")
 
 
+class TestPhoneDescriptorHash:
+    """PhoneDescriptor equality and hashing reflect full dataclass state including ``stable_key``."""
+
+    def test_stable_key_participates_in_hash_and_eq(self) -> None:
+        fixed_last = datetime.datetime(2025, 6, 15, 10, 30, 0)
+        sk_tier_one = compute_phone_stable_key(
+            hardware_serial="SN123",
+            product="prod",
+            model="mod",
+            fingerprint_when_no_serial=False,
+        )
+        assert sk_tier_one == "hw:v1:SN123"
+
+        d1 = PhoneDescriptor(
+            id="adb-1",
+            name="n",
+            os="Android",
+            ip="10.0.0.1",
+            port=5555,
+            product="prod",
+            model="mod",
+            transport_id="1",
+            state="device",
+            last_communication=fixed_last,
+            hardware_serial="SN123",
+            stable_key=sk_tier_one,
+            manufacturer="",
+        )
+        d2 = PhoneDescriptor(
+            id="adb-1",
+            name="n",
+            os="Android",
+            ip="10.0.0.1",
+            port=5555,
+            product="prod",
+            model="mod",
+            transport_id="1",
+            state="device",
+            last_communication=fixed_last,
+            hardware_serial="SN123",
+            stable_key=sk_tier_one,
+            manufacturer="",
+        )
+        assert d1 == d2 and hash(d1) == hash(d2)
+
+        sk_fingerprint = compute_phone_stable_key(
+            hardware_serial=None,
+            product="prod",
+            model="mod",
+            manufacturer="Fab",
+            fingerprint_when_no_serial=True,
+        )
+        assert sk_fingerprint.startswith("fp:v1:")
+        d3 = PhoneDescriptor(
+            id="adb-1",
+            name="n",
+            os="Android",
+            ip="10.0.0.1",
+            port=5555,
+            product="prod",
+            model="mod",
+            transport_id="1",
+            state="device",
+            last_communication=fixed_last,
+            hardware_serial="",
+            stable_key=sk_fingerprint,
+            manufacturer="Fab",
+        )
+        assert d3 != d1
+
+
 # --- Computer ---
 
 
@@ -208,8 +282,66 @@ class TestComputer:
         assert computer.descriptor.port is None
         assert computer.descriptor.state == "online"
         assert computer.descriptor.last_communication is now
+        assert computer.descriptor.stable_key == ""
+        assert computer.stable_key == ""
 
     def test_computer_from_string_not_implemented(self) -> None:
         """Computer.from_string currently raises a NotImplementedError."""
         with pytest.raises(NotImplementedError, match="not implemented yet"):
             Computer.from_string("any")
+
+
+class TestComputeComputerStableKey:
+    """Host install-token stable keys (distinct from phone hw/fp tiers)."""
+
+    def test_compute_computer_stable_key_empty_token(self) -> None:
+        assert compute_computer_stable_key("") == ""
+        assert compute_computer_stable_key("   ") == ""
+
+    def test_compute_computer_stable_key_normalized(self) -> None:
+        u = "550E8400-E29b-41D4-A716-446655440000"
+        expected = "pc:v1:install:" + u.casefold()
+        assert compute_computer_stable_key(u) == expected
+
+
+class TestComputerDescriptorHash:
+    """ComputerDescriptor equality and hashing include ``stable_key`` (parity with PhoneDescriptor tests)."""
+
+    def test_stable_key_participates_in_hash_and_eq(self) -> None:
+        token_a = compute_computer_stable_key("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+        token_b = compute_computer_stable_key("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+        d1 = ComputerDescriptor(
+            id="host-1",
+            name="n",
+            os="o",
+            ip="127.0.0.1",
+            port=None,
+            state=None,
+            last_communication=None,
+            stable_key=token_a,
+        )
+        d2 = ComputerDescriptor(
+            id="host-1",
+            name="n",
+            os="o",
+            ip="127.0.0.1",
+            port=None,
+            state=None,
+            last_communication=None,
+            stable_key=token_b,
+        )
+        assert d1 == d2 and hash(d1) == hash(d2)
+
+        d3 = ComputerDescriptor(
+            id="host-1",
+            name="n",
+            os="o",
+            ip="127.0.0.1",
+            port=None,
+            state=None,
+            last_communication=None,
+            stable_key=compute_computer_stable_key(
+                "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+            ),
+        )
+        assert d3 != d1

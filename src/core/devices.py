@@ -11,6 +11,7 @@ from collection import Repository
 # Prefixes so stored keys remain version-migratable and distinguish Tier 1 vs Tier 2.
 _STABLE_HW_PREFIX = "hw:v1:"
 _STABLE_FP_PREFIX = "fp:v1:"
+_STABLE_PC_INSTALL_PREFIX = "pc:v1:install:"
 _FINGERPRINT_V1_MARKER = "|fp|v1|"
 
 
@@ -65,13 +66,28 @@ def compute_phone_stable_key(
     return ""
 
 
-@dataclass
+def compute_computer_stable_key(install_token: str) -> str:
+    """
+    Stable logical host identity from the persisted install UUID (controller-owned file).
+
+    Prefix ``pc:v1:install:`` version-migrates independently of phone ``hw:v1:`` / ``fp:v1:`` keys.
+    Returns empty when no token is available yet.
+    """
+    token = (install_token or "").strip()
+    if not token:
+        return ""
+    return f"{_STABLE_PC_INSTALL_PREFIX}{token.casefold()}"
+
+
+@dataclass(unsafe_hash=True, match_args=True)
 class DeviceDescriptor:
     """
     Metadata about the device
     """
 
-    id: str = field(metadata={"description": "The id of the device"}, default="")
+    id: str = field(
+        metadata={"description": "The id of the device"}, default="", hash=True
+    )
     name: str = field(metadata={"description": "The name of the device"}, default="")
     os: str = field(
         metadata={"description": "The operating system of the device"}, default=""
@@ -84,7 +100,7 @@ class DeviceDescriptor:
     )
 
 
-@dataclass
+@dataclass(unsafe_hash=True, match_args=True)
 class PhoneDescriptor(DeviceDescriptor):
     """
     Metadata about the phone device
@@ -113,6 +129,7 @@ class PhoneDescriptor(DeviceDescriptor):
             "description": "Stable logical identity across ADB reconnects (hw or fingerprint Tier)"
         },
         default="",
+        hash=True,
     )
     manufacturer: str = field(
         metadata={
@@ -138,7 +155,7 @@ class PhoneDescriptor(DeviceDescriptor):
         )
 
 
-@dataclass
+@dataclass(unsafe_hash=True, match_args=True)
 class ComputerDescriptor(DeviceDescriptor):
     """
     Metadata about the computer device
@@ -151,12 +168,26 @@ class ComputerDescriptor(DeviceDescriptor):
         metadata={"description": "The last communication time of the computer"},
         default=None,
     )
+    stable_key: str = field(
+        metadata={
+            "description": "Stable install-scoped host identity (set after startup from persisted UUID)"
+        },
+        default="",
+        hash=True,
+    )
 
     def __str__(self):
-        return f"{self.id} - {self.name} - {self.os} - {self.ip}:{self.port} - {self.state} - {self.last_communication}"
+        return (
+            f"{self.id} - {self.name} - {self.os} - {self.ip}:{self.port} - "
+            f"{self.state} - {self.stable_key} - {self.last_communication}"
+        )
 
     def __repr__(self):
-        return f"{self.__class__.__name__}(id={self.id}, name={self.name}, os={self.os}, ip={self.ip}, port={self.port}, state={self.state}, last_communication={self.last_communication})"
+        return (
+            f"{self.__class__.__name__}(id={self.id}, name={self.name}, os={self.os}, "
+            f"ip={self.ip}, port={self.port}, state={self.state}, "
+            f"stable_key={self.stable_key!r}, last_communication={self.last_communication})"
+        )
 
 
 class Device(ABC):
@@ -218,6 +249,12 @@ class Device(ABC):
 
     def __repr__(self):
         return f"{self.__class__.__name__}(id={self._descriptor.id}, name={self._descriptor.name}, os={self._descriptor.os}, ip={self._descriptor.ip}, port={self._descriptor.port})"
+
+    def __hash__(self) -> int:
+        return hash(self._descriptor)
+
+    def __eq__(self, other: Any) -> bool:
+        return isinstance(other, Device) and self._descriptor == other._descriptor
 
 
 class Phone(Device):
@@ -381,7 +418,22 @@ class Computer(Device):
             port=port,
             state=state,
             last_communication=last_communication,
+            stable_key="",
         )
+
+    @property
+    def descriptor(self) -> ComputerDescriptor:
+        return self._descriptor  # type: ignore[return-value]
+
+    @descriptor.setter
+    def descriptor(self, value: ComputerDescriptor) -> None:
+        if not isinstance(value, ComputerDescriptor):
+            raise TypeError("descriptor must be an instance of ComputerDescriptor")
+        self._descriptor = value
+
+    @property
+    def stable_key(self) -> str:
+        return self._descriptor.stable_key
 
     def get_name(self) -> str:
         return self._descriptor.name

@@ -1,11 +1,12 @@
+"""
+User-writable paths for configuration and application-local data (`~/.arow`, `%APPDATA%`, etc.).
+"""
+
+from __future__ import annotations
+
 import os
 import sys
 from pathlib import Path
-
-
-def get_project_dir() -> str:
-    """Directory containing this package (`src/controller`), as a normalized path string."""
-    return os.fspath(Path(__file__).resolve().parent)
 
 
 def get_or_create_application_dir() -> Path:

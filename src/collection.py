@@ -11,7 +11,7 @@ class Repository(ABC, Generic[RepositoryObject]):
     """Repository for the collection."""
 
     def __init__(self):
-        self._repository: dict[str, RepositoryObject] = {}
+        self._repository: dict[str, RepositoryObject] = dict()
 
     def get(self, id: str) -> RepositoryObject | None:
         """Get the item for the repository."""

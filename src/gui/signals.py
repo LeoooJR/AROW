@@ -26,10 +26,9 @@ class ViewSignals(QObject):
     AuthentificationConfirmed = Signal(str, str, str)
     AuthentificationFailed = Signal(str, int, str)
     AuthentificationSucceeded = Signal(str)
+    DeviceSelectionRequested = Signal(str)
+    DeviceSelectionCancelled = Signal()
     DeviceSelectionSucceeded = Signal(str)
-    DeviceSelected = Signal(object)
-    DeviceConnectionRequested = Signal(str)
-    DeviceConnectionCancelled = Signal()
     RefreshDeviceListRequested = Signal()
     DevicesUpdated = Signal(object)
 

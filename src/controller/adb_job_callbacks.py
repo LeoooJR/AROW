@@ -1,5 +1,5 @@
 """
-Per-async-job outcome callbacks for AdbSubController (startup, authentificate, list refresh).
+Per-async-job outcome callbacks for AdbSubController (startup, host identity, authentificate, list refresh).
 
 Keep AsyncRunner callbacks out of the subcontroller so each job is easy to read.
 """
@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 from controller.helper import validate_model, validate_view
 from core.authentificate_device_work import AuthentificateDeviceOutcome
 from core.devices import Phone
+from core.host_install_identity_work import HostInstallIdentityOutcome
 from core.startup_work import StartupResult
 from logger import logger
 
@@ -60,6 +61,7 @@ class StartupCoreRuntimeCallback:
             adb_server=result.adb_server is not None,
         )
         model.apply_result(result)
+        self._subcontroller._enqueue_host_install_identity_job()
 
     def on_failed(self, error: JobError) -> None:
         log_startup_job_failure(error)
@@ -145,11 +147,45 @@ class RefreshDeviceListCallback:
         log_refresh_device_list_job_failure(error)
 
 
+def log_host_install_identity_job_failure(error: JobError) -> None:
+    """Log a failed host install-identity disk job."""
+    logger.error(
+        "AdbSubController: host_install_identity job failed",
+        message=error.message,
+        return_code=error.return_code,
+        traceback=error.traceback or None,
+    )
+
+
+class HostInstallIdentityCallback:
+    """Persisted install UUID read/create on a worker thread; apply on Qt main thread."""
+
+    __slots__ = ("_subcontroller", "__weakref__")
+
+    def __init__(self, subcontroller: AdbSubController) -> None:
+        self._subcontroller = subcontroller
+
+    @validate_model
+    def on_completed(self, result: object) -> None:
+        model = self._subcontroller.model
+        if not isinstance(result, HostInstallIdentityOutcome):
+            logger.error(
+                "AdbSubController: unexpected host_install_identity result type",
+                result_type=type(result).__name__,
+            )
+            return
+        model.apply_result(result)
+
+    def on_failed(self, error: JobError) -> None:
+        log_host_install_identity_job_failure(error)
+
+
 # AdbSubController method (async entry) -> attribute on :class:`AdbAsyncJobCallbacks`.
 ADB_SUBCONTROLLER_METHOD_TO_CALLBACK_ATTR: dict[str, str] = {
     "_startup_core_runtime": "startup",
     "_on_authentification_confirmed": "authentificate_device",
     "_on_refresh_device_list_requested": "refresh_device_list",
+    "_enqueue_host_install_identity_job": "host_install_identity",
 }
 
 
@@ -165,6 +201,7 @@ class AdbAsyncJobCallbacks:
     startup: StartupCoreRuntimeCallback
     authentificate_device: AuthentificateDeviceCallback
     refresh_device_list: RefreshDeviceListCallback
+    host_install_identity: HostInstallIdentityCallback
 
     @classmethod
     def for_subcontroller(cls, subcontroller: AdbSubController) -> AdbAsyncJobCallbacks:
@@ -172,4 +209,5 @@ class AdbAsyncJobCallbacks:
             startup=StartupCoreRuntimeCallback(subcontroller),
             authentificate_device=AuthentificateDeviceCallback(subcontroller),
             refresh_device_list=RefreshDeviceListCallback(subcontroller),
+            host_install_identity=HostInstallIdentityCallback(subcontroller),
         )

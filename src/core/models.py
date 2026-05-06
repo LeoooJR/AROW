@@ -1,17 +1,28 @@
 from abc import ABC
+from functools import cached_property
+from pathlib import Path
 from typing import Callable
 
 from core.adb import AdbClient, AdbServer
+from core.application_paths import (
+    get_or_create_application_dir,
+    get_or_create_config_dir,
+)
 from core.authentificate_device_work import (
     AuthenticateDeviceWork,
     AuthentificateDeviceOutcome,
 )
 from core.device_serial_work import refresh_known_devices_with_serial
 from core.devices import Computer, Phone
+from core.host_install_identity_work import (
+    HostInstallIdentityOutcome,
+    HostInstallIdentityWork,
+)
 from core.signals import (
     AdbServerStartedPayload,
     AdbServerStoppedPayload,
     CoreSignal,
+    DeviceAuthentificationFailedPayload,
     DevicesUpdatedPayload,
     InMemoryCoreSignalBus,
     SignalHandler,
@@ -29,6 +40,7 @@ CoreRuntimeResultApplier = Callable[["CoreRuntimeModel", object], None]
 _CORE_RUNTIME_RESULT_APPLIERS: dict[type[object], CoreRuntimeResultApplier] = {
     StartupResult: StartupCoreRuntimeWork.apply_main_thread,
     AuthentificateDeviceOutcome: AuthenticateDeviceWork.apply_main_thread,
+    HostInstallIdentityOutcome: HostInstallIdentityWork.apply_main_thread,
 }
 
 
@@ -45,6 +57,14 @@ class Model(ABC):
     def __init__(self):
 
         self._signal_bus: InMemoryCoreSignalBus = InMemoryCoreSignalBus()
+
+    @cached_property
+    def config_dir(self) -> Path:
+        return get_or_create_config_dir()
+
+    @cached_property
+    def application_dir(self) -> Path:
+        return get_or_create_application_dir()
 
     def subscribe(self, signal: CoreSignal, handler: SignalHandler[object]) -> None:
         self._signal_bus.subscribe(signal, handler)
@@ -90,6 +110,21 @@ class CoreRuntimeModel(Model):
         Pair the device over ADB (worker thread). Does not emit on the core bus;
         controllers apply outcomes on the main thread after AsyncRunner completes.
         """
+        if self._adb_server is None or self._adb_client is None:
+            raise AttributeError(
+                "ADB server and client must be initialized before authentification"
+            )
+        for device in self._adb_server.paired_devices:
+            if device.ip == ip:
+                return AuthentificateDeviceOutcome(
+                    success_phone=None,
+                    failure=DeviceAuthentificationFailedPayload(
+                        ip=ip,
+                        port=port,
+                        association_code=association_code,
+                        reason="Device with this IP address is already paired",
+                    ),
+                )
         return AuthenticateDeviceWork(
             adb_server=self._adb_server,
             adb_client=self._adb_client,
@@ -103,7 +138,19 @@ class CoreRuntimeModel(Model):
         List devices from the bound server and enrich ``ro.serialno`` via ADB.
         Blocking; intended for AsyncRunner / worker-thread use only.
         """
+        if self._adb_server is None or self._adb_client is None:
+            raise AttributeError(
+                "ADB server and client must be initialized before refreshing devices"
+            )
         return refresh_known_devices_with_serial(self._adb_server, self._adb_client)
+
+    def run_host_install_identity(self) -> HostInstallIdentityOutcome:
+        """
+        Load or create persisted install UUID (worker thread).
+
+        Apply on the main thread via :meth:`apply_result` after AsyncRunner completes.
+        """
+        return HostInstallIdentityWork().run()
 
     def restart_adb_server(self) -> None:
         """
@@ -136,8 +183,10 @@ class CoreRuntimeModel(Model):
         """
         Get a device from the ADB server.
         """
-        if self._adb_server is None:
-            return None
+        if self._adb_server is None or self._adb_client is None:
+            raise AttributeError(
+                "ADB server and client must be initialized before getting a device"
+            )
         return self._adb_server.paired_devices.get(device_id)
 
     def get_known_devices(self, server: AdbServer | None = None) -> list[Phone]:

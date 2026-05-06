@@ -7,7 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from core.adb import AdbClient, AdbClientException, AdbServer
+from core.adb import AdbClient, AdbClientException, AdbServer, AdbServerException
 from core.core_runtime_work import CoreRuntimeWork
 from core.devices import Phone, apply_phone_ro_serial_enrichment
 from core.signals import (
@@ -44,7 +44,6 @@ def _ro_serial_after_pair(adb_client: AdbClient, phone: Phone | None) -> str:
     return adb_client.get_ro_serialno(phone)
 
 
-@dataclass(frozen=True, slots=True)
 class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
     """
     Pair over ADB on a worker; emit success/failure from the main thread only.
@@ -53,11 +52,19 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
     client mirror :class:`~core.models.CoreRuntimeModel` at job submit time.
     """
 
-    adb_server: AdbServer | None
-    adb_client: AdbClient | None
-    ip: str
-    port: int
-    association_code: str
+    def __init__(
+        self,
+        adb_server: AdbServer,
+        adb_client: AdbClient,
+        ip: str,
+        port: int,
+        association_code: str,
+    ) -> None:
+        self.adb_server: AdbServer = adb_server
+        self.adb_client: AdbClient = adb_client
+        self.ip: str = ip
+        self.port: int = port
+        self.association_code: str = association_code
 
     def run(self) -> AuthentificateDeviceOutcome:
         """Authentificate a device over ADB (worker thread). Does not touch the core signal bus."""
@@ -91,9 +98,9 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
                     return AuthentificateDeviceOutcome(
                         success_phone=phone, failure=None
                     )
-                except AdbClientException as retry_error:
+                except (AdbClientException, AdbServerException) as retry_error:
                     logger.warning(
-                        "CoreRuntimeModel: pairing retry failed after restart",
+                        "CoreRuntimeModel: authentification retry failed after ADB server restart",
                         ip=ip,
                         port=port,
                         error=str(retry_error),
@@ -101,7 +108,10 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
             return AuthentificateDeviceOutcome(
                 success_phone=None,
                 failure=DeviceAuthentificationFailedPayload(
-                    ip=ip, port=port, association_code=association_code
+                    ip=ip,
+                    port=port,
+                    association_code=association_code,
+                    reason=error_message,
                 ),
             )
 
@@ -114,18 +124,18 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
 
         if not isinstance(model, _CoreRuntimeModel):
             raise TypeError("apply_main_thread() requires CoreRuntimeModel")
+        if outcome.failure is not None:
+            model._signal_bus.emit(
+                CoreSignal.DEVICE_AUTHENTIFICATION_FAILED,
+                outcome.failure,
+            )
+            return
         if outcome.success_phone is not None:
             if model._adb_server is not None:
                 model._adb_server.paired_devices.add(outcome.success_phone)
             model._signal_bus.emit(
                 CoreSignal.DEVICE_AUTHENTIFICATION_SUCCEEDED,
                 DeviceAuthentificationSucceededPayload(phone=outcome.success_phone),
-            )
-            return
-        if outcome.failure is not None:
-            model._signal_bus.emit(
-                CoreSignal.DEVICE_AUTHENTIFICATION_FAILED,
-                outcome.failure,
             )
             return
         logger.warning(
