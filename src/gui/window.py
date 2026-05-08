@@ -3,7 +3,7 @@ This file contains the main window of the application.
 """
 
 from collections import deque
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from time import monotonic
 from typing import Deque, Final, Optional
 
@@ -31,6 +31,7 @@ from PySide6.QtWidgets import (
 )
 from shiboken6 import isValid
 
+import gui.faker as ui_faker
 import gui.ressources_rc
 from gui.__init__ import __application__
 from gui.animation import animate_widget_visibility
@@ -844,10 +845,6 @@ class MainContainer(QWidget):
         self.ui.toast = None
         QTimer.singleShot(0, self._show_next_toast)
 
-    # def wake_up(self) -> None:
-    #     """Wake up the application."""
-    #     self.ui.body.run_helper_animation()
-
 
 class AuthentificationOverlay(QWidget):
     """
@@ -940,7 +937,17 @@ class MainWindow(QMainWindow):
             "Make sure the device is powered on, in developer mode and connected to the same network as the computer.\n"
             "You must own full ownership of the device to use it with this software."
         )
-        demo_device_name: Final[str] = "Samsung Galaxy"
+        demo_device_id: Final[str] = "1234567890"
+        demo_device_name: Final[str] = field(
+            default_factory=ui_faker.generate_android_device_model
+        )
+        demo_device_os: Final[str] = field(
+            default_factory=ui_faker.generate_android_release_label
+        )
+        demo_device_location: Final[str] = field(
+            default_factory=ui_faker.generate_city_state_location
+        )
+        demo_device_last_communication: Final[str] = "2026-01-01 12:00:00"
         authentification_success_toast: str = (
             "Successfully connected to device: {device}."
         )
@@ -1072,9 +1079,9 @@ class MainWindow(QMainWindow):
         """Forward the ADB server stopped signal."""
         view_signals.ADBServerStopped.emit()
 
-    def _on_device_selection_requested(self, device_name: str) -> None:
+    def _on_device_selection_requested(self, device_id: str, device_name: str) -> None:
         """Handle the device selection request."""
-        if device_name is None:
+        if device_id is None:
             return
         if self._device_selection_dialog_open:
             logger.debug(
@@ -1084,7 +1091,7 @@ class MainWindow(QMainWindow):
         self._device_selection_dialog_open = True
         logger.info(
             "MainWindow: device selection requested",
-            device_label=device_name,
+            device_id=device_id,
         )
         dialog = QuestionDialog(
             self,
@@ -1102,9 +1109,19 @@ class MainWindow(QMainWindow):
                     logger.warning(
                         "MainWindow: device selection request skipped (UI constraints disabled)",
                     )
-                    self.forward_device_selection_succeeded(device_name)
+                    self.forward_device_selection_succeeded(
+                        {
+                            "id": device_id,
+                            "name": device_name,
+                            "os": self.texts.demo_device_os,
+                            "location": self.texts.demo_device_location,
+                            "last_communication": self.texts.demo_device_last_communication,
+                        }
+                    )
+                else:
+                    view_signals.DeviceSelectionConfirmed.emit(device_id, device_name)
             else:
-                self.forward_device_selection_cancelled()
+                view_signals.DeviceSelectionCancelled.emit()
         finally:
             self._device_selection_dialog_open = False
 
@@ -1124,39 +1141,44 @@ class MainWindow(QMainWindow):
         logger.info("MainWindow: authentification confirmed")
         self.ui.authentification_overlay.hide()
         if self._ui_constraints_disabled:
-            self.forward_device_authentification_succeeded(self.texts.demo_device_name)
+            self.forward_device_authentification_succeeded(
+                {
+                    "id": self.texts.demo_device_id,
+                    "name": self.texts.demo_device_name,
+                    "os": self.texts.demo_device_os,
+                    "location": self.texts.demo_device_location,
+                    "last_communication": self.texts.demo_device_last_communication,
+                }
+            )
 
-    def forward_device_authentification_succeeded(self, device: str) -> None:
+    def forward_device_authentification_succeeded(self, device: dict) -> None:
         """Handle the device authentification succeeded."""
-        logger.info("MainWindow: device authentification succeeded", device=device)
+        logger.info(
+            "MainWindow: device authentification succeeded", device=device["name"]
+        )
         view_signals.AuthentificationSucceeded.emit(device)
         self.ui.container.post_toast(
-            self.texts.authentification_success_toast.format(device=device),
+            self.texts.authentification_success_toast.format(device=device["name"]),
             level="success",
         )
 
-    def forward_device_selection_succeeded(self, device: str) -> None:
+    def forward_device_selection_succeeded(self, device: dict) -> None:
         """Handle the device selection succeeded without adding a new list entry."""
-        logger.info("MainWindow: device selection succeeded", device=device)
+        logger.info("MainWindow: device selection succeeded", device=device["name"])
         view_signals.DeviceSelectionSucceeded.emit(device)
         self.ui.container.post_toast(
-            self.texts.authentification_success_toast.format(device=device),
+            self.texts.authentification_success_toast.format(device=device["name"]),
             level="success",
         )
 
-    def forward_device_selection_failed(self, device: str) -> None:
+    def forward_device_selection_failed(self, device: dict) -> None:
         """Handle the device selection failed."""
-        logger.warning("MainWindow: device selection failed", device=device)
+        logger.warning("MainWindow: device selection failed", device=device["name"])
         view_signals.DeviceSelectionFailed.emit(device)
         self.ui.container.post_toast(
-            self.texts.device_selection_failed_toast.format(device=device),
+            self.texts.device_selection_failed_toast.format(device=device["name"]),
             level="error",
         )
-
-    def forward_device_selection_cancelled(self) -> None:
-        """Handle the device selection cancelled."""
-        logger.info("MainWindow: device selection cancelled")
-        view_signals.DeviceSelectionCancelled.emit()
 
     def forward_device_authentification_failed(
         self, ip: str, port: int, association_code: str, reason: str
@@ -1177,12 +1199,12 @@ class MainWindow(QMainWindow):
             level="error",
         )
 
-    def forward_devices_updated(self, devices: list[str]) -> None:
+    def forward_devices_updated(self, devices: list[dict]) -> None:
         """Handle the devices updated."""
         logger.info(
             "MainWindow: devices updated",
             device_count=len(devices),
-            device_ids=devices,
+            device_descriptors=devices,
         )
         view_signals.DevicesUpdated.emit(devices)
 

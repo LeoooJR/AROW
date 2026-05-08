@@ -159,13 +159,13 @@ class AdbSubController:
 
     @validate_view
     def _on_devices_updated(self, payload: DevicesUpdatedPayload) -> None:
-        device_ids = [d.descriptor.id for d in payload.devices]
+        descriptors = [vars(d.descriptor) for d in payload.devices]
         logger.info(
             "AdbSubController: devices updated",
-            device_count=len(device_ids),
-            device_ids=device_ids,
+            device_count=len(descriptors),
+            device_descriptors=descriptors,
         )
-        self.view.forward_devices_updated(device_ids)
+        self.view.forward_devices_updated(descriptors)
 
     @validate_view
     def _on_device_authentification_succeeded(
@@ -177,7 +177,7 @@ class AdbSubController:
             device_id=desc.id,
             device_name=desc.name,
         )
-        self.view.forward_device_authentification_succeeded(desc.id)
+        self.view.forward_device_authentification_succeeded(vars(desc))
 
     @validate_view
     def _on_device_authentification_failed(

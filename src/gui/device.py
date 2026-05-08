@@ -2,6 +2,9 @@
 This file contains all graphical elements related to the device panel.
 """
 
+from __future__ import annotations
+
+import datetime as dt
 from dataclasses import dataclass, field
 from typing import Final, Literal, Optional
 
@@ -40,6 +43,53 @@ from logger import logger
 
 DeviceKind = Literal["mobile"]
 DeviceBadge = Literal["none", "active", "trusted", "new"]
+
+# Relative labels switch to absolute date/time after this many days.
+_LAST_COMMUNICATION_RELATIVE_MAX_DAYS = 7
+
+
+def format_last_communication_short(
+    value: dt.datetime | None,
+    *,
+    now: dt.datetime | None = None,
+) -> str:
+    """User-facing label for last contact time (relative for recent, absolute when older).
+
+    Naive datetimes are treated as local wall time, consistent with ``Phone`` construction.
+
+    Args:
+        value: Last communication instant, or ``None`` if unknown.
+        now: Reference "current" time for tests; default ``datetime.now()`` (naive local).
+    """
+    if value is None:
+        return "Never"
+    current = now if now is not None else dt.datetime.now()
+    if value > current:
+        return "Just now"
+    delta = current - value
+    secs = int(delta.total_seconds())
+    if secs < 60:
+        return "Just now"
+    minutes = secs // 60
+    if minutes < 60:
+        if minutes == 1:
+            return "1 minute ago"
+        return f"{minutes} minutes ago"
+    hours = secs // 3600
+    if hours < 24:
+        if hours == 1:
+            return "1 hour ago"
+        return f"{hours} hours ago"
+    days = secs // 86400
+    if days < _LAST_COMMUNICATION_RELATIVE_MAX_DAYS:
+        if days == 1:
+            return "1 day ago"
+        return f"{days} days ago"
+    # Compact English timestamp (locale-neutral).
+    h12 = value.strftime("%I").lstrip("0") or "12"
+    mm = value.strftime("%M")
+    ampm = value.strftime("%p")
+    return f"{value.strftime('%b')} {value.day}, {value.year}, {h12}:{mm} {ampm}"
 
 
 class _DeviceItemRowWidget(QWidget):
@@ -117,6 +167,7 @@ class DeviceItem(QListWidgetItem):
     def __init__(
         self,
         parent=None,
+        id: str | None = None,
         text: str | None = None,
         type: str = "available",
         *,
@@ -124,20 +175,22 @@ class DeviceItem(QListWidgetItem):
         badge: DeviceBadge = "none",
         operating_system: str = "",
         location: str = "",
-        last_communication: str = "",
+        last_communication: str | dt.datetime | None = "",
         alert_highlight: bool = False,
     ):
         """Create a styled device entry for embedding in a ``QListWidget``.
 
         Args:
             parent: Optional list widget or owner passed to ``QListWidgetItem``.
+            id: Device unique identifier.
             text: Primary device name; falls back to default when omitted.
             type: Device category label used in helper/status copy.
             device_kind: Fixed literal for supported device kinds (currently mobile).
             badge: Visual trust/activity badge variant.
             operating_system: OS line shown in the subtitle stack.
             location: Location line shown in the subtitle stack.
-            last_communication: Right-side recency label when extended.
+            last_communication: Right-side recency when extended: plain string (fixed
+                label), datetime (live relative/absolute formatting), or None (Never).
             alert_highlight: When True, apply attention styling to the row.
         """
         super().__init__(parent)
@@ -156,12 +209,16 @@ class DeviceItem(QListWidgetItem):
         )
         self.setIcon(QIcon())
 
+        self._id: str | None = id
         self._text: str = display_name
         self._device_kind: DeviceKind = device_kind
         self._badge: DeviceBadge = badge
         self._operating_system: str = operating_system
         self._location: str = location
-        self._last_communication: str = last_communication
+        self._last_communication_is_static: bool = isinstance(last_communication, str)
+        self._last_communication_live_at: dt.datetime | None = (
+            None if self._last_communication_is_static else last_communication
+        )
         self._alert_highlight: bool = alert_highlight
         self._is_extended: bool = False
         self._sync_size_hint_in_progress: bool = False
@@ -316,8 +373,13 @@ class DeviceItem(QListWidgetItem):
 
         self._apply_badge()
         self._refresh_subtitle()
-        self.set_last_communication(last_communication)
-        self.set_alert_highlight(alert_highlight)
+        if self._last_communication_is_static:
+            self.ui.time_label.setText(last_communication)
+        else:
+            self.ui.time_label.setText(
+                format_last_communication_short(self._last_communication_live_at)
+            )
+        self.alert_highlight = alert_highlight
         self._finalize_ui_hooks()
         self._sync_size_hint()
 
@@ -500,42 +562,102 @@ class DeviceItem(QListWidgetItem):
             " · ".join(chunks) if chunks else self.texts.empty_subtitle
         )
 
-    def get_text(self) -> str:
+    @property
+    def id(self) -> str | None:
+        return self._id
+
+    @property
+    def name(self) -> str:
         return self.ui.name_label.text().strip()
 
-    def set_text(self, text: str) -> None:
-        self.ui.name_label.setText(text)
+    @name.setter
+    def name(self, value: str) -> None:
+        self._text = value
+        self.ui.name_label.setText(value)
         self._sync_size_hint()
 
-    def set_operating_system(self, text: str) -> None:
-        self._operating_system = text
+    @property
+    def operating_system(self) -> str:
+        return self._operating_system
+
+    @operating_system.setter
+    def operating_system(self, value: str) -> None:
+        self._operating_system = value
         self._refresh_subtitle()
         self._sync_size_hint()
 
-    def set_location(self, text: str) -> None:
-        self._location = text
+    @property
+    def location(self) -> str:
+        return self._location
+
+    @location.setter
+    def location(self, value: str) -> None:
+        self._location = value
         self._refresh_subtitle()
         self._sync_size_hint()
 
-    def set_last_communication(self, text: str) -> None:
-        self._last_communication = text
-        self.ui.time_label.setText(text)
+    @property
+    def last_communication(self) -> str | dt.datetime | None:
+        return self._last_communication_live_at
+
+    @last_communication.setter
+    def last_communication(
+        self,
+        value: str | dt.datetime | None,
+        *,
+        now: dt.datetime | None = None,
+    ) -> None:
+        """Set the right-side time label: static string or live datetime/None."""
+        if isinstance(value, str):
+            self._last_communication_is_static = True
+            self._last_communication_live_at = None
+            self.ui.time_label.setText(value)
+        else:
+            self._last_communication_is_static = False
+            self._last_communication_live_at = value
+            self.ui.time_label.setText(format_last_communication_short(value, now=now))
         self._sync_size_hint()
 
-    def set_alert_highlight(self, enabled: bool) -> None:
-        self._alert_highlight = enabled
-        self.ui.row.setProperty("alert", enabled)
+    def refresh_last_communication_label(
+        self, *, now: dt.datetime | None = None
+    ) -> None:
+        """Recompute label from stored live instant (no-op for static/placeholder rows)."""
+        if self._last_communication_is_static:
+            return
+        self.ui.time_label.setText(
+            format_last_communication_short(self._last_communication_live_at, now=now)
+        )
+        self._sync_size_hint()
+
+    @property
+    def alert_highlight(self) -> bool:
+        return self._alert_highlight
+
+    @alert_highlight.setter
+    def alert_highlight(self, value: bool) -> None:
+        self._alert_highlight = value
+        self.ui.row.setProperty("alert", value)
         self.ui.row.style().unpolish(self.ui.row)
         self.ui.row.style().polish(self.ui.row)
         self.ui.row.update()
 
-    def set_badge(self, badge: DeviceBadge) -> None:
-        self._badge = badge
+    @property
+    def badge(self) -> DeviceBadge:
+        return self._badge
+
+    @badge.setter
+    def badge(self, value: DeviceBadge) -> None:
+        self._badge = value
         self._apply_badge()
         self._sync_size_hint()
 
-    def set_device_kind(self, kind: DeviceKind) -> None:
-        self._device_kind = kind
+    @property
+    def device_kind(self) -> DeviceKind:
+        return self._device_kind
+
+    @device_kind.setter
+    def device_kind(self, value: DeviceKind) -> None:
+        self._device_kind = value
         path = GenericIcons.DEVICE.value
         self.ui.icon_label.setPixmap(
             QIcon(path).pixmap(QSize(self._ICON_INNER_PX, self._ICON_INNER_PX))
@@ -546,17 +668,19 @@ class DeviceItem(QListWidgetItem):
         cls,
         list_widget: QListWidget,
         *,
+        id: str | None = None,
         text: str | None = None,
         type: str = "available",
         device_kind: DeviceKind = "mobile",
         badge: DeviceBadge = "none",
         operating_system: str = "",
         location: str = "",
-        last_communication: str = "",
+        last_communication: str | dt.datetime | None = "",
         alert_highlight: bool = False,
     ) -> "DeviceItem":
         item = cls(
             None,
+            id=id,
             text=text,
             type=type,
             device_kind=device_kind,
@@ -597,7 +721,7 @@ class DeviceState(QGroupBox):
         title: Final[str] = "About device"
         state: Final[str] = "State: <state>"
         operating_system: Final[str] = "Operating system: <operating_system>"
-        last_communication: Final[str] = "Last communication: <last_communication>"
+        last_communication_prefix: Final[str] = "Last communication: "
 
     @dataclass
     class UI:
@@ -621,6 +745,7 @@ class DeviceState(QGroupBox):
         self.ui: DeviceState.UI
 
         self.setProperty("panel-section", True)
+        self._last_communication_at: dt.datetime | None = None
 
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)  # Padding handled by panel-section style
@@ -638,7 +763,11 @@ class DeviceState(QGroupBox):
         )
         layout.addWidget(operating_system)
 
-        last_communication = QLabel(self.texts.last_communication, self)
+        last_communication = QLabel(
+            self.texts.last_communication_prefix
+            + format_last_communication_short(None),
+            self,
+        )
         last_communication.setFont(
             QFont(Settings.FONT.FAMILY, Settings.FONT.SIZE_DEFAULT, QFont.Weight.Normal)
         )
@@ -652,6 +781,25 @@ class DeviceState(QGroupBox):
             last_communication=last_communication,
         )
         self._finalize_ui_hooks()
+
+    def set_last_communication(
+        self,
+        value: dt.datetime | None,
+        *,
+        now: dt.datetime | None = None,
+    ) -> None:
+        """Set the stored instant and refresh the about-device line."""
+        self._last_communication_at = value
+        self.ui.last_communication.setText(
+            self.texts.last_communication_prefix
+            + format_last_communication_short(value, now=now)
+        )
+
+    def refresh_last_communication_display(
+        self, *, now: dt.datetime | None = None
+    ) -> None:
+        """Re-apply formatting using the stored instant (for timer ticks)."""
+        self.set_last_communication(self._last_communication_at, now=now)
 
     def _finalize_ui_hooks(self) -> None:
         """Run the final UI setup hooks for the device state section."""
@@ -997,8 +1145,28 @@ class DeviceSelectionPanel(QFrame):
         self._highlight_stop_timer.timeout.connect(self.stop_highlight_attention)
         self._highlight_elapsed = QElapsedTimer()
 
+        self._last_communication_refresh_timer = QTimer(self)
+        self._last_communication_refresh_timer.setSingleShot(False)
+        self._last_communication_refresh_timer.timeout.connect(
+            self.refresh_last_communication_timestamps
+        )
+        self._last_communication_refresh_timer.setInterval(
+            Settings.LIST.LAST_COMMUNICATION_REFRESH_MS
+        )
+        self._last_communication_refresh_timer.start()
+
         self._finalize_ui_hooks()
         self._update_available_device_empty_state_visibility()
+
+    def refresh_last_communication_timestamps(
+        self, *, now: dt.datetime | None = None
+    ) -> None:
+        """Recompute all live last-communication labels (QTimer slot and tests)."""
+        ref = now if now is not None else dt.datetime.now()
+        for list_item in self.ui.available_device_list.iter_items():
+            if isinstance(list_item, DeviceItem):
+                list_item.refresh_last_communication_label(now=ref)
+        self.ui.device_state.refresh_last_communication_display(now=ref)
 
     def _finalize_ui_hooks(self) -> None:
         """Run the final UI setup hooks for the device selection panel."""
@@ -1059,7 +1227,7 @@ class DeviceSelectionPanel(QFrame):
         #### Debugging signals ####
         view_signals.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
 
-        #### Signals for selecting a device workflow (pairing, selection, connection) ####
+        #### Signals for selecting a device workflow (authentification, selection) ####
         self.ui.add_device_button.clicked.connect(view_signals.AddDeviceRequested.emit)
         view_signals.AuthentificationSucceeded.connect(
             self._on_authentification_succeeded
@@ -1068,6 +1236,7 @@ class DeviceSelectionPanel(QFrame):
         view_signals.DeviceSelectionSucceeded.connect(
             self._on_device_selection_succeeded
         )
+        view_signals.DeviceSelectionFailed.connect(self._on_device_selection_failed)
         view_signals.DevicesUpdated.connect(self._on_devices_updated)
         self.ui.refresh_button.clicked.connect(self._on_refresh_button_clicked)
         self.ui.trash_button.clicked.connect(self._on_trash_button_clicked)
@@ -1118,33 +1287,34 @@ class DeviceSelectionPanel(QFrame):
     def _on_ui_constraints_disabled(self) -> None:
         """Handle the UI constraints disabled event."""
         self.add_list_items_placeholder(self.ui.available_device_list)
-        self._update_available_device_empty_state_visibility()
+        self._on_available_device_list_model_changed()
 
-    def _on_authentification_succeeded(self, device: str) -> None:
+    def _on_authentification_succeeded(self, device: dict) -> None:
         """Handle the authentification succeeded event."""
         for item in self.ui.available_device_list.iter_items():
-            item.set_badge("trusted")
+            item.badge = "trusted"
         item = DeviceItem.add_to_list(
             self.ui.available_device_list,
-            text=device,
+            id=device["id"],
+            text=device["name"],
             type="available",
             badge="active",
-            operating_system=self.texts.placeholder_operating_system,
-            location=self.texts.placeholder_location_primary,
-            last_communication=self.texts.placeholder_last_communication_active,
+            operating_system=device["os"],
+            location="N/A",
+            last_communication=device["last_communication"],
             alert_highlight=True,
         )
         self.ui.available_device_list.setCurrentItem(item)
         self.ui.available_device_list.sortItems()
-        self._update_available_device_empty_state_visibility()
+        self._on_available_device_list_model_changed()
 
     def _on_device_selected(self, item: DeviceItem) -> None:
         """Handle the device selected event."""
         if item is None:
             return
-        view_signals.DeviceSelectionRequested.emit(item.get_text())
+        view_signals.DeviceSelectionRequested.emit(item.id, item.name)
 
-    def _on_device_selection_succeeded(self, device: str) -> None:
+    def _on_device_selection_succeeded(self, device: dict) -> None:
         """
         Handle the device selection succeeded event.
         """
@@ -1152,18 +1322,33 @@ class DeviceSelectionPanel(QFrame):
         if selected_item is None:
             return
         for list_item in self.ui.available_device_list.iter_items():
-            list_item.set_badge("trusted")
-        selected_item.set_badge("active")
+            list_item.badge = "trusted"
+        selected_item.badge = "active"
+        self._on_available_device_list_model_changed()
 
-    def _on_devices_updated(self, devices: list[str]) -> None:
+    def _on_device_selection_failed(self, device: dict) -> None:
+        """Handle the device selection failed event."""
+        self.ui.available_device_list.setCurrentItem(None)
+        self.ui.available_device_list.sortItems()
+        self._on_available_device_list_model_changed()
+
+    def _on_devices_updated(self, devices: list[dict]) -> None:
         """Handle the devices updated event."""
         self.ui.available_device_list.clear()
         for device in devices:
             DeviceItem.add_to_list(
-                self.ui.available_device_list, text=device, type="available"
+                self.ui.available_device_list,
+                id=device["id"],
+                text=device["name"],
+                type="available",
+                device_kind="mobile",
+                badge="new",
+                operating_system=device["os"],
+                location="N/A",
+                last_communication=device["last_communication"],
             )
         self.ui.available_device_list.sortItems()
-        self._update_available_device_empty_state_visibility()
+        self._on_available_device_list_model_changed()
 
     def _on_refresh_button_clicked(self) -> None:
         """Handle the refresh button click event."""
@@ -1174,7 +1359,7 @@ class DeviceSelectionPanel(QFrame):
         """Handle the trash button click event."""
         logger.info("Remove all devices requested.")
         self.ui.available_device_list.clear()
-        self._update_available_device_empty_state_visibility()
+        self._on_available_device_list_model_changed()
 
     def _sort_available_device_list(self) -> None:
         """Sort the available device list."""
@@ -1309,7 +1494,7 @@ class DeviceSelectionPanel(QFrame):
             last_communication=self.texts.placeholder_last_communication_old,
             alert_highlight=True,
         )
-        self._update_available_device_empty_state_visibility()
+        self._on_available_device_list_model_changed()
 
     def extend_list_items(self) -> None:
         """Extend the list items to show the last communication time and menu button."""

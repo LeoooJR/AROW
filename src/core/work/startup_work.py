@@ -20,7 +20,7 @@ from core.signals import (
     DevicesUpdatedPayload,
 )
 from core.work.core_runtime_work import CoreRuntimeWork
-from core.work.device_serial_work import enrich_phones_with_serial
+from core.work.device_serial_work import enrich_phones_with_adb_shell_properties
 from logger import logger
 
 if TYPE_CHECKING:
@@ -102,7 +102,7 @@ class StartupResult:
 
 class StartupCoreRuntimeWork(CoreRuntimeWork[StartupResult]):
     """
-    Worker job: start ADB server/client, list devices, enrich serials.
+    Worker job: start ADB server/client, list devices, enrich phones from ADB shell properties.
 
     Apply path owns model server/client fields and emits on the core bus.
     """
@@ -112,7 +112,7 @@ class StartupCoreRuntimeWork(CoreRuntimeWork[StartupResult]):
         adb_server = _start_adb_server()
         adb_client = _create_adb_client()
         devices = adb_server.get_known_devices()
-        enrich_phones_with_serial(adb_client, devices)
+        enrich_phones_with_adb_shell_properties(adb_client, devices)
         return StartupResult(
             adb_server=adb_server,
             adb_client=adb_client,

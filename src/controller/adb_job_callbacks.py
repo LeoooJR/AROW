@@ -10,9 +10,9 @@ import importlib
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from controller.helper import validate_model, validate_view
-from core.devices import Phone
+from controller.helper import validate_model
 from core.work.authentificate_device_work import AuthentificateDeviceOutcome
+from core.work.device_serial_work import RefreshKnownDevicesOutcome
 from core.work.host_install_identity_work import HostInstallIdentityOutcome
 from core.work.startup_work import StartupResult
 from logger import logger
@@ -118,30 +118,22 @@ class RefreshDeviceListCallback:
     def __init__(self, subcontroller: AdbSubController) -> None:
         self._subcontroller = subcontroller
 
-    @validate_view
+    @validate_model
     def on_completed(self, result: object) -> None:
-        if not isinstance(result, list):
+        model = self._subcontroller.model
+        if not isinstance(result, RefreshKnownDevicesOutcome):
             logger.error(
                 "AdbSubController: unexpected refresh_device_list result type",
                 result_type=type(result).__name__,
             )
             return
-        for item in result:
-            if not isinstance(item, Phone):
-                logger.error(
-                    "AdbSubController: refresh list contained non-Phone",
-                    item_type=type(item).__name__,
-                )
-                return
-
-        view = self._subcontroller.view
-        device_ids = [d.descriptor.id for d in result]
+        device_ids = [d.descriptor.id for d in result.devices]
         logger.success(
             "AdbSubController: known devices listed (async)",
             device_count=len(device_ids),
             device_ids=device_ids,
         )
-        view.forward_devices_updated(device_ids)
+        model.apply_result(result)
 
     def on_failed(self, error: JobError) -> None:
         log_refresh_device_list_job_failure(error)

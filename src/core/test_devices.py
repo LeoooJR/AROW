@@ -8,12 +8,20 @@ import datetime
 
 import pytest
 
+from core.adb import ADBCommandParser
 from core.devices import (
+    DEFAULT_PHONE_DISPLAY_NAME,
     Computer,
     ComputerDescriptor,
+    Device,
     DeviceDescriptor,
     Phone,
     PhoneDescriptor,
+    apply_phone_android_api_level_enrichment,
+    apply_phone_android_release_enrichment,
+    apply_phone_device_name_enrichment,
+    apply_phone_manufacturer_enrichment,
+    apply_phone_product_model_enrichment,
     apply_phone_ro_serial_enrichment,
     compute_computer_stable_key,
     compute_phone_stable_key,
@@ -59,33 +67,6 @@ class TestDeviceDescriptor:
 
 class TestPhone:
     """Tests for the Phone device class."""
-
-    def test_phone_from_string_success(self) -> None:
-        """Phone.from_string parses an ADB `devices -l` line with six tokens."""
-        line = "abc123 device product:model model:pixel device:Pixel transport_id:1"
-        phone = Phone.from_string(line)
-        assert phone.descriptor.id == "abc123"
-        assert phone.descriptor.name == "device:Pixel"
-        assert phone.descriptor.product == "product:model"
-        assert phone.descriptor.model == "model:pixel"
-        assert phone.descriptor.state == "device"
-        assert phone.transport_id == ""
-        assert phone.stable_key == ""
-
-    def test_phone_from_string_six_token_line_is_parsed_positionally(self) -> None:
-        """Phone.from_string uses the current six-token positional parser."""
-        line = "emulator-5554 offline product:sdk model:sdk_gphone device:emulator transport_id:9"
-        phone = Phone.from_string(line)
-        assert phone.descriptor.id == "emulator-5554"
-        assert phone.descriptor.name == "device:emulator"
-        assert phone.descriptor.product == "product:sdk"
-        assert phone.descriptor.model == "model:sdk_gphone"
-        assert phone.descriptor.state == "offline"
-
-    def test_phone_from_string_invalid_too_few_tokens(self) -> None:
-        """Phone.from_string raises when there are too few fields."""
-        with pytest.raises(ValueError, match="not enough values to unpack"):
-            Phone.from_string("id name os")
 
     def test_phone_descriptor_setter(self) -> None:
         """Assigning `phone.descriptor = ...` updates the nested PhoneDescriptor status field."""
@@ -140,6 +121,98 @@ class TestPhone:
         apply_phone_ro_serial_enrichment(phone, "ABC123DEVICE\n")
         assert phone.hardware_serial == "ABC123DEVICE"
         assert phone.stable_key == "hw:v1:ABC123DEVICE"
+
+    def test_apply_phone_manufacturer_and_model_updates_tier_two_stable_key(
+        self,
+    ) -> None:
+        """Without serial, manufacturer + model enrichment produces fp:v1: stable_key."""
+        phone = Phone(
+            id="dev", name="Pixel", product="ocean", model="m1", state="device"
+        )
+        assert phone.stable_key == ""
+        apply_phone_manufacturer_enrichment(phone, "FabCo")
+        apply_phone_product_model_enrichment(phone, "OceanView")
+        assert phone.descriptor.manufacturer == "FabCo"
+        assert phone.descriptor.model == "OceanView"
+        assert phone.stable_key.startswith("fp:v1:")
+
+    def test_apply_shell_property_enrichment_tier_one_unchanged(self) -> None:
+        """After Tier-1 serial, model enrichment does not change hw stable_key."""
+        phone = Phone(
+            id="dev", name="Pixel", product="ocean", model="m1", state="device"
+        )
+        apply_phone_ro_serial_enrichment(phone, "SERIALX")
+        key = phone.stable_key
+        apply_phone_product_model_enrichment(phone, "OceanView")
+        assert phone.descriptor.model == "OceanView"
+        assert phone.stable_key == key == "hw:v1:SERIALX"
+
+    def test_apply_phone_android_release_sets_os(self) -> None:
+        phone = Phone(id="x", name="n", os="", state="device")
+        apply_phone_android_release_enrichment(phone, " 15 \n")
+        assert phone.descriptor.os == "15"
+
+    def test_apply_phone_device_name_blank_clears_shell_and_recomputes_display(
+        self,
+    ) -> None:
+        """Blank ``device_name`` clears shell override; label falls back to list token / model."""
+        phone = Phone(
+            id="x",
+            name="keep-token",
+            model="ModX",
+            state="device",
+        )
+        apply_phone_device_name_enrichment(phone, "  ")
+        assert phone.descriptor.shell_device_name == ""
+        # Model beats legacy name-as-list-token for display.
+        assert phone.descriptor.name == "ModX"
+
+    def test_display_name_model_only_before_manufacturer(self) -> None:
+        phone = Phone(
+            id="dev1",
+            product="ocean",
+            model="OceanPhone",
+            device="Handset1",
+            state="device",
+        )
+        assert phone.descriptor.name == "OceanPhone"
+
+    def test_display_name_manufacturer_and_model_after_enrichment(self) -> None:
+        phone = Phone(
+            id="dev1",
+            model="OceanPhone",
+            device="Handset1",
+            state="device",
+        )
+        apply_phone_manufacturer_enrichment(phone, "FabCo")
+        assert phone.descriptor.name == "FabCo OceanPhone"
+
+    def test_display_name_getprop_overrides_manufacturer_model(self) -> None:
+        phone = Phone(id="d", model="X", manufacturer="Fab", state="device")
+        assert "Fab" in phone.descriptor.name
+        apply_phone_device_name_enrichment(phone, "Living Room Phone")
+        assert phone.descriptor.name == "Living Room Phone"
+        assert phone.descriptor.shell_device_name == "Living Room Phone"
+
+    def test_connect_to_device_default_display(self) -> None:
+        phone = connect_to_device("192.168.1.20", 5555, "123456")
+        assert phone.descriptor.name == DEFAULT_PHONE_DISPLAY_NAME
+
+    def test_sync_phone_display_name_long_id_suffix(self) -> None:
+        pid = "adb-X9ZZ99000012345678-aBc1dE"
+        phone = Phone(id=pid, state="device")
+        assert phone.descriptor.name == f"{DEFAULT_PHONE_DISPLAY_NAME} (8-aBc1dE)"
+
+    def test_sync_phone_display_name_emulator_id(self) -> None:
+        phone = Phone(id="emulator-5554", state="offline")
+        assert phone.descriptor.name == "emulator-5554"
+
+    def test_apply_phone_android_api_level(self) -> None:
+        phone = Phone(id="x", name="n", state="device")
+        apply_phone_android_api_level_enrichment(phone, 35)
+        assert phone.descriptor.android_api_level == 35
+        apply_phone_android_api_level_enrichment(phone, None)
+        assert phone.descriptor.android_api_level == 35
 
 
 class TestComputePhoneStableKey:
@@ -284,11 +357,6 @@ class TestComputer:
         assert computer.descriptor.last_communication is now
         assert computer.descriptor.stable_key == ""
         assert computer.stable_key == ""
-
-    def test_computer_from_string_not_implemented(self) -> None:
-        """Computer.from_string currently raises a NotImplementedError."""
-        with pytest.raises(NotImplementedError, match="not implemented yet"):
-            Computer.from_string("any")
 
 
 class TestComputeComputerStableKey:

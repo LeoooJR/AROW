@@ -8,13 +8,14 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from core.adb import AdbClient, AdbClientException, AdbServer, AdbServerException
-from core.devices import Phone, apply_phone_ro_serial_enrichment
+from core.devices import Phone
 from core.signals import (
     CoreSignal,
     DeviceAuthentificationFailedPayload,
     DeviceAuthentificationSucceededPayload,
 )
 from core.work.core_runtime_work import CoreRuntimeWork
+from core.work.device_serial_work import enrich_phones_with_adb_shell_properties
 from logger import logger
 
 if TYPE_CHECKING:
@@ -73,8 +74,7 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
         ip, port, association_code = self.ip, self.port, self.association_code
         try:
             phone = adb_client.pair(ip, port, association_code)
-            ro_serial = _ro_serial_after_pair(adb_client, phone)
-            apply_phone_ro_serial_enrichment(phone, ro_serial)
+            enrich_phones_with_adb_shell_properties(adb_client, [phone])
             return AuthentificateDeviceOutcome(success_phone=phone, failure=None)
         except AdbClientException as error:
             error_message: str = str(error)
@@ -93,8 +93,7 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
                         port=port,
                     )
                     phone = adb_client.pair(ip, port, association_code)
-                    ro_serial = _ro_serial_after_pair(adb_client, phone)
-                    apply_phone_ro_serial_enrichment(phone, ro_serial)
+                    enrich_phones_with_adb_shell_properties(adb_client, [phone])
                     return AuthentificateDeviceOutcome(
                         success_phone=phone, failure=None
                     )

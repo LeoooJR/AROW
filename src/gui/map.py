@@ -679,9 +679,7 @@ class Map(QWidget):
 
     def play_placeholder_helper_animation(self) -> None:
         """
-        Run a one-shot opacity pulse on the placeholder phone icon to remind the user
-        to connect their device before the map can load. Called when the map tab is
-        shown and progress is still 0 (map not loaded yet).
+        Run a one-shot opacity pulse on the canvas placeholder. Help to draw attention of the user to the placeholder.
         """
         svg = self.ui.placeholder.findChild(SVG)
         if svg is None:
@@ -795,15 +793,24 @@ class MapPanel(QFrame):
     def _connect_signals(self) -> None:
         """Connect signals for the map panel and its UI widgets."""
         #### Signals for handling the step transition from authentification to map display ####
-        view_signals.AuthentificationSucceeded.connect(self._on_device_connected)
-        view_signals.DeviceSelectionSucceeded.connect(self._on_device_connected)
+        view_signals.AuthentificationSucceeded.connect(
+            self._on_device_selection_succeeded
+        )
+        view_signals.DeviceSelectionSucceeded.connect(
+            self._on_device_selection_succeeded
+        )
         view_signals.AuthentificationFailed.connect(self._on_authentification_failed)
+        view_signals.DeviceSelectionFailed.connect(self._on_device_selection_failed)
 
-    def _on_device_connected(self, device: str) -> None:
+    def _on_device_selection_succeeded(self, device: dict) -> None:
         """Handle map UI updates for any successful connection flow."""
         self.ui.map.update_placeholder(
             self.texts.loading_placeholder, GenericIcons.MAP_PLACEHOLDER.value
         )
+        self.ui.map.play_placeholder_helper_animation()
+
+    def _on_device_selection_failed(self, device: dict) -> None:
+        """Handle the device selection failed event."""
         self.ui.map.play_placeholder_helper_animation()
 
     def _on_authentification_failed(self) -> None:

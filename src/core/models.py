@@ -22,7 +22,10 @@ from core.work.authentificate_device_work import (
     AuthenticateDeviceWork,
     AuthentificateDeviceOutcome,
 )
-from core.work.device_serial_work import refresh_known_devices_with_serial
+from core.work.device_serial_work import (
+    RefreshKnownDevicesOutcome,
+    RefreshKnownDevicesWork,
+)
 from core.work.host_install_identity_work import (
     HostInstallIdentityOutcome,
     HostInstallIdentityWork,
@@ -40,6 +43,7 @@ _CORE_RUNTIME_RESULT_APPLIERS: dict[type[object], CoreRuntimeResultApplier] = {
     StartupResult: StartupCoreRuntimeWork.apply_main_thread,
     AuthentificateDeviceOutcome: AuthenticateDeviceWork.apply_main_thread,
     HostInstallIdentityOutcome: HostInstallIdentityWork.apply_main_thread,
+    RefreshKnownDevicesOutcome: RefreshKnownDevicesWork.apply_main_thread,
 }
 
 
@@ -132,7 +136,7 @@ class CoreRuntimeModel(Model):
             association_code=association_code,
         ).run()
 
-    def refresh_known_devices(self) -> list[Phone]:
+    def refresh_known_devices(self) -> RefreshKnownDevicesOutcome:
         """
         List devices from the bound server and enrich ``ro.serialno`` via ADB.
         Blocking; intended for AsyncRunner / worker-thread use only.
@@ -141,7 +145,7 @@ class CoreRuntimeModel(Model):
             raise AttributeError(
                 "ADB server and client must be initialized before refreshing devices"
             )
-        return refresh_known_devices_with_serial(self._adb_server, self._adb_client)
+        return RefreshKnownDevicesWork(self._adb_server, self._adb_client).run()
 
     def run_host_install_identity(self) -> HostInstallIdentityOutcome:
         """

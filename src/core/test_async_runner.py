@@ -13,7 +13,8 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import importlib
 
-from PySide6.QtCore import QCoreApplication, QEventLoop
+from PySide6.QtCore import QEventLoop
+from PySide6.QtWidgets import QApplication
 
 _async_mod = importlib.import_module("controller.async")
 AsyncRunner = _async_mod.AsyncRunner
@@ -26,14 +27,15 @@ pytestmark = [pytest.mark.async_jobs]
 @pytest.fixture(scope="session", autouse=True)
 def _qt_core_app() -> None:
     """
-    Ensure a Qt core event loop exists for QTimer.singleShot and signals.
+    Ensure a Qt GUI application exists for QTimer/signals and pytest-qt widget tests.
 
-    Note: we use QCoreApplication (not QApplication) to keep tests headless.
+    ``QApplication`` subclasses ``QCoreApplication`` and satisfies both
+    ``AsyncRunner`` event-loop tests and ``src/gui`` widget tests in one session.
     """
 
-    app = QCoreApplication.instance()
+    app = QApplication.instance()
     if app is None:
-        QCoreApplication([])
+        QApplication([])
 
 
 def _process_events_until(
@@ -45,12 +47,12 @@ def _process_events_until(
     Raises AssertionError on timeout.
     """
 
-    assert QCoreApplication.instance() is not None
+    assert QApplication.instance() is not None
     deadline = time.monotonic() + timeout_s
     while time.monotonic() < deadline:
         if condition():
             return
-        QCoreApplication.instance().processEvents(QEventLoop.AllEvents, 50)
+        QApplication.instance().processEvents(QEventLoop.AllEvents, 50)
         time.sleep(0.01)
     assert condition(), "Timed out while waiting for async runner signals"
 

@@ -2,9 +2,11 @@ import datetime
 import hashlib
 import platform
 import socket
-from abc import ABC, abstractmethod
+from abc import ABC
 from dataclasses import dataclass, field
 from typing import Any, Optional, Self
+
+from loguru import logger
 
 from collection import Repository
 
@@ -13,6 +15,28 @@ _STABLE_HW_PREFIX = "hw:v1:"
 _STABLE_FP_PREFIX = "fp:v1:"
 _STABLE_PC_INSTALL_PREFIX = "pc:v1:install:"
 _FINGERPRINT_V1_MARKER = "|fp|v1|"
+
+# User-visible fallback when manufacturer/model/device_name are unavailable.
+DEFAULT_PHONE_DISPLAY_NAME = "Android device"
+# When using the default label, append this many chars from the end of the ADB id to disambiguate.
+_PHONE_DISPLAY_ID_TAIL_LEN = 8
+
+
+def _adb_connection_id_is_human_readable(connection_id: str) -> bool:
+    """
+    True when the ADB connection id is suitable as a list title (emulator, short USB serial).
+
+    Long dotted hostnames (typical of TLS discovery) are treated as not human-readable so we
+    show a generic label plus a short suffix instead.
+    """
+    cid = connection_id.strip()
+    if not cid:
+        return False
+    if cid.startswith("emulator-"):
+        return True
+    if "." in cid:
+        return False
+    return len(cid) <= 24
 
 
 def _tier1_stable_key_from_serial(normalized_serial: str) -> str:
@@ -88,7 +112,12 @@ class DeviceDescriptor:
     id: str = field(
         metadata={"description": "The id of the device"}, default="", hash=True
     )
-    name: str = field(metadata={"description": "The name of the device"}, default="")
+    name: str = field(
+        metadata={
+            "description": "The name of the device. This value is displayed to the user and should be human readable."
+        },
+        default="",
+    )
     os: str = field(
         metadata={"description": "The operating system of the device"}, default=""
     )
@@ -110,6 +139,14 @@ class PhoneDescriptor(DeviceDescriptor):
         metadata={"description": "The product of the phone"}, default=""
     )
     model: str = field(metadata={"description": "The model of the phone"}, default="")
+    device: str = field(
+        metadata={
+            "description": (
+                "Value of the device: column from adb devices -l (display fallback before enrichment)"
+            )
+        },
+        default="",
+    )
     transport_id: str = field(
         metadata={"description": "The transport id of the phone"}, default=""
     )
@@ -137,12 +174,26 @@ class PhoneDescriptor(DeviceDescriptor):
         },
         default="",
     )
+    android_api_level: int | None = field(
+        metadata={
+            "description": "Android API level from ro.build.version.sdk after enrichment (optional)"
+        },
+        default=None,
+    )
+    shell_device_name: str = field(
+        metadata={
+            "description": "Friendly name from getprop device_name after enrichment (optional)"
+        },
+        default="",
+        hash=False,
+    )
 
     def __str__(self):
         return (
             f"{self.id} - {self.name} - {self.os} - {self.ip}:{self.port} - "
             f"{self.product} - {self.model} - {self.transport_id} - {self.state} - "
-            f"{self.hardware_serial} - {self.stable_key} - {self.last_communication}"
+            f"{self.hardware_serial} - {self.stable_key} - {self.manufacturer} - "
+            f"{self.android_api_level} - {self.last_communication}"
         )
 
     def __repr__(self):
@@ -151,6 +202,8 @@ class PhoneDescriptor(DeviceDescriptor):
             f"ip={self.ip}, port={self.port}, product={self.product}, model={self.model}, "
             f"transport_id={self.transport_id}, state={self.state}, "
             f"hardware_serial={self.hardware_serial!r}, stable_key={self.stable_key!r}, "
+            f"manufacturer={self.manufacturer!r}, android_api_level={self.android_api_level!r}, "
+            f"shell_device_name={self.shell_device_name!r}, "
             f"last_communication={self.last_communication})"
         )
 
@@ -239,11 +292,6 @@ class Device(ABC):
         for key, value in kwargs.items():
             setattr(self._descriptor, key, value)
 
-    @classmethod
-    @abstractmethod
-    def from_string(cls, string: str) -> Self:
-        raise NotImplementedError
-
     def __str__(self):
         return f"{self._descriptor.name} - {self._descriptor.os} - {self._descriptor.ip}:{self._descriptor.port}"
 
@@ -265,19 +313,22 @@ class Phone(Device):
     def __init__(
         self,
         id: str,
-        name: str,
+        name: str | None = None,
         os: str | None = None,
         ip: str | None = None,
         port: int | None = None,
+        device: str | None = None,
         product: str | None = None,
         model: str | None = None,
         state: str | None = None,
         hardware_serial: str | None = None,
         manufacturer: str | None = None,
+        transport_id: str | None = None,
+        android_api_level: int | None = None,
     ) -> None:
         super().__init__(
             id=id,
-            name=name,
+            name="",
             os=os or "",
             ip=ip or "",
             port=port,
@@ -285,7 +336,11 @@ class Phone(Device):
         prod = product or ""
         mod = model or ""
         man_u = manufacturer or ""
+        tid = (transport_id.strip() if transport_id else "") or ""
         hs = (hardware_serial.strip() if hardware_serial else "") or ""
+        dev_col = (device.strip() if device else "") or ""
+        if not dev_col and name:
+            dev_col = (name.strip() if name else "") or ""
         stable = compute_phone_stable_key(
             hardware_serial=hs if hs else None,
             product=prod,
@@ -295,18 +350,23 @@ class Phone(Device):
         )
         self._descriptor: PhoneDescriptor = PhoneDescriptor(
             id=id,
-            name=name,
+            name="",
             os=os or "",
             ip=ip or "",
             port=port,
             product=prod,
             model=mod,
+            device=dev_col,
+            transport_id=tid,
             state=state or "",
             last_communication=datetime.datetime.now(),
             hardware_serial=hs if hs else "",
             stable_key=stable,
             manufacturer=man_u,
+            android_api_level=android_api_level,
+            shell_device_name="",
         )
+        sync_phone_display_name(self)
 
     @property
     def product(self) -> str:
@@ -358,10 +418,66 @@ class Phone(Device):
     def hardware_serial(self) -> str:
         return self._descriptor.hardware_serial
 
-    @classmethod
-    def from_string(cls, string: str) -> Self:
-        id, state, product, model, device, transport_id = string.strip().split()
-        return cls(id=id, name=device, product=product, model=model, state=state)
+
+def sync_phone_display_name(phone: Phone) -> None:
+    """
+    Set ``PhoneDescriptor.name`` from enrichment and list data using a fixed precedence.
+
+    Order: ``getprop device_name`` shell value, ``manufacturer`` + ``model``, ``model`` alone,
+    ``product``, ``PhoneDescriptor.device`` (``devices -l`` device column), human-readable connection ``id``, then a default
+    label (optionally with a short ``id`` suffix for disambiguation).
+    """
+    d = phone.descriptor
+    shell = (d.shell_device_name or "").strip()
+    if shell:
+        d.name = shell
+        return
+
+    man = (d.manufacturer or "").strip()
+    mod = (d.model or "").strip()
+    if man and mod:
+        d.name = f"{man} {mod}"
+        return
+    if mod:
+        d.name = mod
+        return
+
+    prod = (d.product or "").strip()
+    if prod:
+        d.name = prod
+        return
+
+    tok = (d.device or "").strip()
+    if tok:
+        d.name = tok
+        return
+
+    cid = (d.id or "").strip()
+    if cid and _adb_connection_id_is_human_readable(cid):
+        d.name = cid
+        return
+
+    if cid and len(cid) > _PHONE_DISPLAY_ID_TAIL_LEN:
+        tail = cid[-_PHONE_DISPLAY_ID_TAIL_LEN:]
+        d.name = f"{DEFAULT_PHONE_DISPLAY_NAME} ({tail})"
+        return
+
+    d.name = DEFAULT_PHONE_DISPLAY_NAME if not cid else cid
+
+
+def _recompute_phone_stable_key_descriptor(phone: Phone) -> None:
+    """
+    After descriptor fields used in Tier-1 / Tier-2 identity change, refresh ``stable_key``.
+    """
+    man = (phone.descriptor.manufacturer or "").strip()
+    hs = (phone.descriptor.hardware_serial or "").strip()
+    phone.descriptor.stable_key = compute_phone_stable_key(
+        hardware_serial=hs if hs else None,
+        product=phone.descriptor.product,
+        model=phone.descriptor.model,
+        manufacturer=man or None if man else None,
+        fingerprint_when_no_serial=True,
+    )
 
 
 def apply_phone_ro_serial_enrichment(phone: Phone, ro_serial_stdout: str) -> None:
@@ -374,15 +490,55 @@ def apply_phone_ro_serial_enrichment(phone: Phone, ro_serial_stdout: str) -> Non
     raw = (ro_serial_stdout or "").strip()
     if raw and raw.casefold() != "unknown":
         phone.descriptor.hardware_serial = raw
-    man = (phone.descriptor.manufacturer or "").strip()
-    hs = (phone.descriptor.hardware_serial or "").strip()
-    phone.descriptor.stable_key = compute_phone_stable_key(
-        hardware_serial=hs if hs else None,
-        product=phone.descriptor.product,
-        model=phone.descriptor.model,
-        manufacturer=man or None if man else None,
-        fingerprint_when_no_serial=True,
-    )
+    _recompute_phone_stable_key_descriptor(phone)
+
+
+def apply_phone_device_name_enrichment(phone: Phone, value: str) -> None:
+    """Apply ``getprop device_name`` to ``shell_device_name`` and refresh the display label."""
+    name = (value or "").strip()
+    if name:
+        phone.descriptor.shell_device_name = name
+    else:
+        phone.descriptor.shell_device_name = ""
+    sync_phone_display_name(phone)
+    _recompute_phone_stable_key_descriptor(phone)
+
+
+def apply_phone_android_release_enrichment(phone: Phone, value: str) -> None:
+    """Apply ``ro.build.version.release`` to ``PhoneDescriptor.os`` (Android release string)."""
+    rel = (value or "").strip()
+    if not rel:
+        return
+    phone.descriptor.os = rel
+    _recompute_phone_stable_key_descriptor(phone)
+
+
+def apply_phone_manufacturer_enrichment(phone: Phone, value: str) -> None:
+    """Apply ``ro.product.manufacturer``; affects Tier-2 ``stable_key`` and display label."""
+    man = (value or "").strip()
+    if not man:
+        return
+    phone.descriptor.manufacturer = man
+    sync_phone_display_name(phone)
+    _recompute_phone_stable_key_descriptor(phone)
+
+
+def apply_phone_product_model_enrichment(phone: Phone, value: str) -> None:
+    """Apply ``ro.product.model`` to ``PhoneDescriptor.model`` and refresh display label."""
+    mod = (value or "").strip()
+    if not mod:
+        return
+    phone.descriptor.model = mod
+    sync_phone_display_name(phone)
+    _recompute_phone_stable_key_descriptor(phone)
+
+
+def apply_phone_android_api_level_enrichment(phone: Phone, value: int | None) -> None:
+    """Apply ``ro.build.version.sdk`` as API level; skip when ``value`` is ``None``."""
+    if value is None:
+        return
+    phone.descriptor.android_api_level = value
+    _recompute_phone_stable_key_descriptor(phone)
 
 
 class Computer(Device):
@@ -450,7 +606,7 @@ class Computer(Device):
     def get_state(self) -> str:
         return self._descriptor.state
 
-    def get_last_communication(self) -> datetime.datetime:
+    def get_last_communication(self) -> datetime.datetime | None:
         return self._descriptor.last_communication
 
     def _resolve_ip(self) -> str:
@@ -469,10 +625,6 @@ class Computer(Device):
             return ip
         except OSError:
             return "127.0.0.1"  # fallback to loopback address
-
-    @classmethod
-    def from_string(cls, string: str) -> Self:
-        raise NotImplementedError("Computer.from_string is not implemented yet.")
 
 
 def connect_to_device(ip: str, port: int, association_code: str) -> Phone:
@@ -500,14 +652,32 @@ class PhoneRepository(Repository[Phone]):
         self._working_device = device
 
     def add(self, item: Phone) -> None:
-        super().add(item)
+        try:
+            super().add(item)
+        except ValueError as e:
+            logger.error(
+                "PhoneRepository: failed to add phone",
+                error=str(e),
+            )
+            return
         if self._working_device is None:
             self._working_device = item
 
     def remove(self, item: Phone) -> None:
-        super().remove(item)
+        try:
+            super().remove(item)
+        except ValueError as e:
+            logger.error(
+                "PhoneRepository: failed to remove phone",
+                error=str(e),
+            )
+            return
         if self._working_device == item:
             self._working_device = None
+
+    def clear(self) -> None:
+        super().clear()
+        self._working_device = None
 
 
 class ComputerRepository(Repository[Computer]):
@@ -528,11 +698,25 @@ class ComputerRepository(Repository[Computer]):
         self._working_device = device
 
     def add(self, item: Computer) -> None:
-        super().add(item)
+        try:
+            super().add(item)
+        except ValueError as e:
+            logger.error(
+                "ComputerRepository: failed to add computer",
+                error=str(e),
+            )
+            return
         if self._working_device is None:
             self._working_device = item
 
     def remove(self, item: Computer) -> None:
-        super().remove(item)
+        try:
+            super().remove(item)
+        except ValueError as e:
+            logger.error(
+                "ComputerRepository: failed to remove computer",
+                error=str(e),
+            )
+            return
         if self._working_device == item:
             self._working_device = None

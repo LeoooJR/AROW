@@ -29,6 +29,17 @@ class Repository(ABC, Generic[RepositoryObject]):
             pformat(self._repository),
         )
 
+    def add_all(self, items: list[RepositoryObject]) -> None:
+        """Add all items to the repository."""
+        for item in items:
+            self.add(item)
+        logger.debug(
+            "{}.add_all: repository snapshot ({} item(s))\n{}",
+            self.__class__.__name__,
+            len(self._repository),
+            pformat(self._repository),
+        )
+
     def remove(self, item: RepositoryObject) -> None:
         """Remove an item from the repository."""
         if item.id not in self._repository:
@@ -38,6 +49,15 @@ class Repository(ABC, Generic[RepositoryObject]):
             "{}.remove: repository snapshot ({} item(s))\n{}",
             self.__class__.__name__,
             len(self._repository),
+            pformat(self._repository),
+        )
+
+    def clear(self) -> None:
+        """Clear the repository."""
+        self._repository.clear()
+        logger.debug(
+            "{}.clear: repository snapshot (0 item(s))\n{}",
+            self.__class__.__name__,
             pformat(self._repository),
         )
 

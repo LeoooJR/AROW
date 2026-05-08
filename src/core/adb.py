@@ -15,6 +15,12 @@ from core.exceptions import AdbClientException, AdbServerException
 from core.location import Location
 from logger import logger
 
+# `adb pair` success line: Successfully paired to <host>:<port> [guid=<device_id>]
+_PAIR_SUCCESS_LINE = re.compile(
+    r"Successfully\s+paired\s+to\s+(\S+)\s+\[guid=([^\]]+)\]",
+    re.IGNORECASE,
+)
+
 
 @dataclass(frozen=True)
 class AdbBinary:
@@ -101,10 +107,39 @@ def _make_strip_parser() -> ParserFn:
 
 
 def _parse_pair(output: str) -> Phone | None:
-    """Parse `adb pair` stdout into `Phone` row; skip header and malformed lines."""
-    raise NotImplementedError(
-        "Not implemented"
-    )  # TODO: implement the parsing of the pair command
+    """
+    Parse `adb pair` stdout/stderr into a ``Phone``.
+
+    Success shape (one line): ``Successfully paired to host:port [guid=adb-…]``.
+    Device id is the value after ``guid=`` (up to ``]``). Host/port use IPv4 ``host:port``
+    parsing via a final ``:`` split.
+    """
+    for raw in output.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        m = _PAIR_SUCCESS_LINE.search(line)
+        if not m:
+            continue
+        hostport, device_id = m.group(1), m.group(2).strip()
+        if not device_id or ":" not in hostport:
+            continue
+        host, port_str = hostport.rsplit(":", 1)
+        try:
+            port_num = int(port_str)
+        except ValueError:
+            continue
+        if not (1 <= port_num <= 65535):
+            continue
+        # state ``device`` so downstream ``get_ro_serialno`` runs after pair in auth flow.
+        return Phone(
+            id=device_id,
+            name=None,
+            ip=host,
+            port=port_num,
+            state="device",
+        )
+    return None
 
 
 def _parse_devices(output: str) -> list[Phone]:
@@ -114,11 +149,22 @@ def _parse_devices(output: str) -> list[Phone]:
         line = raw.strip()
         if not line or line.startswith("List of devices attached"):
             continue
-        parts = line.split()
-        if len(parts) < 6:
+        tokens = line.split()
+        if len(tokens) < 6:
             continue
         try:
-            phones.append(Phone.from_string(line))
+            values = list(map(lambda x: x.split(":")[1] if ":" in x else x, tokens))
+            id, state, product, model, device, transport_id = values
+            phones.append(
+                Phone(
+                    id=id,
+                    product=product,
+                    model=model,
+                    state=state,
+                    transport_id=transport_id,
+                    device=device,
+                )
+            )
         except (ValueError, TypeError):
             continue
     return phones
@@ -412,18 +458,24 @@ class AdbClient:
         """
         self._history.pop(datetime.datetime.now())
 
-    def pair(self, ip: str, port: int, association_code: str) -> Phone | None:
+    def pair(self, ip: str, port: int, association_code: str) -> Phone:
         """
-        Pair with a device
+        Pair with a device and return a ``Phone`` parsed from adb output (``guid=`` id).
         """
         command = AdbCommands.PAIR.value
         try:
             result = self._execute(command, None, [f"{ip}:{port}", association_code])
         except AdbClientException as e:
             raise
-        return ADBCommandParser.PAIR.parse(
-            result.output or ""
-        )  # TODO: implement the parsing of the pair command
+        combined = f"{result.output or ''}\n{result.error or ''}".strip()
+        phone = ADBCommandParser.PAIR.parse(combined)
+        if phone is None:
+            snippet = combined if len(combined) <= 500 else combined[:500] + "…"
+            raise AdbClientException(
+                "Unparseable adb pair output (expected 'Successfully paired to … [guid=…]'): "
+                f"{snippet}"
+            )
+        return phone
 
     def devices(self) -> list[Phone]:
         """
@@ -496,6 +548,84 @@ class AdbClient:
             serial_len=len(out),
         )
         return out
+
+    def get_device_name_prop(self, phone: Phone) -> str:
+        """
+        ``adb -s <id> shell getprop device_name``. Returns stripped value or ``""`` on failure.
+        """
+        command = AdbCommands.GET_DEVICE_NAME.value
+        try:
+            result = self._execute(command, phone)
+        except AdbClientException as exc:
+            logger.warning(
+                "AdbClient: failed to read device_name",
+                device_id=phone.descriptor.id,
+                error=str(exc),
+            )
+            return ""
+        parsed = ADBCommandParser.GET_DEVICE_NAME.parse(result.output or "")
+        return (parsed or "").strip()
+
+    def get_android_release(self, phone: Phone) -> str:
+        """
+        ``ro.build.version.release`` — Android version string (e.g. ``"15"``).
+        """
+        command = AdbCommands.GET_ANDROID_VERSION.value
+        try:
+            result = self._execute(command, phone)
+        except AdbClientException as exc:
+            logger.warning(
+                "AdbClient: failed to read ro.build.version.release",
+                device_id=phone.descriptor.id,
+                error=str(exc),
+            )
+            return ""
+        parsed = ADBCommandParser.GET_ANDROID_VERSION.parse(result.output or "")
+        return (parsed or "").strip()
+
+    def get_product_manufacturer(self, phone: Phone) -> str:
+        """``ro.product.manufacturer``."""
+        command = AdbCommands.GET_MANUFACTURER.value
+        try:
+            result = self._execute(command, phone)
+        except AdbClientException as exc:
+            logger.warning(
+                "AdbClient: failed to read ro.product.manufacturer",
+                device_id=phone.descriptor.id,
+                error=str(exc),
+            )
+            return ""
+        parsed = ADBCommandParser.GET_MANUFACTURER.parse(result.output or "")
+        return (parsed or "").strip()
+
+    def get_product_model(self, phone: Phone) -> str:
+        """``ro.product.model`` (commercial model string)."""
+        command = AdbCommands.GET_PRODUCT_MODEL.value
+        try:
+            result = self._execute(command, phone)
+        except AdbClientException as exc:
+            logger.warning(
+                "AdbClient: failed to read ro.product.model",
+                device_id=phone.descriptor.id,
+                error=str(exc),
+            )
+            return ""
+        parsed = ADBCommandParser.GET_PRODUCT_MODEL.parse(result.output or "")
+        return (parsed or "").strip()
+
+    def get_android_sdk_api_level(self, phone: Phone) -> int | None:
+        """``ro.build.version.sdk`` as integer API level, or ``None`` if unreadable."""
+        command = AdbCommands.GET_SDK_VERSION.value
+        try:
+            result = self._execute(command, phone)
+        except AdbClientException as exc:
+            logger.warning(
+                "AdbClient: failed to read ro.build.version.sdk",
+                device_id=phone.descriptor.id,
+                error=str(exc),
+            )
+            return None
+        return ADBCommandParser.GET_SDK_VERSION.parse(result.output or "")
 
     def _execute(
         self,

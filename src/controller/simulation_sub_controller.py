@@ -95,8 +95,8 @@ class SimulationSubController:
         return self._app.view
 
     def connect_view_signals(self) -> None:
-        view_signals.DeviceSelectionRequested.connect(
-            self._on_device_selection_requested
+        view_signals.DeviceSelectionConfirmed.connect(
+            self._on_device_selection_confirmed
         )
         view_signals.SimulationLogFileUpdateRequested.connect(
             self._on_simulation_log_file_update_requested
@@ -177,28 +177,30 @@ class SimulationSubController:
         pass
 
     @validate_model
-    def _on_device_selection_requested(self, device_id: str) -> None:
+    def _on_device_selection_confirmed(self, device_id: str, device_name: str) -> None:
         """In-memory selection of the active device (UI thread)."""
         logger.debug(
-            "SimulationSubController: device connection requested",
-            device_id=device_id,
+            "SimulationSubController: device selection confirmed",
+            input_device_id=device_id,
+            input_device_name=device_name,
         )
         try:
             device: Phone = self.model.get_device(device_id)
+            self._session.device = device
+            desc = device.descriptor
+            logger.success(
+                "SimulationSubController: active device set",
+                device_id=desc.id,
+                device_name=desc.name,
+            )
+            self.view.forward_device_selection_succeeded(vars(desc))
         except AttributeError as e:
             logger.error(
                 "SimulationSubController: failed to get device",
                 error=str(e),
                 device_id=device_id,
             )
-            return
-        self._session.device = device
-        desc = device.descriptor
-        logger.success(
-            "SimulationSubController: active device set",
-            device_id=desc.id,
-            device_name=desc.name,
-        )
+            self.view.forward_device_selection_failed(device_id)
 
     @validate_view
     def _on_simulation_log_file_update_requested(self, filename: str) -> None:
