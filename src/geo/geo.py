@@ -5,7 +5,7 @@ import folium
 import geopandas
 import pandas as pd
 import xyzservices.providers as xyz
-from folium.plugins import Fullscreen, MarkerCluster, MousePosition
+from folium.plugins import Fullscreen, MarkerCluster, MousePosition, Search
 from folium.utilities import JsCode
 from loguru import logger
 
@@ -223,6 +223,7 @@ class MapRenderer:
     def _create_layers(self):
 
         DEFAULT_LIGNE_COLOR = "#94a3b8"  # unknown – light slate
+        SEARCH_LIGNE_COLOR = "#f97316"
 
         TYPE_LIGNE_COLOR = {
             "Ligne proprement dite": "#1e3a5f",  # main line – dark blue
@@ -263,6 +264,21 @@ class MapRenderer:
             },
         )
 
+        stations_search = Search(
+            layer=stations_cluster,
+            geom_type="Point",
+            position="topleft",
+            placeholder="Search for a station",
+            search_zoom=13,
+            collapsed=True,
+            search_label="nom",
+            color="#2266cc",
+            weight=3,
+            fillOpacity=0.9,
+        )
+
+        stations_search.add_to(self.map)
+
         stations_layer.add_to(stations_cluster)
 
         railways_features_group = folium.FeatureGroup(
@@ -297,6 +313,21 @@ class MapRenderer:
                 aliases=["Ligne", "Code", "Type"],
             ),
         )
+
+        railways_search = Search(
+            layer=railways_layer,
+            geom_type="Line",
+            position="topleft",
+            placeholder="Search for a railway",
+            search_zoom=9,
+            collapsed=True,
+            search_label="lib_ligne",
+            color=SEARCH_LIGNE_COLOR,
+            weight=4,
+            opacity=1,
+        )
+
+        railways_search.add_to(self.map)
 
         railways_layer.add_to(railways_features_group)
 
