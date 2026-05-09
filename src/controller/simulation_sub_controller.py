@@ -200,7 +200,9 @@ class SimulationSubController:
                 error=str(e),
                 device_id=device_id,
             )
-            self.view.forward_device_selection_failed(device_id)
+            self.view.forward_device_selection_failed(
+                {"id": device_id, "name": device_name}
+            )
 
     @validate_view
     def _on_simulation_log_file_update_requested(self, filename: str) -> None:

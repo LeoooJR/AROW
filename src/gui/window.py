@@ -954,6 +954,8 @@ class MainWindow(QMainWindow):
         authentification_failed_toast: str = (
             "Failed to authentificate device: {ip}:{port} with association code: {association_code}: {reason}."
         )
+        device_selection_failed_toast: str = "Failed to select device: {device}."
+        device_selection_success_toast: str = "Successfully selected device: {device}."
 
     @dataclass
     class UI:
@@ -1167,7 +1169,7 @@ class MainWindow(QMainWindow):
         logger.info("MainWindow: device selection succeeded", device=device["name"])
         view_signals.DeviceSelectionSucceeded.emit(device)
         self.ui.container.post_toast(
-            self.texts.authentification_success_toast.format(device=device["name"]),
+            self.texts.device_selection_success_toast.format(device=device["name"]),
             level="success",
         )
 
