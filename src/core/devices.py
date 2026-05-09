@@ -4,7 +4,7 @@ import platform
 import socket
 from abc import ABC
 from dataclasses import dataclass, field
-from typing import Any, Optional, Self
+from typing import Any, Optional
 
 from loguru import logger
 

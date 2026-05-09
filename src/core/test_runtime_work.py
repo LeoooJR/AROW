@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from core.models import CoreRuntimeModel
-from core.work.close_work import CloseCoreRuntimeWork, CloseResult
+from core.work.close_work import CloseCoreRuntimeWork, CloseOutcome
 
 pytestmark = [pytest.mark.async_jobs]
 
@@ -17,7 +17,7 @@ class TestCloseCoreRuntimeWork:
             emitted.append((signal, payload))
 
         model._signal_bus.emit = fake_emit
-        CloseCoreRuntimeWork.apply_main_thread(model, CloseResult(adb_server=None))
+        CloseCoreRuntimeWork.apply_main_thread(model, CloseOutcome(adb_server=None))
         assert model.adb_server is None
         assert emitted == []
 

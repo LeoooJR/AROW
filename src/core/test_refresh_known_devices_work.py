@@ -1,10 +1,10 @@
-"""Tests for src/core/work/device_serial_work.py (shell enrichment orchestration)."""
+"""Tests for src/core/work/refresh_known_devices_work.py (shell enrichment orchestration)."""
 
 from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from core.work.device_serial_work import enrich_phones_with_adb_shell_properties
+from core.work.refresh_known_devices_work import enrich_phones_with_adb_shell_properties
 
 
 def test_enrich_phones_with_adb_shell_properties_empty_skips_adb_methods() -> None:

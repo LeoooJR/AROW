@@ -22,25 +22,28 @@ from core.work.authentificate_device_work import (
     AuthenticateDeviceWork,
     AuthentificateDeviceOutcome,
 )
-from core.work.device_serial_work import (
-    RefreshKnownDevicesOutcome,
-    RefreshKnownDevicesWork,
-)
+from core.work.core_runtime_work import CoreRuntimeWorkOutcome
 from core.work.host_install_identity_work import (
     HostInstallIdentityOutcome,
     HostInstallIdentityWork,
 )
+from core.work.refresh_known_devices_work import (
+    RefreshKnownDevicesOutcome,
+    RefreshKnownDevicesWork,
+)
 from core.work.startup_work import (
     StartupCoreRuntimeWork,
-    StartupResult,
+    StartupOutcome,
 )
 from logger import logger
 
-# Main-thread appliers keyed by exact worker result type (AsyncRunner completion).
-CoreRuntimeResultApplier = Callable[["CoreRuntimeModel", object], None]
+# Main-thread appliers keyed by exact worker outcome type (AsyncRunner completion).
+CoreRuntimeResultApplier = Callable[["CoreRuntimeModel", CoreRuntimeWorkOutcome], None]
 
-_CORE_RUNTIME_RESULT_APPLIERS: dict[type[object], CoreRuntimeResultApplier] = {
-    StartupResult: StartupCoreRuntimeWork.apply_main_thread,
+_CORE_RUNTIME_RESULT_APPLIERS: dict[
+    type[CoreRuntimeWorkOutcome], CoreRuntimeResultApplier
+] = {
+    StartupOutcome: StartupCoreRuntimeWork.apply_main_thread,
     AuthentificateDeviceOutcome: AuthenticateDeviceWork.apply_main_thread,
     HostInstallIdentityOutcome: HostInstallIdentityWork.apply_main_thread,
     RefreshKnownDevicesOutcome: RefreshKnownDevicesWork.apply_main_thread,
@@ -48,7 +51,7 @@ _CORE_RUNTIME_RESULT_APPLIERS: dict[type[object], CoreRuntimeResultApplier] = {
 
 
 def register_core_runtime_result_applier(
-    result_type: type[object],
+    result_type: type[CoreRuntimeWorkOutcome],
     applier: CoreRuntimeResultApplier,
 ) -> None:
     """Register or replace the main-thread applier for ``result_type`` outcomes."""
@@ -100,7 +103,7 @@ class CoreRuntimeModel(Model):
         """Return the active ADB server instance if available."""
         return self._adb_server
 
-    def startup(self) -> StartupResult:
+    def startup(self) -> StartupOutcome:
         """
         Initialize runtime core services at application startup (worker thread).
         """
@@ -202,7 +205,7 @@ class CoreRuntimeModel(Model):
             return []
         return resolved.get_known_devices()
 
-    def apply_result(self, result: object) -> None:
+    def apply_result(self, result: CoreRuntimeWorkOutcome) -> None:
         """
         Dispatch worker results to the matching ``apply_main_thread`` helper (Qt main thread).
 

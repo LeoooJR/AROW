@@ -24,7 +24,7 @@ from core.devices import (
     apply_phone_ro_serial_enrichment,
 )
 from core.signals import CoreSignal, DevicesUpdatedPayload
-from core.work.core_runtime_work import CoreRuntimeWork
+from core.work.core_runtime_work import CoreRuntimeWork, CoreRuntimeWorkOutcome
 
 if TYPE_CHECKING:
     from core.models import CoreRuntimeModel
@@ -119,7 +119,7 @@ def enrich_phones_with_adb_shell_properties(
 
 
 @dataclass(frozen=True, slots=True)
-class RefreshKnownDevicesOutcome:
+class RefreshKnownDevicesOutcome(CoreRuntimeWorkOutcome):
     """Result of :meth:`RefreshKnownDevicesWork.run` (worker thread)."""
 
     devices: list[Phone] = field(default_factory=list)

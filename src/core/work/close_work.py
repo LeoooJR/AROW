@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 
 from core.adb import AdbServer, AdbServerException
 from core.signals import AdbServerStoppedPayload, CoreSignal
-from core.work.core_runtime_work import CoreRuntimeWork
+from core.work.core_runtime_work import CoreRuntimeWork, CoreRuntimeWorkOutcome
 from logger import logger
 
 if TYPE_CHECKING:
@@ -39,16 +39,14 @@ def _stop_adb_server(adb_server: AdbServer) -> bool:
         return False
 
 
-@dataclass
-class CloseResult:
-    """
-    Result of the close job.
-    """
+@dataclass(frozen=True, slots=True)
+class CloseOutcome(CoreRuntimeWorkOutcome):
+    """Outcome of the close job."""
 
     adb_server: AdbServer | None = None
 
 
-class CloseCoreRuntimeWork(CoreRuntimeWork[CloseResult]):
+class CloseCoreRuntimeWork(CoreRuntimeWork[CloseOutcome]):
     """
     Worker job: close the core runtime.
     """
@@ -56,17 +54,17 @@ class CloseCoreRuntimeWork(CoreRuntimeWork[CloseResult]):
     def __init__(self, adb_server: AdbServer) -> None:
         self._adb_server = adb_server
 
-    def run(self) -> CloseResult:
+    def run(self) -> CloseOutcome:
         """
         Execute close steps that may block (AsyncRunner worker thread).
         """
         if _stop_adb_server(self._adb_server):
-            return CloseResult(adb_server=self._adb_server)
+            return CloseOutcome(adb_server=self._adb_server)
         else:
-            return CloseResult(adb_server=None)
+            return CloseOutcome(adb_server=None)
 
     @staticmethod
-    def apply_main_thread(model: CoreRuntimeModel, result: CloseResult) -> None:
+    def apply_main_thread(model: CoreRuntimeModel, result: CloseOutcome) -> None:
         """
         Apply the result of the close job to the model in the main thread.
         """

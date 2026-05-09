@@ -12,9 +12,9 @@ from typing import TYPE_CHECKING
 
 from controller.helper import validate_model
 from core.work.authentificate_device_work import AuthentificateDeviceOutcome
-from core.work.device_serial_work import RefreshKnownDevicesOutcome
 from core.work.host_install_identity_work import HostInstallIdentityOutcome
-from core.work.startup_work import StartupResult
+from core.work.refresh_known_devices_work import RefreshKnownDevicesOutcome
+from core.work.startup_work import StartupOutcome
 from logger import logger
 
 if TYPE_CHECKING:
@@ -50,7 +50,7 @@ class StartupCoreRuntimeCallback:
     def on_completed(self, result: object) -> None:
         """Handle completion (Qt main thread, from AsyncRunner)."""
         model = self._subcontroller.model
-        if not isinstance(result, StartupResult):
+        if not isinstance(result, StartupOutcome):
             logger.error(
                 "AdbSubController: unexpected startup result type",
                 result_type=type(result).__name__,

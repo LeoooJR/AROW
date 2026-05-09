@@ -1,7 +1,7 @@
 """
 Paired worker output and main-thread application for core runtime startup.
 
-:class:`StartupCoreRuntimeWork` implements :class:`~core.core_runtime_work.CoreRuntimeWork`
+:class:`StartupCoreRuntimeWork` implements :class:`~core.work.core_runtime_work.CoreRuntimeWork`
 so startup matches the project-wide paired worker / apply convention.
 """
 
@@ -19,8 +19,8 @@ from core.signals import (
     CoreSignal,
     DevicesUpdatedPayload,
 )
-from core.work.core_runtime_work import CoreRuntimeWork
-from core.work.device_serial_work import enrich_phones_with_adb_shell_properties
+from core.work.core_runtime_work import CoreRuntimeWork, CoreRuntimeWorkOutcome
+from core.work.refresh_known_devices_work import enrich_phones_with_adb_shell_properties
 from logger import logger
 
 if TYPE_CHECKING:
@@ -85,9 +85,9 @@ def _create_adb_client() -> AdbClient:
     return AdbClient(binary=adb_binary)
 
 
-@dataclass
-class StartupResult:
-    """Result of the async startup job (build on a worker, apply on the main thread)."""
+@dataclass(frozen=True, slots=True)
+class StartupOutcome(CoreRuntimeWorkOutcome):
+    """Outcome of the async startup job (build on a worker, apply on the main thread)."""
 
     adb_server: AdbServer | None = field(
         default=None, metadata={"description": "The ADB server instance"}
@@ -100,27 +100,27 @@ class StartupResult:
     )
 
 
-class StartupCoreRuntimeWork(CoreRuntimeWork[StartupResult]):
+class StartupCoreRuntimeWork(CoreRuntimeWork[StartupOutcome]):
     """
     Worker job: start ADB server/client, list devices, enrich phones from ADB shell properties.
 
     Apply path owns model server/client fields and emits on the core bus.
     """
 
-    def run(self) -> StartupResult:
+    def run(self) -> StartupOutcome:
         """Execute startup steps that may block (AsyncRunner worker thread)."""
         adb_server = _start_adb_server()
         adb_client = _create_adb_client()
         devices = adb_server.get_known_devices()
         enrich_phones_with_adb_shell_properties(adb_client, devices)
-        return StartupResult(
+        return StartupOutcome(
             adb_server=adb_server,
             adb_client=adb_client,
             devices=devices,
         )
 
     @staticmethod
-    def apply_main_thread(model: CoreRuntimeModel, result: StartupResult) -> None:
+    def apply_main_thread(model: CoreRuntimeModel, result: StartupOutcome) -> None:
         """
         Own server/client state and emit on the bus (Qt main thread; AsyncRunner
         completion runs there).

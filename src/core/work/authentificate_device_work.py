@@ -14,8 +14,8 @@ from core.signals import (
     DeviceAuthentificationFailedPayload,
     DeviceAuthentificationSucceededPayload,
 )
-from core.work.core_runtime_work import CoreRuntimeWork
-from core.work.device_serial_work import enrich_phones_with_adb_shell_properties
+from core.work.core_runtime_work import CoreRuntimeWork, CoreRuntimeWorkOutcome
+from core.work.refresh_known_devices_work import enrich_phones_with_adb_shell_properties
 from logger import logger
 
 if TYPE_CHECKING:
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 
 @dataclass(frozen=True, slots=True)
-class AuthentificateDeviceOutcome:
+class AuthentificateDeviceOutcome(CoreRuntimeWorkOutcome):
     """
     Result of :meth:`AuthenticateDeviceWork.run` (worker).
 
