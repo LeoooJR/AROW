@@ -9,15 +9,17 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from controller.app_sub_controller import AppSubController
+
 if TYPE_CHECKING:
     from controller.app_controller import AppController
 
 
-class MapSubController:
+class MapSubController(AppSubController):
     """Subcontroller for map flows; does not own an AsyncRunner."""
 
     def __init__(self, app: AppController) -> None:
-        self._app = app
+        super().__init__(app)
 
     def connect_view_signals(self) -> None:
         """Connect map-relevant :data:`view_signals` when map UI is ready."""

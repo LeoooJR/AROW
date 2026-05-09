@@ -125,7 +125,7 @@ If **`coalesce_key`** is set, submitting a new job with the same key **cancels t
 
 ## Custom callbacks (project pattern)
 
-Existing code keeps completion handlers in dedicated modules (see **`controller/adb_job_callbacks.py`**):
+Existing code keeps completion handlers in dedicated modules (see **`controller/work_callbacks.py`**):
 
 1. **Small classes** with **`on_completed(self, result: object)`** and **`on_failed(self, error: JobError)`**.
 2. **`__slots__`** plus **`__weakref__`** on the class when methods are used as Qt signal slots (Qt may weak-reference bound methods).

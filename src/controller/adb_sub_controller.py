@@ -6,9 +6,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from controller.adb_job_callbacks import AdbAsyncJobCallbacks
+from controller.app_sub_controller import AppSubController
 from controller.helper import validate_model, validate_view
-from core.models import CoreRuntimeModel
+from controller.work_callbacks import AdbAsyncJobCallbacks
 from core.signals import (
     AdbServerStartedPayload,
     AdbServerStoppedPayload,
@@ -25,22 +25,14 @@ if TYPE_CHECKING:
     from controller.app_controller import AppController
 
 
-class AdbSubController:
+class AdbSubController(AppSubController):
     """Subcontroller for ADB server and device list flows (no own AsyncRunner)."""
 
     def __init__(self, app: AppController) -> None:
-        self._app = app
+        super().__init__(app)
         self._async_job_callbacks: AdbAsyncJobCallbacks = (
             AdbAsyncJobCallbacks.for_subcontroller(self)
         )
-
-    @property
-    def model(self) -> CoreRuntimeModel:
-        return self._app.model
-
-    @property
-    def view(self) -> MainWindow:
-        return self._app.view
 
     def _submit_model_async_call(self, *args, **kwargs):
         return self._app._submit_model_async_call(*args, **kwargs)

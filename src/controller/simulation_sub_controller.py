@@ -10,10 +10,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
 from collection import Repository
+from controller.app_sub_controller import AppSubController
 from controller.helper import validate_model, validate_view
 from core.devices import Phone
 from core.location import Location
-from core.models import CoreRuntimeModel
 from gui.signals import view_signals
 from gui.window import MainWindow
 from logger import logger
@@ -75,24 +75,16 @@ class SimulationRepository(Repository[Simulation]):
         super().__init__()
 
 
-class SimulationSubController:
+class SimulationSubController(AppSubController):
     """Subcontroller for the current simulation model state (no own AsyncRunner)."""
 
     def __init__(self, app: AppController) -> None:
-        self._app = app
+        super().__init__(app)
         sim_id = uuid.uuid4().hex
         self._session: Simulation = Simulation(
             id=sim_id,
-            log_file=self._app.model.config_dir / "simulations" / f"{sim_id}.log",
+            log_file=self.model.config_dir / "simulations" / f"{sim_id}.log",
         )
-
-    @property
-    def model(self) -> CoreRuntimeModel:
-        return self._app.model
-
-    @property
-    def view(self) -> MainWindow:
-        return self._app.view
 
     def connect_view_signals(self) -> None:
         view_signals.DeviceSelectionConfirmed.connect(
