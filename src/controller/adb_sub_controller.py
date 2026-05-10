@@ -4,11 +4,18 @@ ADB and device list orchestration (server lifecycle, pairing, list refresh, core
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from controller.app_sub_controller import AppSubController
 from controller.helper import validate_model, validate_view
-from controller.work_callbacks import AdbAsyncJobCallbacks
+from controller.work_callbacks import (
+    AdbAsyncJobCallbacks,
+    AuthentificateDeviceCallback,
+    HostInstallIdentityCallback,
+    RefreshDeviceListCallback,
+    StartupCoreRuntimeCallback,
+)
 from core.signals import (
     AdbServerStartedPayload,
     AdbServerStoppedPayload,
@@ -33,6 +40,9 @@ class AdbSubController(AppSubController):
         self._async_job_callbacks: AdbAsyncJobCallbacks = (
             AdbAsyncJobCallbacks.for_subcontroller(self)
         )
+        # One-shot hook after CloseCoreRuntime apply (e.g. quit nested QEventLoop); held on
+        # self so AsyncRunner slots keep a long-lived CloseCoreRuntimeCallback on AdbAsyncJobCallbacks.
+        self._pending_after_close_apply: Callable[[], None] | None = None
 
     def _submit_model_async_call(self, *args, **kwargs):
         return self._app._submit_model_async_call(*args, **kwargs)
@@ -70,14 +80,17 @@ class AdbSubController(AppSubController):
 
     @validate_model
     def _startup_core_runtime(self) -> None:
+        callback: StartupCoreRuntimeCallback = self._async_job_callbacks.startup
+        if callback is None:
+            raise ValueError("StartupCoreRuntimeCallback is not set")
         self._submit_model_async_call(
             name="startup_core_runtime",
             fn=self.model.startup,
             description="Startup the core runtime",
             job_type="thread",
             coalesce_key="startup",
-            on_completed=self._async_job_callbacks.startup.on_completed,
-            on_failed=self._async_job_callbacks.startup.on_failed,
+            on_completed=callback.on_completed,
+            on_failed=callback.on_failed,
         )
 
     @validate_model
@@ -86,14 +99,19 @@ class AdbSubController(AppSubController):
         After startup apply finishes, persist/load install UUID off the main thread and
         attach ``stable_key`` on completion (serialized after core runtime startup).
         """
+        callback: HostInstallIdentityCallback = (
+            self._async_job_callbacks.host_install_identity
+        )
+        if callback is None:
+            raise ValueError("HostInstallIdentityCallback is not set")
         self._submit_model_async_call(
             name="host_install_identity",
             fn=self.model.run_host_install_identity,
             description="Load or create persisted host install UUID",
             job_type="thread",
             coalesce_key=None,
-            on_completed=self._async_job_callbacks.host_install_identity.on_completed,
-            on_failed=self._async_job_callbacks.host_install_identity.on_failed,
+            on_completed=callback.on_completed,
+            on_failed=callback.on_failed,
         )
 
     @validate_model
@@ -107,6 +125,11 @@ class AdbSubController(AppSubController):
             port=port,
             association_code=association_code,
         )
+        callback: AuthentificateDeviceCallback = (
+            self._async_job_callbacks.authentificate_device
+        )
+        if callback is None:
+            raise ValueError("AuthentificateDeviceCallback is not set")
         _port = int(port)
         self._submit_model_async_call(
             name="authentification_workflow",
@@ -115,22 +138,46 @@ class AdbSubController(AppSubController):
             description="Authenticate a device over ADB",
             job_type="thread",
             coalesce_key="device",
-            on_completed=self._async_job_callbacks.authentificate_device.on_completed,
-            on_failed=self._async_job_callbacks.authentificate_device.on_failed,
+            on_completed=callback.on_completed,
+            on_failed=callback.on_failed,
         )
 
     @validate_model
     def _on_refresh_device_list_requested(self) -> None:
         """ADB list query on a worker."""
         logger.debug("AdbSubController: refresh device list requested")
+        callback: RefreshDeviceListCallback = (
+            self._async_job_callbacks.refresh_device_list
+        )
+        if callback is None:
+            raise ValueError("RefreshDeviceListCallback is not set")
         self._submit_model_async_call(
             name="refresh_device_list",
             fn=self.model.refresh_known_devices,
             description="Refresh device list from ADB",
             job_type="thread",
             coalesce_key="device",
-            on_completed=self._async_job_callbacks.refresh_device_list.on_completed,
-            on_failed=self._async_job_callbacks.refresh_device_list.on_failed,
+            on_completed=callback.on_completed,
+            on_failed=callback.on_failed,
+        )
+
+    @validate_model
+    def _enqueue_close_core_runtime(
+        self,
+        *,
+        after_apply: Callable[[], None] | None = None,
+    ) -> None:
+        """Stop ADB on a worker; apply outcome on main thread via callback."""
+        self._pending_after_close_apply = after_apply
+        callback = self._async_job_callbacks.close
+        self._submit_model_async_call(
+            name="close_core_runtime",
+            fn=self.model.close_core_runtime,
+            description="Stop ADB server and detach core runtime",
+            job_type="thread",
+            coalesce_key=None,
+            on_completed=callback.on_completed,
+            on_failed=callback.on_failed,
         )
 
     @validate_view

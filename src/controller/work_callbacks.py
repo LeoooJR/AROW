@@ -1,5 +1,6 @@
 """
-Per-async-job outcome callbacks for AdbSubController (startup, host identity, authentificate, list refresh).
+Per-async-job outcome callbacks for AdbSubController (startup, host identity,
+authentificate, list refresh, close core runtime).
 
 Keep AsyncRunner callbacks out of the subcontroller so each job is easy to read.
 """
@@ -12,6 +13,7 @@ from typing import TYPE_CHECKING
 
 from controller.helper import validate_model
 from core.work.authentificate_device_work import AuthentificateDeviceOutcome
+from core.work.close_work import CloseOutcome
 from core.work.host_install_identity_work import HostInstallIdentityOutcome
 from core.work.refresh_known_devices_work import RefreshKnownDevicesOutcome
 from core.work.startup_work import StartupOutcome
@@ -175,12 +177,57 @@ class HostInstallIdentityCallback:
         log_host_install_identity_job_failure(error)
 
 
+def log_close_core_runtime_job_failure(error: JobError) -> None:
+    """Log a failed close-core-runtime async job."""
+    logger.error(
+        "AdbSubController: close_core_runtime job failed",
+        message=error.message,
+        return_code=error.return_code,
+        traceback=error.traceback or None,
+    )
+
+
+class CloseCoreRuntimeCallback:
+    """Callback for closing the core runtime (ADB stop); optional hook after ``apply_result``."""
+
+    __slots__ = ("_subcontroller", "__weakref__")
+
+    def __init__(self, subcontroller: AdbSubController) -> None:
+        self._subcontroller = subcontroller
+
+    def _consume_pending_after_close_apply(self) -> None:
+        """Clear and invoke one-shot hook registered on ``AdbSubController`` (shutdown / tests)."""
+        sc = self._subcontroller
+        hook = sc._pending_after_close_apply
+        sc._pending_after_close_apply = None
+        if hook is not None:
+            hook()
+
+    @validate_model
+    def on_completed(self, result: object) -> None:
+        model = self._subcontroller.model
+        if not isinstance(result, CloseOutcome):
+            logger.error(
+                "AdbSubController: unexpected close_core_runtime result type",
+                result_type=type(result).__name__,
+            )
+            self._consume_pending_after_close_apply()
+            return
+        model.apply_result(result)
+        self._consume_pending_after_close_apply()
+
+    def on_failed(self, error: JobError) -> None:
+        log_close_core_runtime_job_failure(error)
+        self._consume_pending_after_close_apply()
+
+
 # AdbSubController method (async entry) -> attribute on :class:`AdbAsyncJobCallbacks`.
 ADB_SUBCONTROLLER_METHOD_TO_CALLBACK_ATTR: dict[str, str] = {
     "_startup_core_runtime": "startup",
     "_on_authentification_confirmed": "authentificate_device",
     "_on_refresh_device_list_requested": "refresh_device_list",
     "_enqueue_host_install_identity_job": "host_install_identity",
+    "_enqueue_close_core_runtime": "close",
 }
 
 
@@ -197,6 +244,7 @@ class AdbAsyncJobCallbacks:
     authentificate_device: AuthentificateDeviceCallback
     refresh_device_list: RefreshDeviceListCallback
     host_install_identity: HostInstallIdentityCallback
+    close: CloseCoreRuntimeCallback
 
     @classmethod
     def for_subcontroller(cls, subcontroller: AdbSubController) -> AdbAsyncJobCallbacks:
@@ -205,4 +253,5 @@ class AdbAsyncJobCallbacks:
             authentificate_device=AuthentificateDeviceCallback(subcontroller),
             refresh_device_list=RefreshDeviceListCallback(subcontroller),
             host_install_identity=HostInstallIdentityCallback(subcontroller),
+            close=CloseCoreRuntimeCallback(subcontroller),
         )

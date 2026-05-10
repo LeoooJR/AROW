@@ -5,10 +5,13 @@ import typer
 from PySide6 import QtWidgets
 
 from __init__ import __application__, __version__
+from logger import setup_logger
+
+setup_logger()
+
 from controller.app_controller import AppController
 from core.models import CoreRuntimeModel
 from gui.window import MainWindow
-from logger import setup_logger
 
 app = typer.Typer()
 
@@ -23,8 +26,6 @@ def main(
     ] = False,
 ) -> None:
     """Start the application."""
-
-    setup_logger()
 
     qt_application = QtWidgets.QApplication([])
 

@@ -203,6 +203,14 @@ def _loguru_format(record: dict[str, Any]) -> str:
 
 
 def setup_logger() -> None:
+    """
+    Configure Loguru sinks and the project format string.
+
+    Call this before importing modules that emit logs at import time. For example,
+    ``core.models`` imports ``CORE_RUNTIME_WORKS``, which constructs
+    :class:`~collection.Repository` subclasses that log snapshot lines from ``add`` / ``add_all``.
+    If this runs too late, those lines go through Loguru's default handler instead of the file sink.
+    """
     logger.remove()
 
     logger.add(
@@ -210,4 +218,5 @@ def setup_logger() -> None:
         format=_loguru_format,
         colorize=False,
         encoding="utf-8",
+        watch=True,
     )

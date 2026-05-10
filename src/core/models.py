@@ -22,6 +22,7 @@ from core.work.authentificate_device_work import (
     AuthenticateDeviceWork,
     AuthentificateDeviceOutcome,
 )
+from core.work.close_work import CloseCoreRuntimeWork, CloseOutcome
 from core.work.core_runtime_work import CoreRuntimeWorkOutcome
 from core.work.host_install_identity_work import (
     HostInstallIdentityOutcome,
@@ -31,10 +32,8 @@ from core.work.refresh_known_devices_work import (
     RefreshKnownDevicesOutcome,
     RefreshKnownDevicesWork,
 )
-from core.work.startup_work import (
-    StartupCoreRuntimeWork,
-    StartupOutcome,
-)
+from core.work.startup_work import StartupCoreRuntimeWork, StartupOutcome
+from core.work.works_repository import CORE_RUNTIME_WORKS
 from logger import logger
 
 # Main-thread appliers keyed by exact worker outcome type (AsyncRunner completion).
@@ -43,10 +42,7 @@ CoreRuntimeResultApplier = Callable[["CoreRuntimeModel", CoreRuntimeWorkOutcome]
 _CORE_RUNTIME_RESULT_APPLIERS: dict[
     type[CoreRuntimeWorkOutcome], CoreRuntimeResultApplier
 ] = {
-    StartupOutcome: StartupCoreRuntimeWork.apply_main_thread,
-    AuthentificateDeviceOutcome: AuthenticateDeviceWork.apply_main_thread,
-    HostInstallIdentityOutcome: HostInstallIdentityWork.apply_main_thread,
-    RefreshKnownDevicesOutcome: RefreshKnownDevicesWork.apply_main_thread,
+    entry.outcome_cls: entry.work_cls.apply_main_thread for entry in CORE_RUNTIME_WORKS
 }
 
 
@@ -157,6 +153,14 @@ class CoreRuntimeModel(Model):
         Apply on the main thread via :meth:`apply_result` after AsyncRunner completes.
         """
         return HostInstallIdentityWork().run()
+
+    def close_core_runtime(self) -> CloseOutcome:
+        """
+        Stop the ADB server (worker thread). Apply on the main thread via :meth:`apply_result`.
+        """
+        if self._adb_server is None:
+            return CloseOutcome(adb_server=None)
+        return CloseCoreRuntimeWork(self._adb_server).run()
 
     def restart_adb_server(self) -> None:
         """
