@@ -214,6 +214,9 @@ class CloseCoreRuntimeCallback:
             self._consume_pending_after_close_apply()
             return
         model.apply_result(result)
+        logger.success(
+            "AdbSubController: close_core_runtime completed",
+        )
         self._consume_pending_after_close_apply()
 
     def on_failed(self, error: JobError) -> None:

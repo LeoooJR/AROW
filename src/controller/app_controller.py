@@ -10,6 +10,7 @@ from PySide6.QtWidgets import QApplication
 
 from controller.adb_sub_controller import AdbSubController
 from controller.controller import Controller
+from controller.helper import watchdog
 from controller.map_sub_controller import MapSubController
 from controller.simulation_sub_controller import SimulationSubController
 from core.models import CoreRuntimeModel
@@ -88,8 +89,6 @@ class AppController(Controller):
             return
 
         bootstrap_loop = QEventLoop()
-        watchdog = QTimer()
-        watchdog.setSingleShot(True)
 
         # Pairs of (per-job signals object, slot) for teardown.
         handle_bindings: list[tuple[object, object]] = []
@@ -103,8 +102,11 @@ class AppController(Controller):
         def _recheck_bootstrap_jobs() -> None:
             # Startup completion may enqueue host_install_identity before history is cleaned up.
             _ensure_per_job_bootstrap_connections()
-            if not self._adb_bootstrap_jobs_pending() and bootstrap_loop.isRunning():
-                bootstrap_loop.quit()
+            if not self._adb_bootstrap_jobs_pending():
+                if bootstrap_watchdog.isActive():
+                    bootstrap_watchdog.stop()
+                if bootstrap_loop.isRunning():
+                    bootstrap_loop.quit()
 
         def _ensure_per_job_bootstrap_connections() -> None:
             for job_id, (handler, handle_signals) in list(self.runner.history.items()):
@@ -126,14 +128,18 @@ class AppController(Controller):
             if bootstrap_loop.isRunning():
                 bootstrap_loop.quit()
 
-        watchdog.timeout.connect(_unblock_bootstrap_loop)
+        bootstrap_watchdog: QTimer = watchdog(_SHUTDOWN_CLOSE_JOB_TIMEOUT_MS)(
+            _unblock_bootstrap_loop
+        )
+
         _ensure_per_job_bootstrap_connections()
         QTimer.singleShot(0, _recheck_bootstrap_jobs)
-        watchdog.start(_SHUTDOWN_CLOSE_JOB_TIMEOUT_MS)
+
         try:
             bootstrap_loop.exec()
         finally:
-            watchdog.stop()
+            if bootstrap_watchdog.isActive():
+                bootstrap_watchdog.stop()
             for hs, slot in handle_bindings:
                 try:
                     hs.Completed.disconnect(slot)
@@ -150,8 +156,6 @@ class AppController(Controller):
         self._wait_for_adb_bootstrap_jobs()
 
         shutdown_loop = QEventLoop()
-        watchdog = QTimer()
-        watchdog.setSingleShot(True)
 
         def _unblock_shutdown_loop() -> None:
             logger.warning(
@@ -161,14 +165,21 @@ class AppController(Controller):
             if shutdown_loop.isRunning():
                 shutdown_loop.quit()
 
+        shutdown_watchdog: QTimer = watchdog(_SHUTDOWN_CLOSE_JOB_TIMEOUT_MS)(
+            _unblock_shutdown_loop
+        )
+
         def _after_close_applied() -> None:
-            watchdog.stop()
+            if shutdown_watchdog.isActive():
+                shutdown_watchdog.stop()
             if shutdown_loop.isRunning():
                 shutdown_loop.quit()
 
-        watchdog.timeout.connect(_unblock_shutdown_loop)
-        watchdog.start(_SHUTDOWN_CLOSE_JOB_TIMEOUT_MS)
         self._adb._enqueue_close_core_runtime(after_apply=_after_close_applied)
-        shutdown_loop.exec()
-        watchdog.stop()
+
+        try:
+            shutdown_loop.exec()
+        finally:
+            if shutdown_watchdog.isActive():
+                shutdown_watchdog.stop()
         self.runner.shutdown()
