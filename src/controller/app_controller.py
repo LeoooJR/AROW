@@ -17,7 +17,10 @@ from gui.window import MainWindow
 from logger import logger
 
 # Hard cap blocking quit until close job applies; avoids orphaned ADB during exit.
-_SHUTDOWN_CLOSE_JOB_TIMEOUT_MS = 30_000
+_SHUTDOWN_CLOSE_JOB_TIMEOUT_MS = 60_000
+
+# Async jobs that must finish (or fail/cancel) before quit runs close/shutdown.
+_ADB_BOOTSTRAP_JOB_NAMES = frozenset({"startup_core_runtime", "host_install_identity"})
 
 
 class AppController(Controller):
@@ -65,14 +68,77 @@ class AppController(Controller):
         self._adb.connect_model_signals()
         self._map.connect_model_signals()
 
-    def _on_application_about_to_quit(self) -> None:
-        """Run close work like other jobs; block until applied, then tear down runners."""
-        if self.model.adb_server is None:
-            self.model.apply_result(self.model.close_core_runtime())
-            self.runner.shutdown()
+    def _adb_bootstrap_jobs_pending(self) -> bool:
+        """True while startup or chained host-install jobs are still in the runner queue."""
+        return any(
+            handler.name in _ADB_BOOTSTRAP_JOB_NAMES
+            for handler, _ in self.runner.history.values()
+        )
+
+    def _wait_for_adb_bootstrap_jobs(self) -> None:
+        """
+        Block quit until in-flight startup / host_install_identity jobs leave ``history``,
+        so ``runner.shutdown()`` cannot strand worker completions that re-apply model state.
+
+        Uses each job's :class:`~controller.async.JobHandlerSignals` (not runner-level
+        signals) so lifecycle ordering matches the intended job graph; ``host_install_identity``
+        may appear while draining startup, so connections are attached incrementally.
+        """
+        if not self._adb_bootstrap_jobs_pending():
             return
 
+        bootstrap_loop = QEventLoop()
+        watchdog = QTimer()
+        watchdog.setSingleShot(True)
+
+        # Pairs of (per-job signals object, slot) for teardown.
+        handle_bindings: list[tuple[object, object]] = []
+        connected_job_ids: set[str] = set()
+
+        def _on_bootstrap_job_finished(*_args: object) -> None:
+            # Startup completion may enqueue host_install_identity before history is cleaned up.
+            _ensure_per_job_bootstrap_connections()
+            if not self._adb_bootstrap_jobs_pending() and bootstrap_loop.isRunning():
+                bootstrap_loop.quit()
+
+        def _ensure_per_job_bootstrap_connections() -> None:
+            for job_id, (handler, handle_signals) in list(self.runner.history.items()):
+                if handler.name not in _ADB_BOOTSTRAP_JOB_NAMES:
+                    continue
+                if job_id in connected_job_ids:
+                    continue
+                handle_signals.Completed.connect(_on_bootstrap_job_finished)
+                handle_signals.Failed.connect(_on_bootstrap_job_finished)
+                handle_signals.Cancelled.connect(_on_bootstrap_job_finished)
+                handle_bindings.append((handle_signals, _on_bootstrap_job_finished))
+                connected_job_ids.add(job_id)
+
+        def _unblock_bootstrap_loop() -> None:
+            logger.warning(
+                "AppController: bootstrap jobs exceeded shutdown wait",
+                timeout_ms=_SHUTDOWN_CLOSE_JOB_TIMEOUT_MS,
+            )
+            if bootstrap_loop.isRunning():
+                bootstrap_loop.quit()
+
+        watchdog.timeout.connect(_unblock_bootstrap_loop)
+        _ensure_per_job_bootstrap_connections()
+        watchdog.start(_SHUTDOWN_CLOSE_JOB_TIMEOUT_MS)
+        try:
+            bootstrap_loop.exec()
+        finally:
+            watchdog.stop()
+            for hs, slot in handle_bindings:
+                hs.Completed.disconnect(slot)
+                hs.Failed.disconnect(slot)
+                hs.Cancelled.disconnect(slot)
+
+    def _on_application_about_to_quit(self) -> None:
+        """Drain bootstrap async work, run close like other jobs, then tear down runners."""
+
         self.view = None  # Ensure the view is not accessible anymore, no data will be forwarded to it
+
+        self._wait_for_adb_bootstrap_jobs()
 
         shutdown_loop = QEventLoop()
         watchdog = QTimer()
