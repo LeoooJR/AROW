@@ -96,6 +96,11 @@ class AppController(Controller):
         connected_job_ids: set[str] = set()
 
         def _on_bootstrap_job_finished(*_args: object) -> None:
+            # AsyncRunner cleans history after emitting per-job signals, so recheck on
+            # the next Qt turn to avoid waiting for the watchdog on an already-done job.
+            QTimer.singleShot(0, _recheck_bootstrap_jobs)
+
+        def _recheck_bootstrap_jobs() -> None:
             # Startup completion may enqueue host_install_identity before history is cleaned up.
             _ensure_per_job_bootstrap_connections()
             if not self._adb_bootstrap_jobs_pending() and bootstrap_loop.isRunning():
@@ -123,15 +128,19 @@ class AppController(Controller):
 
         watchdog.timeout.connect(_unblock_bootstrap_loop)
         _ensure_per_job_bootstrap_connections()
+        QTimer.singleShot(0, _recheck_bootstrap_jobs)
         watchdog.start(_SHUTDOWN_CLOSE_JOB_TIMEOUT_MS)
         try:
             bootstrap_loop.exec()
         finally:
             watchdog.stop()
             for hs, slot in handle_bindings:
-                hs.Completed.disconnect(slot)
-                hs.Failed.disconnect(slot)
-                hs.Cancelled.disconnect(slot)
+                try:
+                    hs.Completed.disconnect(slot)
+                    hs.Failed.disconnect(slot)
+                    hs.Cancelled.disconnect(slot)
+                except (RuntimeError, TypeError):
+                    pass
 
     def _on_application_about_to_quit(self) -> None:
         """Drain bootstrap async work, run close like other jobs, then tear down runners."""
