@@ -24,6 +24,10 @@ def main(
             help="Only start the interface, no controller and model, useful for debugging."
         ),
     ] = False,
+    mock_adb: Annotated[
+        bool,
+        typer.Option(help="Use faker-backed mock ADB (no real adb daemon or binary)."),
+    ] = False,
 ) -> None:
     """Start the application."""
 
@@ -39,7 +43,7 @@ def main(
 
     if not interface_only:
 
-        simulation_model: CoreRuntimeModel = CoreRuntimeModel()
+        simulation_model: CoreRuntimeModel = CoreRuntimeModel(use_mock_adb=mock_adb)
 
         app_controller: AppController = AppController(
             model=simulation_model, view=main_window

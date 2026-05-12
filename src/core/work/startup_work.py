@@ -7,12 +7,22 @@ so startup matches the project-wide paired worker / apply convention.
 
 from __future__ import annotations
 
+import os
 import platform
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from core.adb import AdbBinary, AdbClient, AdbServer
+from core.adb import (
+    DEFAULT_MOCK_ADB_BINARY_PATH,
+    AdbBinary,
+    AdbClient,
+    AdbServer,
+    MockAdbClient,
+    MockAdbServer,
+    MockAdbState,
+    mock_adb_seed_from_env,
+)
 from core.devices import Phone
 from core.signals import (
     AdbServerStartedPayload,
@@ -25,6 +35,17 @@ from logger import logger
 
 if TYPE_CHECKING:
     from core.models import CoreRuntimeModel
+
+
+def _use_mock_adb_effective(cli_or_model_flag: bool) -> bool:
+    """Enable mock ADB from constructor/CLI flag or ``AROW_USE_MOCK_ADB`` env."""
+    if cli_or_model_flag:
+        return True
+    return os.environ.get("AROW_USE_MOCK_ADB", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
 
 
 def _resolve_adb_binary_path() -> Path:
@@ -107,10 +128,26 @@ class StartupCoreRuntimeWork(CoreRuntimeWork[StartupOutcome]):
     Apply path owns model server/client fields and emits on the core bus.
     """
 
+    def __init__(self, use_mock_adb: bool = False) -> None:
+        self._use_mock_adb: bool = use_mock_adb
+
     def run(self) -> StartupOutcome:
         """Execute startup steps that may block (AsyncRunner worker thread)."""
-        adb_server = _start_adb_server()
-        adb_client = _create_adb_client()
+        use_mock = _use_mock_adb_effective(self._use_mock_adb)
+        if use_mock:
+            seed = mock_adb_seed_from_env()
+            adb_state = MockAdbState(seed=seed)
+            adb_binary = AdbBinary(path=DEFAULT_MOCK_ADB_BINARY_PATH)
+            adb_server = MockAdbServer(state=adb_state, binary=adb_binary)
+            adb_client = MockAdbClient(state=adb_state, binary=adb_binary)
+            logger.info(
+                "startup_work: mock ADB server/client initialized",
+                adb_path=str(adb_binary.path),
+                mock_seed=seed,
+            )
+        else:
+            adb_server = _start_adb_server()
+            adb_client = _create_adb_client()
         devices = adb_server.get_known_devices()
         enrich_phones_with_adb_shell_properties(adb_client, devices)
         return StartupOutcome(
