@@ -83,11 +83,12 @@ class CoreRuntimeModel(Model):
     can interact with a stable model API rather than low-level core classes.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, *, use_mock_adb: bool = False) -> None:
         super().__init__()
         self._host: Computer = Computer(id="host-1")
         self._adb_server: AdbServer | None = None
         self._adb_client: AdbClient | None = None
+        self._use_mock_adb: bool = use_mock_adb
 
     @property
     def host(self) -> Computer:
@@ -103,7 +104,7 @@ class CoreRuntimeModel(Model):
         """
         Initialize runtime core services at application startup (worker thread).
         """
-        return StartupCoreRuntimeWork().run()
+        return StartupCoreRuntimeWork(use_mock_adb=self._use_mock_adb).run()
 
     def authentificate_device(
         self, ip: str, port: int, association_code: str
