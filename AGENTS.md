@@ -98,6 +98,11 @@ Apply these rules whenever you touch `src/geo`.
 
 Apply these rules whenever you touch `src/gui`.
 
+### Design guidelines
+
+- Follow `DESIGN.md` for the AROW visual direction, including light/dark palettes, typography, spacing, widget styling, and interaction states.
+- Treat `DESIGN.md` as the design source of truth before adding new GUI colors, dimensions, component treatments, or theme behavior.
+
 ### Settings and dimensions
 
 - Use values from `src/gui/settings.py` for margins, spacing, dimensions, and fonts.
