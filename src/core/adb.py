@@ -1139,23 +1139,24 @@ class MockAdbClient(AdbClient):
         tup = tuple(args)
         if tup == ("getprop", "ro.serialno"):
             return f"{profile.ro_serialno}\n"
-        if tup == ("getprop", "device_name"):
+        elif tup == ("getprop", "device_name"):
             return f"{profile.device_name}\n" if profile.device_name else ""
-        if tup == ("getprop", "ro.build.version.release"):
+        elif tup == ("getprop", "ro.build.version.release"):
             return f"{profile.android_release}\n"
-        if tup == ("getprop", "ro.product.manufacturer"):
+        elif tup == ("getprop", "ro.product.manufacturer"):
             return f"{profile.manufacturer}\n"
-        if tup == ("getprop", "ro.product.model"):
+        elif tup == ("getprop", "ro.product.model"):
             return f"{profile.model.replace('_', ' ')}\n"
-        if tup == ("getprop", "ro.build.version.sdk"):
+        elif tup == ("getprop", "ro.build.version.sdk"):
             return f"{profile.sdk}\n"
-        if tup == ("settings", "get", "secure", "location_mode"):
+        elif tup == ("settings", "get", "secure", "location_mode"):
             return str(fake.random_int(min=0, max=3)) + "\n"
-        if tup == ("dumpsys", "battery"):
+        elif tup == ("dumpsys", "battery"):
             return _mock_battery_blob(fake)
-        if tup == ("dumpsys", "window"):
+        elif tup == ("dumpsys", "window"):
             return _mock_window_blob(profile)
-        return ""
+        else:
+            return ""
 
     @property
     def _faker(self) -> Faker:

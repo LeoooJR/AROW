@@ -117,6 +117,7 @@ class CoreRuntimeModel(Model):
             raise AttributeError(
                 "ADB server and client must be initialized before authentification"
             )
+        # Check if a device with this IP address on the current ADB server is already paired
         for device in self._adb_server.paired_devices:
             if device.ip == ip:
                 return AuthentificateDeviceOutcome(
