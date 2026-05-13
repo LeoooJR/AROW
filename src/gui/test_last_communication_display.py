@@ -74,6 +74,25 @@ def test_device_item_live_row_updates_with_now(qtbot) -> None:
     assert item.ui.time_label.text() == "4 hours ago"
 
 
+def test_device_item_badge_stacks_in_compact_mode_and_restores_when_extended(
+    qtbot,
+) -> None:
+    item = DeviceItem(None, text="Zenfone 11", badge="trusted")
+    qtbot.addWidget(item.ui.row)
+    qtbot.wait(0)
+
+    assert item.ui.center.get_layout().indexOf(item.ui.badge_container) == 1
+    assert item.ui.title_row.get_layout().indexOf(item.ui.badge_container) == -1
+
+    item.extend_device_item()
+    assert item.ui.title_row.get_layout().indexOf(item.ui.badge_container) == 1
+    assert item.ui.center.get_layout().indexOf(item.ui.badge_container) == -1
+
+    item.shorten_device_item()
+    assert item.ui.center.get_layout().indexOf(item.ui.badge_container) == 1
+    assert item.ui.title_row.get_layout().indexOf(item.ui.badge_container) == -1
+
+
 def test_refresh_panel_timer_invokes_batch_refresh(qtbot, monkeypatch) -> None:
     calls: list[int] = []
     real = DeviceSelectionPanel.refresh_last_communication_timestamps

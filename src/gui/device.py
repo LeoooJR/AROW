@@ -19,7 +19,6 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QSizePolicy,
-    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -122,6 +121,14 @@ class _DeviceItemRowWidget(QWidget):
         super().resizeEvent(event)
         self._device_item._sync_size_hint()
 
+    def enterEvent(self, event: QEvent) -> None:
+        super().enterEvent(event)
+        self._device_item.set_hovered(True)
+
+    def leaveEvent(self, event: QEvent) -> None:
+        super().leaveEvent(event)
+        self._device_item.set_hovered(False)
+
 
 class DeviceItem(QListWidgetItem):
     """
@@ -138,8 +145,8 @@ class DeviceItem(QListWidgetItem):
         """Default labels, badges, and affordances for a device list row."""
 
         default_name: Final[str] = "Unknown Device"
-        menu_button: Final[str] = "⋮"
-        menu_button_tooltip: Final[str] = "Device actions"
+        trash_button: Final[str] = ""
+        trash_button_tooltip: Final[str] = "Remove device"
         active_badge: Final[str] = "Active"
         trusted_badge: Final[str] = "Trusted"
         new_badge: Final[str] = "New"
@@ -160,7 +167,7 @@ class DeviceItem(QListWidgetItem):
         subtitle_host: VerticalLayoutWrapper
         subtitle_label: QLabel
         time_label: QLabel
-        menu_button: QToolButton
+        trash_button: ToolButton
         icon_label: QLabel
         helper_text: str
 
@@ -221,6 +228,7 @@ class DeviceItem(QListWidgetItem):
         )
         self._alert_highlight: bool = alert_highlight
         self._is_extended: bool = False
+        self._uses_compact_badge_layout: bool = False
         self._sync_size_hint_in_progress: bool = False
 
         row = _DeviceItemRowWidget(self)
@@ -292,13 +300,13 @@ class DeviceItem(QListWidgetItem):
             time_label, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop
         )
 
-        menu_button = QToolButton(row)
-        menu_button.setObjectName("device-item-menu")
-        menu_button.setText(self.texts.menu_button)
-        menu_button.setToolTip(self.texts.menu_button_tooltip)
-        menu_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        menu_button.setAutoRaise(True)
-        menu_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        trash_button = ToolButton(
+            row,
+            icon_path=GenericIcons.TRASH.value,
+            tooltip=self.texts.trash_button_tooltip,
+        )
+        trash_button.setObjectName("device-item-trash")
+        trash_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
         title_row = HorizontalLayoutWrapper(
             row,
@@ -326,13 +334,13 @@ class DeviceItem(QListWidgetItem):
 
         right_wrap = HorizontalLayoutWrapper(
             row,
-            widgets=[time_label, menu_button],
+            widgets=[time_label, trash_button],
             spacing=Settings.LIST.DEVICE_ITEM_ROW_RIGHT_GAP,
             margins=Settings.SPACING.MARGIN_NONE,
         )
         right_wrap.setObjectName("device-item-right-wrap")
         right_wrap.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        right_wrap.hide()
+        time_label.hide()
 
         main_row = HorizontalLayoutWrapper(
             row,
@@ -366,7 +374,7 @@ class DeviceItem(QListWidgetItem):
             subtitle_host=subtitle_host,
             subtitle_label=subtitle_label,
             time_label=time_label,
-            menu_button=menu_button,
+            trash_button=trash_button,
             icon_label=icon_label,
             helper_text=helper_text,
         )
@@ -381,6 +389,7 @@ class DeviceItem(QListWidgetItem):
             )
         self.alert_highlight = alert_highlight
         self._finalize_ui_hooks()
+        self._set_compact_badge_layout()
         self._sync_size_hint()
 
     def _finalize_ui_hooks(self) -> None:
@@ -429,7 +438,7 @@ class DeviceItem(QListWidgetItem):
         self.ui.time_label.setSizePolicy(
             QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred
         )
-        self.ui.menu_button.setSizePolicy(
+        self.ui.trash_button.setSizePolicy(
             QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed
         )
         self.ui.title_row.setSizePolicy(
@@ -444,13 +453,40 @@ class DeviceItem(QListWidgetItem):
         self.ui.title_row.get_layout().setAlignment(Qt.AlignmentFlag.AlignTop)
         self.ui.center.get_layout().setAlignment(Qt.AlignmentFlag.AlignTop)
         self.ui.right_wrap.get_layout().setAlignment(
-            self.ui.menu_button, Qt.AlignmentFlag.AlignVCenter
+            self.ui.trash_button, Qt.AlignmentFlag.AlignVCenter
         )
         self.ui.right_wrap.get_layout().setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
     def _connect_signals(self) -> None:
         """Signals for the device row (menu, future actions)."""
         pass
+
+    def set_hovered(self, hovered: bool) -> None:
+        """Apply hover state to the custom list row widget."""
+        self.ui.row.setProperty("hovered", hovered)
+        self.ui.row.style().unpolish(self.ui.row)
+        self.ui.row.style().polish(self.ui.row)
+        self.ui.row.update()
+
+    def _set_compact_badge_layout(self) -> None:
+        """Move the badge below the name so narrow rows do not clip labels."""
+        if self._uses_compact_badge_layout:
+            return
+        title_layout = self.ui.title_row.get_layout()
+        center_layout = self.ui.center.get_layout()
+        title_layout.removeWidget(self.ui.badge_container)
+        center_layout.insertWidget(1, self.ui.badge_container)
+        self._uses_compact_badge_layout = True
+
+    def _set_extended_badge_layout(self) -> None:
+        """Restore the wider inline name/badge layout used by expanded rows."""
+        if not self._uses_compact_badge_layout:
+            return
+        center_layout = self.ui.center.get_layout()
+        title_layout = self.ui.title_row.get_layout()
+        center_layout.removeWidget(self.ui.badge_container)
+        title_layout.insertWidget(1, self.ui.badge_container)
+        self._uses_compact_badge_layout = False
 
     @staticmethod
     def _clear_layout(layout: QLayout) -> None:
@@ -700,15 +736,20 @@ class DeviceItem(QListWidgetItem):
         if self._is_extended:
             return
         self._is_extended = True
+        self._set_extended_badge_layout()
+        self.ui.time_label.show()
         self.ui.right_wrap.show()
         self._sync_size_hint()
 
     def shorten_device_item(self) -> None:
         """Shorten the device item to hide the last communication time and menu button."""
         if not self._is_extended:
+            self._set_compact_badge_layout()
             return
         self._is_extended = False
-        self.ui.right_wrap.hide()
+        self._set_compact_badge_layout()
+        self.ui.time_label.hide()
+        self.ui.right_wrap.show()
         self._sync_size_hint()
 
 
@@ -1082,12 +1123,16 @@ class DeviceSelectionPanel(QFrame):
             widgets=[
                 (add_device_button, 0, 0),
                 (refresh_button, 0, 1),
-                (trash_button, 1, 0),
             ],
+            spacing=Settings.SPACING.SM,
         )
+        buttons_wrapper.setObjectName("available-device-actions")
+        trash_button.hide()
 
         available_device_wrapper = HorizontalLayoutWrapper(
-            self, widgets=[available_device_list, buttons_wrapper]
+            self,
+            widgets=[available_device_list, buttons_wrapper],
+            spacing=Settings.SPACING.MD,
         )
         available_device_wrapper.get_layout().setStretchFactor(available_device_list, 1)
         available_device_wrapper.get_layout().setStretchFactor(buttons_wrapper, 0)
@@ -1100,6 +1145,7 @@ class DeviceSelectionPanel(QFrame):
             widgets=[available_device_wrapper, select_helper_text],
             title=self.texts.available_devices_group_title,
         )
+        available_device_group_box.setObjectName("available-device-group-box")
 
         body = VerticalLayoutWrapper(
             self,

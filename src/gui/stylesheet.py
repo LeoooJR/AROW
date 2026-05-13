@@ -487,15 +487,62 @@ QGroupBox QListWidget::item {{
     margin: 2px 0px;
 }}
 
+QGroupBox#available-device-group-box {{
+    background-color: {palette.WHITE};
+    border: 1px solid {palette.LIGHT_DIVIDER};
+    border-radius: {Settings.BORDER_RADIUS.MD}px;
+    padding: {Settings.PANEL.CONTENT_PADDING}px;
+    padding-top: 18px;
+}}
+
+QGroupBox#available-device-group-box::title {{
+    background-color: {palette.WHITE};
+    color: {palette.BLACK};
+    font-size: {Settings.FONT.SIZE_DEFAULT}px;
+    font-weight: {Settings.FONT.WEIGHT_DEMIBOLD};
+}}
+
+QGroupBox#available-device-group-box QListWidget#availabe-device-list {{
+    background-color: {palette.TRANSPARENT};
+    border: none;
+    border-radius: {Settings.BORDER_RADIUS.MD}px;
+    padding: {Settings.SPACING.SM}px;
+}}
+
+QGroupBox#available-device-group-box QListWidget#availabe-device-list::item {{
+    background-color: {palette.TRANSPARENT};
+    border: none;
+    margin: 0px 0px {Settings.SPACING.SM}px 0px;
+    padding: 0px;
+}}
+
+QGroupBox#available-device-group-box QWidget#available-device-actions {{
+    background-color: {palette.TRANSPARENT};
+}}
+
 /* Device list row (custom item widget) */
 QWidget#device-item-row {{
-    background-color: {palette.TRANSPARENT};
-    border-radius: {Settings.BORDER_RADIUS.SM}px;
+    background-color: {palette.WHITE};
+    border: 1px solid {palette.LIGHT_DIVIDER};
+    border-radius: {Settings.BORDER_RADIUS.MD}px;
 }}
 
 QWidget#device-item-row[alert="true"] {{
     background-color: rgba(255, 106, 0, 0.10);
-    border-radius: {Settings.BORDER_RADIUS.SM}px;
+    border: 1px solid rgba(255, 106, 0, 0.16);
+    border-radius: {Settings.BORDER_RADIUS.MD}px;
+}}
+
+QWidget#device-item-row[hovered="true"] {{
+    background-color: {palette.COMPONENT};
+    border: 1px solid {palette.LIGHT_DIVIDER_HIGHLIGHT};
+    border-radius: {Settings.BORDER_RADIUS.MD}px;
+}}
+
+QWidget#device-item-row[alert="true"][hovered="true"] {{
+    background-color: rgba(255, 106, 0, 0.16);
+    border: 1px solid rgba(255, 106, 0, 0.24);
+    border-radius: {Settings.BORDER_RADIUS.MD}px;
 }}
 
 /* Avoid global QWidget {{ white }} painting opaque blocks over list item hover/selection. */
@@ -566,34 +613,35 @@ QLabel#device-item-time {{
     padding: 2px 0px 2px 8px;
 }}
 
-QToolButton#device-item-menu {{
+QToolButton#device-item-trash {{
     background-color: {palette.TRANSPARENT};
     border: none;
     color: {palette.HELPER_TEXT};
-    font-size: 18px;
-    font-weight: bold;
-    padding: 4px 6px;
-    min-width: 28px;
+    padding: 2px;
+    min-width: {Settings.DIMENSION.TOOLBUTTON_HEIGHT}px;
+    max-width: {Settings.DIMENSION.TOOLBUTTON_HEIGHT}px;
+    min-height: {Settings.DIMENSION.TOOLBUTTON_HEIGHT}px;
+    max-height: {Settings.DIMENSION.TOOLBUTTON_HEIGHT}px;
 }}
 
-QToolButton#device-item-menu:hover {{
-    background-color: {palette.COMPONENT_HIGHLIGHT};
+QToolButton#device-item-trash:hover {{
+    background-color: rgba(255, 106, 0, 0.12);
     border-radius: {Settings.BORDER_RADIUS.XS}px;
 }}
 
-QGroupBox QToolButton#device-item-menu {{
+QGroupBox QToolButton#device-item-trash {{
     background-color: {palette.TRANSPARENT};
     border: none;
     color: {palette.HELPER_TEXT};
 }}
 
-QGroupBox QToolButton#device-item-menu:hover {{
-    background-color: {palette.COMPONENT_HIGHLIGHT};
+QGroupBox QToolButton#device-item-trash:hover {{
+    background-color: rgba(255, 106, 0, 0.12);
     border-radius: {Settings.BORDER_RADIUS.XS}px;
 }}
 
-QGroupBox QToolButton#device-item-menu:pressed {{
-    background-color: {palette.COMPONENT_HIGHLIGHT};
+QGroupBox QToolButton#device-item-trash:pressed {{
+    background-color: rgba(255, 106, 0, 0.18);
 }}
 
 QGroupBox QToolButton {{
@@ -739,17 +787,19 @@ QWidget#adb-bridge-section {{
 
 QGroupBox#identity-group-box,
 QGroupBox#adb-group-box {{
+    background-color: {palette.WHITE};
     border: 1px solid {palette.LIGHT_DIVIDER};
-    border-radius: {Settings.BORDER_RADIUS.SM}px;
-    padding-top: 14px;
+    border-radius: {Settings.BORDER_RADIUS.MD}px;
+    padding: {Settings.PANEL.CONTENT_PADDING}px;
+    padding-top: 18px;
 }}
 
-QGroupBox#identity-group-box {{
-    background-color: {palette.COMPONENT};
-}}
-
-QGroupBox#adb-group-box {{
-    background-color: {palette.COMPONENT_HIGHLIGHT};
+QGroupBox#identity-group-box::title,
+QGroupBox#adb-group-box::title {{
+    background-color: {palette.WHITE};
+    color: {palette.BLACK};
+    font-size: {Settings.FONT.SIZE_DEFAULT}px;
+    font-weight: {Settings.FONT.WEIGHT_DEMIBOLD};
 }}
 
 QWidget#host-identity-section QLabel[host-title="true"] {{
@@ -830,6 +880,14 @@ QFrame[panel-section-compact="true"] {{
     border: 1px solid {palette.LIGHT_DIVIDER};
     border-radius: 6px;
     padding: 8px 12px;
+}}
+
+QFrame#host-identity-section,
+QFrame#adb-bridge-section {{
+    background-color: {palette.TRANSPARENT};
+    border: none;
+    border-radius: 0px;
+    padding: 4px 8px 6px 8px;
 }}
 
 QGroupBox {{
