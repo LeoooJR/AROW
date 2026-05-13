@@ -109,7 +109,7 @@ class AdbSubController(AppSubController):
             fn=self.model.run_host_install_identity,
             description="Load or create persisted host install UUID",
             job_type="thread",
-            coalesce_key=None,
+            coalesce_key="host_install_identity",
             on_completed=callback.on_completed,
             on_failed=callback.on_failed,
         )
@@ -137,7 +137,7 @@ class AdbSubController(AppSubController):
             args=(ip, _port, association_code),
             description="Authenticate a device over ADB",
             job_type="thread",
-            coalesce_key="device",
+            coalesce_key="authentification",
             on_completed=callback.on_completed,
             on_failed=callback.on_failed,
         )
@@ -156,7 +156,7 @@ class AdbSubController(AppSubController):
             fn=self.model.refresh_known_devices,
             description="Refresh device list from ADB",
             job_type="thread",
-            coalesce_key="device",
+            coalesce_key="refresh_device_list",
             on_completed=callback.on_completed,
             on_failed=callback.on_failed,
         )
@@ -175,7 +175,7 @@ class AdbSubController(AppSubController):
             fn=self.model.close_core_runtime,
             description="Stop ADB server and detach core runtime",
             job_type="thread",
-            coalesce_key=None,
+            coalesce_key="close",
             on_completed=callback.on_completed,
             on_failed=callback.on_failed,
         )
