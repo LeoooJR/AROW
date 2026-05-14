@@ -155,7 +155,7 @@ class CoreSignalBus(ABC):
         Implementations should make subscription idempotency/duplication behavior
         explicit (allow duplicates vs reject duplicates).
         """
-        pass
+        ...
 
     @abstractmethod
     def unsubscribe(self, signal: CoreSignal, handler: SignalHandler[object]) -> None:
@@ -164,7 +164,7 @@ class CoreSignalBus(ABC):
 
         Implementations should define behavior when handler/signal does not exist.
         """
-        pass
+        ...
 
     @abstractmethod
     def emit(self, signal: CoreSignal, payload: object) -> None:
@@ -176,7 +176,7 @@ class CoreSignalBus(ABC):
         - exception policy (fail-fast vs collect/log and continue)
         - re-entrancy behavior
         """
-        pass
+        ...
 
 
 class InMemoryCoreSignalBus(CoreSignalBus):

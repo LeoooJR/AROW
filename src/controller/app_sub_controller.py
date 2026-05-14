@@ -29,7 +29,9 @@ class AppSubController(ABC):
     @abstractmethod
     def connect_view_signals(self) -> None:
         """Wire :data:`gui.signals.view_signals` for this domain."""
+        ...
 
     @abstractmethod
     def connect_model_signals(self) -> None:
         """Subscribe to :class:`core.signals.CoreSignal` (or related) for this domain."""
+        ...

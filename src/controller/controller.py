@@ -49,12 +49,14 @@ class Controller(ABC):
         """
         Connect view signals to controller methods
         """
+        ...
 
     @abstractmethod
     def _connect_model_signals(self):
         """
         Connect model signals to controller methods
         """
+        ...
 
     #### Getters / Setters ####
 
