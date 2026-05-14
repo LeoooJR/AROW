@@ -202,20 +202,24 @@ class DeviceItem(QListWidgetItem):
         """
         super().__init__(parent)
 
-        self.texts = DeviceItem.Text()
+        self.texts: DeviceItem.Text = DeviceItem.Text()
 
         display_name = text if text is not None else self.texts.default_name
         helper_text = f"{type.capitalize()} device"
+        whats_this_text = (
+            f"A {type.capitalize()} device which can be used to work with."
+        )
 
         self.setToolTip(display_name)
         self.setStatusTip(helper_text)
-        self.setWhatsThis(helper_text)
+        self.setWhatsThis(whats_this_text)
 
         self.setTextAlignment(
             Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft
         )
-        self.setIcon(QIcon())
+        self.setIcon(QIcon())  # Icon is not set using the default list widget method
 
+        # Device item properties
         self._id: str | None = id
         self._text: str = display_name
         self._device_kind: DeviceKind = device_kind
@@ -227,6 +231,8 @@ class DeviceItem(QListWidgetItem):
             None if self._last_communication_is_static else last_communication
         )
         self._alert_highlight: bool = alert_highlight
+
+        # Device item UI properties
         self._is_extended: bool = False
         self._uses_compact_badge_layout: bool = False
         self._sync_size_hint_in_progress: bool = False
@@ -234,6 +240,8 @@ class DeviceItem(QListWidgetItem):
         row = _DeviceItemRowWidget(self)
         row.setObjectName("device-item-row")
         row.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+
+        ### Icon label ###
 
         icon_path = GenericIcons.DEVICE.value
         icon_label = QLabel(row)
@@ -254,6 +262,8 @@ class DeviceItem(QListWidgetItem):
         icon_frame.setObjectName("device-item-icon-frame")
         icon_frame.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
 
+        ### Device name label ###
+
         name_label = QLabel(display_name, row)
         name_label.setObjectName("device-item-name")
         name_label.setFont(
@@ -265,6 +275,8 @@ class DeviceItem(QListWidgetItem):
             name_label, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop
         )
 
+        ### Badge container ###
+
         badge_container = HorizontalLayoutWrapper(
             row,
             widgets=[],
@@ -274,6 +286,8 @@ class DeviceItem(QListWidgetItem):
         badge_container.setObjectName("device-item-badge-container")
         badge_container.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
 
+        ### Subtitle label ###
+
         subtitle_label = QLabel(row)
         subtitle_label.setObjectName("device-item-subtitle")
         subtitle_label.setFont(
@@ -282,6 +296,9 @@ class DeviceItem(QListWidgetItem):
         DeviceItem._configure_wrapped_line_label(
             subtitle_label, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop
         )
+
+        ### Subtitle host ###
+
         subtitle_host = VerticalLayoutWrapper(
             row,
             widgets=[subtitle_label],
@@ -291,6 +308,8 @@ class DeviceItem(QListWidgetItem):
         subtitle_host.setObjectName("device-item-subtitle-host")
         subtitle_host.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
 
+        ### Last communication time label ###
+
         time_label = QLabel(row)
         time_label.setObjectName("device-item-time")
         time_label.setFont(
@@ -299,6 +318,16 @@ class DeviceItem(QListWidgetItem):
         DeviceItem._configure_wrapped_line_label(
             time_label, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop
         )
+        # Set the last communication time label text based on the last communication property (dynamic or static)
+        if self._last_communication_is_static:
+            time_label.setText(last_communication)
+        else:
+            time_label.setText(
+                format_last_communication_short(self._last_communication_live_at)
+            )
+        time_label.hide()  # Hide the last communication time by default (shown in extended mode)
+
+        ### Trash button ###
 
         trash_button = ToolButton(
             row,
@@ -307,6 +336,9 @@ class DeviceItem(QListWidgetItem):
         )
         trash_button.setObjectName("device-item-trash")
         trash_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        trash_button.show()
+
+        ### Title row ###
 
         title_row = HorizontalLayoutWrapper(
             row,
@@ -317,6 +349,8 @@ class DeviceItem(QListWidgetItem):
         )
         title_row.setObjectName("device-item-title-row")
         title_row.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+
+        ### Center layout ###
 
         center = VerticalLayoutWrapper(
             row,
@@ -332,6 +366,8 @@ class DeviceItem(QListWidgetItem):
         center.setObjectName("device-item-center")
         center.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
 
+        ### Right wrap layout ###
+
         right_wrap = HorizontalLayoutWrapper(
             row,
             widgets=[time_label, trash_button],
@@ -340,7 +376,8 @@ class DeviceItem(QListWidgetItem):
         )
         right_wrap.setObjectName("device-item-right-wrap")
         right_wrap.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        time_label.hide()
+
+        ### Main row layout ###
 
         main_row = HorizontalLayoutWrapper(
             row,
@@ -380,16 +417,9 @@ class DeviceItem(QListWidgetItem):
         )
 
         self._apply_badge()
-        self._refresh_subtitle()
-        if self._last_communication_is_static:
-            self.ui.time_label.setText(last_communication)
-        else:
-            self.ui.time_label.setText(
-                format_last_communication_short(self._last_communication_live_at)
-            )
-        self.alert_highlight = alert_highlight
-        self._finalize_ui_hooks()
         self._set_compact_badge_layout()
+        self._refresh_subtitle()
+        self._finalize_ui_hooks()
         self._sync_size_hint()
 
     def _finalize_ui_hooks(self) -> None:
@@ -461,143 +491,6 @@ class DeviceItem(QListWidgetItem):
         """Signals for the device row (menu, future actions)."""
         pass
 
-    def set_hovered(self, hovered: bool) -> None:
-        """Apply hover state to the custom list row widget."""
-        self.ui.row.setProperty("hovered", hovered)
-        self.ui.row.style().unpolish(self.ui.row)
-        self.ui.row.style().polish(self.ui.row)
-        self.ui.row.update()
-
-    def _set_compact_badge_layout(self) -> None:
-        """Move the badge below the name so narrow rows do not clip labels."""
-        if self._uses_compact_badge_layout:
-            return
-        title_layout = self.ui.title_row.get_layout()
-        center_layout = self.ui.center.get_layout()
-        title_layout.removeWidget(self.ui.badge_container)
-        center_layout.insertWidget(1, self.ui.badge_container)
-        self._uses_compact_badge_layout = True
-
-    def _set_extended_badge_layout(self) -> None:
-        """Restore the wider inline name/badge layout used by expanded rows."""
-        if not self._uses_compact_badge_layout:
-            return
-        center_layout = self.ui.center.get_layout()
-        title_layout = self.ui.title_row.get_layout()
-        center_layout.removeWidget(self.ui.badge_container)
-        title_layout.insertWidget(1, self.ui.badge_container)
-        self._uses_compact_badge_layout = False
-
-    @staticmethod
-    def _clear_layout(layout: QLayout) -> None:
-        while layout.count():
-            item = layout.takeAt(0)
-            w = item.widget()
-            if w is not None:
-                w.deleteLater()
-
-    def _sync_size_hint(self) -> None:
-        if self._sync_size_hint_in_progress:
-            return
-        try:
-            self._sync_size_hint_in_progress = True
-            row = self.ui.row
-            lay = row.layout()
-            if lay is not None:
-                lay.invalidate()
-                lay.activate()
-            row.updateGeometry()
-
-            # Extended: keep current behavior (size hint tracks the laid-out row).
-            if self._is_extended:
-                sh = row.sizeHint()
-                h = max(Settings.LIST.DEVICE_ITEM_ROW_MIN_HEIGHT, sh.height())
-                self.setSizeHint(QSize(sh.width(), h))
-            else:
-                # Shortened: do not carry over the row's stretched width from the extended
-                # state — width must match hidden right column so AdjustToContents can shrink.
-                mw = max(1, row.minimumSizeHint().width())
-                saved = QSize(row.width(), row.height())
-                row.resize(mw, saved.height())
-                if lay is not None:
-                    lay.activate()
-                row.updateGeometry()
-                sh = row.sizeHint()
-                row.resize(saved)
-                if lay is not None:
-                    lay.activate()
-                row.updateGeometry()
-                h = max(Settings.LIST.DEVICE_ITEM_ROW_MIN_HEIGHT, sh.height())
-                self.setSizeHint(QSize(mw, h))
-        finally:
-            self._sync_size_hint_in_progress = False
-        lw = self.listWidget()
-        if lw is not None:
-            lw.viewport().update()
-
-    def _apply_badge(self) -> None:
-        layout = self.ui.badge_container.layout()
-        assert layout is not None
-        self._clear_layout(layout)
-        if self._badge == "none":
-            return
-        if self._badge == "active":
-            lab = QLabel(self.texts.active_badge)
-            lab.setProperty("device-item-badge", "active")
-            lab.setFont(
-                QFont(
-                    Settings.FONT.FAMILY, Settings.FONT.SIZE_HELPER, QFont.Weight.Normal
-                )
-            )
-            lab.setWordWrap(True)
-            lab.setMinimumWidth(0)
-            lab.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Preferred)
-            layout.addWidget(lab)
-        elif self._badge == "trusted":
-            ic = QLabel()
-            ic.setPixmap(
-                QIcon(GenericIcons.CHECK.value).pixmap(
-                    QSize(self._SUBTITLE_ICON_PX, self._SUBTITLE_ICON_PX)
-                )
-            )
-            tx = QLabel(self.texts.trusted_badge)
-            tx.setProperty("device-item-badge", "trusted-text")
-            tx.setFont(
-                QFont(
-                    Settings.FONT.FAMILY, Settings.FONT.SIZE_HELPER, QFont.Weight.Normal
-                )
-            )
-            tx.setWordWrap(True)
-            tx.setMinimumWidth(0)
-            tx.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Preferred)
-            layout.addWidget(ic)
-            layout.addWidget(tx)
-        elif self._badge == "new":
-            lab = QLabel(self.texts.new_badge)
-            lab.setProperty("device-item-badge", "new")
-            lab.setFont(
-                QFont(
-                    Settings.FONT.FAMILY,
-                    Settings.FONT.SIZE_HELPER,
-                    QFont.Weight.DemiBold,
-                )
-            )
-            lab.setWordWrap(True)
-            lab.setMinimumWidth(0)
-            lab.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Preferred)
-            layout.addWidget(lab)
-        layout.addStretch(1)
-
-    def _refresh_subtitle(self) -> None:
-        chunks: list[str] = []
-        if self._operating_system:
-            chunks.append(self._operating_system)
-        if self._location:
-            chunks.append(self._location)
-        self.ui.subtitle_label.setText(
-            " · ".join(chunks) if chunks else self.texts.empty_subtitle
-        )
-
     @property
     def id(self) -> str | None:
         return self._id
@@ -631,6 +524,17 @@ class DeviceItem(QListWidgetItem):
         self._location = value
         self._refresh_subtitle()
         self._sync_size_hint()
+
+    def _refresh_subtitle(self) -> None:
+        """Refresh the subtitle label with the operating system and location."""
+        chunks: list[str] = []
+        if self._operating_system:
+            chunks.append(self._operating_system)
+        if self._location:
+            chunks.append(self._location)
+        self.ui.subtitle_label.setText(
+            " · ".join(chunks) if chunks else self.texts.empty_subtitle
+        )
 
     @property
     def last_communication(self) -> str | dt.datetime | None:
@@ -687,6 +591,87 @@ class DeviceItem(QListWidgetItem):
         self._apply_badge()
         self._sync_size_hint()
 
+    def _apply_badge(self) -> None:
+        layout = self.ui.badge_container.layout()
+        assert layout is not None
+        self._clear_layout(layout)
+        if self._badge == "none":
+            return
+        if self._badge == "active":
+            lab = QLabel(self.texts.active_badge)
+            lab.setProperty("device-item-badge", "active")
+            lab.setFont(
+                QFont(
+                    Settings.FONT.FAMILY, Settings.FONT.SIZE_HELPER, QFont.Weight.Normal
+                )
+            )
+            lab.setWordWrap(True)
+            lab.setMinimumWidth(0)
+            lab.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Preferred)
+            layout.addWidget(lab)
+        elif self._badge == "trusted":
+            ic = QLabel()
+            ic.setPixmap(
+                QIcon(GenericIcons.CHECK.value).pixmap(
+                    QSize(self._SUBTITLE_ICON_PX, self._SUBTITLE_ICON_PX)
+                )
+            )
+            tx = QLabel(self.texts.trusted_badge)
+            tx.setProperty("device-item-badge", "trusted-text")
+            tx.setFont(
+                QFont(
+                    Settings.FONT.FAMILY, Settings.FONT.SIZE_HELPER, QFont.Weight.Normal
+                )
+            )
+            tx.setWordWrap(True)
+            tx.setMinimumWidth(0)
+            tx.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Preferred)
+            layout.addWidget(ic)
+            layout.addWidget(tx)
+        elif self._badge == "new":
+            lab = QLabel(self.texts.new_badge)
+            lab.setProperty("device-item-badge", "new")
+            lab.setFont(
+                QFont(
+                    Settings.FONT.FAMILY,
+                    Settings.FONT.SIZE_HELPER,
+                    QFont.Weight.DemiBold,
+                )
+            )
+            lab.setWordWrap(True)
+            lab.setMinimumWidth(0)
+            lab.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Preferred)
+            layout.addWidget(lab)
+        layout.addStretch(1)
+
+    @staticmethod
+    def _clear_layout(layout: QLayout) -> None:
+        while layout.count():
+            item = layout.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.deleteLater()
+
+    def _set_compact_badge_layout(self) -> None:
+        """Move the badge below the name so narrow rows do not clip labels."""
+        if self._uses_compact_badge_layout:
+            return
+        title_layout = self.ui.title_row.get_layout()
+        center_layout = self.ui.center.get_layout()
+        title_layout.removeWidget(self.ui.badge_container)
+        center_layout.insertWidget(1, self.ui.badge_container)
+        self._uses_compact_badge_layout = True
+
+    def _set_extended_badge_layout(self) -> None:
+        """Restore the wider inline name/badge layout used by expanded rows."""
+        if not self._uses_compact_badge_layout:
+            return
+        center_layout = self.ui.center.get_layout()
+        title_layout = self.ui.title_row.get_layout()
+        center_layout.removeWidget(self.ui.badge_container)
+        title_layout.insertWidget(1, self.ui.badge_container)
+        self._uses_compact_badge_layout = False
+
     @property
     def device_kind(self) -> DeviceKind:
         return self._device_kind
@@ -714,6 +699,7 @@ class DeviceItem(QListWidgetItem):
         last_communication: str | dt.datetime | None = "",
         alert_highlight: bool = False,
     ) -> "DeviceItem":
+        """Add a device item to the list widget and sync the size hint."""
         item = cls(
             None,
             id=id,
@@ -731,25 +717,71 @@ class DeviceItem(QListWidgetItem):
         QTimer.singleShot(0, item._sync_size_hint)
         return item
 
+    def set_hovered(self, hovered: bool) -> None:
+        """Apply hover state to the custom list row widget."""
+        self.ui.row.setProperty("hovered", hovered)
+        self.ui.row.style().unpolish(self.ui.row)
+        self.ui.row.style().polish(self.ui.row)
+        self.ui.row.update()
+
+    def _sync_size_hint(self) -> None:
+        if self._sync_size_hint_in_progress:
+            return
+        try:
+            self._sync_size_hint_in_progress = True
+            row = self.ui.row
+            lay = row.layout()
+            if lay is not None:
+                lay.invalidate()
+                lay.activate()
+            row.updateGeometry()
+
+            # Extended: keep current behavior (size hint tracks the laid-out row).
+            if self._is_extended:
+                sh = row.sizeHint()
+                h = max(Settings.LIST.DEVICE_ITEM_ROW_MIN_HEIGHT, sh.height())
+                self.setSizeHint(QSize(sh.width(), h))
+            else:
+                # Shortened: do not carry over the row's stretched width from the extended
+                # state — width must match hidden right column so AdjustToContents can shrink.
+                mw = max(1, row.minimumSizeHint().width())
+                saved = QSize(row.width(), row.height())
+                row.resize(mw, saved.height())
+                if lay is not None:
+                    lay.activate()
+                row.updateGeometry()
+                sh = row.sizeHint()
+                row.resize(saved)
+                if lay is not None:
+                    lay.activate()
+                row.updateGeometry()
+                h = max(Settings.LIST.DEVICE_ITEM_ROW_MIN_HEIGHT, sh.height())
+                self.setSizeHint(QSize(mw, h))
+        finally:
+            self._sync_size_hint_in_progress = False
+        lw = self.listWidget()
+        if lw is not None:
+            lw.viewport().update()
+
+    ### Extend / shorten core logic ###
+
     def extend_device_item(self) -> None:
-        """Extend the device item to show the last communication time and menu button."""
+        """Extend the device item to show the last communication time."""
         if self._is_extended:
             return
         self._is_extended = True
-        self._set_extended_badge_layout()
-        self.ui.time_label.show()
-        self.ui.right_wrap.show()
+        self._set_extended_badge_layout()  # In extended mode, the badge is inline with the device name
+        self.ui.time_label.show()  # Show the last communication time
         self._sync_size_hint()
 
     def shorten_device_item(self) -> None:
-        """Shorten the device item to hide the last communication time and menu button."""
+        """Shorten the device item to hide the last communication time"""
         if not self._is_extended:
-            self._set_compact_badge_layout()
+            self._set_compact_badge_layout()  # In shortened mode, the badge is below the device name
             return
         self._is_extended = False
-        self._set_compact_badge_layout()
-        self.ui.time_label.hide()
-        self.ui.right_wrap.show()
+        self._set_compact_badge_layout()  # In shortened mode, the badge is below the device name
+        self.ui.time_label.hide()  # Hide the last communication time
         self._sync_size_hint()
 
 
