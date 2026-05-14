@@ -29,8 +29,9 @@ from gui.animation import (
     apply_highlight_level,
     compute_sine_pulse_level,
 )
+from gui.colors import Theme
 from gui.elements import GroupBox, HelperText, List, PanelTitle, PlaceHolder, ToolButton
-from gui.icons import GenericIcons
+from gui.icons import GenericIcons, icon_qt_path, icon_qt_path_for_theme
 from gui.settings import Settings
 from gui.signals import view_signals
 from gui.wrapper import (
@@ -243,7 +244,7 @@ class DeviceItem(QListWidgetItem):
 
         ### Icon label ###
 
-        icon_path = GenericIcons.DEVICE.value
+        icon_path = icon_qt_path(GenericIcons.DEVICE)
         icon_label = QLabel(row)
         icon_label.setPixmap(
             QIcon(icon_path).pixmap(QSize(self._ICON_INNER_PX, self._ICON_INNER_PX))
@@ -331,7 +332,7 @@ class DeviceItem(QListWidgetItem):
 
         trash_button = ToolButton(
             row,
-            icon_path=GenericIcons.TRASH.value,
+            icon_path=icon_qt_path(GenericIcons.TRASH),
             tooltip=self.texts.trash_button_tooltip,
         )
         trash_button.setObjectName("device-item-trash")
@@ -612,7 +613,7 @@ class DeviceItem(QListWidgetItem):
         elif self._badge == "trusted":
             ic = QLabel()
             ic.setPixmap(
-                QIcon(GenericIcons.CHECK.value).pixmap(
+                QIcon(icon_qt_path(GenericIcons.CHECK)).pixmap(
                     QSize(self._SUBTITLE_ICON_PX, self._SUBTITLE_ICON_PX)
                 )
             )
@@ -679,7 +680,7 @@ class DeviceItem(QListWidgetItem):
     @device_kind.setter
     def device_kind(self, value: DeviceKind) -> None:
         self._device_kind = value
-        path = GenericIcons.DEVICE.value
+        path = icon_qt_path(GenericIcons.DEVICE)
         self.ui.icon_label.setPixmap(
             QIcon(path).pixmap(QSize(self._ICON_INNER_PX, self._ICON_INNER_PX))
         )
@@ -762,6 +763,15 @@ class DeviceItem(QListWidgetItem):
         lw = self.listWidget()
         if lw is not None:
             lw.viewport().update()
+
+    def apply_theme_icons(self, theme: Theme) -> None:
+        """Refresh row icons after a global light/dark switch."""
+        p = icon_qt_path_for_theme(theme, GenericIcons.DEVICE)
+        self.ui.icon_label.setPixmap(
+            QIcon(p).pixmap(QSize(self._ICON_INNER_PX, self._ICON_INNER_PX))
+        )
+        self.ui.trash_button.set_icon(icon_qt_path_for_theme(theme, GenericIcons.TRASH))
+        self._apply_badge()
 
     ### Extend / shorten core logic ###
 
@@ -951,7 +961,9 @@ class DevicePairingPanel(QFrame):
         )  # Consistent spacing between major sections
 
         title = PanelTitle(
-            parent=None, text=self.texts.title, icon_path=GenericIcons.DEVICE.value
+            parent=None,
+            text=self.texts.title,
+            icon_path=icon_qt_path(GenericIcons.DEVICE),
         )
         title.setProperty("main-panel-title", True)
 
@@ -978,6 +990,11 @@ class DevicePairingPanel(QFrame):
         )
 
         self._finalize_ui_hooks()
+
+    def apply_theme_icons(self, theme: Theme) -> None:
+        self.ui.title.set_leading_icon_path(
+            icon_qt_path_for_theme(theme, GenericIcons.DEVICE)
+        )
 
     def _finalize_ui_hooks(self) -> None:
         """Run the final UI setup hooks for the device pairing panel."""
@@ -1085,12 +1102,14 @@ class DeviceSelectionPanel(QFrame):
         )  # Consistent spacing between major sections
 
         title = PanelTitle(
-            parent=self, text=self.texts.title, icon_path=GenericIcons.DEVICE.value
+            parent=self,
+            text=self.texts.title,
+            icon_path=icon_qt_path(GenericIcons.DEVICE),
         )
 
         expand_button = ToolButton(
             self,
-            icon_path=GenericIcons.LAYOUT_TOPBAR_INSET.value,
+            icon_path=icon_qt_path(GenericIcons.LAYOUT_TOPBAR_INSET),
             tooltip=self.texts.expand_button_tooltip,
         )
         expand_button.setProperty("toggle", True)
@@ -1110,7 +1129,7 @@ class DeviceSelectionPanel(QFrame):
             text=self.texts.empty_state,
             minimum_width=0,
             minimum_height=0,
-            icon_path=GenericIcons.DEVICE_PLACEHOLDER.value,
+            icon_path=icon_qt_path(GenericIcons.DEVICE_PLACEHOLDER),
         )
         available_device_empty_state.setObjectName("available-device-empty-state")
         available_device_empty_state.setProperty("place-holder", False)
@@ -1128,7 +1147,7 @@ class DeviceSelectionPanel(QFrame):
 
         add_device_button = ToolButton(
             self,
-            icon_path=GenericIcons.PLUS.value,
+            icon_path=icon_qt_path(GenericIcons.PLUS),
             tooltip=self.texts.add_device_tooltip,
         )
         add_device_button.setEnabled(True)
@@ -1136,7 +1155,7 @@ class DeviceSelectionPanel(QFrame):
 
         refresh_button = ToolButton(
             self,
-            icon_path=GenericIcons.ARROW_CLOCKWISE.value,
+            icon_path=icon_qt_path(GenericIcons.ARROW_CLOCKWISE),
             tooltip=self.texts.refresh_button_tooltip,
         )
         refresh_button.setEnabled(True)
@@ -1144,7 +1163,7 @@ class DeviceSelectionPanel(QFrame):
 
         trash_button = ToolButton(
             self,
-            icon_path=GenericIcons.TRASH.value,
+            icon_path=icon_qt_path(GenericIcons.TRASH),
             tooltip=self.texts.trash_button_tooltip,
         )
         trash_button.setEnabled(True)
@@ -1451,6 +1470,28 @@ class DeviceSelectionPanel(QFrame):
         """Check if the device panel is visible."""
         return bool(self.ui.expand_button.property("toggle"))
 
+    def apply_theme_icons(self, theme: Theme) -> None:
+        """Refresh toolbar, header, empty state, and row icons for ``theme``."""
+        self.ui.title.set_leading_icon_path(
+            icon_qt_path_for_theme(theme, GenericIcons.DEVICE)
+        )
+        inset = bool(self.ui.expand_button.property("toggle"))
+        ex = GenericIcons.LAYOUT_TOPBAR_INSET if inset else GenericIcons.LAYOUT_TOPBAR
+        self.ui.expand_button.setIcon(QIcon(icon_qt_path_for_theme(theme, ex)))
+        self.ui.available_device_empty_state.set_icon(
+            icon_qt_path_for_theme(theme, GenericIcons.DEVICE_PLACEHOLDER)
+        )
+        self.ui.add_device_button.set_icon(
+            icon_qt_path_for_theme(theme, GenericIcons.PLUS)
+        )
+        self.ui.refresh_button.set_icon(
+            icon_qt_path_for_theme(theme, GenericIcons.ARROW_CLOCKWISE)
+        )
+        self.ui.trash_button.set_icon(icon_qt_path_for_theme(theme, GenericIcons.TRASH))
+        for lw_item in self.ui.available_device_list.iter_items():
+            if isinstance(lw_item, DeviceItem):
+                lw_item.apply_theme_icons(theme)
+
     def _reduced_height(self) -> int:
         """Height of the panel when reduced (header only): layout padding + header size."""
         height = self.ui.header.sizeHint().height()
@@ -1462,7 +1503,9 @@ class DeviceSelectionPanel(QFrame):
         """Show the device panel."""
         if not self.is_panel_visible():
             self.ui.expand_button.setProperty("toggle", True)
-            self.ui.expand_button.setIcon(QIcon(GenericIcons.LAYOUT_TOPBAR_INSET.value))
+            self.ui.expand_button.setIcon(
+                QIcon(icon_qt_path(GenericIcons.LAYOUT_TOPBAR_INSET))
+            )
             animate_widget_visibility(
                 self,
                 visible=True,
@@ -1475,7 +1518,9 @@ class DeviceSelectionPanel(QFrame):
         """Hide the device panel."""
         if self.is_panel_visible():
             self.ui.expand_button.setProperty("toggle", False)
-            self.ui.expand_button.setIcon(QIcon(GenericIcons.LAYOUT_TOPBAR.value))
+            self.ui.expand_button.setIcon(
+                QIcon(icon_qt_path(GenericIcons.LAYOUT_TOPBAR))
+            )
             animate_widget_visibility(
                 self,
                 visible=False,
@@ -1489,7 +1534,9 @@ class DeviceSelectionPanel(QFrame):
         if self.ui.expand_button.property("toggle"):
             # Reduce: hide body and constrain height so the panel under can grow.
             self.ui.expand_button.setProperty("toggle", False)
-            self.ui.expand_button.setIcon(QIcon(GenericIcons.LAYOUT_TOPBAR.value))
+            self.ui.expand_button.setIcon(
+                QIcon(icon_qt_path(GenericIcons.LAYOUT_TOPBAR))
+            )
             animate_widget_visibility(
                 self,
                 visible=False,
@@ -1500,7 +1547,9 @@ class DeviceSelectionPanel(QFrame):
         else:
             # Expand: show body and allow panel to grow again.
             self.ui.expand_button.setProperty("toggle", True)
-            self.ui.expand_button.setIcon(QIcon(GenericIcons.LAYOUT_TOPBAR_INSET.value))
+            self.ui.expand_button.setIcon(
+                QIcon(icon_qt_path(GenericIcons.LAYOUT_TOPBAR_INSET))
+            )
             animate_widget_visibility(
                 self,
                 visible=True,

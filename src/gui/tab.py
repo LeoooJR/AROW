@@ -4,7 +4,7 @@ from typing import Final
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QTabWidget, QWidget
 
-from gui.icons import GenericIcons
+from gui.icons import GenericIcons, icon_qt_path
 from gui.map import MapPanel
 
 
@@ -51,7 +51,7 @@ class Tab(QFrame):
 
         tabs.addTab(map_panel, self.texts.map_tab)
 
-        tabs.setTabIcon(0, QIcon(GenericIcons.MAP.value))
+        tabs.setTabIcon(0, QIcon(icon_qt_path(GenericIcons.MAP)))
 
         layout.addWidget(tabs, 1)
 

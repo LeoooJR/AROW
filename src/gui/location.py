@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 )
 
 from gui.animation import animate_widget_visibility
+from gui.colors import Theme
 from gui.elements import (
     Button,
     DemiBoldText,
@@ -30,9 +31,10 @@ from gui.elements import (
     ToolButton,
     WarningDialog,
 )
-from gui.icons import GenericIcons
+from gui.icons import GenericIcons, icon_qt_path, icon_qt_path_for_theme
 from gui.settings import Settings
 from gui.signals import view_signals
+from gui.svg import get_svg_size
 from gui.wrapper import VerticalLayoutWrapper
 
 
@@ -108,11 +110,11 @@ class LocationPanel(QFrame):
         )  # Consistent spacing between major sections
 
         title = PanelTitle(
-            parent=self, text=self.texts.title, icon_path=GenericIcons.GEO.value
+            parent=self, text=self.texts.title, icon_path=icon_qt_path(GenericIcons.GEO)
         )
         expand_button = ToolButton(
             self,
-            icon_path=GenericIcons.LAYOUT_BOTTOMBAR_INSET.value,
+            icon_path=icon_qt_path(GenericIcons.LAYOUT_BOTTOMBAR_INSET),
             tooltip=self.texts.expand_button_tooltip,
         )
         expand_button.setProperty("toggle", True)
@@ -150,7 +152,7 @@ class LocationPanel(QFrame):
         railway_label = DemiBoldText(None, self.texts.railway_label)
         railway_label_icon = IconLabel(
             None,
-            icon_path=GenericIcons.RAILWAY.value,
+            icon_path=icon_qt_path(GenericIcons.RAILWAY),
             text=railway_label,
             spacing=Settings.SPACING.ICON_SPACING,
             margins=Settings.SPACING.MARGIN_NONE,
@@ -175,7 +177,7 @@ class LocationPanel(QFrame):
         kilometric_label = DemiBoldText(None, self.texts.kilometric_label)
         kilometric_label_icon = IconLabel(
             None,
-            icon_path=GenericIcons.MILESTONE.value,
+            icon_path=icon_qt_path(GenericIcons.MILESTONE),
             text=kilometric_label,
             spacing=Settings.SPACING.ICON_SPACING,
             margins=Settings.SPACING.MARGIN_NONE,
@@ -197,7 +199,9 @@ class LocationPanel(QFrame):
         body_layout.addWidget(kilometric_input_wrapper)
 
         start_simulation_button = Button(
-            self, self.texts.start_simulation_button, icon_path=GenericIcons.START.value
+            self,
+            self.texts.start_simulation_button,
+            icon_path=icon_qt_path(GenericIcons.START),
         )
         body_layout.addWidget(start_simulation_button)
 
@@ -303,6 +307,30 @@ class LocationPanel(QFrame):
             )
         )
 
+    def apply_theme_icons(self, theme: Theme) -> None:
+        self.ui.title.set_leading_icon_path(
+            icon_qt_path_for_theme(theme, GenericIcons.GEO)
+        )
+        inset = bool(self.ui.expand_button.property("toggle"))
+        ex = (
+            GenericIcons.LAYOUT_BOTTOMBAR_INSET
+            if inset
+            else GenericIcons.LAYOUT_BOTTOMBAR
+        )
+        self.ui.expand_button.setIcon(QIcon(icon_qt_path_for_theme(theme, ex)))
+        self.ui.railway_label_icon.set_icon(
+            icon_qt_path_for_theme(theme, GenericIcons.RAILWAY)
+        )
+        self.ui.kilometric_label_icon.set_icon(
+            icon_qt_path_for_theme(theme, GenericIcons.MILESTONE)
+        )
+        self.ui.start_simulation_button.setIcon(
+            QIcon(icon_qt_path_for_theme(theme, GenericIcons.START))
+        )
+        self.ui.start_simulation_button.setIconSize(
+            get_svg_size(self.ui.start_simulation_button.font().pointSize())
+        )
+
     def is_panel_visible(self) -> bool:
         """Check if the location panel is visible."""
         return bool(self.ui.expand_button.property("toggle"))
@@ -318,7 +346,7 @@ class LocationPanel(QFrame):
         if not self.is_panel_visible():
             self.ui.expand_button.setProperty("toggle", True)
             self.ui.expand_button.setIcon(
-                QIcon(GenericIcons.LAYOUT_BOTTOMBAR_INSET.value)
+                QIcon(icon_qt_path(GenericIcons.LAYOUT_BOTTOMBAR_INSET))
             )
             animate_widget_visibility(
                 self,
@@ -332,7 +360,9 @@ class LocationPanel(QFrame):
         """Hide the location panel."""
         if self.is_panel_visible():
             self.ui.expand_button.setProperty("toggle", False)
-            self.ui.expand_button.setIcon(QIcon(GenericIcons.LAYOUT_BOTTOMBAR.value))
+            self.ui.expand_button.setIcon(
+                QIcon(icon_qt_path(GenericIcons.LAYOUT_BOTTOMBAR))
+            )
             animate_widget_visibility(
                 self,
                 visible=False,
@@ -346,7 +376,9 @@ class LocationPanel(QFrame):
         if self.ui.expand_button.property("toggle"):
             # Reduce: hide body and constrain height so the panel under can grow.
             self.ui.expand_button.setProperty("toggle", False)
-            self.ui.expand_button.setIcon(QIcon(GenericIcons.LAYOUT_BOTTOMBAR.value))
+            self.ui.expand_button.setIcon(
+                QIcon(icon_qt_path(GenericIcons.LAYOUT_BOTTOMBAR))
+            )
             animate_widget_visibility(
                 self,
                 visible=False,
@@ -358,7 +390,7 @@ class LocationPanel(QFrame):
             # Expand: show body and allow it to grow.
             self.ui.expand_button.setProperty("toggle", True)
             self.ui.expand_button.setIcon(
-                QIcon(GenericIcons.LAYOUT_BOTTOMBAR_INSET.value)
+                QIcon(icon_qt_path(GenericIcons.LAYOUT_BOTTOMBAR_INSET))
             )
             animate_widget_visibility(
                 self,

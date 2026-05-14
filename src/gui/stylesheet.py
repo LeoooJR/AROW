@@ -4,7 +4,6 @@ Light and dark stylesheets are built once from the color palette for each theme.
 """
 
 from gui.colors import get_palette
-from gui.icons import GenericIcons
 from gui.settings import Settings
 
 
@@ -692,15 +691,6 @@ QComboBox::drop-down {{
     border-left-style: solid;
     border-top-right-radius: 3px;
     border-bottom-right-radius: 3px;
-}}
-
-QComboBox::down-arrow {{
-    image: url("{GenericIcons.ARROW_DOWN.value}");
-}}
-
-QComboBox::down-arrow:on {{
-    top: 1px;
-    left: 1px;
 }}
 
 QComboBox QAbstractItemView {{

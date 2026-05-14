@@ -35,7 +35,7 @@ import gui.faker as ui_faker
 import gui.ressources_rc
 from gui.__init__ import __application__
 from gui.animation import animate_widget_visibility
-from gui.colors import Theme, get_current_palette
+from gui.colors import Theme, get_current_palette, set_current_theme
 from gui.device import DeviceItem, DevicePairingPanel, DeviceSelectionPanel
 from gui.elements import (
     SVG,
@@ -48,7 +48,13 @@ from gui.elements import (
 )
 from gui.event_filter import ActivityTracker
 from gui.host import HostPanel
-from gui.icons import ApplicationIcons, GenericIcons
+from gui.icons import (
+    ApplicationIcons,
+    GenericIcons,
+    icon_qt_path,
+    icon_qt_path_for_theme,
+    icons_need_theme_updates,
+)
 from gui.location import LocationPanel
 from gui.logs import LogPanel
 from gui.map import MapPanel
@@ -120,12 +126,12 @@ class Header(QWidget):
         palette_button_group = ButtonGroup(self)
         light_palette_button = ToolButton(
             self,
-            icon_path=GenericIcons.LIGHT_MODE.value,
+            icon_path=icon_qt_path(GenericIcons.LIGHT_MODE),
             tooltip=self.texts.light_palette_button_tooltip,
         )
         dark_palette_button = ToolButton(
             self,
-            icon_path=GenericIcons.DARK_MODE.value,
+            icon_path=icon_qt_path(GenericIcons.DARK_MODE),
             tooltip=self.texts.dark_palette_button_tooltip,
         )
         palette_button_group.addButton(light_palette_button, 0)
@@ -151,7 +157,7 @@ class Header(QWidget):
         QTimer.singleShot(0, self._update_palette_thumb_geometry)
 
         # Create name, the application name
-        name = SVG(ApplicationIcons.NAME.value, self)
+        name = SVG(icon_qt_path(ApplicationIcons.NAME), self)
         name.setFixedSize(
             Settings.DIMENSION.APP_NAME_WIDTH, Settings.DIMENSION.APP_NAME_HEIGHT
         )
@@ -161,7 +167,7 @@ class Header(QWidget):
         # Left panels visibility button: toggles left sidebar (device + location panels). visibility=True => panels shown; at start panels are visible.
         left_panel_visibility_request_button = ToolButton(
             self,
-            icon_path=GenericIcons.LAYOUT_SIDEBAR_INSET.value,
+            icon_path=icon_qt_path(GenericIcons.LAYOUT_SIDEBAR_INSET),
             tooltip=self.texts.left_panel_visibility_button_tooltip,
         )
         left_panel_visibility_request_button.setObjectName(
@@ -173,7 +179,7 @@ class Header(QWidget):
         # Right panels visibility button: toggles right sidebar (host + log panels). visibility=True => panels shown; at start panels are visible.
         right_panel_visibility_request_button = ToolButton(
             self,
-            icon_path=GenericIcons.LAYOUT_SIDEBAR_INSET_REVERSE.value,
+            icon_path=icon_qt_path(GenericIcons.LAYOUT_SIDEBAR_INSET_REVERSE),
             tooltip=self.texts.right_panel_visibility_button_tooltip,
         )
         right_panel_visibility_request_button.setObjectName(
@@ -281,11 +287,11 @@ class Header(QWidget):
         if button.property("inset"):
             button.setProperty("inset", False)
             button.setProperty("visibility", False)
-            button.setIcon(QIcon(GenericIcons.LAYOUT_SIDEBAR.value))
+            button.setIcon(QIcon(icon_qt_path(GenericIcons.LAYOUT_SIDEBAR)))
         else:
             button.setProperty("inset", True)
             button.setProperty("visibility", True)
-            button.setIcon(QIcon(GenericIcons.LAYOUT_SIDEBAR_INSET.value))
+            button.setIcon(QIcon(icon_qt_path(GenericIcons.LAYOUT_SIDEBAR_INSET)))
 
     def toggle_right_panels_visibility_request_button(self) -> None:
         """Update right panels button icon and properties to the toggled state (call after body right panels visibility has been set).
@@ -300,11 +306,47 @@ class Header(QWidget):
         if button.property("inset"):
             button.setProperty("inset", False)
             button.setProperty("visibility", False)
-            button.setIcon(QIcon(GenericIcons.LAYOUT_SIDEBAR_REVERSE.value))
+            button.setIcon(QIcon(icon_qt_path(GenericIcons.LAYOUT_SIDEBAR_REVERSE)))
         else:
             button.setProperty("inset", True)
             button.setProperty("visibility", True)
-            button.setIcon(QIcon(GenericIcons.LAYOUT_SIDEBAR_INSET_REVERSE.value))
+            button.setIcon(
+                QIcon(icon_qt_path(GenericIcons.LAYOUT_SIDEBAR_INSET_REVERSE))
+            )
+
+    def apply_theme_icons(self, theme: Theme) -> None:
+        """Refresh header chrome icon resources for ``theme``."""
+        self.ui.light_palette_button.set_icon(
+            icon_qt_path_for_theme(theme, GenericIcons.LIGHT_MODE)
+        )
+        self.ui.dark_palette_button.set_icon(
+            icon_qt_path_for_theme(theme, GenericIcons.DARK_MODE)
+        )
+        self.ui.name.set_path(icon_qt_path_for_theme(theme, ApplicationIcons.NAME))
+        left_btn = self.ui.left_panel_visibility_request_button
+        if left_btn.property("inset"):
+            left_btn.setIcon(
+                QIcon(icon_qt_path_for_theme(theme, GenericIcons.LAYOUT_SIDEBAR_INSET))
+            )
+        else:
+            left_btn.setIcon(
+                QIcon(icon_qt_path_for_theme(theme, GenericIcons.LAYOUT_SIDEBAR))
+            )
+        right_btn = self.ui.right_panel_visibility_request_button
+        if right_btn.property("inset"):
+            right_btn.setIcon(
+                QIcon(
+                    icon_qt_path_for_theme(
+                        theme, GenericIcons.LAYOUT_SIDEBAR_INSET_REVERSE
+                    )
+                )
+            )
+        else:
+            right_btn.setIcon(
+                QIcon(
+                    icon_qt_path_for_theme(theme, GenericIcons.LAYOUT_SIDEBAR_REVERSE)
+                )
+            )
 
     #### Private methods ####
 
@@ -321,10 +363,14 @@ class Header(QWidget):
 
     def _on_palette_button_clicked(self, button: QAbstractButton) -> None:
         """Handle the palette button click."""
+
+        ### Palette button signal emission ###
         if button == self.ui.light_palette_button:
             view_signals.UpdatePaletteSignal.emit("light")
         elif button == self.ui.dark_palette_button:
             view_signals.UpdatePaletteSignal.emit("dark")
+
+        ### Palette thumb animation (move the thumb over the clicked button) ###
         thumb = self.ui.palette_thumb
         btn_rect = button.geometry()
         tw, th = thumb.width(), thumb.height()
@@ -426,20 +472,20 @@ class Body(QWidget):
 
         tabs.addTab(welcome_panel, self.texts.welcome_tab)
 
-        tabs.setTabIcon(0, QIcon(GenericIcons.HAND_RAISED.value))
+        tabs.setTabIcon(0, QIcon(icon_qt_path(GenericIcons.HAND_RAISED)))
 
         map_panel = MapPanel(None)
         map_panel.setVisible(True)
 
         tabs.addTab(map_panel, self.texts.map_tab)
 
-        tabs.setTabIcon(1, QIcon(GenericIcons.MAP.value))
+        tabs.setTabIcon(1, QIcon(icon_qt_path(GenericIcons.MAP)))
 
         device_pairing_panel = DevicePairingPanel(None)
 
         tabs.addTab(device_pairing_panel, self.texts.device_tab)
 
-        tabs.setTabIcon(2, QIcon(GenericIcons.DEVICE.value))
+        tabs.setTabIcon(2, QIcon(icon_qt_path(GenericIcons.DEVICE)))
 
         tabs.setTabVisible(2, False)
 
@@ -658,6 +704,24 @@ class Body(QWidget):
         """Get the current device."""
         return self.ui.device_selection_panel.current_device()
 
+    def apply_theme_icons(self, theme: Theme) -> None:
+        """Re-resolve tab and side-panel icon resources for ``theme``."""
+        tabs = self.ui.tabs
+        tabs.setTabIcon(
+            0, QIcon(icon_qt_path_for_theme(theme, GenericIcons.HAND_RAISED))
+        )
+        tabs.setTabIcon(1, QIcon(icon_qt_path_for_theme(theme, GenericIcons.MAP)))
+        tabs.setTabIcon(2, QIcon(icon_qt_path_for_theme(theme, GenericIcons.DEVICE)))
+        welcome = tabs.widget(0)
+        if welcome is not None and hasattr(welcome, "apply_theme_icons"):
+            welcome.apply_theme_icons(theme)
+        self.ui.map_panel.apply_theme_icons(theme)
+        self.ui.device_pairing_panel.apply_theme_icons(theme)
+        self.ui.device_selection_panel.apply_theme_icons(theme)
+        self.ui.location_panel.apply_theme_icons(theme)
+        self.ui.host_panel.apply_theme_icons(theme)
+        self.ui.log_panel.apply_theme_icons(theme)
+
     def _on_device_connected(self, device: str) -> None:
         """Handle post-connection UI updates for any successful connection flow."""
         self.ui.progress_bar.setValue(1)
@@ -734,6 +798,11 @@ class MainContainer(QWidget):
         self.ui = MainContainer.UI(header=header, body=body)
 
         self._finalize_ui_hooks()
+
+    def apply_theme_icons(self, theme: Theme) -> None:
+        """Refresh icon-bearing subtrees (palette background handled in MainWindow)."""
+        self.ui.header.apply_theme_icons(theme)
+        self.ui.body.apply_theme_icons(theme)
 
     def _finalize_ui_hooks(self) -> None:
         """Run the final UI setup hooks for the main container."""
@@ -887,7 +956,7 @@ class AuthentificationOverlay(QWidget):
         authentification_card = AuthentificationCard(
             self,
             title=self.texts.title,
-            icon_path=GenericIcons.DEVICE.value,
+            icon_path=icon_qt_path(GenericIcons.DEVICE),
             description=self.texts.description,
         )
         layout.addWidget(authentification_card)
@@ -901,6 +970,10 @@ class AuthentificationOverlay(QWidget):
         )
 
         self._finalize_ui_hooks()
+
+    def apply_theme_icons(self, theme: Theme) -> None:
+        card = self.ui.authentification_card
+        card.apply_theme_icons(theme)
 
     def _finalize_ui_hooks(self) -> None:
         """Run the final UI setup hooks for the authentification overlay."""
@@ -1015,7 +1088,7 @@ class MainWindow(QMainWindow):
         self.setObjectName("main-container")
 
         # Set window icon to logo
-        self.setWindowIcon(QPixmap(ApplicationIcons.LOGO.value))
+        self.setWindowIcon(QPixmap(icon_qt_path(ApplicationIcons.LOGO)))
 
         # Set the main container as the central widget to fill the window
         self.setCentralWidget(container)
@@ -1064,8 +1137,23 @@ class MainWindow(QMainWindow):
 
     def _on_palette_update(self, theme: Theme) -> None:
         """Handle the palette update."""
+        set_current_theme(theme)
         self.setStyleSheet(stylesheet_light if theme == "light" else stylesheet_dark)
+        palette = self.ui.container.palette()
+        palette.setColor(QPalette.ColorRole.Window, QColor(get_current_palette().WHITE))
+        self.ui.container.setPalette(palette)
+        self._refresh_theme_icons(theme)
         logger.info("MainWindow: palette updated", theme=str(theme))
+
+    def _refresh_theme_icons(self, theme: Theme) -> None:
+        """Repaint pixmap/icon widgets when assets differ per theme."""
+        if not icons_need_theme_updates():
+            return
+        self.setWindowIcon(
+            QPixmap(icon_qt_path_for_theme(theme, ApplicationIcons.LOGO))
+        )
+        self.ui.container.apply_theme_icons(theme)
+        self.ui.authentification_overlay.apply_theme_icons(theme)
 
     def _on_idle(self) -> None:
         """Handle the idle state: run helper and highlight device lists to draw attention."""

@@ -60,8 +60,13 @@ from PySide6.QtWidgets import (
 )
 
 from gui.animation import apply_highlight_level, compute_sine_pulse_level
-from gui.colors import get_current_palette
-from gui.icons import GenericIcons
+from gui.colors import Theme, get_current_palette
+from gui.icons import (
+    GenericIcons,
+    OperatingSystemIcons,
+    icon_qt_path,
+    icon_qt_path_for_theme,
+)
 from gui.settings import Settings
 from gui.signals import view_signals
 from gui.svg import get_svg_size
@@ -87,15 +92,23 @@ class Element(ABC, metaclass=QtABCMeta):
 
     @abstractmethod
     def _set_size_policy(self) -> None:
-        pass
+        """Set the size policy for the element."""
+        ...
 
     @abstractmethod
     def _set_alignment(self) -> None:
-        pass
+        """Set the alignment for the element."""
+        ...
 
     @abstractmethod
     def _connect_signals(self) -> None:
-        pass
+        """Connect signals for the element."""
+        ...
+
+    @abstractmethod
+    def apply_theme_icons(self, theme: Theme) -> None:
+        """Apply theme icons to the element."""
+        ...
 
 
 class Logo(QLabel, Element):
@@ -151,6 +164,9 @@ class Logo(QLabel, Element):
     def _connect_signals(self) -> None:
         pass
 
+    def apply_theme_icons(self, theme: Theme) -> None:
+        pass
+
 
 class GradientText(QLabel, Element):
     """
@@ -197,6 +213,9 @@ class GradientText(QLabel, Element):
         pass
 
     def _connect_signals(self) -> None:
+        pass
+
+    def apply_theme_icons(self, theme: Theme) -> None:
         pass
 
     def set_gradient_colors(self, start_color, end_color):
@@ -327,6 +346,9 @@ class IconLabel(QWidget, Element):
     def _connect_signals(self) -> None:
         pass
 
+    def apply_theme_icons(self, theme: Theme) -> None:
+        pass
+
     def set_icon(self, icon_path: str | None = None) -> None:
         if icon_path is None:
             return
@@ -431,14 +453,14 @@ class PanelTitle(QFrame, Element):
             Settings.PANEL.TITLE_ICON_SPACING
         )  # Increased spacing for better visual separation
 
+        self._leading_svg: SVG | None = None
         if icon_path is not None:
-            icon = SVG(icon_path, self)
-            # Use calculated or provided icon size
-            icon.setFixedSize(icon_size)
-            icon.setAlignment(
+            self._leading_svg = SVG(icon_path, self)
+            self._leading_svg.setFixedSize(icon_size)
+            self._leading_svg.setAlignment(
                 Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignHCenter
             )
-            layout.addWidget(icon)
+            layout.addWidget(self._leading_svg)
 
         label = QLabel(text, self)
         label.setProperty("section-title", True)
@@ -450,6 +472,11 @@ class PanelTitle(QFrame, Element):
         self.setMaximumSize(layout.sizeHint())
         self._finalize_ui_hooks()
 
+    def set_leading_icon_path(self, path: str) -> None:
+        """Swap the title-leading SVG resource (e.g. after a light/dark theme change)."""
+        if self._leading_svg is not None:
+            self._leading_svg.set_path(path)
+
     def _set_size_policy(self) -> None:
         pass
 
@@ -457,6 +484,9 @@ class PanelTitle(QFrame, Element):
         pass
 
     def _connect_signals(self) -> None:
+        pass
+
+    def apply_theme_icons(self, theme: Theme) -> None:
         pass
 
 
@@ -505,6 +535,9 @@ class Button(QPushButton, Element):
         pass
 
     def _connect_signals(self) -> None:
+        pass
+
+    def apply_theme_icons(self, theme: Theme) -> None:
         pass
 
 
@@ -610,6 +643,15 @@ class WalkthroughButton(QPushButton, Element):
     def _connect_signals(self) -> None:
         pass
 
+    def apply_theme_icons(self, theme: Theme) -> None:
+        """Refresh walkthrough row SVGs for the given palette."""
+        self._lead_icon.set_path(
+            icon_qt_path_for_theme(theme, OperatingSystemIcons.ANDROID)
+        )
+        self._trail_icon.set_path(
+            icon_qt_path_for_theme(theme, GenericIcons.HAND_INDEX)
+        )
+
 
 class ToolButton(QToolButton, Element):
 
@@ -659,6 +701,9 @@ class ToolButton(QToolButton, Element):
         pass
 
     def _connect_signals(self) -> None:
+        pass
+
+    def apply_theme_icons(self, theme: Theme) -> None:
         pass
 
     def set_icon(
@@ -720,6 +765,9 @@ class ButtonGroup(QButtonGroup, Element):
     def _connect_signals(self) -> None:
         pass
 
+    def apply_theme_icons(self, theme: Theme) -> None:
+        pass
+
 
 class SelectionField(QComboBox, Element):
 
@@ -770,6 +818,9 @@ class SelectionField(QComboBox, Element):
     def _connect_signals(self) -> None:
         pass
 
+    def apply_theme_icons(self, theme: Theme) -> None:
+        pass
+
 
 class RegularText(QLabel, Element):
 
@@ -810,6 +861,9 @@ class RegularText(QLabel, Element):
         pass
 
     def _connect_signals(self) -> None:
+        pass
+
+    def apply_theme_icons(self, theme: Theme) -> None:
         pass
 
 
@@ -856,6 +910,9 @@ class DemiBoldText(QLabel, Element):
     def _connect_signals(self) -> None:
         pass
 
+    def apply_theme_icons(self, theme: Theme) -> None:
+        pass
+
 
 class HelperText(QLabel, Element):
 
@@ -897,6 +954,9 @@ class HelperText(QLabel, Element):
         pass
 
     def _connect_signals(self) -> None:
+        pass
+
+    def apply_theme_icons(self, theme: Theme) -> None:
         pass
 
 
@@ -970,6 +1030,9 @@ class List(QListWidget, Element):
     def _connect_signals(self) -> None:
         pass
 
+    def apply_theme_icons(self, theme: Theme) -> None:
+        pass
+
     def add_items(self, items: list[QListWidgetItem | str]):
         """Append multiple items, accepting raw strings or concrete items.
 
@@ -1035,6 +1098,9 @@ class SVG(QLabel, Element):
         pass
 
     def _connect_signals(self) -> None:
+        pass
+
+    def apply_theme_icons(self, theme: Theme) -> None:
         pass
 
     def paintEvent(self, event):
@@ -1155,6 +1221,9 @@ class PlaceHolder(QFrame, Element):
     def _connect_signals(self) -> None:
         pass
 
+    def apply_theme_icons(self, theme: Theme) -> None:
+        pass
+
     def set_text(self, text: str) -> None:
         """Update the placeholder message.
 
@@ -1218,6 +1287,9 @@ class FileOpenDialog(QFileDialog, Element):
     def _connect_signals(self) -> None:
         pass
 
+    def apply_theme_icons(self, theme: Theme) -> None:
+        pass
+
 
 class FileSaveDialog(QFileDialog, Element):
 
@@ -1263,6 +1335,9 @@ class FileSaveDialog(QFileDialog, Element):
         pass
 
     def _connect_signals(self) -> None:
+        pass
+
+    def apply_theme_icons(self, theme: Theme) -> None:
         pass
 
 
@@ -1328,6 +1403,9 @@ class WarningDialog(QMessageBox, Element):
     def _connect_signals(self) -> None:
         pass
 
+    def apply_theme_icons(self, theme: Theme) -> None:
+        pass
+
 
 class QuestionDialog(QMessageBox, Element):
 
@@ -1389,6 +1467,9 @@ class QuestionDialog(QMessageBox, Element):
         pass
 
     def _connect_signals(self) -> None:
+        pass
+
+    def apply_theme_icons(self, theme: Theme) -> None:
         pass
 
 
@@ -1458,16 +1539,16 @@ class Toast(QWidget, Element):
 
         if level == "info":
             color = palette.PRIMARY
-            icon = GenericIcons.INFO.value
+            icon_path = icon_qt_path(GenericIcons.INFO)
         elif level == "success":
             color = palette.SUCCESS
-            icon = GenericIcons.CHECK.value
+            icon_path = icon_qt_path(GenericIcons.CHECK)
         elif level == "warning":
             color = palette.WARNING
-            icon = GenericIcons.EXCLAMATION.value
+            icon_path = icon_qt_path(GenericIcons.EXCLAMATION)
         elif level == "error":
             color = palette.ERROR
-            icon = GenericIcons.X_CIRCLE.value
+            icon_path = icon_qt_path(GenericIcons.X_CIRCLE)
 
         inner_widget.setStyleSheet(f"""
             QWidget#toast-inner {{
@@ -1491,7 +1572,7 @@ class Toast(QWidget, Element):
         inner_layout.setContentsMargins(*Settings.SPACING.MARGIN_TOAST)
         inner_layout.setSpacing(Settings.SPACING.ICON_SPACING)
 
-        svg = SVG(icon, inner_widget)
+        svg = SVG(icon_path, inner_widget)
         svg.setFixedSize(get_svg_size(label.font().pointSize()))
         svg.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignHCenter)
         inner_layout.addWidget(svg)
@@ -1551,6 +1632,9 @@ class Toast(QWidget, Element):
         pass
 
     def _connect_signals(self) -> None:
+        pass
+
+    def apply_theme_icons(self, theme: Theme) -> None:
         pass
 
     def _move_to_bottom_right(self):
@@ -1634,6 +1718,9 @@ class ProgressBar(QProgressBar, Element):
     def _connect_signals(self) -> None:
         self.valueChanged.connect(self._update_format)
 
+    def apply_theme_icons(self, theme: Theme) -> None:
+        pass
+
     def _update_format(self, value: int) -> None:
         if 0 <= value < len(self._step_labels):
             self.setFormat(f"{value}. {self._step_labels[value]}")
@@ -1673,6 +1760,10 @@ class Image(QLabel, Element):
         self.setScaledContents(True)
         self._finalize_ui_hooks()
 
+    def set_pixmap_path(self, image_path: str) -> None:
+        """Reload the pixmap from a (possibly theme-specific) Qt resource path."""
+        self.setPixmap(QPixmap(image_path))
+
     def _set_size_policy(self) -> None:
         pass
 
@@ -1680,6 +1771,9 @@ class Image(QLabel, Element):
         pass
 
     def _connect_signals(self) -> None:
+        pass
+
+    def apply_theme_icons(self, theme: Theme) -> None:
         pass
 
 
@@ -1734,6 +1828,9 @@ class GroupBox(QGroupBox, Element):
         pass
 
     def _connect_signals(self) -> None:
+        pass
+
+    def apply_theme_icons(self, theme: Theme) -> None:
         pass
 
 
@@ -1792,6 +1889,9 @@ class ConditionIndicator(QFrame, Element):
         pass
 
     def _connect_signals(self) -> None:
+        pass
+
+    def apply_theme_icons(self, theme: Theme) -> None:
         pass
 
     def _indicator_color(self) -> str:
@@ -1922,10 +2022,11 @@ class File(QWidget, Element):
         file_icon_wrapper.setObjectName("file-icon-wrapper")
         file_icon_wrapper.setLayout(QVBoxLayout())
         file_icon_wrapper.layout().setContentsMargins(0, 0, 0, 0)
-        file_icon = SVG(GenericIcons.FILE.value, file_icon_wrapper)
+        file_icon = SVG(icon_qt_path(GenericIcons.FILE), file_icon_wrapper)
         file_icon.setFixedSize(get_svg_size(Settings.FONT.SIZE_DEFAULT))
         file_icon_wrapper.layout().addWidget(file_icon)
         file_icon_wrapper.layout().setAlignment(file_icon, Qt.AlignmentFlag.AlignCenter)
+        self._file_icon = file_icon
         layout.addWidget(file_icon_wrapper)
         layout.setAlignment(
             file_icon_wrapper,
@@ -1959,7 +2060,7 @@ class File(QWidget, Element):
         if self._file_save:
             save_as_button = ToolButton(
                 self,
-                icon_path=GenericIcons.SAVE_AS.value,
+                icon_path=icon_qt_path(GenericIcons.SAVE_AS),
                 tooltip=self.texts.save_as_tooltip,
             )
             layout.addWidget(save_as_button)
@@ -1980,6 +2081,13 @@ class File(QWidget, Element):
     def _connect_signals(self) -> None:
         if hasattr(self, "_save_as_button"):
             self._save_as_button.clicked.connect(self._on_save_as_button_clicked)
+
+    def apply_theme_icons(self, theme: Theme) -> None:
+        self._file_icon.set_path(icon_qt_path_for_theme(theme, GenericIcons.FILE))
+        if hasattr(self, "_save_as_button"):
+            self._save_as_button.set_icon(
+                icon_qt_path_for_theme(theme, GenericIcons.SAVE_AS)
+            )
 
     def _on_save_as_button_clicked(self) -> None:
         """Handle the save as button click event."""
@@ -2092,6 +2200,9 @@ class OTPLineEdit(QLineEdit, Element):
         pass
 
     def _connect_signals(self) -> None:
+        pass
+
+    def apply_theme_icons(self, theme: Theme) -> None:
         pass
 
     def keyPressEvent(self, event):
@@ -2221,6 +2332,9 @@ class OTPInput(QWidget, Element):
     def _connect_signals(self) -> None:
         pass
 
+    def apply_theme_icons(self, theme: Theme) -> None:
+        pass
+
     def _on_otp_text_changed(self, index: int, text: str) -> None:
         if index < self._otp_length - 1 and len(text) == self._max_length[index]:
             self._otp_inputs[index + 1].setFocus()
@@ -2324,7 +2438,7 @@ class AuthentificationCard(QFrame, Element):
 
         close_button = ToolButton(
             self,
-            icon_path=GenericIcons.X.value,
+            icon_path=icon_qt_path(GenericIcons.X),
             tooltip=self.texts.close_button_tooltip,
         )
 
@@ -2535,6 +2649,10 @@ class AuthentificationCard(QFrame, Element):
     def _connect_signals(self) -> None:
         self.ui.confirm_button.clicked.connect(self._on_confirm_button_clicked)
         self.ui.close_button.clicked.connect(self._on_close_button_clicked)
+
+    def apply_theme_icons(self, theme: Theme) -> None:
+        self.ui.close_button.set_icon(icon_qt_path_for_theme(theme, GenericIcons.X))
+        self.ui.icon.set_path(icon_qt_path_for_theme(theme, GenericIcons.DEVICE))
 
     def _on_close_button_clicked(self) -> None:
         """Handle the close button clicked event."""

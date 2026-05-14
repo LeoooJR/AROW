@@ -6,8 +6,15 @@ from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QFrame, QLabel, QSizePolicy, QVBoxLayout
 
 from gui import faker as ui_faker
+from gui.colors import Theme
 from gui.elements import DemiBoldText, File, Image, WalkthroughButton
-from gui.icons import ApplicationIcons, GenericIcons, OperatingSystemIcons
+from gui.icons import (
+    ApplicationIcons,
+    GenericIcons,
+    OperatingSystemIcons,
+    icon_qt_path,
+    icon_qt_path_for_theme,
+)
 from gui.settings import Settings
 from gui.wrapper import HorizontalLayoutWrapper, VerticalLayoutWrapper
 
@@ -62,7 +69,7 @@ class WelcomePanel(QFrame):
         self.setObjectName("welcome-panel")
         self.setProperty("welcome-panel", True)
 
-        image = Image(self, ApplicationIcons.LOGO_UI.value)
+        image = Image(self, icon_qt_path(ApplicationIcons.LOGO_UI))
         image.setFixedSize(
             Settings.DIMENSION.WELCOME_LOGO_SIZE, Settings.DIMENSION.WELCOME_LOGO_SIZE
         )
@@ -114,14 +121,14 @@ class WelcomePanel(QFrame):
         walkthrough_wifi_button = WalkthroughButton(
             self,
             self.texts.walkthrough_wifi_button,
-            lead_icon_path=OperatingSystemIcons.ANDROID.value,
-            trailing_icon_path=GenericIcons.HAND_INDEX.value,
+            lead_icon_path=icon_qt_path(OperatingSystemIcons.ANDROID),
+            trailing_icon_path=icon_qt_path(GenericIcons.HAND_INDEX),
         )
         walkthrough_usb_button = WalkthroughButton(
             self,
             self.texts.walkthrough_usb_button,
-            lead_icon_path=OperatingSystemIcons.ANDROID.value,
-            trailing_icon_path=GenericIcons.HAND_INDEX.value,
+            lead_icon_path=icon_qt_path(OperatingSystemIcons.ANDROID),
+            trailing_icon_path=icon_qt_path(GenericIcons.HAND_INDEX),
         )
         walkthrough_buttons_wrapper = VerticalLayoutWrapper(
             self,
@@ -183,6 +190,19 @@ class WelcomePanel(QFrame):
         )
 
         self._finalize_ui_hooks()
+
+    def apply_theme_icons(self, theme: Theme) -> None:
+        self.ui.image.set_pixmap_path(
+            icon_qt_path_for_theme(theme, ApplicationIcons.LOGO_UI)
+        )
+        self.ui.walkthrough_wifi_button.apply_theme_icons(theme)
+        self.ui.walkthrough_usb_button.apply_theme_icons(theme)
+        lay = self.ui.recent_files_wrapper.get_layout()
+        for i in range(lay.count()):
+            item = lay.itemAt(i)
+            w = item.widget() if item is not None else None
+            if isinstance(w, File):
+                w.apply_theme_icons(theme)
 
     def _finalize_ui_hooks(self) -> None:
         """Run the final UI setup hooks for the welcome panel."""

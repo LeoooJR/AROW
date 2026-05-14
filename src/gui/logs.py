@@ -12,6 +12,7 @@ from PySide6.QtWidgets import QFrame, QHBoxLayout, QSizePolicy, QVBoxLayout, QWi
 
 from gui import faker as ui_faker
 from gui.animation import animate_widget_visibility
+from gui.colors import Theme
 from gui.elements import (
     File,
     FileSaveDialog,
@@ -21,7 +22,7 @@ from gui.elements import (
     PanelTitle,
     ToolButton,
 )
-from gui.icons import GenericIcons
+from gui.icons import GenericIcons, icon_qt_path, icon_qt_path_for_theme
 from gui.settings import Settings
 from gui.signals import view_signals
 from gui.wrapper import HorizontalLayoutWrapper, VerticalLayoutWrapper
@@ -85,12 +86,14 @@ class LogPanel(QFrame):
         )  # Consistent spacing between major sections
 
         title = PanelTitle(
-            parent=self, text=self.texts.title, icon_path=GenericIcons.LOGS.value
+            parent=self,
+            text=self.texts.title,
+            icon_path=icon_qt_path(GenericIcons.LOGS),
         )
 
         expand_button = ToolButton(
             self,
-            icon_path=GenericIcons.LAYOUT_BOTTOMBAR_INSET.value,
+            icon_path=icon_qt_path(GenericIcons.LAYOUT_BOTTOMBAR_INSET),
             tooltip=self.texts.expand_button_tooltip,
         )
         expand_button.setProperty("toggle", True)
@@ -220,6 +223,19 @@ class LogPanel(QFrame):
         """Check if the log panel is visible."""
         return bool(self.ui.expand_button.property("toggle"))
 
+    def apply_theme_icons(self, theme: Theme) -> None:
+        self.ui.title.set_leading_icon_path(
+            icon_qt_path_for_theme(theme, GenericIcons.LOGS)
+        )
+        inset = bool(self.ui.expand_button.property("toggle"))
+        ex = (
+            GenericIcons.LAYOUT_BOTTOMBAR_INSET
+            if inset
+            else GenericIcons.LAYOUT_BOTTOMBAR
+        )
+        self.ui.expand_button.setIcon(QIcon(icon_qt_path_for_theme(theme, ex)))
+        self.ui.file_display_widget.apply_theme_icons(theme)
+
     def _on_simulation_log_file_updated(
         self, simulation_id: str, log_file_path: str
     ) -> None:
@@ -245,7 +261,7 @@ class LogPanel(QFrame):
         if not self.is_panel_visible():
             self.ui.expand_button.setProperty("toggle", True)
             self.ui.expand_button.setIcon(
-                QIcon(GenericIcons.LAYOUT_BOTTOMBAR_INSET.value)
+                QIcon(icon_qt_path(GenericIcons.LAYOUT_BOTTOMBAR_INSET))
             )
             animate_widget_visibility(
                 self,
@@ -259,7 +275,9 @@ class LogPanel(QFrame):
         """Hide the log panel."""
         if self.is_panel_visible():
             self.ui.expand_button.setProperty("toggle", False)
-            self.ui.expand_button.setIcon(QIcon(GenericIcons.LAYOUT_BOTTOMBAR.value))
+            self.ui.expand_button.setIcon(
+                QIcon(icon_qt_path(GenericIcons.LAYOUT_BOTTOMBAR))
+            )
             animate_widget_visibility(
                 self,
                 visible=False,
@@ -273,7 +291,9 @@ class LogPanel(QFrame):
         if self.ui.expand_button.property("toggle"):
             # Reduce: hide body and constrain height so the panel under can grow.
             self.ui.expand_button.setProperty("toggle", False)
-            self.ui.expand_button.setIcon(QIcon(GenericIcons.LAYOUT_BOTTOMBAR.value))
+            self.ui.expand_button.setIcon(
+                QIcon(icon_qt_path(GenericIcons.LAYOUT_BOTTOMBAR))
+            )
             animate_widget_visibility(
                 self,
                 visible=False,
@@ -285,7 +305,7 @@ class LogPanel(QFrame):
             # Expand: show body and allow it to grow.
             self.ui.expand_button.setProperty("toggle", True)
             self.ui.expand_button.setIcon(
-                QIcon(GenericIcons.LAYOUT_BOTTOMBAR_INSET.value)
+                QIcon(icon_qt_path(GenericIcons.LAYOUT_BOTTOMBAR_INSET))
             )
             animate_widget_visibility(
                 self,

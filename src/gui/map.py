@@ -25,9 +25,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from gui.colors import get_current_palette
+from gui.colors import Theme, get_current_palette
 from gui.elements import SVG, IconLabel, PanelTitle, PlaceHolder, ToolButton
-from gui.icons import GenericIcons
+from gui.icons import GenericIcons, icon_qt_path, icon_qt_path_for_theme
 from gui.settings import Settings
 from gui.signals import view_signals
 from gui.svg import get_svg_size
@@ -131,14 +131,14 @@ class Legend(QFrame):
 
         location_label_icon = IconLabel(
             None,
-            icon_path=GenericIcons.LOCATION.value,
+            icon_path=icon_qt_path(GenericIcons.LOCATION),
             text=self.texts.location_label,
             spacing=Settings.SPACING.ICON_SPACING,
             margins=Settings.SPACING.MARGIN_NONE,
         )
         simulated_location_label_icon = IconLabel(
             None,
-            icon_path=GenericIcons.FAKE_LOCATION.value,
+            icon_path=icon_qt_path(GenericIcons.FAKE_LOCATION),
             text=self.texts.simulated_location_label,
             spacing=Settings.SPACING.ICON_SPACING,
             margins=Settings.SPACING.MARGIN_NONE,
@@ -154,7 +154,7 @@ class Legend(QFrame):
 
         kilometric_point_label_icon = IconLabel(
             None,
-            icon_path=GenericIcons.MILESTONE.value,
+            icon_path=icon_qt_path(GenericIcons.MILESTONE),
             text=self.texts.kilometric_point_label,
             spacing=Settings.SPACING.ICON_SPACING,
             margins=Settings.SPACING.MARGIN_NONE,
@@ -181,6 +181,17 @@ class Legend(QFrame):
             legend_second_row=legend_second_row,
         )
         self._set_alignment()
+
+    def apply_theme_icons(self, theme: Theme) -> None:
+        self.ui.location_label_icon.set_icon(
+            icon_qt_path_for_theme(theme, GenericIcons.LOCATION)
+        )
+        self.ui.simulated_location_label_icon.set_icon(
+            icon_qt_path_for_theme(theme, GenericIcons.FAKE_LOCATION)
+        )
+        self.ui.kilometric_point_label_icon.set_icon(
+            icon_qt_path_for_theme(theme, GenericIcons.MILESTONE)
+        )
 
     def _set_alignment(self) -> None:
         """Centralize layout alignment for the legend and its UI widgets."""
@@ -262,12 +273,13 @@ class Location(QWidget):
         )
         latitude_label_font_size = latitude_label.font().pointSize()
 
+        self._coordinate_lead_svg: SVG | None = None
         if icon_path is not None:
-            svg = SVG(icon_path, self)
+            self._coordinate_lead_svg = SVG(icon_path, self)
             svg_size = get_svg_size(Settings.FONT.SIZE_DEFAULT)
-            svg.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            svg.setFixedSize(svg_size)
-            layout.addWidget(svg)
+            self._coordinate_lead_svg.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self._coordinate_lead_svg.setFixedSize(svg_size)
+            layout.addWidget(self._coordinate_lead_svg)
 
         latitude_widget.layout().addWidget(latitude_label)
 
@@ -301,7 +313,7 @@ class Location(QWidget):
 
         crosshair_button = ToolButton(
             parent=self,
-            icon_path=GenericIcons.CROSSHAIR.value,
+            icon_path=icon_qt_path(GenericIcons.CROSSHAIR),
             tooltip=self.texts.crosshair_button_tooltip,
         )
         crosshair_button.setEnabled(False)
@@ -317,6 +329,14 @@ class Location(QWidget):
             crosshair_button=crosshair_button,
         )
         self._finalize_ui_hooks()
+
+    def apply_row_icons(self, theme: Theme, lead: GenericIcons) -> None:
+        """Update the coordinate row leading marker and crosshair for ``theme``."""
+        if self._coordinate_lead_svg is not None:
+            self._coordinate_lead_svg.set_path(icon_qt_path_for_theme(theme, lead))
+        self.ui.crosshair_button.set_icon(
+            icon_qt_path_for_theme(theme, GenericIcons.CROSSHAIR)
+        )
 
     def _finalize_ui_hooks(self) -> None:
         """Run the final UI setup hooks for the location widget."""
@@ -428,14 +448,14 @@ class Coordinates(QFrame):
 
         simulation_state_off = IconLabel(
             self,
-            icon_path=GenericIcons.OFF.value,
+            icon_path=icon_qt_path(GenericIcons.OFF),
             text=self.texts.simulation_state_off,
             spacing=Settings.SPACING.ICON_SPACING,
             margins=Settings.SPACING.MARGIN_NONE,
         )
         simulation_state_on = IconLabel(
             self,
-            icon_path=GenericIcons.ON.value,
+            icon_path=icon_qt_path(GenericIcons.ON),
             text=self.texts.simulation_state_on,
             spacing=Settings.SPACING.ICON_SPACING,
             margins=Settings.SPACING.MARGIN_NONE,
@@ -455,7 +475,7 @@ class Coordinates(QFrame):
 
         play_button = ToolButton(
             parent=self,
-            icon_path=GenericIcons.PLAY.value,
+            icon_path=icon_qt_path(GenericIcons.PLAY),
             icon_size=get_svg_size(Settings.FONT.SIZE_DEFAULT),
             tooltip=self.texts.play_button_tooltip,
         )
@@ -464,10 +484,12 @@ class Coordinates(QFrame):
         play_button.clicked.connect(self._on_play_button_clicked)
         layout.addWidget(play_button)
 
-        location_widget = Location(self, GenericIcons.LOCATION.value)
+        location_widget = Location(self, icon_qt_path(GenericIcons.LOCATION))
         layout.addWidget(location_widget)
 
-        simulated_location_widget = Location(self, GenericIcons.FAKE_LOCATION.value)
+        simulated_location_widget = Location(
+            self, icon_qt_path(GenericIcons.FAKE_LOCATION)
+        )
         layout.addWidget(simulated_location_widget)
 
         self.setLayout(layout)
@@ -482,6 +504,29 @@ class Coordinates(QFrame):
             play_button=play_button,
         )
         self._finalize_ui_hooks()
+
+    def apply_theme_icons(self, theme: Theme) -> None:
+        self.ui.simulation_state_off.set_icon(
+            icon_qt_path_for_theme(theme, GenericIcons.OFF)
+        )
+        self.ui.simulation_state_on.set_icon(
+            icon_qt_path_for_theme(theme, GenericIcons.ON)
+        )
+        pb = self.ui.play_button
+        if pb.property("toggle"):
+            pb.set_icon(
+                icon_qt_path_for_theme(theme, GenericIcons.PAUSE),
+                Settings.FONT.SIZE_DEFAULT,
+            )
+        else:
+            pb.set_icon(
+                icon_qt_path_for_theme(theme, GenericIcons.PLAY),
+                Settings.FONT.SIZE_DEFAULT,
+            )
+        self.ui.location_widget.apply_row_icons(theme, GenericIcons.LOCATION)
+        self.ui.simulated_location_widget.apply_row_icons(
+            theme, GenericIcons.FAKE_LOCATION
+        )
 
     def _finalize_ui_hooks(self) -> None:
         """Run the final UI setup hooks for the coordinates section."""
@@ -524,7 +569,7 @@ class Coordinates(QFrame):
 
         if state:
             self.ui.play_button.set_icon(
-                GenericIcons.PAUSE.value, Settings.FONT.SIZE_DEFAULT
+                icon_qt_path(GenericIcons.PAUSE), Settings.FONT.SIZE_DEFAULT
             )
             self.ui.play_button.setToolTip(self.texts.pause_button_tooltip)
             anim_off = QPropertyAnimation(effect_off, b"opacity")
@@ -539,7 +584,7 @@ class Coordinates(QFrame):
             anim_on.setEasingCurve(easing)
         else:
             self.ui.play_button.set_icon(
-                GenericIcons.PLAY.value, Settings.FONT.SIZE_DEFAULT
+                icon_qt_path(GenericIcons.PLAY), Settings.FONT.SIZE_DEFAULT
             )
             self.ui.play_button.setToolTip(self.texts.play_button_tooltip)
             anim_off = QPropertyAnimation(effect_off, b"opacity")
@@ -622,7 +667,7 @@ class Map(QWidget):
             minimum_width=Settings.DIMENSION.MIN_WIDTH_LARGE,
             minimum_height=Settings.DIMENSION.MIN_HEIGHT_SMALL,
             stretch_widgets=False,
-            icon_path=GenericIcons.DEVICE_PLACEHOLDER.value,
+            icon_path=icon_qt_path(GenericIcons.DEVICE_PLACEHOLDER),
         )
         placeholder.setObjectName("map-placeholder")
         layout.addWidget(placeholder, 1)
@@ -636,6 +681,7 @@ class Map(QWidget):
             canvas=canvas, coordinates=coordinates, placeholder=placeholder
         )
         self._placeholder_helper_anim: QSequentialAnimationGroup | None = None
+        self._placeholder_icon: GenericIcons = GenericIcons.DEVICE_PLACEHOLDER
 
         self._finalize_ui_hooks()
 
@@ -667,15 +713,18 @@ class Map(QWidget):
     def is_canvas_visible(self) -> bool:
         return self.ui.canvas.isVisible()
 
-    def update_placeholder(self, text: str, icon_path: str) -> None:
-        """Update the placeholder text and icon.
+    def update_placeholder(self, text: str, icon_member: GenericIcons) -> None:
+        """Update the placeholder text and symbology for the given logical icon."""
 
-        Args:
-            text: Message shown in the empty state.
-            icon_path: Asset path for the placeholder illustration.
-        """
+        self._placeholder_icon = icon_member
         self.ui.placeholder.set_text(text)
-        self.ui.placeholder.set_icon(icon_path)
+        self.ui.placeholder.set_icon(icon_qt_path(icon_member))
+
+    def apply_theme_icons(self, theme: Theme) -> None:
+        self.ui.placeholder.set_icon(
+            icon_qt_path_for_theme(theme, self._placeholder_icon)
+        )
+        self.ui.coordinates.apply_theme_icons(theme)
 
     def play_placeholder_helper_animation(self) -> None:
         """
@@ -761,7 +810,7 @@ class MapPanel(QFrame):
         )  # Consistent spacing between major sections
 
         title = PanelTitle(
-            parent=self, text=self.texts.title, icon_path=GenericIcons.MAP.value
+            parent=self, text=self.texts.title, icon_path=icon_qt_path(GenericIcons.MAP)
         )
         title.setProperty("main-panel-title", True)
         layout.addWidget(title)
@@ -805,7 +854,7 @@ class MapPanel(QFrame):
     def _on_device_selection_succeeded(self, device: dict) -> None:
         """Handle map UI updates for any successful connection flow."""
         self.ui.map.update_placeholder(
-            self.texts.loading_placeholder, GenericIcons.MAP_PLACEHOLDER.value
+            self.texts.loading_placeholder, GenericIcons.MAP_PLACEHOLDER
         )
         self.ui.map.play_placeholder_helper_animation()
 
@@ -816,6 +865,13 @@ class MapPanel(QFrame):
     def _on_authentification_failed(self) -> None:
         """Handle the authentification failed event."""
         self.ui.map.play_placeholder_helper_animation()
+
+    def apply_theme_icons(self, theme: Theme) -> None:
+        self.ui.title.set_leading_icon_path(
+            icon_qt_path_for_theme(theme, GenericIcons.MAP)
+        )
+        self.ui.legend.apply_theme_icons(theme)
+        self.ui.map.apply_theme_icons(theme)
 
     def _set_size_policy(self) -> None:
         """Centralize size policies for the panel and its UI widgets (window resizing)."""

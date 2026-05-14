@@ -9,6 +9,19 @@ from typing import Literal
 
 Theme = Literal["light", "dark"]
 
+_APP_THEME: Theme = "light"
+
+
+def get_current_theme() -> Theme:
+    """Return the active UI theme (light or dark)."""
+    return _APP_THEME
+
+
+def set_current_theme(theme: Theme) -> None:
+    """Set the active UI theme; intended to be driven from MainWindow palette updates."""
+    global _APP_THEME
+    _APP_THEME = theme
+
 
 @dataclass(frozen=True)
 class Color:
@@ -83,5 +96,5 @@ def get_palette(theme: Theme) -> Palette:
 
 
 def get_current_palette() -> Palette:
-    """Return the palette for the active theme. Only light mode is used for now."""
-    return get_palette("light")
+    """Return the color palette for the active theme."""
+    return get_palette(get_current_theme())

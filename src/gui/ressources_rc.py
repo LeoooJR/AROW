@@ -6,901 +6,6 @@
 from PySide6 import QtCore
 
 qt_resource_data = b"\
-\x00\x00\x01\xa4\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2216\
-\x22 height=\x2216\x22 fi\
-ll=\x22currentColor\
-\x22 class=\x22bi bi-u\
-pload\x22 viewBox=\x22\
-0 0 16 16\x22>\x0a  <p\
-ath d=\x22M.5 9.9a.\
-5.5 0 0 1 .5.5v2\
-.5a1 1 0 0 0 1 1\
-h12a1 1 0 0 0 1-\
-1v-2.5a.5.5 0 0 \
-1 1 0v2.5a2 2 0 \
-0 1-2 2H2a2 2 0 \
-0 1-2-2v-2.5a.5.\
-5 0 0 1 .5-.5\x22/>\
-\x0a  <path d=\x22M7.6\
-46 1.146a.5.5 0 \
-0 1 .708 0l3 3a.\
-5.5 0 0 1-.708.7\
-08L8.5 2.707V11.\
-5a.5.5 0 0 1-1 0\
-V2.707L5.354 4.8\
-54a.5.5 0 1 1-.7\
-08-.708z\x22/>\x0a</sv\
-g>\x0a\
-\x00\x00\x027\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2216\
-\x22 height=\x2216\x22 fi\
-ll=\x22currentColor\
-\x22 class=\x22bi bi-m\
-oon\x22 viewBox=\x220 \
-0 16 16\x22>\x0a  <pat\
-h d=\x22M6 .278a.77\
-.77 0 0 1 .08.85\
-8 7.2 7.2 0 0 0-\
-.878 3.46c0 4.02\
-1 3.278 7.277 7.\
-318 7.277q.792-.\
-001 1.533-.16a.7\
-9.79 0 0 1 .81.3\
-16.73.73 0 0 1-.\
-031.893A8.35 8.3\
-5 0 0 1 8.344 16\
-C3.734 16 0 12.2\
-86 0 7.71 0 4.26\
-6 2.114 1.312 5.\
-124.06A.75.75 0 \
-0 1 6 .278M4.858\
- 1.311A7.27 7.27\
- 0 0 0 1.025 7.7\
-1c0 4.02 3.279 7\
-.276 7.319 7.276\
-a7.32 7.32 0 0 0\
- 5.205-2.162q-.5\
-06.063-1.029.063\
-c-4.61 0-8.343-3\
-.714-8.343-8.29 \
-0-1.167.242-2.27\
-8.681-3.286\x22/>\x0a<\
-/svg>\x0a\
-\x00\x00\x01\xa5\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2216\
-\x22 height=\x2216\x22 fi\
-ll=\x22currentColor\
-\x22 class=\x22bi bi-x\
--circle\x22 viewBox\
-=\x220 0 16 16\x22>\x0a  \
-<path d=\x22M8 15A7\
- 7 0 1 1 8 1a7 7\
- 0 0 1 0 14m0 1A\
-8 8 0 1 0 8 0a8 \
-8 0 0 0 0 16\x22/>\x0a\
-  <path d=\x22M4.64\
-6 4.646a.5.5 0 0\
- 1 .708 0L8 7.29\
-3l2.646-2.647a.5\
-.5 0 0 1 .708.70\
-8L8.707 8l2.647 \
-2.646a.5.5 0 0 1\
--.708.708L8 8.70\
-7l-2.646 2.647a.\
-5.5 0 0 1-.708-.\
-708L7.293 8 4.64\
-6 5.354a.5.5 0 0\
- 1 0-.708\x22/>\x0a</s\
-vg>\x0a\
-\x00\x00\x01;\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2216\
-\x22 height=\x2216\x22 fi\
-ll=\x22currentColor\
-\x22 class=\x22bi bi-l\
-ayout-sidebar-re\
-verse\x22 viewBox=\x22\
-0 0 16 16\x22>\x0a  <p\
-ath d=\x22M16 3a2 2\
- 0 0 0-2-2H2a2 2\
- 0 0 0-2 2v10a2 \
-2 0 0 0 2 2h12a2\
- 2 0 0 0 2-2zm-5\
--1v12H2a1 1 0 0 \
-1-1-1V3a1 1 0 0 \
-1 1-1zm1 0h2a1 1\
- 0 0 1 1 1v10a1 \
-1 0 0 1-1 1h-2z\x22\
-/>\x0a</svg>\x0a\
-\x00\x00\x01V\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2216\
-\x22 height=\x2216\x22 fi\
-ll=\x22currentColor\
-\x22 class=\x22bi bi-p\
-lay-circle\x22 view\
-Box=\x220 0 16 16\x22>\
-\x0a  <path d=\x22M8 1\
-5A7 7 0 1 1 8 1a\
-7 7 0 0 1 0 14m0\
- 1A8 8 0 1 0 8 0\
-a8 8 0 0 0 0 16\x22\
-/>\x0a  <path d=\x22M6\
-.271 5.055a.5.5 \
-0 0 1 .52.038l3.\
-5 2.5a.5.5 0 0 1\
- 0 .814l-3.5 2.5\
-A.5.5 0 0 1 6 10\
-.5v-5a.5.5 0 0 1\
- .271-.445\x22/>\x0a</\
-svg>\x0a\
-\x00\x00\x00\xab\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x228\x22\
- height=\x228\x22 view\
-Box=\x220 0 8 8\x22><p\
-ath fill=\x22#28A74\
-5\x22 d=\x22M4 4c0-2 3\
--2 3 0S4 6 4 4m1\
-.5 2c3 0 3-4 0-4\
-h-3c-3 0-3 4 0 4\
-\x22/></svg>\x0a\
-\x00\x00.\x11\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2227\
-.77\x22 height=\x2232\x22\
- viewBox=\x220 0 25\
-6 295\x22><defs><li\
-nearGradient id=\
-\x22linux__logosLin\
-uxTux0\x22 x1=\x2248.5\
-48%\x22 x2=\x2251.047%\
-\x22 y1=\x22115.276%\x22 \
-y2=\x2241.364%\x22><st\
-op offset=\x220%\x22 s\
-top-color=\x22#FFEE\
-D7\x22/><stop offse\
-t=\x22100%\x22 stop-co\
-lor=\x22#BDBFC2\x22/><\
-/linearGradient>\
-<linearGradient \
-id=\x22linux__logos\
-LinuxTux1\x22 x1=\x225\
-4.407%\x22 x2=\x2246.1\
-75%\x22 y1=\x222.404%\x22\
- y2=\x2290.542%\x22><s\
-top offset=\x220%\x22 \
-stop-color=\x22#FFF\
-\x22 stop-opacity=\x22\
-.8\x22/><stop offse\
-t=\x22100%\x22 stop-co\
-lor=\x22#FFF\x22 stop-\
-opacity=\x220\x22/></l\
-inearGradient><l\
-inearGradient id\
-=\x22linux__logosLi\
-nuxTux2\x22 x1=\x2251.\
-86%\x22 x2=\x2247.947%\
-\x22 y1=\x2288.248%\x22 y\
-2=\x229.748%\x22><stop\
- offset=\x220%\x22 sto\
-p-color=\x22#FFEED7\
-\x22/><stop offset=\
-\x22100%\x22 stop-colo\
-r=\x22#BDBFC2\x22/></l\
-inearGradient><l\
-inearGradient id\
-=\x22linux__logosLi\
-nuxTux3\x22 x1=\x2249.\
-925%\x22 x2=\x2249.924\
-%\x22 y1=\x2285.49%\x22 y\
-2=\x2213.811%\x22><sto\
-p offset=\x220%\x22 st\
-op-color=\x22#FFEED\
-7\x22/><stop offset\
-=\x22100%\x22 stop-col\
-or=\x22#BDBFC2\x22/></\
-linearGradient><\
-linearGradient i\
-d=\x22linux__logosL\
-inuxTux4\x22 x1=\x2253\
-.901%\x22 x2=\x2245.95\
-6%\x22 y1=\x223.102%\x22 \
-y2=\x2293.895%\x22><st\
-op offset=\x220%\x22 s\
-top-color=\x22#FFF\x22\
- stop-opacity=\x22.\
-65\x22/><stop offse\
-t=\x22100%\x22 stop-co\
-lor=\x22#FFF\x22 stop-\
-opacity=\x220\x22/></l\
-inearGradient><l\
-inearGradient id\
-=\x22linux__logosLi\
-nuxTux5\x22 x1=\x2245.\
-593%\x22 x2=\x2254.811\
-%\x22 y1=\x225.475%\x22 y\
-2=\x2293.524%\x22><sto\
-p offset=\x220%\x22 st\
-op-color=\x22#FFF\x22 \
-stop-opacity=\x22.6\
-5\x22/><stop offset\
-=\x22100%\x22 stop-col\
-or=\x22#FFF\x22 stop-o\
-pacity=\x220\x22/></li\
-nearGradient><li\
-nearGradient id=\
-\x22linux__logosLin\
-uxTux6\x22 x1=\x2249.9\
-84%\x22 x2=\x2249.984%\
-\x22 y1=\x2289.845%\x22 y\
-2=\x2240.632%\x22><sto\
-p offset=\x220%\x22 st\
-op-color=\x22#FFEED\
-7\x22/><stop offset\
-=\x22100%\x22 stop-col\
-or=\x22#BDBFC2\x22/></\
-linearGradient><\
-linearGradient i\
-d=\x22linux__logosL\
-inuxTux7\x22 x1=\x2253\
-.505%\x22 x2=\x2242.74\
-6%\x22 y1=\x2299.975%\x22\
- y2=\x2223.545%\x22><s\
-top offset=\x220%\x22 \
-stop-color=\x22#FFE\
-ED7\x22/><stop offs\
-et=\x22100%\x22 stop-c\
-olor=\x22#BDBFC2\x22/>\
-</linearGradient\
-><linearGradient\
- id=\x22linux__logo\
-sLinuxTux8\x22 x1=\x22\
-49.841%\x22 x2=\x2250.\
-241%\x22 y1=\x2213.229\
-%\x22 y2=\x2294.673%\x22>\
-<stop offset=\x220%\
-\x22 stop-color=\x22#F\
-FF\x22 stop-opacity\
-=\x22.8\x22/><stop off\
-set=\x22100%\x22 stop-\
-color=\x22#FFF\x22 sto\
-p-opacity=\x220\x22/><\
-/linearGradient>\
-<linearGradient \
-id=\x22linux__logos\
-LinuxTux9\x22 x1=\x224\
-9.927%\x22 x2=\x2250.7\
-27%\x22 y1=\x2237.327%\
-\x22 y2=\x2292.782%\x22><\
-stop offset=\x220%\x22\
- stop-color=\x22#FF\
-F\x22 stop-opacity=\
-\x22.65\x22/><stop off\
-set=\x22100%\x22 stop-\
-color=\x22#FFF\x22 sto\
-p-opacity=\x220\x22/><\
-/linearGradient>\
-<linearGradient \
-id=\x22linux__logos\
-LinuxTuxa\x22 x1=\x224\
-9.876%\x22 x2=\x2249.8\
-76%\x22 y1=\x222.299%\x22\
- y2=\x2281.204%\x22><s\
-top offset=\x220%\x22 \
-stop-color=\x22#FFF\
-\x22 stop-opacity=\x22\
-.65\x22/><stop offs\
-et=\x22100%\x22 stop-c\
-olor=\x22#FFF\x22 stop\
--opacity=\x220\x22/></\
-linearGradient><\
-linearGradient i\
-d=\x22linux__logosL\
-inuxTuxb\x22 x1=\x2249\
-.833%\x22 x2=\x2249.82\
-4%\x22 y1=\x222.272%\x22 \
-y2=\x2271.799%\x22><st\
-op offset=\x220%\x22 s\
-top-color=\x22#FFF\x22\
- stop-opacity=\x22.\
-65\x22/><stop offse\
-t=\x22100%\x22 stop-co\
-lor=\x22#FFF\x22 stop-\
-opacity=\x220\x22/></l\
-inearGradient><l\
-inearGradient id\
-=\x22linux__logosLi\
-nuxTuxc\x22 x1=\x2253.\
-467%\x22 x2=\x2238.949\
-%\x22 y1=\x2248.921%\x22 \
-y2=\x2298.1%\x22><stop\
- offset=\x220%\x22 sto\
-p-color=\x22#FFA63F\
-\x22/><stop offset=\
-\x22100%\x22 stop-colo\
-r=\x22#FF0\x22/></line\
-arGradient><line\
-arGradient id=\x22l\
-inux__logosLinux\
-Tuxd\x22 x1=\x2252.373\
-%\x22 x2=\x2247.579%\x22 \
-y1=\x22143.009%\x22 y2\
-=\x22-64.622%\x22><sto\
-p offset=\x220%\x22 st\
-op-color=\x22#FFEED\
-7\x22/><stop offset\
-=\x22100%\x22 stop-col\
-or=\x22#BDBFC2\x22/></\
-linearGradient><\
-linearGradient i\
-d=\x22linux__logosL\
-inuxTuxe\x22 x1=\x2230\
-.581%\x22 x2=\x2265.88\
-7%\x22 y1=\x2234.024%\x22\
- y2=\x2289.175%\x22><s\
-top offset=\x220%\x22 \
-stop-color=\x22#FFA\
-63F\x22/><stop offs\
-et=\x22100%\x22 stop-c\
-olor=\x22#FF0\x22/></l\
-inearGradient><l\
-inearGradient id\
-=\x22linux__logosLi\
-nuxTuxf\x22 x1=\x2259.\
-572%\x22 x2=\x2248.361\
-%\x22 y1=\x22-17.216%\x22\
- y2=\x2266.118%\x22><s\
-top offset=\x220%\x22 \
-stop-color=\x22#FFF\
-\x22 stop-opacity=\x22\
-.65\x22/><stop offs\
-et=\x22100%\x22 stop-c\
-olor=\x22#FFF\x22 stop\
--opacity=\x220\x22/></\
-linearGradient><\
-linearGradient i\
-d=\x22linux__logosL\
-inuxTuxg\x22 x1=\x2247\
-.769%\x22 x2=\x2251.37\
-3%\x22 y1=\x221.565%\x22 \
-y2=\x22104.313%\x22><s\
-top offset=\x220%\x22 \
-stop-color=\x22#FFF\
-\x22 stop-opacity=\x22\
-.65\x22/><stop offs\
-et=\x22100%\x22 stop-c\
-olor=\x22#FFF\x22 stop\
--opacity=\x220\x22/></\
-linearGradient><\
-linearGradient i\
-d=\x22linux__logosL\
-inuxTuxh\x22 x1=\x2243\
-.55%\x22 x2=\x2257.114\
-%\x22 y1=\x224.533%\x22 y\
-2=\x2292.827%\x22><sto\
-p offset=\x220%\x22 st\
-op-color=\x22#FFF\x22 \
-stop-opacity=\x22.6\
-5\x22/><stop offset\
-=\x22100%\x22 stop-col\
-or=\x22#FFF\x22 stop-o\
-pacity=\x220\x22/></li\
-nearGradient><li\
-nearGradient id=\
-\x22linux__logosLin\
-uxTuxi\x22 x1=\x2249.7\
-33%\x22 x2=\x2250.558%\
-\x22 y1=\x2217.609%\x22 y\
-2=\x2299.385%\x22><sto\
-p offset=\x220%\x22 st\
-op-color=\x22#FFA63\
-F\x22/><stop offset\
-=\x22100%\x22 stop-col\
-or=\x22#FF0\x22/></lin\
-earGradient><lin\
-earGradient id=\x22\
-linux__logosLinu\
-xTuxj\x22 x1=\x2250.17\
-%\x22 x2=\x2249.68%\x22 y\
-1=\x222.89%\x22 y2=\x2294\
-.17%\x22><stop offs\
-et=\x220%\x22 stop-col\
-or=\x22#FFF\x22 stop-o\
-pacity=\x22.65\x22/><s\
-top offset=\x22100%\
-\x22 stop-color=\x22#F\
-FF\x22 stop-opacity\
-=\x220\x22/></linearGr\
-adient><filter i\
-d=\x22linux__logosL\
-inuxTuxk\x22 width=\
-\x22200%\x22 height=\x222\
-00%\x22 x=\x22-50%\x22 y=\
-\x22-50%\x22 filterUni\
-ts=\x22objectBoundi\
-ngBox\x22><feOffset\
- in=\x22SourceAlpha\
-\x22 result=\x22shadow\
-OffsetOuter1\x22/><\
-feGaussianBlur i\
-n=\x22shadowOffsetO\
-uter1\x22 result=\x22s\
-hadowBlurOuter1\x22\
- stdDeviation=\x226\
-.5\x22/></filter></\
-defs><g fill=\x22no\
-ne\x22><path fill=\x22\
-#000\x22 fill-opaci\
-ty=\x22.2\x22 d=\x22M235.\
-125 249.359c0 17\
-.355-52.617 31.4\
-97-117.54 31.497\
-S.044 266.806.04\
-4 249.359c0-17.3\
-56 52.618-31.498\
- 117.54-31.498c6\
-4.924 0 117.45 1\
-4.142 117.541 31\
-.498\x22 filter=\x22ur\
-l(#linux__logosL\
-inuxTuxk)\x22 trans\
-form=\x22translate(\
-10)\x22/><path fill\
-=\x22#000\x22 d=\x22M63.2\
-13 215.474c-11.3\
-87-16.346-13.591\
--69.606 12.947-1\
-02.39C89.292 97.\
-383 92.69 86.455\
- 93.7 71.67c.734\
--16.805-11.846-6\
-6.851 35.537-70.\
-616c48.027-3.857\
- 45.364 43.526 4\
-5.088 68.596c-.1\
-83 21.12 15.52 3\
-3.15 26.355 49.6\
-8c19.927 30.303 \
-18.274 82.461-3.\
-765 110.745c-27.\
-916 35.354-51.79\
-1 20.018-67.678 \
-21.304c-29.752 1\
-.745-30.762 17.5\
-4-66.024-35.905\x22\
-/><path fill=\x22ur\
-l(#linux__logosL\
-inuxTux0)\x22 d=\x22M1\
-69.1 122.451c8.2\
-65 7.622 29.661 \
-41.69-4.224 62.9\
-95c-11.937 7.438\
- 10.653 35.721 2\
-1.488 22.039c19.\
-193-24.61 6.98-6\
-3.913-4.591-77.9\
-63c-7.714-9.917-\
-19.651-13.774-12\
-.672-7.07\x22 trans\
-form=\x22translate(\
-10)\x22/><path fill\
-=\x22#000\x22 stroke=\x22\
-#000\x22 stroke-wid\
-th=\x22.977\x22 d=\x22M17\
-6.805 117.86c13.\
-59 11.02 38.292 \
-49.587 2.204 74.\
-748c-11.846 7.80\
-6 10.468 32.508 \
-23.049 19.927c43\
-.618-43.894-1.10\
-2-94.308-16.53-1\
-11.664c-13.774-1\
-5.151-25.987 3.4\
-9-8.723 16.989z\x22\
-/><path fill=\x22ur\
-l(#linux__logosL\
-inuxTux1)\x22 d=\x22M1\
-47.245 25.02c-.4\
-59 12.581-14.325\
- 23.51-30.946 24\
-.52c-16.621 1.01\
--29.66-8.54-29.2\
-02-21.121c.46-12\
-.581 14.326-23.5\
-09 30.947-24.519\
-c16.62-.918 29.6\
-6 8.54 29.201 21\
-.12\x22 transform=\x22\
-translate(10)\x22/>\
-<path fill=\x22url(\
-#linux__logosLin\
-uxTux2)\x22 d=\x22M107\
-.483 54.957c.46 \
-8.173-3.397 15.0\
-6-8.723 15.335c-\
-5.326.276-10.01-\
-6.06-10.469-14.2\
-33c-.459-8.173 3\
-.398-15.06 8.724\
--15.335c5.326-.2\
-76 10.01 6.06 10\
-.468 14.233\x22 tra\
-nsform=\x22translat\
-e(10)\x22/><path fi\
-ll=\x22url(#linux__\
-logosLinuxTux3)\x22\
- d=\x22M117.125 55.\
-6c.184 9.458 6.3\
-37 16.988 13.683\
- 16.805c7.346-.1\
-84 13.131-7.99 1\
-2.948-17.54c-.18\
-4-9.458-6.336-16\
-.988-13.683-16.8\
-04c-7.346.183-13\
-.223 8.08-12.948\
- 17.539\x22 transfo\
-rm=\x22translate(10\
-)\x22/><path fill=\x22\
-#000\x22 d=\x22M133.18\
-6 57.712c-.092 5\
-.234 2.48 9.458 \
-5.877 9.458c3.30\
-6 0 6.153-4.224 \
-6.245-9.366c.091\
--5.234-2.48-9.45\
-9-5.878-9.459c-3\
-.397 0-6.152 4.2\
-25-6.244 9.367m-\
-21.212.092c.459 \
-4.316-1.194 7.98\
-9-3.582 8.356c-2\
-.387.276-4.683-2\
-.938-5.142-7.254\
-c-.46-4.316 1.19\
-4-7.99 3.581-8.3\
-57c2.388-.275 4.\
-684 2.939 5.143 \
-7.255\x22/><path fi\
-ll=\x22url(#linux__\
-logosLinuxTux4)\x22\
- d=\x22M124.564 54.\
-773c-.276 2.939 \
-1.102 5.326 3.03\
- 5.51c1.928.184 \
-3.765-2.112 4.04\
--4.959c.276-2.93\
-8-1.102-5.326-3.\
-03-5.51c-1.928-.\
-183-3.765 2.113-\
-4.04 4.96\x22 trans\
-form=\x22translate(\
-10)\x22/><path fill\
-=\x22url(#linux__lo\
-gosLinuxTux5)\x22 d\
-=\x22M99.953 55.508\
-c.276 2.388-.734\
- 4.5-2.203 4.683\
-c-1.47.184-2.847\
--1.653-3.123-4.1\
-32c-.275-2.388.7\
-35-4.5 2.204-4.6\
-83c1.47-.184 2.8\
-47 1.744 3.122 4\
-.132\x22 transform=\
-\x22translate(10)\x22/\
-><path fill=\x22url\
-(#linux__logosLi\
-nuxTux6)\x22 d=\x22M71\
-.027 145.684c6.5\
-2-14.785 20.386-\
-40.772 20.662-60\
-.883c0-15.978 47\
-.843-19.835 51.7\
--3.856c3.856 15.\
-978 13.59 39.853\
- 19.834 51.424c6\
-.245 11.478 24.3\
-35 48.118 5.051 \
-80.074c-17.356 2\
-8.284-69.973 50.\
-69-98.073-3.856c\
--9.55-18.917-7.8\
-06-42.333.826-62\
-.903\x22 transform=\
-\x22translate(10)\x22/\
-><path fill=\x22url\
-(#linux__logosLi\
-nuxTux7)\x22 d=\x22M65\
-.15 134.664c-5.6\
-01 10.56-17.172 \
-38.293 11.112 53\
-.445c30.395 16.1\
-62 30.303 49.312\
--6.245 33.517c-3\
-3.425-14.233-18.\
-641-71.902-9.274\
--85.676c6.06-9.6\
-42 15.243-21.488\
- 4.407-1.286\x22 tr\
-ansform=\x22transla\
-te(10)\x22/><path f\
-ill=\x22#000\x22 strok\
-e=\x22#000\x22 stroke-\
-width=\x221.25\x22 d=\x22\
-M79.925 122.727c\
--8.907 14.509-30\
-.211 48.669-1.65\
-2 66.484c38.384 \
-23.6 27.548 47.1\
-08-7.53 25.895c-\
-49.404-29.568-5.\
-97-89.257 13.774\
--112.03c22.59-25\
-.529 4.316 4.683\
--4.592 19.65z\x22/>\
-<path fill=\x22url(\
-#linux__logosLin\
-uxTux8)\x22 d=\x22M156\
-.428 151.285c0 1\
-6.162-15.519 37.\
-1-42.15 36.916c-\
-27.456.183-39.11\
-8-20.754-39.118-\
-36.916c0-16.161 \
-18.182-29.293 40\
-.588-29.293c22.4\
-98.092 40.68 13.\
-132 40.68 29.293\
-\x22 transform=\x22tra\
-nslate(10)\x22/><pa\
-th fill=\x22url(#li\
-nux__logosLinuxT\
-ux9)\x22 d=\x22M141.92\
- 100.504c-.276 1\
-6.713-11.204 20.\
-662-24.978 20.66\
-2c-13.775 0-23.7\
-84-2.48-24.978-2\
-0.662c0-11.387 1\
-1.203-17.998 24.\
-978-17.998c13.77\
-4-.092 24.977 6.\
-52 24.977 17.998\
-\x22 transform=\x22tra\
-nslate(10)\x22/><pa\
-th fill=\x22url(#li\
-nux__logosLinuxT\
-uxa)\x22 d=\x22M58.63 \
-126.216c9-13.682\
- 28.008-34.711 3\
-.582 2.939c-19.8\
-35 31.038-7.346 \
-50.965-.918 56.4\
-74c18.549 16.53 \
-17.814 27.64 3.2\
-14 18.917c-31.31\
-4-18.641-24.794-\
-50.047-5.878-78.\
-33\x22 transform=\x22t\
-ranslate(10)\x22/><\
-path fill=\x22url(#\
-linux__logosLinu\
-xTuxb)\x22 d=\x22M188.\
-936 131.818c-7.8\
-06-16.07-32.6-56\
-.842 1.193-9.459\
-c30.763 42.884 9\
-.183 72.729 5.32\
-6 75.667c-3.856 \
-2.939-16.804 8.9\
-08-13.04-1.469c3\
-.858-10.377 22.9\
-58-30.028 6.52-6\
-4.74\x22 transform=\
-\x22translate(10)\x22/\
-><path fill=\x22url\
-(#linux__logosLi\
-nuxTuxc)\x22 stroke\
-=\x22#E68C3F\x22 strok\
-e-width=\x226.25\x22 d\
-=\x22M51.835 258.54\
-2c-20.57-10.928-\
-50.414 2.112-39.\
-578-27.457c2.204\
--6.704-3.214-16.\
-805.275-23.325c4\
-.133-7.989 13.04\
--6.244 18.366-11\
-.57c5.234-5.51 8\
-.54-15.06 18.366\
--13.59c9.734 1.4\
-68 16.254 13.406\
- 23.049 28.099c5\
-.05 10.468 22.86\
-5 25.253 21.672 \
-37.007c-1.47 17.\
-998-21.948 21.39\
-6-42.15 10.836z\x22\
- transform=\x22tran\
-slate(10)\x22/><pat\
-h fill=\x22url(#lin\
-ux__logosLinuxTu\
-xd)\x22 d=\x22M201.608\
- 189.119c-3.122 \
-5.877-16.162 15.\
-335-24.886 12.85\
-6c-8.815-2.388-1\
-2.856-15.795-11.\
-111-25.988c1.653\
--11.386 11.111-1\
-2.03 23.05-6.336\
-c12.855 6.336 16\
-.712 11.662 12.9\
-47 19.468\x22 trans\
-form=\x22translate(\
-10)\x22/><path fill\
-=\x22url(#linux__lo\
-gosLinuxTuxe)\x22 s\
-troke=\x22#E68C3F\x22 \
-stroke-width=\x226.\
-251\x22 d=\x22M194.445\
- 253.49c15.06-18\
-.273 48.578-14.5\
-08 25.988-39.577\
-c-4.775-5.418-3.\
-306-16.989-9.183\
--21.947c-6.887-6\
-.061-14.509-1.10\
-2-21.488-4.224c-\
-6.979-3.398-14.3\
-25-9.918-22.865-\
-5.327c-8.54 4.68\
-4-9.459 16.805-1\
-0.285 32.783c-.7\
-35 11.479-11.203\
- 30.671-5.602 41\
-.231c8.081 16.34\
-6 29.11 14.142 4\
-3.435-2.938z\x22 tr\
-ansform=\x22transla\
-te(10)\x22/><path f\
-ill=\x22url(#linux_\
-_logosLinuxTuxf)\
-\x22 d=\x22M187.925 22\
-9.064c23.325-34.\
-435 5.97-34.16.0\
-92-36.823c-5.877\
--2.755-12.03-8.1\
-73-18.916-4.408c\
--6.888 3.857-7.2\
-55 13.775-7.439 \
-26.814c-.275 9.3\
-67-8.08 25.07-3.\
-397 33.793c5.693\
- 10.193 19.467-4\
-.591 29.66-19.37\
-6\x22 transform=\x22tr\
-anslate(10)\x22/><p\
-ath fill=\x22url(#l\
-inux__logosLinux\
-Tuxg)\x22 d=\x22M47.06\
- 234.023c-34.895\
--22.59-18.55-30.\
-303-13.315-33.88\
-5c6.336-4.591 6.\
-428-13.407 14.23\
-3-12.58c7.806.82\
-6 12.397 10.468 \
-17.631 22.406c3.\
-857 8.54 17.264 \
-19.927 16.254 29\
-.753c-1.285 11.5\
-7-19.743 3.948-3\
-4.803-5.694\x22 tra\
-nsform=\x22translat\
-e(10)\x22/><path fi\
-ll=\x22#000\x22 d=\x22M20\
-9.588 188.843c-2\
-.755 4.776-13.95\
-8 12.306-21.396 \
-10.285c-7.622-1.\
-928-11.112-12.67\
-2-9.55-20.753c1.\
-377-9.183 9.55-9\
-.642 19.834-5.05\
-c10.928 4.958 14\
-.326 9.182 11.11\
-2 15.518\x22/><path\
- fill=\x22url(#linu\
-x__logosLinuxTux\
-h)\x22 d=\x22M192.058 \
-186.18c-1.745 3.\
-306-9.091 8.54-1\
-4.234 7.163c-5.1\
-42-1.377-7.713-8\
-.815-6.887-14.41\
-7c.735-6.336 6.2\
-44-6.704 13.223-\
-3.581c7.53 3.49 \
-9.918 6.428 7.89\
-8 10.835\x22 transf\
-orm=\x22translate(1\
-0)\x22/><path fill=\
-\x22url(#linux__log\
-osLinuxTuxi)\x22 st\
-roke=\x22#E68C3F\x22 s\
-troke-width=\x223.7\
-5\x22 d=\x22M97.107 66\
-.344c3.673-3.398\
- 12.58-13.774 29\
-.477-2.939c3.122\
- 2.02 5.693 2.20\
-4 11.662 4.775c1\
-2.03 4.96 6.336 \
-16.897-6.52 20.9\
-37c-5.51 1.745-1\
-0.468 8.449-20.3\
-86 7.806c-8.54-.\
-46-10.744-6.06-1\
-5.978-9.091c-9.2\
-75-5.234-10.652-\
-12.305-5.602-16.\
-07c5.051-3.765 6\
-.98-5.143 7.347-\
-5.418z\x22 transfor\
-m=\x22translate(10)\
-\x22/><path stroke=\
-\x22#E68C3F\x22 stroke\
--width=\x222.5\x22 d=\x22\
-M148.43 75.986c-\
-5.05.275-15.979 \
-11.203-27.457 11\
-.203c-11.479 0-1\
-8.366-10.652-20.\
-11-10.652\x22/><pat\
-h fill=\x22url(#lin\
-ux__logosLinuxTu\
-xj)\x22 d=\x22M102.8 6\
-5.426c1.837-1.65\
-3 7.622-6.153 15\
-.244-1.562c1.653\
-.919 3.306 1.929\
- 5.693 3.306c4.8\
-67 2.847 2.48 6.\
-98-3.398 9.55c-2\
-.663 1.102-7.07 \
-3.49-10.376 3.30\
-6c-3.673-.367-6.\
-153-2.755-8.54-4\
-.316c-4.5-2.938-\
-4.224-5.418-2.11\
-2-7.346c1.56-1.4\
-7 3.305-2.847 3.\
-49-2.938\x22 transf\
-orm=\x22translate(1\
-0)\x22/></g></svg>\x0a\
-\
 \x00\x01CF\
 \x89\
 PNG\x0d\x0a\x1a\x0a\x00\x00\x00\x0dIHDR\x00\
@@ -6076,632 +5181,6 @@ T\x80\x00\x01\x02\x04\x08\x10 @\x80\x00\x01\x02\x04\x08\
 \x04\x08\x10 @\x80\x00\x01\x02\x04\x08\x10 p-\x81\
 \x1fr\xb2\xb53\x0c\xc6a\xca\x00\x00\x00\x00IEN\
 D\xaeB`\x82\
-\x00\x00\x01\xaa\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2216\
-\x22 height=\x2216\x22 fi\
-ll=\x22currentColor\
-\x22\x0a  class=\x22bi bi\
--layout-topbar-i\
-nset\x22 viewBox=\x220\
- 0 16 16\x22>\x0a  <g \
-transform=\x22rotat\
-e(90 8 8)\x22>\x0a    \
-<path d=\x22M14 2a1\
- 1 0 0 1 1 1v10a\
-1 1 0 0 1-1 1H2a\
-1 1 0 0 1-1-1V3a\
-1 1 0 0 1 1-1zM2\
- 1a2 2 0 0 0-2 2\
-v10a2 2 0 0 0 2 \
-2h12a2 2 0 0 0 2\
--2V3a2 2 0 0 0-2\
--2z\x22/>\x0a    <path\
- d=\x22M3 4a1 1 0 0\
- 1 1-1h2a1 1 0 0\
- 1 1 1v8a1 1 0 0\
- 1-1 1H4a1 1 0 0\
- 1-1-1z\x22/>\x0a  </g\
->\x0a</svg>\x0a\
-\x00\x00\x03\xec\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2216\
-\x22 height=\x2216\x22 vi\
-ewBox=\x220 0 16 16\
-\x22>\x0a  <defs>\x0a    \
-<linearGradient \
-id=\x22globeGradien\
-t\x22 x1=\x220\x22 y1=\x220\x22\
- x2=\x220\x22 y2=\x221\x22 g\
-radientUnits=\x22ob\
-jectBoundingBox\x22\
->\x0a      <stop of\
-fset=\x220\x22 stop-co\
-lor=\x22#111111\x22/>\x0a\
-      <stop offs\
-et=\x221\x22 stop-colo\
-r=\x22#FF6A00\x22/>\x0a  \
-  </linearGradie\
-nt>\x0a  </defs>\x0a  \
-<path fill=\x22url(\
-#globeGradient)\x22\
- d=\x22M8 0a8 8 0 1\
- 0 0 16A8 8 0 0 \
-0 8 0M4.882 1.73\
-1a.48.48 0 0 0 .\
-14.291.487.487 0\
- 0 1-.126.78l-.2\
-91.146a.7.7 0 0 \
-0-.188.135l-.48.\
-48a1 1 0 0 1-1.0\
-23.242l-.02-.007\
-a1 1 0 0 0-.462-\
-.04 7 7 0 0 1 2.\
-45-2.027m-3 9.67\
-4.86-.216a1 1 0 \
-0 0 .758-.97v-.1\
-84a1 1 0 0 1 .44\
-5-.832l.04-.026a\
-1 1 0 0 0 .152-1\
-.54L3.121 6.621a\
-.414.414 0 0 1 .\
-542-.624l1.09.81\
-8a.5.5 0 0 0 .52\
-3.047.5.5 0 0 1 \
-.724.447v.455a.8\
-.8 0 0 0 .131.43\
-3l.795 1.192a1 1\
- 0 0 1 .116.238l\
-.73 2.19a1 1 0 0\
- 0 .949.683h.058\
-a1 1 0 0 0 .949-\
-.684l.73-2.189a1\
- 1 0 0 1 .116-.2\
-38l.791-1.187A.4\
-5.45 0 0 1 11.74\
-3 8c.16 0 .306.0\
-84.392.218.557.8\
-75 1.63 2.282 2.\
-365 2.282l.04-.0\
-01a7.003 7.003 0\
- 0 1-12.658.905Z\
-\x22/>\x0a</svg>\x0a\
-\x00\x00\x00\xea\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2224\
-\x22 height=\x2224\x22 vi\
-ewBox=\x220 0 24 24\
-\x22><path fill=\x22cu\
-rrentColor\x22 d=\x22M\
-12 2C8.13 2 5 5.\
-13 5 9c0 5.25 7 \
-13 7 13s7-7.75 7\
--13c0-3.87-3.13-\
-7-7-7m0 9.5a2.5 \
-2.5 0 0 1 0-5a2.\
-5 2.5 0 0 1 0 5\x22\
-/></svg>\x0a\
-\x00\x00\x02\x15\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2215\
-\x22 height=\x2215\x22 vi\
-ewBox=\x220 0 15 15\
-\x22><path fill=\x22cu\
-rrentColor\x22 d=\x22M\
-2.5 13v1h-1c-.28\
- 0-.5-.22-.5-.5v\
--2c0-.28.22-.5.5\
--.5h1v1H2v1zm0-5\
-v1h-1c-.28 0-.5-\
-.22-.5-.5v-2c0-.\
-28.22-.5.5-.5h1v\
-1H2v1zm0-5v1h-1c\
--.28 0-.5-.22-.5\
--.5v-2c0-.28.22-\
-.5.5-.5h1v1H2v1z\
-m10 10h.5v-1h-.5\
-v-1h1c.28 0 .5.2\
-2.5.5v2c0 .28-.2\
-2.5-.5.5h-1zm0-5\
-h.5V7h-.5V6h1c.2\
-8 0 .5.22.5.5v2c\
-0 .28-.22.5-.5.5\
-h-1zm0-5h.5V2h-.\
-5V1h1c.28 0 .5.2\
-2.5.5v2c0 .28-.2\
-2.5-.5.5h-1zm-8 \
-8h6v3h-6zm0-5h6v\
-3h-6zm0-5h6v3h-6\
-zM3 0h1v15H3zm8 \
-0h1v15h-1z\x22/></s\
-vg>\x0a\
-\x00\x00\x02\x91\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2216\
-\x22 height=\x2216\x22 fi\
-ll=\x22currentColor\
-\x22 class=\x22bi bi-t\
-rash3\x22 viewBox=\x22\
-0 0 16 16\x22>\x0a  <p\
-ath d=\x22M6.5 1h3a\
-.5.5 0 0 1 .5.5v\
-1H6v-1a.5.5 0 0 \
-1 .5-.5M11 2.5v-\
-1A1.5 1.5 0 0 0 \
-9.5 0h-3A1.5 1.5\
- 0 0 0 5 1.5v1H1\
-.5a.5.5 0 0 0 0 \
-1h.538l.853 10.6\
-6A2 2 0 0 0 4.88\
-5 16h6.23a2 2 0 \
-0 0 1.994-1.84l.\
-853-10.66h.538a.\
-5.5 0 0 0 0-1zm1\
-.958 1-.846 10.5\
-8a1 1 0 0 1-.997\
-.92h-6.23a1 1 0 \
-0 1-.997-.92L3.0\
-42 3.5zm-7.487 1\
-a.5.5 0 0 1 .528\
-.47l.5 8.5a.5.5 \
-0 0 1-.998.06L5 \
-5.03a.5.5 0 0 1 \
-.47-.53Zm5.058 0\
-a.5.5 0 0 1 .47.\
-53l-.5 8.5a.5.5 \
-0 1 1-.998-.06l.\
-5-8.5a.5.5 0 0 1\
- .528-.47M8 4.5a\
-.5.5 0 0 1 .5.5v\
-8.5a.5.5 0 0 1-1\
- 0V5a.5.5 0 0 1 \
-.5-.5\x22/>\x0a</svg>\x0a\
-\
-\x00\x00\x01r\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2216\
-\x22 height=\x2216\x22 fi\
-ll=\x22currentColor\
-\x22 class=\x22bi bi-c\
-heck-circle\x22 vie\
-wBox=\x220 0 16 16\x22\
->\x0a  <path d=\x22M8 \
-15A7 7 0 1 1 8 1\
-a7 7 0 0 1 0 14m\
-0 1A8 8 0 1 0 8 \
-0a8 8 0 0 0 0 16\
-\x22/>\x0a  <path d=\x22m\
-10.97 4.97-.02.0\
-22-3.473 4.425-2\
-.093-2.094a.75.7\
-5 0 0 0-1.06 1.0\
-6L6.97 11.03a.75\
-.75 0 0 0 1.079-\
-.02l3.992-4.99a.\
-75.75 0 0 0-1.07\
-1-1.05\x22/>\x0a</svg>\
-\x0a\
-\x00\x00\x01\x87\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2216\
-\x22 height=\x2216\x22 fi\
-ll=\x22currentColor\
-\x22 class=\x22bi bi-l\
-ayout-sidebar-in\
-set-reverse\x22 vie\
-wBox=\x220 0 16 16\x22\
->\x0a  <path d=\x22M2 \
-2a1 1 0 0 0-1 1v\
-10a1 1 0 0 0 1 1\
-h12a1 1 0 0 0 1-\
-1V3a1 1 0 0 0-1-\
-1zm12-1a2 2 0 0 \
-1 2 2v10a2 2 0 0\
- 1-2 2H2a2 2 0 0\
- 1-2-2V3a2 2 0 0\
- 1 2-2z\x22/>\x0a  <pa\
-th d=\x22M13 4a1 1 \
-0 0 0-1-1h-2a1 1\
- 0 0 0-1 1v8a1 1\
- 0 0 0 1 1h2a1 1\
- 0 0 0 1-1z\x22/>\x0a<\
-/svg>\x0a\
-\x00\x00\x01^\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2216\
-\x22 height=\x2216\x22 fi\
-ll=\x22currentColor\
-\x22 class=\x22bi bi-a\
-rrow-clockwise\x22 \
-viewBox=\x220 0 16 \
-16\x22>\x0a  <path fil\
-l-rule=\x22evenodd\x22\
- d=\x22M8 3a5 5 0 1\
- 0 4.546 2.914.5\
-.5 0 0 1 .908-.4\
-17A6 6 0 1 1 8 2\
-z\x22/>\x0a  <path d=\x22\
-M8 4.466V.534a.2\
-5.25 0 0 1 .41-.\
-192l2.36 1.966c.\
-12.1.12.284 0 .3\
-84L8.41 4.658A.2\
-5.25 0 0 1 8 4.4\
-66\x22/>\x0a</svg>\x0a\
-\x00\x00\x010\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2216\
-\x22 height=\x2216\x22 fi\
-ll=\x22currentColor\
-\x22 class=\x22bi bi-l\
-ayout-sidebar\x22 v\
-iewBox=\x220 0 16 1\
-6\x22>\x0a  <path d=\x22M\
-0 3a2 2 0 0 1 2-\
-2h12a2 2 0 0 1 2\
- 2v10a2 2 0 0 1-\
-2 2H2a2 2 0 0 1-\
-2-2zm5-1v12h9a1 \
-1 0 0 0 1-1V3a1 \
-1 0 0 0-1-1zM4 2\
-H2a1 1 0 0 0-1 1\
-v10a1 1 0 0 0 1 \
-1h2z\x22/>\x0a</svg>\x0a\
-\x00\x00\x042\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2216\
-\x22 height=\x2216\x22 fi\
-ll=\x22currentColor\
-\x22 class=\x22bi bi-h\
-and-index\x22 viewB\
-ox=\x220 0 16 16\x22>\x0a\
-  <path d=\x22M6.75\
- 1a.75.75 0 0 1 \
-.75.75V8a.5.5 0 \
-0 0 1 0V5.467l.0\
-86-.004c.317-.01\
-2.637-.008.816.0\
-27.134.027.294.0\
-96.448.182.077.0\
-42.15.147.15.314\
-V8a.5.5 0 1 0 1 \
-0V6.435l.106-.01\
-c.316-.024.584-.\
-01.708.04.118.04\
-6.3.207.486.43.0\
-81.096.15.19.2.2\
-59V8.5a.5.5 0 0 \
-0 1 0v-1h.342a1 \
-1 0 0 1 .995 1.1\
-l-.271 2.715a2.5\
- 2.5 0 0 1-.317.\
-991l-1.395 2.442\
-a.5.5 0 0 1-.434\
-.252H6.035a.5.5 \
-0 0 1-.416-.223l\
--1.433-2.15a1.5 \
-1.5 0 0 1-.243-.\
-666l-.345-3.105a\
-.5.5 0 0 1 .399-\
-.546L5 8.11V9a.5\
-.5 0 0 0 1 0V1.7\
-5A.75.75 0 0 1 6\
-.75 1M8.5 4.466V\
-1.75a1.75 1.75 0\
- 1 0-3.5 0v5.34l\
--1.2.24a1.5 1.5 \
-0 0 0-1.196 1.63\
-6l.345 3.106a2.5\
- 2.5 0 0 0 .405 \
-1.11l1.433 2.15A\
-1.5 1.5 0 0 0 6.\
-035 16h6.385a1.5\
- 1.5 0 0 0 1.302\
--.756l1.395-2.44\
-1a3.5 3.5 0 0 0 \
-.444-1.389l.271-\
-2.715a2 2 0 0 0-\
-1.99-2.199h-.581\
-a5 5 0 0 0-.195-\
-.248c-.191-.229-\
-.51-.568-.88-.71\
-6-.364-.146-.846\
--.132-1.158-.108\
-l-.132.012a1.26 \
-1.26 0 0 0-.56-.\
-642 2.6 2.6 0 0 \
-0-.738-.288c-.31\
--.062-.739-.058-\
-1.05-.046zm2.094\
- 2.025\x22/>\x0a</svg>\
-\x0a\
-\x00\x00\x04~\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2224\
-\x22 height=\x2224\x22 vi\
-ewBox=\x220 0 24 24\
-\x22><path fill=\x22cu\
-rrentColor\x22 d=\x22M\
-5.616 20q-.667 0\
--1.141-.475T4 18\
-.386V5.615q0-.66\
-6.475-1.14T5.615\
- 4h10.29q.333 0 \
-.633.13t.518.349\
-l2.465 2.465q.21\
-8.218.348.518t.1\
-31.632v3.252q0 .\
-213-.144.357t-.3\
-57.143t-.356-.14\
-3t-.143-.357V7.8\
-44L16.156 5H5.61\
-6q-.27 0-.443.17\
-3T5 5.616v12.769\
-q0 .269.173.442t\
-.443.173h4.73q.2\
-13 0 .357.144t.1\
-43.357t-.143.356\
-t-.357.143zM5 5v\
-14zm8.23 16.192V\
-20.12q0-.153.057\
--.296q.055-.144.\
-186-.275l5.09-5.\
-065q.149-.148.30\
-6-.2q.158-.052.3\
-15-.052q.172 0 .\
-338.064q.166.065\
-.301.194l.925.94\
-4q.123.148.188.3\
-08q.064.159.064.\
-319t-.061.322t-.\
-191.31l-5.065 5.\
-066q-.131.13-.27\
-5.186q-.143.056-\
-.297.056h-1.073q\
--.343 0-.575-.23\
-2t-.232-.576m6.8\
-84-5.133l-.925-.\
-944zm-6 5.056h.9\
-5l3.468-3.473l-.\
-47-.475l-.455-.4\
-88l-3.493 3.486z\
-m3.948-3.948l-.4\
-55-.488l.925.963\
-zM7.577 9.77h5.8\
-03q.353 0 .582-.\
-232t.23-.576V7.5\
-77q0-.343-.232-.\
-576t-.576-.232H7\
-.581q-.352 0-.58\
-2.232t-.23.576v1\
-.384q0 .344.233.\
-576t.575.232M12 \
-16.54q.179 0 .33\
-9-.039q.159-.039\
-.319-.134l1.169-\
-1.145q.096-.165.\
-135-.331q.038-.1\
-67.038-.351q0-.8\
-34-.582-1.417t-1\
-.413-.583t-1.419\
-.582T10 14.534t.\
-583 1.418t1.417.\
-587\x22/></svg>\x0a\
-\x00\x00\x02!\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2216\
-\x22 height=\x2216\x22 fi\
-ll=\x22currentColor\
-\x22 class=\x22bi bi-c\
-rosshair\x22 viewBo\
-x=\x220 0 16 16\x22>\x0a \
- <path d=\x22M8.5.5\
-a.5.5 0 0 0-1 0v\
-.518A7 7 0 0 0 1\
-.018 7.5H.5a.5.5\
- 0 0 0 0 1h.518A\
-7 7 0 0 0 7.5 14\
-.982v.518a.5.5 0\
- 0 0 1 0v-.518A7\
- 7 0 0 0 14.982 \
-8.5h.518a.5.5 0 \
-0 0 0-1h-.518A7 \
-7 0 0 0 8.5 1.01\
-8zm-6.48 7A6 6 0\
- 0 1 7.5 2.02v.4\
-8a.5.5 0 0 0 1 0\
-v-.48a6 6 0 0 1 \
-5.48 5.48h-.48a.\
-5.5 0 0 0 0 1h.4\
-8a6 6 0 0 1-5.48\
- 5.48v-.48a.5.5 \
-0 0 0-1 0v.48A6 \
-6 0 0 1 2.02 8.5\
-h.48a.5.5 0 0 0 \
-0-1zM8 10a2 2 0 \
-1 0 0-4 2 2 0 0 \
-0 0 4\x22/>\x0a</svg>\x0a\
-\
-\x00\x00\x02\xa7\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 xml:space\
-=\x22preserve\x22 widt\
-h=\x22209\x22 height=\x22\
-256\x22 viewBox=\x220 \
-0 814 1000\x22><pat\
-h d=\x22M788.1 340.\
-9c-5.8 4.5-108.2\
- 62.2-108.2 190.\
-5 0 148.4 130.3 \
-200.9 134.2 202.\
-2-.6 3.2-20.7 71\
-.9-68.7 141.9-42\
-.8 61.6-87.5 123\
-.1-155.5 123.1s-\
-85.5-39.5-164-39\
-.5c-76.5 0-103.7\
- 40.8-165.9 40.8\
-s-105.6-57-155.5\
--127C46.7 790.7 \
-0 663 0 541.8c0-\
-194.4 126.4-297.\
-5 250.8-297.5 66\
-.1 0 121.2 43.4 \
-162.7 43.4 39.5 \
-0 101.1-46 176.3\
--46 28.5 0 130.9\
- 2.6 198.3 99.2z\
-m-234-181.5c31.1\
--36.9 53.1-88.1 \
-53.1-139.3 0-7.1\
--.6-14.3-1.9-20.\
-1-50.6 1.9-110.8\
- 33.7-147.1 75.8\
--28.5 32.4-55.1 \
-83.6-55.1 135.5 \
-0 7.8 1.3 15.6 1\
-.9 18.1 3.2.6 8.\
-4 1.3 13.6 1.3 4\
-5.4 0 102.5-30.4\
- 135.5-71.3z\x22/><\
-/svg>\x0a\
-\x00\x00\x02\x02\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2240\
-0\x22 height=\x22120\x22 \
-viewBox=\x220 0 400\
- 120\x22>\x0a  <defs>\x0a\
-    <linearGradi\
-ent id=\x22textGrad\
-ient\x22 x1=\x220%\x22 y1\
-=\x220%\x22 x2=\x22100%\x22 \
-y2=\x220%\x22>\x0a      <\
-stop offset=\x220%\x22\
- stop-color=\x22#11\
-1111\x22 stop-opaci\
-ty=\x221\x22/>\x0a      <\
-stop offset=\x22100\
-%\x22 stop-color=\x22#\
-FF6A00\x22 stop-opa\
-city=\x221\x22/>\x0a    <\
-/linearGradient>\
-\x0a  </defs>\x0a  <te\
-xt x=\x22200\x22 y=\x2285\
-\x22 dominant-basel\
-ine=\x22middle\x22 tex\
-t-anchor=\x22middle\
-\x22 font-family=\x22A\
-rial, sans-serif\
-\x22 font-size=\x2280\x22\
- font-weight=\x22bo\
-ld\x22 fill=\x22url(#t\
-extGradient)\x22>AR\
-OW</text>\x0a</svg>\
-\x0a\
-\x00\x00\x04\x9c\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2216\
-\x22 height=\x2216\x22 vi\
-ewBox=\x220 0 16 16\
-\x22>\x0a  <defs>\x0a    \
-<!-- Same grey g\
-radient stops as\
- device-placehol\
-der.svg, adapted\
- for the globe i\
-con. -->\x0a    <li\
-nearGradient id=\
-\x22globe-placehold\
-er-gradient\x22 x1=\
-\x228\x22 y1=\x221\x22 x2=\x228\
-\x22 y2=\x2215\x22 gradie\
-ntUnits=\x22userSpa\
-ceOnUse\x22>\x0a      \
-<stop offset=\x220\x22\
- stop-color=\x22#8E\
-8E8E\x22/>\x0a      <s\
-top offset=\x220.5\x22\
- stop-color=\x22#75\
-7575\x22/>\x0a      <s\
-top offset=\x221\x22 s\
-top-color=\x22#5C5C\
-5C\x22/>\x0a    </line\
-arGradient>\x0a  </\
-defs>\x0a  <path\x0a  \
-  fill=\x22url(#glo\
-be-placeholder-g\
-radient)\x22\x0a    d=\
-\x22M8 0a8 8 0 1 0 \
-0 16A8 8 0 0 0 8\
- 0M4.882 1.731a.\
-48.48 0 0 0 .14.\
-291.487.487 0 0 \
-1-.126.78l-.291.\
-146a.7.7 0 0 0-.\
-188.135l-.48.48a\
-1 1 0 0 1-1.023.\
-242l-.02-.007a1 \
-1 0 0 0-.462-.04\
- 7 7 0 0 1 2.45-\
-2.027m-3 9.674.8\
-6-.216a1 1 0 0 0\
- .758-.97v-.184a\
-1 1 0 0 1 .445-.\
-832l.04-.026a1 1\
- 0 0 0 .152-1.54\
-L3.121 6.621a.41\
-4.414 0 0 1 .542\
--.624l1.09.818a.\
-5.5 0 0 0 .523.0\
-47.5.5 0 0 1 .72\
-4.447v.455a.8.8 \
-0 0 0 .131.433l.\
-795 1.192a1 1 0 \
-0 1 .116.238l.73\
- 2.19a1 1 0 0 0 \
-.949.683h.058a1 \
-1 0 0 0 .949-.68\
-4l.73-2.189a1 1 \
-0 0 1 .116-.238l\
-.791-1.187A.45.4\
-5 0 0 1 11.743 8\
-c.16 0 .306.084.\
-392.218.557.875 \
-1.63 2.282 2.365\
- 2.282l.04-.001a\
-7.003 7.003 0 0 \
-1-12.658.905Z\x22\x0a \
- />\x0a</svg>\x0a\
 \x00\x04\x9b\x02\
 \x89\
 PNG\x0d\x0a\x1a\x0a\x00\x00\x00\x0dIHDR\x00\
@@ -25569,6 +24048,1527 @@ E\x19=\xf9\xaf\xc5\x9f\xd1\x87 @\x80\x00\x81\xab*\
 \x80\x00\x01\x02\x04\x08\x10 \xf0\xca\x02\xff\x02rmq\
 \xfb\xeb\x1b\xca\x8c\x00\x00\x00\x00IEND\xaeB`\
 \x82\
+\x00\x00\x01\xa4\
+<\
+svg xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22 width=\x2216\
+\x22 height=\x2216\x22 fi\
+ll=\x22currentColor\
+\x22 class=\x22bi bi-u\
+pload\x22 viewBox=\x22\
+0 0 16 16\x22>\x0a  <p\
+ath d=\x22M.5 9.9a.\
+5.5 0 0 1 .5.5v2\
+.5a1 1 0 0 0 1 1\
+h12a1 1 0 0 0 1-\
+1v-2.5a.5.5 0 0 \
+1 1 0v2.5a2 2 0 \
+0 1-2 2H2a2 2 0 \
+0 1-2-2v-2.5a.5.\
+5 0 0 1 .5-.5\x22/>\
+\x0a  <path d=\x22M7.6\
+46 1.146a.5.5 0 \
+0 1 .708 0l3 3a.\
+5.5 0 0 1-.708.7\
+08L8.5 2.707V11.\
+5a.5.5 0 0 1-1 0\
+V2.707L5.354 4.8\
+54a.5.5 0 1 1-.7\
+08-.708z\x22/>\x0a</sv\
+g>\x0a\
+\x00\x00\x027\
+<\
+svg xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22 width=\x2216\
+\x22 height=\x2216\x22 fi\
+ll=\x22currentColor\
+\x22 class=\x22bi bi-m\
+oon\x22 viewBox=\x220 \
+0 16 16\x22>\x0a  <pat\
+h d=\x22M6 .278a.77\
+.77 0 0 1 .08.85\
+8 7.2 7.2 0 0 0-\
+.878 3.46c0 4.02\
+1 3.278 7.277 7.\
+318 7.277q.792-.\
+001 1.533-.16a.7\
+9.79 0 0 1 .81.3\
+16.73.73 0 0 1-.\
+031.893A8.35 8.3\
+5 0 0 1 8.344 16\
+C3.734 16 0 12.2\
+86 0 7.71 0 4.26\
+6 2.114 1.312 5.\
+124.06A.75.75 0 \
+0 1 6 .278M4.858\
+ 1.311A7.27 7.27\
+ 0 0 0 1.025 7.7\
+1c0 4.02 3.279 7\
+.276 7.319 7.276\
+a7.32 7.32 0 0 0\
+ 5.205-2.162q-.5\
+06.063-1.029.063\
+c-4.61 0-8.343-3\
+.714-8.343-8.29 \
+0-1.167.242-2.27\
+8.681-3.286\x22/>\x0a<\
+/svg>\x0a\
+\x00\x00\x01\xa5\
+<\
+svg xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22 width=\x2216\
+\x22 height=\x2216\x22 fi\
+ll=\x22currentColor\
+\x22 class=\x22bi bi-x\
+-circle\x22 viewBox\
+=\x220 0 16 16\x22>\x0a  \
+<path d=\x22M8 15A7\
+ 7 0 1 1 8 1a7 7\
+ 0 0 1 0 14m0 1A\
+8 8 0 1 0 8 0a8 \
+8 0 0 0 0 16\x22/>\x0a\
+  <path d=\x22M4.64\
+6 4.646a.5.5 0 0\
+ 1 .708 0L8 7.29\
+3l2.646-2.647a.5\
+.5 0 0 1 .708.70\
+8L8.707 8l2.647 \
+2.646a.5.5 0 0 1\
+-.708.708L8 8.70\
+7l-2.646 2.647a.\
+5.5 0 0 1-.708-.\
+708L7.293 8 4.64\
+6 5.354a.5.5 0 0\
+ 1 0-.708\x22/>\x0a</s\
+vg>\x0a\
+\x00\x00\x01;\
+<\
+svg xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22 width=\x2216\
+\x22 height=\x2216\x22 fi\
+ll=\x22currentColor\
+\x22 class=\x22bi bi-l\
+ayout-sidebar-re\
+verse\x22 viewBox=\x22\
+0 0 16 16\x22>\x0a  <p\
+ath d=\x22M16 3a2 2\
+ 0 0 0-2-2H2a2 2\
+ 0 0 0-2 2v10a2 \
+2 0 0 0 2 2h12a2\
+ 2 0 0 0 2-2zm-5\
+-1v12H2a1 1 0 0 \
+1-1-1V3a1 1 0 0 \
+1 1-1zm1 0h2a1 1\
+ 0 0 1 1 1v10a1 \
+1 0 0 1-1 1h-2z\x22\
+/>\x0a</svg>\x0a\
+\x00\x00\x01V\
+<\
+svg xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22 width=\x2216\
+\x22 height=\x2216\x22 fi\
+ll=\x22currentColor\
+\x22 class=\x22bi bi-p\
+lay-circle\x22 view\
+Box=\x220 0 16 16\x22>\
+\x0a  <path d=\x22M8 1\
+5A7 7 0 1 1 8 1a\
+7 7 0 0 1 0 14m0\
+ 1A8 8 0 1 0 8 0\
+a8 8 0 0 0 0 16\x22\
+/>\x0a  <path d=\x22M6\
+.271 5.055a.5.5 \
+0 0 1 .52.038l3.\
+5 2.5a.5.5 0 0 1\
+ 0 .814l-3.5 2.5\
+A.5.5 0 0 1 6 10\
+.5v-5a.5.5 0 0 1\
+ .271-.445\x22/>\x0a</\
+svg>\x0a\
+\x00\x00\x00\xab\
+<\
+svg xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22 width=\x228\x22\
+ height=\x228\x22 view\
+Box=\x220 0 8 8\x22><p\
+ath fill=\x22#28A74\
+5\x22 d=\x22M4 4c0-2 3\
+-2 3 0S4 6 4 4m1\
+.5 2c3 0 3-4 0-4\
+h-3c-3 0-3 4 0 4\
+\x22/></svg>\x0a\
+\x00\x00.\x11\
+<\
+svg xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22 width=\x2227\
+.77\x22 height=\x2232\x22\
+ viewBox=\x220 0 25\
+6 295\x22><defs><li\
+nearGradient id=\
+\x22linux__logosLin\
+uxTux0\x22 x1=\x2248.5\
+48%\x22 x2=\x2251.047%\
+\x22 y1=\x22115.276%\x22 \
+y2=\x2241.364%\x22><st\
+op offset=\x220%\x22 s\
+top-color=\x22#FFEE\
+D7\x22/><stop offse\
+t=\x22100%\x22 stop-co\
+lor=\x22#BDBFC2\x22/><\
+/linearGradient>\
+<linearGradient \
+id=\x22linux__logos\
+LinuxTux1\x22 x1=\x225\
+4.407%\x22 x2=\x2246.1\
+75%\x22 y1=\x222.404%\x22\
+ y2=\x2290.542%\x22><s\
+top offset=\x220%\x22 \
+stop-color=\x22#FFF\
+\x22 stop-opacity=\x22\
+.8\x22/><stop offse\
+t=\x22100%\x22 stop-co\
+lor=\x22#FFF\x22 stop-\
+opacity=\x220\x22/></l\
+inearGradient><l\
+inearGradient id\
+=\x22linux__logosLi\
+nuxTux2\x22 x1=\x2251.\
+86%\x22 x2=\x2247.947%\
+\x22 y1=\x2288.248%\x22 y\
+2=\x229.748%\x22><stop\
+ offset=\x220%\x22 sto\
+p-color=\x22#FFEED7\
+\x22/><stop offset=\
+\x22100%\x22 stop-colo\
+r=\x22#BDBFC2\x22/></l\
+inearGradient><l\
+inearGradient id\
+=\x22linux__logosLi\
+nuxTux3\x22 x1=\x2249.\
+925%\x22 x2=\x2249.924\
+%\x22 y1=\x2285.49%\x22 y\
+2=\x2213.811%\x22><sto\
+p offset=\x220%\x22 st\
+op-color=\x22#FFEED\
+7\x22/><stop offset\
+=\x22100%\x22 stop-col\
+or=\x22#BDBFC2\x22/></\
+linearGradient><\
+linearGradient i\
+d=\x22linux__logosL\
+inuxTux4\x22 x1=\x2253\
+.901%\x22 x2=\x2245.95\
+6%\x22 y1=\x223.102%\x22 \
+y2=\x2293.895%\x22><st\
+op offset=\x220%\x22 s\
+top-color=\x22#FFF\x22\
+ stop-opacity=\x22.\
+65\x22/><stop offse\
+t=\x22100%\x22 stop-co\
+lor=\x22#FFF\x22 stop-\
+opacity=\x220\x22/></l\
+inearGradient><l\
+inearGradient id\
+=\x22linux__logosLi\
+nuxTux5\x22 x1=\x2245.\
+593%\x22 x2=\x2254.811\
+%\x22 y1=\x225.475%\x22 y\
+2=\x2293.524%\x22><sto\
+p offset=\x220%\x22 st\
+op-color=\x22#FFF\x22 \
+stop-opacity=\x22.6\
+5\x22/><stop offset\
+=\x22100%\x22 stop-col\
+or=\x22#FFF\x22 stop-o\
+pacity=\x220\x22/></li\
+nearGradient><li\
+nearGradient id=\
+\x22linux__logosLin\
+uxTux6\x22 x1=\x2249.9\
+84%\x22 x2=\x2249.984%\
+\x22 y1=\x2289.845%\x22 y\
+2=\x2240.632%\x22><sto\
+p offset=\x220%\x22 st\
+op-color=\x22#FFEED\
+7\x22/><stop offset\
+=\x22100%\x22 stop-col\
+or=\x22#BDBFC2\x22/></\
+linearGradient><\
+linearGradient i\
+d=\x22linux__logosL\
+inuxTux7\x22 x1=\x2253\
+.505%\x22 x2=\x2242.74\
+6%\x22 y1=\x2299.975%\x22\
+ y2=\x2223.545%\x22><s\
+top offset=\x220%\x22 \
+stop-color=\x22#FFE\
+ED7\x22/><stop offs\
+et=\x22100%\x22 stop-c\
+olor=\x22#BDBFC2\x22/>\
+</linearGradient\
+><linearGradient\
+ id=\x22linux__logo\
+sLinuxTux8\x22 x1=\x22\
+49.841%\x22 x2=\x2250.\
+241%\x22 y1=\x2213.229\
+%\x22 y2=\x2294.673%\x22>\
+<stop offset=\x220%\
+\x22 stop-color=\x22#F\
+FF\x22 stop-opacity\
+=\x22.8\x22/><stop off\
+set=\x22100%\x22 stop-\
+color=\x22#FFF\x22 sto\
+p-opacity=\x220\x22/><\
+/linearGradient>\
+<linearGradient \
+id=\x22linux__logos\
+LinuxTux9\x22 x1=\x224\
+9.927%\x22 x2=\x2250.7\
+27%\x22 y1=\x2237.327%\
+\x22 y2=\x2292.782%\x22><\
+stop offset=\x220%\x22\
+ stop-color=\x22#FF\
+F\x22 stop-opacity=\
+\x22.65\x22/><stop off\
+set=\x22100%\x22 stop-\
+color=\x22#FFF\x22 sto\
+p-opacity=\x220\x22/><\
+/linearGradient>\
+<linearGradient \
+id=\x22linux__logos\
+LinuxTuxa\x22 x1=\x224\
+9.876%\x22 x2=\x2249.8\
+76%\x22 y1=\x222.299%\x22\
+ y2=\x2281.204%\x22><s\
+top offset=\x220%\x22 \
+stop-color=\x22#FFF\
+\x22 stop-opacity=\x22\
+.65\x22/><stop offs\
+et=\x22100%\x22 stop-c\
+olor=\x22#FFF\x22 stop\
+-opacity=\x220\x22/></\
+linearGradient><\
+linearGradient i\
+d=\x22linux__logosL\
+inuxTuxb\x22 x1=\x2249\
+.833%\x22 x2=\x2249.82\
+4%\x22 y1=\x222.272%\x22 \
+y2=\x2271.799%\x22><st\
+op offset=\x220%\x22 s\
+top-color=\x22#FFF\x22\
+ stop-opacity=\x22.\
+65\x22/><stop offse\
+t=\x22100%\x22 stop-co\
+lor=\x22#FFF\x22 stop-\
+opacity=\x220\x22/></l\
+inearGradient><l\
+inearGradient id\
+=\x22linux__logosLi\
+nuxTuxc\x22 x1=\x2253.\
+467%\x22 x2=\x2238.949\
+%\x22 y1=\x2248.921%\x22 \
+y2=\x2298.1%\x22><stop\
+ offset=\x220%\x22 sto\
+p-color=\x22#FFA63F\
+\x22/><stop offset=\
+\x22100%\x22 stop-colo\
+r=\x22#FF0\x22/></line\
+arGradient><line\
+arGradient id=\x22l\
+inux__logosLinux\
+Tuxd\x22 x1=\x2252.373\
+%\x22 x2=\x2247.579%\x22 \
+y1=\x22143.009%\x22 y2\
+=\x22-64.622%\x22><sto\
+p offset=\x220%\x22 st\
+op-color=\x22#FFEED\
+7\x22/><stop offset\
+=\x22100%\x22 stop-col\
+or=\x22#BDBFC2\x22/></\
+linearGradient><\
+linearGradient i\
+d=\x22linux__logosL\
+inuxTuxe\x22 x1=\x2230\
+.581%\x22 x2=\x2265.88\
+7%\x22 y1=\x2234.024%\x22\
+ y2=\x2289.175%\x22><s\
+top offset=\x220%\x22 \
+stop-color=\x22#FFA\
+63F\x22/><stop offs\
+et=\x22100%\x22 stop-c\
+olor=\x22#FF0\x22/></l\
+inearGradient><l\
+inearGradient id\
+=\x22linux__logosLi\
+nuxTuxf\x22 x1=\x2259.\
+572%\x22 x2=\x2248.361\
+%\x22 y1=\x22-17.216%\x22\
+ y2=\x2266.118%\x22><s\
+top offset=\x220%\x22 \
+stop-color=\x22#FFF\
+\x22 stop-opacity=\x22\
+.65\x22/><stop offs\
+et=\x22100%\x22 stop-c\
+olor=\x22#FFF\x22 stop\
+-opacity=\x220\x22/></\
+linearGradient><\
+linearGradient i\
+d=\x22linux__logosL\
+inuxTuxg\x22 x1=\x2247\
+.769%\x22 x2=\x2251.37\
+3%\x22 y1=\x221.565%\x22 \
+y2=\x22104.313%\x22><s\
+top offset=\x220%\x22 \
+stop-color=\x22#FFF\
+\x22 stop-opacity=\x22\
+.65\x22/><stop offs\
+et=\x22100%\x22 stop-c\
+olor=\x22#FFF\x22 stop\
+-opacity=\x220\x22/></\
+linearGradient><\
+linearGradient i\
+d=\x22linux__logosL\
+inuxTuxh\x22 x1=\x2243\
+.55%\x22 x2=\x2257.114\
+%\x22 y1=\x224.533%\x22 y\
+2=\x2292.827%\x22><sto\
+p offset=\x220%\x22 st\
+op-color=\x22#FFF\x22 \
+stop-opacity=\x22.6\
+5\x22/><stop offset\
+=\x22100%\x22 stop-col\
+or=\x22#FFF\x22 stop-o\
+pacity=\x220\x22/></li\
+nearGradient><li\
+nearGradient id=\
+\x22linux__logosLin\
+uxTuxi\x22 x1=\x2249.7\
+33%\x22 x2=\x2250.558%\
+\x22 y1=\x2217.609%\x22 y\
+2=\x2299.385%\x22><sto\
+p offset=\x220%\x22 st\
+op-color=\x22#FFA63\
+F\x22/><stop offset\
+=\x22100%\x22 stop-col\
+or=\x22#FF0\x22/></lin\
+earGradient><lin\
+earGradient id=\x22\
+linux__logosLinu\
+xTuxj\x22 x1=\x2250.17\
+%\x22 x2=\x2249.68%\x22 y\
+1=\x222.89%\x22 y2=\x2294\
+.17%\x22><stop offs\
+et=\x220%\x22 stop-col\
+or=\x22#FFF\x22 stop-o\
+pacity=\x22.65\x22/><s\
+top offset=\x22100%\
+\x22 stop-color=\x22#F\
+FF\x22 stop-opacity\
+=\x220\x22/></linearGr\
+adient><filter i\
+d=\x22linux__logosL\
+inuxTuxk\x22 width=\
+\x22200%\x22 height=\x222\
+00%\x22 x=\x22-50%\x22 y=\
+\x22-50%\x22 filterUni\
+ts=\x22objectBoundi\
+ngBox\x22><feOffset\
+ in=\x22SourceAlpha\
+\x22 result=\x22shadow\
+OffsetOuter1\x22/><\
+feGaussianBlur i\
+n=\x22shadowOffsetO\
+uter1\x22 result=\x22s\
+hadowBlurOuter1\x22\
+ stdDeviation=\x226\
+.5\x22/></filter></\
+defs><g fill=\x22no\
+ne\x22><path fill=\x22\
+#000\x22 fill-opaci\
+ty=\x22.2\x22 d=\x22M235.\
+125 249.359c0 17\
+.355-52.617 31.4\
+97-117.54 31.497\
+S.044 266.806.04\
+4 249.359c0-17.3\
+56 52.618-31.498\
+ 117.54-31.498c6\
+4.924 0 117.45 1\
+4.142 117.541 31\
+.498\x22 filter=\x22ur\
+l(#linux__logosL\
+inuxTuxk)\x22 trans\
+form=\x22translate(\
+10)\x22/><path fill\
+=\x22#000\x22 d=\x22M63.2\
+13 215.474c-11.3\
+87-16.346-13.591\
+-69.606 12.947-1\
+02.39C89.292 97.\
+383 92.69 86.455\
+ 93.7 71.67c.734\
+-16.805-11.846-6\
+6.851 35.537-70.\
+616c48.027-3.857\
+ 45.364 43.526 4\
+5.088 68.596c-.1\
+83 21.12 15.52 3\
+3.15 26.355 49.6\
+8c19.927 30.303 \
+18.274 82.461-3.\
+765 110.745c-27.\
+916 35.354-51.79\
+1 20.018-67.678 \
+21.304c-29.752 1\
+.745-30.762 17.5\
+4-66.024-35.905\x22\
+/><path fill=\x22ur\
+l(#linux__logosL\
+inuxTux0)\x22 d=\x22M1\
+69.1 122.451c8.2\
+65 7.622 29.661 \
+41.69-4.224 62.9\
+95c-11.937 7.438\
+ 10.653 35.721 2\
+1.488 22.039c19.\
+193-24.61 6.98-6\
+3.913-4.591-77.9\
+63c-7.714-9.917-\
+19.651-13.774-12\
+.672-7.07\x22 trans\
+form=\x22translate(\
+10)\x22/><path fill\
+=\x22#000\x22 stroke=\x22\
+#000\x22 stroke-wid\
+th=\x22.977\x22 d=\x22M17\
+6.805 117.86c13.\
+59 11.02 38.292 \
+49.587 2.204 74.\
+748c-11.846 7.80\
+6 10.468 32.508 \
+23.049 19.927c43\
+.618-43.894-1.10\
+2-94.308-16.53-1\
+11.664c-13.774-1\
+5.151-25.987 3.4\
+9-8.723 16.989z\x22\
+/><path fill=\x22ur\
+l(#linux__logosL\
+inuxTux1)\x22 d=\x22M1\
+47.245 25.02c-.4\
+59 12.581-14.325\
+ 23.51-30.946 24\
+.52c-16.621 1.01\
+-29.66-8.54-29.2\
+02-21.121c.46-12\
+.581 14.326-23.5\
+09 30.947-24.519\
+c16.62-.918 29.6\
+6 8.54 29.201 21\
+.12\x22 transform=\x22\
+translate(10)\x22/>\
+<path fill=\x22url(\
+#linux__logosLin\
+uxTux2)\x22 d=\x22M107\
+.483 54.957c.46 \
+8.173-3.397 15.0\
+6-8.723 15.335c-\
+5.326.276-10.01-\
+6.06-10.469-14.2\
+33c-.459-8.173 3\
+.398-15.06 8.724\
+-15.335c5.326-.2\
+76 10.01 6.06 10\
+.468 14.233\x22 tra\
+nsform=\x22translat\
+e(10)\x22/><path fi\
+ll=\x22url(#linux__\
+logosLinuxTux3)\x22\
+ d=\x22M117.125 55.\
+6c.184 9.458 6.3\
+37 16.988 13.683\
+ 16.805c7.346-.1\
+84 13.131-7.99 1\
+2.948-17.54c-.18\
+4-9.458-6.336-16\
+.988-13.683-16.8\
+04c-7.346.183-13\
+.223 8.08-12.948\
+ 17.539\x22 transfo\
+rm=\x22translate(10\
+)\x22/><path fill=\x22\
+#000\x22 d=\x22M133.18\
+6 57.712c-.092 5\
+.234 2.48 9.458 \
+5.877 9.458c3.30\
+6 0 6.153-4.224 \
+6.245-9.366c.091\
+-5.234-2.48-9.45\
+9-5.878-9.459c-3\
+.397 0-6.152 4.2\
+25-6.244 9.367m-\
+21.212.092c.459 \
+4.316-1.194 7.98\
+9-3.582 8.356c-2\
+.387.276-4.683-2\
+.938-5.142-7.254\
+c-.46-4.316 1.19\
+4-7.99 3.581-8.3\
+57c2.388-.275 4.\
+684 2.939 5.143 \
+7.255\x22/><path fi\
+ll=\x22url(#linux__\
+logosLinuxTux4)\x22\
+ d=\x22M124.564 54.\
+773c-.276 2.939 \
+1.102 5.326 3.03\
+ 5.51c1.928.184 \
+3.765-2.112 4.04\
+-4.959c.276-2.93\
+8-1.102-5.326-3.\
+03-5.51c-1.928-.\
+183-3.765 2.113-\
+4.04 4.96\x22 trans\
+form=\x22translate(\
+10)\x22/><path fill\
+=\x22url(#linux__lo\
+gosLinuxTux5)\x22 d\
+=\x22M99.953 55.508\
+c.276 2.388-.734\
+ 4.5-2.203 4.683\
+c-1.47.184-2.847\
+-1.653-3.123-4.1\
+32c-.275-2.388.7\
+35-4.5 2.204-4.6\
+83c1.47-.184 2.8\
+47 1.744 3.122 4\
+.132\x22 transform=\
+\x22translate(10)\x22/\
+><path fill=\x22url\
+(#linux__logosLi\
+nuxTux6)\x22 d=\x22M71\
+.027 145.684c6.5\
+2-14.785 20.386-\
+40.772 20.662-60\
+.883c0-15.978 47\
+.843-19.835 51.7\
+-3.856c3.856 15.\
+978 13.59 39.853\
+ 19.834 51.424c6\
+.245 11.478 24.3\
+35 48.118 5.051 \
+80.074c-17.356 2\
+8.284-69.973 50.\
+69-98.073-3.856c\
+-9.55-18.917-7.8\
+06-42.333.826-62\
+.903\x22 transform=\
+\x22translate(10)\x22/\
+><path fill=\x22url\
+(#linux__logosLi\
+nuxTux7)\x22 d=\x22M65\
+.15 134.664c-5.6\
+01 10.56-17.172 \
+38.293 11.112 53\
+.445c30.395 16.1\
+62 30.303 49.312\
+-6.245 33.517c-3\
+3.425-14.233-18.\
+641-71.902-9.274\
+-85.676c6.06-9.6\
+42 15.243-21.488\
+ 4.407-1.286\x22 tr\
+ansform=\x22transla\
+te(10)\x22/><path f\
+ill=\x22#000\x22 strok\
+e=\x22#000\x22 stroke-\
+width=\x221.25\x22 d=\x22\
+M79.925 122.727c\
+-8.907 14.509-30\
+.211 48.669-1.65\
+2 66.484c38.384 \
+23.6 27.548 47.1\
+08-7.53 25.895c-\
+49.404-29.568-5.\
+97-89.257 13.774\
+-112.03c22.59-25\
+.529 4.316 4.683\
+-4.592 19.65z\x22/>\
+<path fill=\x22url(\
+#linux__logosLin\
+uxTux8)\x22 d=\x22M156\
+.428 151.285c0 1\
+6.162-15.519 37.\
+1-42.15 36.916c-\
+27.456.183-39.11\
+8-20.754-39.118-\
+36.916c0-16.161 \
+18.182-29.293 40\
+.588-29.293c22.4\
+98.092 40.68 13.\
+132 40.68 29.293\
+\x22 transform=\x22tra\
+nslate(10)\x22/><pa\
+th fill=\x22url(#li\
+nux__logosLinuxT\
+ux9)\x22 d=\x22M141.92\
+ 100.504c-.276 1\
+6.713-11.204 20.\
+662-24.978 20.66\
+2c-13.775 0-23.7\
+84-2.48-24.978-2\
+0.662c0-11.387 1\
+1.203-17.998 24.\
+978-17.998c13.77\
+4-.092 24.977 6.\
+52 24.977 17.998\
+\x22 transform=\x22tra\
+nslate(10)\x22/><pa\
+th fill=\x22url(#li\
+nux__logosLinuxT\
+uxa)\x22 d=\x22M58.63 \
+126.216c9-13.682\
+ 28.008-34.711 3\
+.582 2.939c-19.8\
+35 31.038-7.346 \
+50.965-.918 56.4\
+74c18.549 16.53 \
+17.814 27.64 3.2\
+14 18.917c-31.31\
+4-18.641-24.794-\
+50.047-5.878-78.\
+33\x22 transform=\x22t\
+ranslate(10)\x22/><\
+path fill=\x22url(#\
+linux__logosLinu\
+xTuxb)\x22 d=\x22M188.\
+936 131.818c-7.8\
+06-16.07-32.6-56\
+.842 1.193-9.459\
+c30.763 42.884 9\
+.183 72.729 5.32\
+6 75.667c-3.856 \
+2.939-16.804 8.9\
+08-13.04-1.469c3\
+.858-10.377 22.9\
+58-30.028 6.52-6\
+4.74\x22 transform=\
+\x22translate(10)\x22/\
+><path fill=\x22url\
+(#linux__logosLi\
+nuxTuxc)\x22 stroke\
+=\x22#E68C3F\x22 strok\
+e-width=\x226.25\x22 d\
+=\x22M51.835 258.54\
+2c-20.57-10.928-\
+50.414 2.112-39.\
+578-27.457c2.204\
+-6.704-3.214-16.\
+805.275-23.325c4\
+.133-7.989 13.04\
+-6.244 18.366-11\
+.57c5.234-5.51 8\
+.54-15.06 18.366\
+-13.59c9.734 1.4\
+68 16.254 13.406\
+ 23.049 28.099c5\
+.05 10.468 22.86\
+5 25.253 21.672 \
+37.007c-1.47 17.\
+998-21.948 21.39\
+6-42.15 10.836z\x22\
+ transform=\x22tran\
+slate(10)\x22/><pat\
+h fill=\x22url(#lin\
+ux__logosLinuxTu\
+xd)\x22 d=\x22M201.608\
+ 189.119c-3.122 \
+5.877-16.162 15.\
+335-24.886 12.85\
+6c-8.815-2.388-1\
+2.856-15.795-11.\
+111-25.988c1.653\
+-11.386 11.111-1\
+2.03 23.05-6.336\
+c12.855 6.336 16\
+.712 11.662 12.9\
+47 19.468\x22 trans\
+form=\x22translate(\
+10)\x22/><path fill\
+=\x22url(#linux__lo\
+gosLinuxTuxe)\x22 s\
+troke=\x22#E68C3F\x22 \
+stroke-width=\x226.\
+251\x22 d=\x22M194.445\
+ 253.49c15.06-18\
+.273 48.578-14.5\
+08 25.988-39.577\
+c-4.775-5.418-3.\
+306-16.989-9.183\
+-21.947c-6.887-6\
+.061-14.509-1.10\
+2-21.488-4.224c-\
+6.979-3.398-14.3\
+25-9.918-22.865-\
+5.327c-8.54 4.68\
+4-9.459 16.805-1\
+0.285 32.783c-.7\
+35 11.479-11.203\
+ 30.671-5.602 41\
+.231c8.081 16.34\
+6 29.11 14.142 4\
+3.435-2.938z\x22 tr\
+ansform=\x22transla\
+te(10)\x22/><path f\
+ill=\x22url(#linux_\
+_logosLinuxTuxf)\
+\x22 d=\x22M187.925 22\
+9.064c23.325-34.\
+435 5.97-34.16.0\
+92-36.823c-5.877\
+-2.755-12.03-8.1\
+73-18.916-4.408c\
+-6.888 3.857-7.2\
+55 13.775-7.439 \
+26.814c-.275 9.3\
+67-8.08 25.07-3.\
+397 33.793c5.693\
+ 10.193 19.467-4\
+.591 29.66-19.37\
+6\x22 transform=\x22tr\
+anslate(10)\x22/><p\
+ath fill=\x22url(#l\
+inux__logosLinux\
+Tuxg)\x22 d=\x22M47.06\
+ 234.023c-34.895\
+-22.59-18.55-30.\
+303-13.315-33.88\
+5c6.336-4.591 6.\
+428-13.407 14.23\
+3-12.58c7.806.82\
+6 12.397 10.468 \
+17.631 22.406c3.\
+857 8.54 17.264 \
+19.927 16.254 29\
+.753c-1.285 11.5\
+7-19.743 3.948-3\
+4.803-5.694\x22 tra\
+nsform=\x22translat\
+e(10)\x22/><path fi\
+ll=\x22#000\x22 d=\x22M20\
+9.588 188.843c-2\
+.755 4.776-13.95\
+8 12.306-21.396 \
+10.285c-7.622-1.\
+928-11.112-12.67\
+2-9.55-20.753c1.\
+377-9.183 9.55-9\
+.642 19.834-5.05\
+c10.928 4.958 14\
+.326 9.182 11.11\
+2 15.518\x22/><path\
+ fill=\x22url(#linu\
+x__logosLinuxTux\
+h)\x22 d=\x22M192.058 \
+186.18c-1.745 3.\
+306-9.091 8.54-1\
+4.234 7.163c-5.1\
+42-1.377-7.713-8\
+.815-6.887-14.41\
+7c.735-6.336 6.2\
+44-6.704 13.223-\
+3.581c7.53 3.49 \
+9.918 6.428 7.89\
+8 10.835\x22 transf\
+orm=\x22translate(1\
+0)\x22/><path fill=\
+\x22url(#linux__log\
+osLinuxTuxi)\x22 st\
+roke=\x22#E68C3F\x22 s\
+troke-width=\x223.7\
+5\x22 d=\x22M97.107 66\
+.344c3.673-3.398\
+ 12.58-13.774 29\
+.477-2.939c3.122\
+ 2.02 5.693 2.20\
+4 11.662 4.775c1\
+2.03 4.96 6.336 \
+16.897-6.52 20.9\
+37c-5.51 1.745-1\
+0.468 8.449-20.3\
+86 7.806c-8.54-.\
+46-10.744-6.06-1\
+5.978-9.091c-9.2\
+75-5.234-10.652-\
+12.305-5.602-16.\
+07c5.051-3.765 6\
+.98-5.143 7.347-\
+5.418z\x22 transfor\
+m=\x22translate(10)\
+\x22/><path stroke=\
+\x22#E68C3F\x22 stroke\
+-width=\x222.5\x22 d=\x22\
+M148.43 75.986c-\
+5.05.275-15.979 \
+11.203-27.457 11\
+.203c-11.479 0-1\
+8.366-10.652-20.\
+11-10.652\x22/><pat\
+h fill=\x22url(#lin\
+ux__logosLinuxTu\
+xj)\x22 d=\x22M102.8 6\
+5.426c1.837-1.65\
+3 7.622-6.153 15\
+.244-1.562c1.653\
+.919 3.306 1.929\
+ 5.693 3.306c4.8\
+67 2.847 2.48 6.\
+98-3.398 9.55c-2\
+.663 1.102-7.07 \
+3.49-10.376 3.30\
+6c-3.673-.367-6.\
+153-2.755-8.54-4\
+.316c-4.5-2.938-\
+4.224-5.418-2.11\
+2-7.346c1.56-1.4\
+7 3.305-2.847 3.\
+49-2.938\x22 transf\
+orm=\x22translate(1\
+0)\x22/></g></svg>\x0a\
+\
+\x00\x00\x01\xaa\
+<\
+svg xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22 width=\x2216\
+\x22 height=\x2216\x22 fi\
+ll=\x22currentColor\
+\x22\x0a  class=\x22bi bi\
+-layout-topbar-i\
+nset\x22 viewBox=\x220\
+ 0 16 16\x22>\x0a  <g \
+transform=\x22rotat\
+e(90 8 8)\x22>\x0a    \
+<path d=\x22M14 2a1\
+ 1 0 0 1 1 1v10a\
+1 1 0 0 1-1 1H2a\
+1 1 0 0 1-1-1V3a\
+1 1 0 0 1 1-1zM2\
+ 1a2 2 0 0 0-2 2\
+v10a2 2 0 0 0 2 \
+2h12a2 2 0 0 0 2\
+-2V3a2 2 0 0 0-2\
+-2z\x22/>\x0a    <path\
+ d=\x22M3 4a1 1 0 0\
+ 1 1-1h2a1 1 0 0\
+ 1 1 1v8a1 1 0 0\
+ 1-1 1H4a1 1 0 0\
+ 1-1-1z\x22/>\x0a  </g\
+>\x0a</svg>\x0a\
+\x00\x00\x03\xec\
+<\
+svg xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22 width=\x2216\
+\x22 height=\x2216\x22 vi\
+ewBox=\x220 0 16 16\
+\x22>\x0a  <defs>\x0a    \
+<linearGradient \
+id=\x22globeGradien\
+t\x22 x1=\x220\x22 y1=\x220\x22\
+ x2=\x220\x22 y2=\x221\x22 g\
+radientUnits=\x22ob\
+jectBoundingBox\x22\
+>\x0a      <stop of\
+fset=\x220\x22 stop-co\
+lor=\x22#111111\x22/>\x0a\
+      <stop offs\
+et=\x221\x22 stop-colo\
+r=\x22#FF6A00\x22/>\x0a  \
+  </linearGradie\
+nt>\x0a  </defs>\x0a  \
+<path fill=\x22url(\
+#globeGradient)\x22\
+ d=\x22M8 0a8 8 0 1\
+ 0 0 16A8 8 0 0 \
+0 8 0M4.882 1.73\
+1a.48.48 0 0 0 .\
+14.291.487.487 0\
+ 0 1-.126.78l-.2\
+91.146a.7.7 0 0 \
+0-.188.135l-.48.\
+48a1 1 0 0 1-1.0\
+23.242l-.02-.007\
+a1 1 0 0 0-.462-\
+.04 7 7 0 0 1 2.\
+45-2.027m-3 9.67\
+4.86-.216a1 1 0 \
+0 0 .758-.97v-.1\
+84a1 1 0 0 1 .44\
+5-.832l.04-.026a\
+1 1 0 0 0 .152-1\
+.54L3.121 6.621a\
+.414.414 0 0 1 .\
+542-.624l1.09.81\
+8a.5.5 0 0 0 .52\
+3.047.5.5 0 0 1 \
+.724.447v.455a.8\
+.8 0 0 0 .131.43\
+3l.795 1.192a1 1\
+ 0 0 1 .116.238l\
+.73 2.19a1 1 0 0\
+ 0 .949.683h.058\
+a1 1 0 0 0 .949-\
+.684l.73-2.189a1\
+ 1 0 0 1 .116-.2\
+38l.791-1.187A.4\
+5.45 0 0 1 11.74\
+3 8c.16 0 .306.0\
+84.392.218.557.8\
+75 1.63 2.282 2.\
+365 2.282l.04-.0\
+01a7.003 7.003 0\
+ 0 1-12.658.905Z\
+\x22/>\x0a</svg>\x0a\
+\x00\x00\x00\xea\
+<\
+svg xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22 width=\x2224\
+\x22 height=\x2224\x22 vi\
+ewBox=\x220 0 24 24\
+\x22><path fill=\x22cu\
+rrentColor\x22 d=\x22M\
+12 2C8.13 2 5 5.\
+13 5 9c0 5.25 7 \
+13 7 13s7-7.75 7\
+-13c0-3.87-3.13-\
+7-7-7m0 9.5a2.5 \
+2.5 0 0 1 0-5a2.\
+5 2.5 0 0 1 0 5\x22\
+/></svg>\x0a\
+\x00\x00\x02\x15\
+<\
+svg xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22 width=\x2215\
+\x22 height=\x2215\x22 vi\
+ewBox=\x220 0 15 15\
+\x22><path fill=\x22cu\
+rrentColor\x22 d=\x22M\
+2.5 13v1h-1c-.28\
+ 0-.5-.22-.5-.5v\
+-2c0-.28.22-.5.5\
+-.5h1v1H2v1zm0-5\
+v1h-1c-.28 0-.5-\
+.22-.5-.5v-2c0-.\
+28.22-.5.5-.5h1v\
+1H2v1zm0-5v1h-1c\
+-.28 0-.5-.22-.5\
+-.5v-2c0-.28.22-\
+.5.5-.5h1v1H2v1z\
+m10 10h.5v-1h-.5\
+v-1h1c.28 0 .5.2\
+2.5.5v2c0 .28-.2\
+2.5-.5.5h-1zm0-5\
+h.5V7h-.5V6h1c.2\
+8 0 .5.22.5.5v2c\
+0 .28-.22.5-.5.5\
+h-1zm0-5h.5V2h-.\
+5V1h1c.28 0 .5.2\
+2.5.5v2c0 .28-.2\
+2.5-.5.5h-1zm-8 \
+8h6v3h-6zm0-5h6v\
+3h-6zm0-5h6v3h-6\
+zM3 0h1v15H3zm8 \
+0h1v15h-1z\x22/></s\
+vg>\x0a\
+\x00\x00\x02\x91\
+<\
+svg xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22 width=\x2216\
+\x22 height=\x2216\x22 fi\
+ll=\x22currentColor\
+\x22 class=\x22bi bi-t\
+rash3\x22 viewBox=\x22\
+0 0 16 16\x22>\x0a  <p\
+ath d=\x22M6.5 1h3a\
+.5.5 0 0 1 .5.5v\
+1H6v-1a.5.5 0 0 \
+1 .5-.5M11 2.5v-\
+1A1.5 1.5 0 0 0 \
+9.5 0h-3A1.5 1.5\
+ 0 0 0 5 1.5v1H1\
+.5a.5.5 0 0 0 0 \
+1h.538l.853 10.6\
+6A2 2 0 0 0 4.88\
+5 16h6.23a2 2 0 \
+0 0 1.994-1.84l.\
+853-10.66h.538a.\
+5.5 0 0 0 0-1zm1\
+.958 1-.846 10.5\
+8a1 1 0 0 1-.997\
+.92h-6.23a1 1 0 \
+0 1-.997-.92L3.0\
+42 3.5zm-7.487 1\
+a.5.5 0 0 1 .528\
+.47l.5 8.5a.5.5 \
+0 0 1-.998.06L5 \
+5.03a.5.5 0 0 1 \
+.47-.53Zm5.058 0\
+a.5.5 0 0 1 .47.\
+53l-.5 8.5a.5.5 \
+0 1 1-.998-.06l.\
+5-8.5a.5.5 0 0 1\
+ .528-.47M8 4.5a\
+.5.5 0 0 1 .5.5v\
+8.5a.5.5 0 0 1-1\
+ 0V5a.5.5 0 0 1 \
+.5-.5\x22/>\x0a</svg>\x0a\
+\
+\x00\x00\x01r\
+<\
+svg xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22 width=\x2216\
+\x22 height=\x2216\x22 fi\
+ll=\x22currentColor\
+\x22 class=\x22bi bi-c\
+heck-circle\x22 vie\
+wBox=\x220 0 16 16\x22\
+>\x0a  <path d=\x22M8 \
+15A7 7 0 1 1 8 1\
+a7 7 0 0 1 0 14m\
+0 1A8 8 0 1 0 8 \
+0a8 8 0 0 0 0 16\
+\x22/>\x0a  <path d=\x22m\
+10.97 4.97-.02.0\
+22-3.473 4.425-2\
+.093-2.094a.75.7\
+5 0 0 0-1.06 1.0\
+6L6.97 11.03a.75\
+.75 0 0 0 1.079-\
+.02l3.992-4.99a.\
+75.75 0 0 0-1.07\
+1-1.05\x22/>\x0a</svg>\
+\x0a\
+\x00\x00\x01\x87\
+<\
+svg xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22 width=\x2216\
+\x22 height=\x2216\x22 fi\
+ll=\x22currentColor\
+\x22 class=\x22bi bi-l\
+ayout-sidebar-in\
+set-reverse\x22 vie\
+wBox=\x220 0 16 16\x22\
+>\x0a  <path d=\x22M2 \
+2a1 1 0 0 0-1 1v\
+10a1 1 0 0 0 1 1\
+h12a1 1 0 0 0 1-\
+1V3a1 1 0 0 0-1-\
+1zm12-1a2 2 0 0 \
+1 2 2v10a2 2 0 0\
+ 1-2 2H2a2 2 0 0\
+ 1-2-2V3a2 2 0 0\
+ 1 2-2z\x22/>\x0a  <pa\
+th d=\x22M13 4a1 1 \
+0 0 0-1-1h-2a1 1\
+ 0 0 0-1 1v8a1 1\
+ 0 0 0 1 1h2a1 1\
+ 0 0 0 1-1z\x22/>\x0a<\
+/svg>\x0a\
+\x00\x00\x01^\
+<\
+svg xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22 width=\x2216\
+\x22 height=\x2216\x22 fi\
+ll=\x22currentColor\
+\x22 class=\x22bi bi-a\
+rrow-clockwise\x22 \
+viewBox=\x220 0 16 \
+16\x22>\x0a  <path fil\
+l-rule=\x22evenodd\x22\
+ d=\x22M8 3a5 5 0 1\
+ 0 4.546 2.914.5\
+.5 0 0 1 .908-.4\
+17A6 6 0 1 1 8 2\
+z\x22/>\x0a  <path d=\x22\
+M8 4.466V.534a.2\
+5.25 0 0 1 .41-.\
+192l2.36 1.966c.\
+12.1.12.284 0 .3\
+84L8.41 4.658A.2\
+5.25 0 0 1 8 4.4\
+66\x22/>\x0a</svg>\x0a\
+\x00\x00\x010\
+<\
+svg xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22 width=\x2216\
+\x22 height=\x2216\x22 fi\
+ll=\x22currentColor\
+\x22 class=\x22bi bi-l\
+ayout-sidebar\x22 v\
+iewBox=\x220 0 16 1\
+6\x22>\x0a  <path d=\x22M\
+0 3a2 2 0 0 1 2-\
+2h12a2 2 0 0 1 2\
+ 2v10a2 2 0 0 1-\
+2 2H2a2 2 0 0 1-\
+2-2zm5-1v12h9a1 \
+1 0 0 0 1-1V3a1 \
+1 0 0 0-1-1zM4 2\
+H2a1 1 0 0 0-1 1\
+v10a1 1 0 0 0 1 \
+1h2z\x22/>\x0a</svg>\x0a\
+\x00\x00\x042\
+<\
+svg xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22 width=\x2216\
+\x22 height=\x2216\x22 fi\
+ll=\x22currentColor\
+\x22 class=\x22bi bi-h\
+and-index\x22 viewB\
+ox=\x220 0 16 16\x22>\x0a\
+  <path d=\x22M6.75\
+ 1a.75.75 0 0 1 \
+.75.75V8a.5.5 0 \
+0 0 1 0V5.467l.0\
+86-.004c.317-.01\
+2.637-.008.816.0\
+27.134.027.294.0\
+96.448.182.077.0\
+42.15.147.15.314\
+V8a.5.5 0 1 0 1 \
+0V6.435l.106-.01\
+c.316-.024.584-.\
+01.708.04.118.04\
+6.3.207.486.43.0\
+81.096.15.19.2.2\
+59V8.5a.5.5 0 0 \
+0 1 0v-1h.342a1 \
+1 0 0 1 .995 1.1\
+l-.271 2.715a2.5\
+ 2.5 0 0 1-.317.\
+991l-1.395 2.442\
+a.5.5 0 0 1-.434\
+.252H6.035a.5.5 \
+0 0 1-.416-.223l\
+-1.433-2.15a1.5 \
+1.5 0 0 1-.243-.\
+666l-.345-3.105a\
+.5.5 0 0 1 .399-\
+.546L5 8.11V9a.5\
+.5 0 0 0 1 0V1.7\
+5A.75.75 0 0 1 6\
+.75 1M8.5 4.466V\
+1.75a1.75 1.75 0\
+ 1 0-3.5 0v5.34l\
+-1.2.24a1.5 1.5 \
+0 0 0-1.196 1.63\
+6l.345 3.106a2.5\
+ 2.5 0 0 0 .405 \
+1.11l1.433 2.15A\
+1.5 1.5 0 0 0 6.\
+035 16h6.385a1.5\
+ 1.5 0 0 0 1.302\
+-.756l1.395-2.44\
+1a3.5 3.5 0 0 0 \
+.444-1.389l.271-\
+2.715a2 2 0 0 0-\
+1.99-2.199h-.581\
+a5 5 0 0 0-.195-\
+.248c-.191-.229-\
+.51-.568-.88-.71\
+6-.364-.146-.846\
+-.132-1.158-.108\
+l-.132.012a1.26 \
+1.26 0 0 0-.56-.\
+642 2.6 2.6 0 0 \
+0-.738-.288c-.31\
+-.062-.739-.058-\
+1.05-.046zm2.094\
+ 2.025\x22/>\x0a</svg>\
+\x0a\
+\x00\x00\x04~\
+<\
+svg xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22 width=\x2224\
+\x22 height=\x2224\x22 vi\
+ewBox=\x220 0 24 24\
+\x22><path fill=\x22cu\
+rrentColor\x22 d=\x22M\
+5.616 20q-.667 0\
+-1.141-.475T4 18\
+.386V5.615q0-.66\
+6.475-1.14T5.615\
+ 4h10.29q.333 0 \
+.633.13t.518.349\
+l2.465 2.465q.21\
+8.218.348.518t.1\
+31.632v3.252q0 .\
+213-.144.357t-.3\
+57.143t-.356-.14\
+3t-.143-.357V7.8\
+44L16.156 5H5.61\
+6q-.27 0-.443.17\
+3T5 5.616v12.769\
+q0 .269.173.442t\
+.443.173h4.73q.2\
+13 0 .357.144t.1\
+43.357t-.143.356\
+t-.357.143zM5 5v\
+14zm8.23 16.192V\
+20.12q0-.153.057\
+-.296q.055-.144.\
+186-.275l5.09-5.\
+065q.149-.148.30\
+6-.2q.158-.052.3\
+15-.052q.172 0 .\
+338.064q.166.065\
+.301.194l.925.94\
+4q.123.148.188.3\
+08q.064.159.064.\
+319t-.061.322t-.\
+191.31l-5.065 5.\
+066q-.131.13-.27\
+5.186q-.143.056-\
+.297.056h-1.073q\
+-.343 0-.575-.23\
+2t-.232-.576m6.8\
+84-5.133l-.925-.\
+944zm-6 5.056h.9\
+5l3.468-3.473l-.\
+47-.475l-.455-.4\
+88l-3.493 3.486z\
+m3.948-3.948l-.4\
+55-.488l.925.963\
+zM7.577 9.77h5.8\
+03q.353 0 .582-.\
+232t.23-.576V7.5\
+77q0-.343-.232-.\
+576t-.576-.232H7\
+.581q-.352 0-.58\
+2.232t-.23.576v1\
+.384q0 .344.233.\
+576t.575.232M12 \
+16.54q.179 0 .33\
+9-.039q.159-.039\
+.319-.134l1.169-\
+1.145q.096-.165.\
+135-.331q.038-.1\
+67.038-.351q0-.8\
+34-.582-1.417t-1\
+.413-.583t-1.419\
+.582T10 14.534t.\
+583 1.418t1.417.\
+587\x22/></svg>\x0a\
+\x00\x00\x02!\
+<\
+svg xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22 width=\x2216\
+\x22 height=\x2216\x22 fi\
+ll=\x22currentColor\
+\x22 class=\x22bi bi-c\
+rosshair\x22 viewBo\
+x=\x220 0 16 16\x22>\x0a \
+ <path d=\x22M8.5.5\
+a.5.5 0 0 0-1 0v\
+.518A7 7 0 0 0 1\
+.018 7.5H.5a.5.5\
+ 0 0 0 0 1h.518A\
+7 7 0 0 0 7.5 14\
+.982v.518a.5.5 0\
+ 0 0 1 0v-.518A7\
+ 7 0 0 0 14.982 \
+8.5h.518a.5.5 0 \
+0 0 0-1h-.518A7 \
+7 0 0 0 8.5 1.01\
+8zm-6.48 7A6 6 0\
+ 0 1 7.5 2.02v.4\
+8a.5.5 0 0 0 1 0\
+v-.48a6 6 0 0 1 \
+5.48 5.48h-.48a.\
+5.5 0 0 0 0 1h.4\
+8a6 6 0 0 1-5.48\
+ 5.48v-.48a.5.5 \
+0 0 0-1 0v.48A6 \
+6 0 0 1 2.02 8.5\
+h.48a.5.5 0 0 0 \
+0-1zM8 10a2 2 0 \
+1 0 0-4 2 2 0 0 \
+0 0 4\x22/>\x0a</svg>\x0a\
+\
+\x00\x00\x02\xa7\
+<\
+svg xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22 xml:space\
+=\x22preserve\x22 widt\
+h=\x22209\x22 height=\x22\
+256\x22 viewBox=\x220 \
+0 814 1000\x22><pat\
+h d=\x22M788.1 340.\
+9c-5.8 4.5-108.2\
+ 62.2-108.2 190.\
+5 0 148.4 130.3 \
+200.9 134.2 202.\
+2-.6 3.2-20.7 71\
+.9-68.7 141.9-42\
+.8 61.6-87.5 123\
+.1-155.5 123.1s-\
+85.5-39.5-164-39\
+.5c-76.5 0-103.7\
+ 40.8-165.9 40.8\
+s-105.6-57-155.5\
+-127C46.7 790.7 \
+0 663 0 541.8c0-\
+194.4 126.4-297.\
+5 250.8-297.5 66\
+.1 0 121.2 43.4 \
+162.7 43.4 39.5 \
+0 101.1-46 176.3\
+-46 28.5 0 130.9\
+ 2.6 198.3 99.2z\
+m-234-181.5c31.1\
+-36.9 53.1-88.1 \
+53.1-139.3 0-7.1\
+-.6-14.3-1.9-20.\
+1-50.6 1.9-110.8\
+ 33.7-147.1 75.8\
+-28.5 32.4-55.1 \
+83.6-55.1 135.5 \
+0 7.8 1.3 15.6 1\
+.9 18.1 3.2.6 8.\
+4 1.3 13.6 1.3 4\
+5.4 0 102.5-30.4\
+ 135.5-71.3z\x22/><\
+/svg>\x0a\
+\x00\x00\x02\x02\
+<\
+svg xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22 width=\x2240\
+0\x22 height=\x22120\x22 \
+viewBox=\x220 0 400\
+ 120\x22>\x0a  <defs>\x0a\
+    <linearGradi\
+ent id=\x22textGrad\
+ient\x22 x1=\x220%\x22 y1\
+=\x220%\x22 x2=\x22100%\x22 \
+y2=\x220%\x22>\x0a      <\
+stop offset=\x220%\x22\
+ stop-color=\x22#11\
+1111\x22 stop-opaci\
+ty=\x221\x22/>\x0a      <\
+stop offset=\x22100\
+%\x22 stop-color=\x22#\
+FF6A00\x22 stop-opa\
+city=\x221\x22/>\x0a    <\
+/linearGradient>\
+\x0a  </defs>\x0a  <te\
+xt x=\x22200\x22 y=\x2285\
+\x22 dominant-basel\
+ine=\x22middle\x22 tex\
+t-anchor=\x22middle\
+\x22 font-family=\x22A\
+rial, sans-serif\
+\x22 font-size=\x2280\x22\
+ font-weight=\x22bo\
+ld\x22 fill=\x22url(#t\
+extGradient)\x22>AR\
+OW</text>\x0a</svg>\
+\x0a\
+\x00\x00\x04\x9c\
+<\
+svg xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22 width=\x2216\
+\x22 height=\x2216\x22 vi\
+ewBox=\x220 0 16 16\
+\x22>\x0a  <defs>\x0a    \
+<!-- Same grey g\
+radient stops as\
+ device-placehol\
+der.svg, adapted\
+ for the globe i\
+con. -->\x0a    <li\
+nearGradient id=\
+\x22globe-placehold\
+er-gradient\x22 x1=\
+\x228\x22 y1=\x221\x22 x2=\x228\
+\x22 y2=\x2215\x22 gradie\
+ntUnits=\x22userSpa\
+ceOnUse\x22>\x0a      \
+<stop offset=\x220\x22\
+ stop-color=\x22#8E\
+8E8E\x22/>\x0a      <s\
+top offset=\x220.5\x22\
+ stop-color=\x22#75\
+7575\x22/>\x0a      <s\
+top offset=\x221\x22 s\
+top-color=\x22#5C5C\
+5C\x22/>\x0a    </line\
+arGradient>\x0a  </\
+defs>\x0a  <path\x0a  \
+  fill=\x22url(#glo\
+be-placeholder-g\
+radient)\x22\x0a    d=\
+\x22M8 0a8 8 0 1 0 \
+0 16A8 8 0 0 0 8\
+ 0M4.882 1.731a.\
+48.48 0 0 0 .14.\
+291.487.487 0 0 \
+1-.126.78l-.291.\
+146a.7.7 0 0 0-.\
+188.135l-.48.48a\
+1 1 0 0 1-1.023.\
+242l-.02-.007a1 \
+1 0 0 0-.462-.04\
+ 7 7 0 0 1 2.45-\
+2.027m-3 9.674.8\
+6-.216a1 1 0 0 0\
+ .758-.97v-.184a\
+1 1 0 0 1 .445-.\
+832l.04-.026a1 1\
+ 0 0 0 .152-1.54\
+L3.121 6.621a.41\
+4.414 0 0 1 .542\
+-.624l1.09.818a.\
+5.5 0 0 0 .523.0\
+47.5.5 0 0 1 .72\
+4.447v.455a.8.8 \
+0 0 0 .131.433l.\
+795 1.192a1 1 0 \
+0 1 .116.238l.73\
+ 2.19a1 1 0 0 0 \
+.949.683h.058a1 \
+1 0 0 0 .949-.68\
+4l.73-2.189a1 1 \
+0 0 1 .116-.238l\
+.791-1.187A.45.4\
+5 0 0 1 11.743 8\
+c.16 0 .306.084.\
+392.218.557.875 \
+1.63 2.282 2.365\
+ 2.282l.04-.001a\
+7.003 7.003 0 0 \
+1-12.658.905Z\x22\x0a \
+ />\x0a</svg>\x0a\
 \x00\x00\x01\xc1\
 <\
 svg xmlns=\x22http:\
@@ -25693,25 +25693,6 @@ und\x22 stroke-line\
 join=\x22round\x22 str\
 oke-width=\x221\x22/><\
 /svg>\x0a\
-\x00\x00\x01\x0a\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2216\
-\x22 height=\x2216\x22 fi\
-ll=\x22currentColor\
-\x22 class=\x22bi bi-c\
-aret-down-fill\x22 \
-viewBox=\x220 0 16 \
-16\x22>\x0a  <path d=\x22\
-M7.247 11.14 2.4\
-51 5.658C1.885 5\
-.013 2.345 4 3.2\
-04 4h9.592a1 1 0\
- 0 1 .753 1.659l\
--4.796 5.48a1 1 \
-0 0 1-1.506 0z\x22/\
->\x0a</svg>\x0a\
 \x00\x00\x07f\
 <\
 svg xmlns=\x22http:\
@@ -26189,7 +26170,7 @@ ath fill=\x22#DC354\
 .5 2c3 0 3-4 0-4\
 h-3c-3 0-3 4 0 4\
 \x22/></svg>\x0a\
-\x00\x00\x01\xef\
+\x00\x00\x01\xf0\
 <\
 svg xmlns=\x22http:\
 //www.w3.org/200\
@@ -26221,7 +26202,7 @@ v2.083c0 .715.40\
 \x0a  <path d=\x22M8 3\
 a1.5 1.5 0 1 0 0\
 -3 1.5 1.5 0 0 0\
- 0 3\x22/>\x0a</svg>\
+ 0 3\x22/>\x0a</svg>\x0a\
 \x00\x00\x033\
 <\
 svg xmlns=\x22http:\
@@ -26429,6 +26410,18 @@ qt_resource_name = b"\
 \x0a\xa8\xafC\
 \x00s\
 \x00t\x00a\x00t\x00i\x00c\x00s\
+\x00\x0b\
+\x04^\xeb\x07\
+\x00l\
+\x00o\x00g\x00o\x00-\x00u\x00i\x00.\x00p\x00n\x00g\
+\x00\x08\
+\x05\xe2Y'\
+\x00l\
+\x00o\x00g\x00o\x00.\x00p\x00n\x00g\
+\x00\x05\
+\x00r\xfd\xf4\
+\x00l\
+\x00i\x00g\x00h\x00t\
 \x00\x0a\
 \x05x\xd4\xa7\
 \x00u\
@@ -26458,10 +26451,6 @@ qt_resource_name = b"\
 \x05\xcb\xbc\xc7\
 \x00l\
 \x00i\x00n\x00u\x00x\x00.\x00s\x00v\x00g\
-\x00\x0b\
-\x04^\xeb\x07\
-\x00l\
-\x00o\x00g\x00o\x00-\x00u\x00i\x00.\x00p\x00n\x00g\
 \x00\x17\
 \x0a\x8bp\xa7\
 \x00l\
@@ -26529,10 +26518,6 @@ qt_resource_name = b"\
 \x00l\x00o\x00b\x00e\x00-\x00c\x00e\x00n\x00t\x00r\x00a\x00l\x00-\x00s\x00o\x00u\
 \x00t\x00h\x00-\x00a\x00s\x00i\x00a\x00-\x00p\x00l\x00a\x00c\x00e\x00h\x00o\x00l\
 \x00d\x00e\x00r\x00.\x00s\x00v\x00g\
-\x00\x08\
-\x05\xe2Y'\
-\x00l\
-\x00o\x00g\x00o\x00.\x00p\x00n\x00g\
 \x00\x0c\
 \x08\xcdo\x87\
 \x00s\
@@ -26551,11 +26536,6 @@ qt_resource_name = b"\
 \x00f\
 \x00a\x00k\x00e\x00-\x00l\x00o\x00c\x00a\x00t\x00i\x00o\x00n\x00.\x00s\x00v\x00g\
 \
-\x00\x13\
-\x00\xd0b\x87\
-\x00c\
-\x00a\x00r\x00e\x00t\x00-\x00d\x00o\x00w\x00n\x00-\x00f\x00i\x00l\x00l\x00.\x00s\
-\x00v\x00g\
 \x00\x10\
 \x0d\x05\xaf\xc7\
 \x00a\
@@ -26645,103 +26625,103 @@ qt_resource_name = b"\
 qt_resource_struct = b"\
 \x00\x00\x00\x00\x00\x02\x00\x00\x00\x01\x00\x00\x00\x01\
 \x00\x00\x00\x00\x00\x00\x00\x00\
-\x00\x00\x00\x00\x00\x02\x00\x00\x000\x00\x00\x00\x02\
+\x00\x00\x00\x00\x00\x02\x00\x00\x00\x03\x00\x00\x00\x02\
 \x00\x00\x00\x00\x00\x00\x00\x00\
-\x00\x00\x03\xaa\x00\x00\x00\x00\x00\x01\x00\x06;\xfd\
-\x00\x00\x01\x9d]/\xfc8\
-\x00\x00\x06\x16\x00\x00\x00\x00\x00\x01\x00\x06`\x9b\
-\x00\x00\x01\x9d]/\xfc8\
-\x00\x00\x03\xdc\x00\x00\x00\x00\x00\x01\x00\x06=W\
-\x00\x00\x01\x9d]/\xfc'\
-\x00\x00\x05\xe4\x00\x00\x00\x00\x00\x01\x00\x06^\xa8\
-\x00\x00\x01\x9d\x9a\x97\xa4\x11\
-\x00\x00\x04\x14\x00\x00\x00\x00\x00\x01\x00\x06Ab\
-\x00\x00\x01\x9d]/\xfcA\
-\x00\x00\x06\xaa\x00\x00\x00\x00\x00\x01\x00\x06h\xbb\
-\x00\x00\x01\x9cMC\xed\xd7\
-\x00\x00\x04f\x00\x00\x00\x00\x00\x01\x00\x06I\xda\
-\x00\x00\x01\x9d]/\xfc\x19\
-\x00\x00\x01x\x00\x00\x00\x00\x00\x01\x00\x01\x7f\xd1\
-\x00\x00\x01\x9d]/\xfcB\
-\x00\x00\x02\xae\x00\x00\x00\x00\x00\x01\x00\x01\x8f:\
-\x00\x00\x01\x9d]/\xfc)\
-\x00\x00\x06\xee\x00\x00\x00\x00\x00\x01\x00\x06kH\
-\x00\x00\x01\x9d]/\xfc@\
-\x00\x00\x00\xea\x00\x00\x00\x00\x00\x01\x00\x006\xe9\
-\x00\x00\x01\x9cj\xf3cv\
-\x00\x00\x05v\x00\x00\x00\x00\x00\x01\x00\x06V\x87\
-\x00\x00\x01\x9d]/\xfc%\
-\x00\x00\x02\xca\x00\x00\x00\x00\x00\x01\x00\x01\x93\xbc\
-\x00\x00\x01\x9d]/\xfc3\
-\x00\x00\x05\x0e\x00\x00\x00\x00\x00\x01\x00\x06Sr\
-\x00\x00\x01\x9cMA;L\
+\x00\x00\x00F\x00\x02\x00\x00\x00-\x00\x00\x00\x05\
+\x00\x00\x00\x00\x00\x00\x00\x00\
 \x00\x00\x00\x14\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\
-\x00\x00\x01\x9d]/\xfcG\
-\x00\x00\x05\x9a\x00\x00\x00\x00\x00\x01\x00\x06XX\
-\x00\x00\x01\x9d]/\xfc,\
-\x00\x00\x05\xd0\x00\x00\x00\x00\x00\x01\x00\x06]\xf9\
-\x00\x00\x01\x9d]/\xfc9\
-\x00\x00\x00\xd2\x00\x00\x00\x00\x00\x01\x00\x00\x08\xd4\
-\x00\x00\x01\x9d]/\xfc-\
-\x00\x00\x03v\x00\x00\x00\x00\x00\x01\x00\x01\x9f2\
+\x00\x00\x01\x9cj\xf3cv\
+\x00\x00\x000\x00\x00\x00\x00\x00\x01\x00\x01CJ\
 \x00\x00\x01\x9cg,\xdf^\
-\x00\x00\x06\xd2\x00\x00\x00\x00\x00\x01\x00\x06j\x1a\
-\x00\x00\x01\x9d]/\xfc+\
-\x00\x00\x04\x96\x00\x00\x00\x00\x00\x01\x00\x06K\xb3\
-\x00\x00\x01\x9d]/\xfc\x1d\
-\x00\x00\x00.\x00\x00\x00\x00\x00\x01\x00\x00\x01\xa8\
-\x00\x00\x01\x9d]/\xfc*\
-\x00\x00\x026\x00\x00\x00\x00\x00\x01\x00\x01\x88n\
-\x00\x00\x01\x9d]/\xfc&\
-\x00\x00\x02\xea\x00\x00\x00\x00\x00\x01\x00\x01\x95\xe1\
+\x00\x00\x03\xba\x00\x00\x00\x00\x00\x01\x00\x06;\xfd\
 \x00\x00\x01\x9d]/\xfc8\
-\x00\x00\x00\xc0\x00\x00\x00\x00\x00\x01\x00\x00\x08%\
-\x00\x00\x01\x9d]/\xfc-\
-\x00\x00\x05\xb8\x00\x00\x00\x00\x00\x01\x00\x06\x5c\xb9\
-\x00\x00\x01\x9d]/\xfcG\
-\x00\x00\x01\xb2\x00\x00\x00\x00\x00\x01\x00\x01\x82\xd8\
-\x00\x00\x01\x9d]/\xfc*\
-\x00\x00\x03\x8c\x00\x00\x00\x00\x00\x01\x00\x06:8\
-\x00\x00\x01\x9d]/\xfc,\
-\x00\x00\x00D\x00\x00\x00\x00\x00\x01\x00\x00\x03\xe3\
-\x00\x00\x01\x9d]/\xfc&\
-\x00\x00\x03\xec\x00\x00\x00\x00\x00\x01\x00\x06>\xa7\
-\x00\x00\x01\x9d]/\xfc+\
-\x00\x00\x02\x8c\x00\x00\x00\x00\x00\x01\x00\x01\x8b\x04\
-\x00\x00\x01\x9d]/\xfc\x1f\
-\x00\x00\x01\x06\x00\x00\x00\x00\x00\x01\x00\x01z3\
-\x00\x00\x01\x9cMB\x9bs\
-\x00\x00\x02b\x00\x00\x00\x00\x00\x01\x00\x01\x89\xd0\
-\x00\x00\x01\x9d]/\xfc\x1d\
-\x00\x00\x04\xce\x00\x00\x00\x00\x00\x01\x00\x06P+\
-\x00\x00\x01\x9d]/\xfc9\
-\x00\x00\x06B\x00\x00\x00\x00\x00\x01\x00\x06c\xd2\
-\x00\x00\x01\x9c\x5c\xfd\x9f\x07\
-\x00\x00\x00\x9c\x00\x00\x00\x00\x00\x01\x00\x00\x06\xcb\
-\x00\x00\x01\x9d]/\xfc\x1b\
-\x00\x00\x01\xf0\x00\x00\x00\x00\x00\x01\x00\x01\x86\xe3\
-\x00\x00\x01\x9d]/\xfcA\
-\x00\x00\x06t\x00\x00\x00\x00\x00\x01\x00\x06g:\
-\x00\x00\x01\x9d]/\xfcA\
-\x00\x00\x00b\x00\x00\x00\x00\x00\x01\x00\x00\x05\x8c\
+\x00\x00\x05\xfa\x00\x00\x00\x00\x00\x01\x00\x06_\x8e\
 \x00\x00\x01\x9d]/\xfc8\
-\x00\x00\x04@\x00\x00\x00\x00\x00\x01\x00\x06Bp\
-\x00\x00\x01\x9d]/\xfc$\
-\x00\x00\x03\x02\x00\x00\x00\x00\x00\x01\x00\x01\x98\x8c\
+\x00\x00\x03\xec\x00\x00\x00\x00\x00\x01\x00\x06=W\
+\x00\x00\x01\x9d]/\xfc'\
+\x00\x00\x05\xc8\x00\x00\x00\x00\x00\x01\x00\x06]\x9a\
+\x00\x00\x01\x9d\x9a\xd1+H\
+\x00\x00\x06\x8e\x00\x00\x00\x00\x00\x01\x00\x06g\xae\
+\x00\x00\x01\x9cMC\xed\xd7\
+\x00\x00\x04J\x00\x00\x00\x00\x00\x01\x00\x06H\xcc\
+\x00\x00\x01\x9d]/\xfc\x19\
+\x00\x00\x01\x9e\x00\x00\x00\x00\x00\x01\x00\x06\x1a\xd7\
+\x00\x00\x01\x9d]/\xfcB\
+\x00\x00\x02\xd4\x00\x00\x00\x00\x00\x01\x00\x06*@\
+\x00\x00\x01\x9d]/\xfc)\
+\x00\x00\x06\xd2\x00\x00\x00\x00\x00\x01\x00\x06j;\
+\x00\x00\x01\x9d]/\xfc@\
+\x00\x00\x05Z\x00\x00\x00\x00\x00\x01\x00\x06Uy\
+\x00\x00\x01\x9d]/\xfc%\
+\x00\x00\x02\xf0\x00\x00\x00\x00\x00\x01\x00\x06.\xc2\
 \x00\x00\x01\x9d]/\xfc3\
-\x00\x00\x04\xe8\x00\x00\x00\x00\x00\x01\x00\x06R\x14\
+\x00\x00\x04\xf2\x00\x00\x00\x00\x00\x01\x00\x06Rd\
+\x00\x00\x01\x9cMA;L\
+\x00\x00\x00V\x00\x00\x00\x00\x00\x01\x00\x05\xdeP\
+\x00\x00\x01\x9d]/\xfcG\
+\x00\x00\x05~\x00\x00\x00\x00\x00\x01\x00\x06WJ\
 \x00\x00\x01\x9d]/\xfc,\
-\x00\x00\x01\x96\x00\x00\x00\x00\x00\x01\x00\x01\x80\xbf\
+\x00\x00\x05\xb4\x00\x00\x00\x00\x00\x01\x00\x06\x5c\xeb\
+\x00\x00\x01\x9d]/\xfc9\
+\x00\x00\x01\x14\x00\x00\x00\x00\x00\x01\x00\x05\xe7$\
+\x00\x00\x01\x9d]/\xfc-\
+\x00\x00\x06\xb6\x00\x00\x00\x00\x00\x01\x00\x06i\x0d\
 \x00\x00\x01\x9d]/\xfc+\
-\x00\x00\x03 \x00\x00\x00\x00\x00\x01\x00\x01\x9a\x92\
-\x00\x00\x01\x9d$\xac\x06'\
-\x00\x00\x01\xca\x00\x00\x00\x00\x00\x01\x00\x01\x85m\
+\x00\x00\x04z\x00\x00\x00\x00\x00\x01\x00\x06J\xa5\
+\x00\x00\x01\x9d]/\xfc\x1d\
+\x00\x00\x00p\x00\x00\x00\x00\x00\x01\x00\x05\xdf\xf8\
 \x00\x00\x01\x9d]/\xfc*\
-\x00\x00\x01:\x00\x00\x00\x00\x00\x01\x00\x01{\xe1\
+\x00\x00\x02\x5c\x00\x00\x00\x00\x00\x01\x00\x06#t\
+\x00\x00\x01\x9d]/\xfc&\
+\x00\x00\x03\x10\x00\x00\x00\x00\x00\x01\x00\x060\xe7\
+\x00\x00\x01\x9d]/\xfc8\
+\x00\x00\x01\x02\x00\x00\x00\x00\x00\x01\x00\x05\xe6u\
+\x00\x00\x01\x9d]/\xfc-\
+\x00\x00\x05\x9c\x00\x00\x00\x00\x00\x01\x00\x06[\xab\
+\x00\x00\x01\x9d]/\xfcG\
+\x00\x00\x01\xd8\x00\x00\x00\x00\x00\x01\x00\x06\x1d\xde\
+\x00\x00\x01\x9d]/\xfc*\
+\x00\x00\x03\x9c\x00\x00\x00\x00\x00\x01\x00\x06:8\
+\x00\x00\x01\x9d]/\xfc,\
+\x00\x00\x00\x86\x00\x00\x00\x00\x00\x01\x00\x05\xe23\
+\x00\x00\x01\x9d]/\xfc&\
+\x00\x00\x03\xfc\x00\x00\x00\x00\x00\x01\x00\x06>\xa7\
+\x00\x00\x01\x9d]/\xfc+\
+\x00\x00\x02\xb2\x00\x00\x00\x00\x00\x01\x00\x06&\x0a\
+\x00\x00\x01\x9d]/\xfc\x1f\
+\x00\x00\x01,\x00\x00\x00\x00\x00\x01\x00\x06\x159\
+\x00\x00\x01\x9cMB\x9bs\
+\x00\x00\x02\x88\x00\x00\x00\x00\x00\x01\x00\x06$\xd6\
+\x00\x00\x01\x9d]/\xfc\x1d\
+\x00\x00\x04\xb2\x00\x00\x00\x00\x00\x01\x00\x06O\x1d\
+\x00\x00\x01\x9d]/\xfc9\
+\x00\x00\x06&\x00\x00\x00\x00\x00\x01\x00\x06b\xc5\
+\x00\x00\x01\x9c\x5c\xfd\x9f\x07\
+\x00\x00\x00\xde\x00\x00\x00\x00\x00\x01\x00\x05\xe5\x1b\
+\x00\x00\x01\x9d]/\xfc\x1b\
+\x00\x00\x02\x16\x00\x00\x00\x00\x00\x01\x00\x06!\xe9\
+\x00\x00\x01\x9d]/\xfcA\
+\x00\x00\x06X\x00\x00\x00\x00\x00\x01\x00\x06f-\
+\x00\x00\x01\x9d]/\xfcA\
+\x00\x00\x00\xa4\x00\x00\x00\x00\x00\x01\x00\x05\xe3\xdc\
+\x00\x00\x01\x9d]/\xfc8\
+\x00\x00\x04$\x00\x00\x00\x00\x00\x01\x00\x06Ab\
+\x00\x00\x01\x9d]/\xfc$\
+\x00\x00\x03(\x00\x00\x00\x00\x00\x01\x00\x063\x92\
+\x00\x00\x01\x9d]/\xfc3\
+\x00\x00\x04\xcc\x00\x00\x00\x00\x00\x01\x00\x06Q\x06\
+\x00\x00\x01\x9d]/\xfc,\
+\x00\x00\x01\xbc\x00\x00\x00\x00\x00\x01\x00\x06\x1b\xc5\
+\x00\x00\x01\x9d]/\xfc+\
+\x00\x00\x03F\x00\x00\x00\x00\x00\x01\x00\x065\x98\
+\x00\x00\x01\x9d$\xac\x06'\
+\x00\x00\x01\xf0\x00\x00\x00\x00\x00\x01\x00\x06 s\
+\x00\x00\x01\x9d]/\xfc*\
+\x00\x00\x01`\x00\x00\x00\x00\x00\x01\x00\x06\x16\xe7\
 \x00\x00\x01\x9d]/\xfc.\
-\x00\x00\x04\xae\x00\x00\x00\x00\x00\x01\x00\x06N\x92\
+\x00\x00\x04\x92\x00\x00\x00\x00\x00\x01\x00\x06M\x84\
 \x00\x00\x01\x9d]/\xfc\x1c\
-\x00\x00\x05H\x00\x00\x00\x00\x00\x01\x00\x06U$\
+\x00\x00\x05,\x00\x00\x00\x00\x00\x01\x00\x06T\x16\
 \x00\x00\x01\x9cMC\xac-\
 "
 

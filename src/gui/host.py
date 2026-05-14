@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 
 from gui import faker as ui_faker
 from gui.animation import animate_widget_visibility
+from gui.colors import Theme
 from gui.elements import (
     SVG,
     ConditionIndicator,
@@ -26,7 +27,12 @@ from gui.elements import (
     PanelTitle,
     ToolButton,
 )
-from gui.icons import GenericIcons, OperatingSystemIcons
+from gui.icons import (
+    GenericIcons,
+    OperatingSystemIcons,
+    icon_qt_path,
+    icon_qt_path_for_theme,
+)
 from gui.settings import Settings
 from gui.signals import view_signals
 from gui.svg import get_svg_size
@@ -284,7 +290,7 @@ class HostIdentitySection(QFrame):
 
         host_item = IconLabel(
             self,
-            icon_path=OperatingSystemIcons.MACOS.value,
+            icon_path=icon_qt_path(OperatingSystemIcons.MACOS),
             text=host_name,
             spacing=Settings.SPACING.ICON_SPACING,
         )
@@ -421,7 +427,9 @@ class AdbBridgeSection(QFrame):
         layout.setContentsMargins(*Settings.SPACING.MARGIN_NONE)
         layout.setSpacing(Settings.HOST_PANEL.ROW_SPACING)
 
-        android_svg = SVG(svg_path=OperatingSystemIcons.ANDROID.value, parent=self)
+        android_svg = SVG(
+            svg_path=icon_qt_path(OperatingSystemIcons.ANDROID), parent=self
+        )
         android_svg.setFixedSize(get_svg_size(Settings.FONT.SIZE_DEFAULT))
 
         status_row = AdbBridgeMetadataRow(
@@ -612,6 +620,7 @@ class HostPanel(QFrame):
         self.texts = HostPanel.Text()
 
         self._is_extended = False
+        self._identity_os: Literal["linux", "windows", "darwin"] | None = "darwin"
 
         self.setObjectName("host-panel")
         self.setProperty("panel", True)
@@ -626,12 +635,14 @@ class HostPanel(QFrame):
         layout.setSpacing(Settings.PANEL.SECTION_SPACING)
 
         title = PanelTitle(
-            parent=self, text=self.texts.title, icon_path=GenericIcons.LAPTOP.value
+            parent=self,
+            text=self.texts.title,
+            icon_path=icon_qt_path(GenericIcons.LAPTOP),
         )
 
         expand_button = ToolButton(
             self,
-            icon_path=GenericIcons.LAYOUT_TOPBAR_INSET.value,
+            icon_path=icon_qt_path(GenericIcons.LAYOUT_TOPBAR_INSET),
             tooltip=self.texts.expand_button_tooltip,
         )
         expand_button.setProperty("toggle", True)
@@ -785,12 +796,13 @@ class HostPanel(QFrame):
 
     def _set_placeholder_values(self) -> None:
         """Populate placeholder values for the host identity and ADB bridge sections."""
+        self._identity_os = "darwin"
         self.set_host_identity_values(
             host_name=self.texts.placeholder_host_name,
             summary=self.texts.placeholder_summary,
             ip_address=self.texts.placeholder_ip_address,
             platform=self.texts.placeholder_platform,
-            os_icon_path=OperatingSystemIcons.MACOS.value,
+            os_icon_path=icon_qt_path(OperatingSystemIcons.MACOS),
             identity_state="valid",
         )
         self.set_adb_bridge_values(
@@ -858,14 +870,15 @@ class HostPanel(QFrame):
     ) -> None:
         """Handle the host device information updated."""
         assert os in ["linux", "windows", "darwin"]
+        self._identity_os = os
         if os == "linux":
-            os_icon_path = OperatingSystemIcons.LINUX.value
+            os_icon_path = icon_qt_path(OperatingSystemIcons.LINUX)
         elif os == "windows":
-            os_icon_path = OperatingSystemIcons.WINDOWS.value
+            os_icon_path = icon_qt_path(OperatingSystemIcons.WINDOWS)
         elif os == "darwin":
-            os_icon_path = OperatingSystemIcons.MACOS.value
+            os_icon_path = icon_qt_path(OperatingSystemIcons.MACOS)
         else:
-            os_icon_path = GenericIcons.LAPTOP.value
+            os_icon_path = icon_qt_path(GenericIcons.LAPTOP)
         self.set_host_identity_values(
             host_name=name,
             summary=self.texts.placeholder_summary,
@@ -873,6 +886,31 @@ class HostPanel(QFrame):
             platform=os,
             os_icon_path=os_icon_path,
             identity_state="valid",
+        )
+
+    def _host_identity_icon_path(self, theme: Theme) -> str:
+        o = self._identity_os
+        if o == "linux":
+            return icon_qt_path_for_theme(theme, OperatingSystemIcons.LINUX)
+        if o == "windows":
+            return icon_qt_path_for_theme(theme, OperatingSystemIcons.WINDOWS)
+        if o == "darwin":
+            return icon_qt_path_for_theme(theme, OperatingSystemIcons.MACOS)
+        return icon_qt_path_for_theme(theme, GenericIcons.LAPTOP)
+
+    def apply_theme_icons(self, theme: Theme) -> None:
+        """Refresh header, host glyph, expand control, and ADB block icon for ``theme``."""
+        self.ui.title.set_leading_icon_path(
+            icon_qt_path_for_theme(theme, GenericIcons.LAPTOP)
+        )
+        inset = bool(self.ui.expand_button.property("toggle"))
+        expand_icon = (
+            GenericIcons.LAYOUT_TOPBAR_INSET if inset else GenericIcons.LAYOUT_TOPBAR
+        )
+        self.ui.expand_button.setIcon(QIcon(icon_qt_path_for_theme(theme, expand_icon)))
+        self.set_host_identity_values(os_icon_path=self._host_identity_icon_path(theme))
+        self.ui.adb_bridge.ui.android_svg.set_path(
+            icon_qt_path_for_theme(theme, OperatingSystemIcons.ANDROID)
         )
 
     def is_panel_visible(self) -> bool:
@@ -883,7 +921,9 @@ class HostPanel(QFrame):
         """Show the host panel."""
         if not self.is_panel_visible():
             self.ui.expand_button.setProperty("toggle", True)
-            self.ui.expand_button.setIcon(QIcon(GenericIcons.LAYOUT_TOPBAR_INSET.value))
+            self.ui.expand_button.setIcon(
+                QIcon(icon_qt_path(GenericIcons.LAYOUT_TOPBAR_INSET))
+            )
             animate_widget_visibility(
                 self,
                 visible=True,
@@ -896,7 +936,9 @@ class HostPanel(QFrame):
         """Hide the host panel."""
         if self.is_panel_visible():
             self.ui.expand_button.setProperty("toggle", False)
-            self.ui.expand_button.setIcon(QIcon(GenericIcons.LAYOUT_TOPBAR.value))
+            self.ui.expand_button.setIcon(
+                QIcon(icon_qt_path(GenericIcons.LAYOUT_TOPBAR))
+            )
             animate_widget_visibility(
                 self,
                 visible=False,
@@ -917,7 +959,9 @@ class HostPanel(QFrame):
         if self.ui.expand_button.property("toggle"):
             # Reduce: hide body and constrain height so the panel under can grow.
             self.ui.expand_button.setProperty("toggle", False)
-            self.ui.expand_button.setIcon(QIcon(GenericIcons.LAYOUT_TOPBAR.value))
+            self.ui.expand_button.setIcon(
+                QIcon(icon_qt_path(GenericIcons.LAYOUT_TOPBAR))
+            )
             animate_widget_visibility(
                 self,
                 visible=False,
@@ -928,7 +972,9 @@ class HostPanel(QFrame):
         else:
             # Expand: show body and allow it to grow.
             self.ui.expand_button.setProperty("toggle", True)
-            self.ui.expand_button.setIcon(QIcon(GenericIcons.LAYOUT_TOPBAR_INSET.value))
+            self.ui.expand_button.setIcon(
+                QIcon(icon_qt_path(GenericIcons.LAYOUT_TOPBAR_INSET))
+            )
             animate_widget_visibility(
                 self,
                 visible=True,
