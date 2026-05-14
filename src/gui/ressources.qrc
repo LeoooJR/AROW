@@ -1,7 +1,7 @@
 <!DOCTYPE RCC>
 <RCC version="1.0">
     <qresource prefix="/">
-        <!-- Generic Icons (light theme assets; dark uses same paths until separate assets exist) -->
+        <!-- Generic Icons (light theme) -->
         <file>statics/light/location.svg</file>
         <file>statics/light/fake-location.svg</file>
         <file>statics/light/milestone.svg</file>
@@ -43,15 +43,72 @@
         <file>statics/light/trash.svg</file>
         <file>statics/light/person-raised-hand.svg</file>
 
+        <!-- Generic Icons (dark theme) -->
+        <file>statics/dark/location.svg</file>
+        <file>statics/dark/fake-location.svg</file>
+        <file>statics/dark/milestone.svg</file>
+        <file>statics/dark/railway.svg</file>
+        <file>statics/dark/railway-gradient.svg</file>
+        <file>statics/dark/globe-central-south-asia.svg</file>
+        <file>statics/dark/globe-central-south-asia-placeholder.svg</file>
+        <file>statics/dark/geo-fill.svg</file>
+        <file>statics/dark/laptop.svg</file>
+        <file>statics/dark/laptop-fill.svg</file>
+        <file>statics/dark/phone.svg</file>
+        <file>statics/dark/device-placeholder.svg</file>
+        <file>statics/dark/substack.svg</file>
+        <file>statics/dark/upload.svg</file>
+        <file>statics/dark/start.svg</file>
+        <file>statics/dark/off.svg</file>
+        <file>statics/dark/on.svg</file>
+        <file>statics/dark/layout-sidebar.svg</file>
+        <file>statics/dark/layout-sidebar-reverse.svg</file>
+        <file>statics/dark/layout-sidebar-inset.svg</file>
+        <file>statics/dark/layout-sidebar-inset-reverse.svg</file>
+        <file>statics/dark/layout-topbar.svg</file>
+        <file>statics/dark/layout-topbar-inset.svg</file>
+        <file>statics/dark/layout-bottombar.svg</file>
+        <file>statics/dark/layout-bottombar-inset.svg</file>
+        <file>statics/dark/crosshair.svg</file>
+        <file>statics/dark/arrow-clockwise.svg</file>
+        <file>statics/dark/play-circle.svg</file>
+        <file>statics/dark/pause-circle.svg</file>
+        <file>statics/dark/brightness-high.svg</file>
+        <file>statics/dark/moon.svg</file>
+        <file>statics/dark/file-earmark-text.svg</file>
+        <file>statics/dark/info-circle.svg</file>
+        <file>statics/dark/check-circle.svg</file>
+        <file>statics/dark/exclamation-circle.svg</file>
+        <file>statics/dark/exclamation-diamond.svg</file>
+        <file>statics/dark/x-circle.svg</file>
+        <file>statics/dark/hand-index.svg</file>
+        <file>statics/dark/save-as.svg</file>
+        <file>statics/dark/plus.svg</file>
+        <file>statics/dark/x.svg</file>
+        <file>statics/dark/trash.svg</file>
+        <file>statics/dark/person-raised-hand.svg</file>
+        <file>statics/dark/eye.svg</file>
+        <file>statics/dark/wifi.svg</file>
+        <file>statics/dark/wifi-off.svg</file>
+        <file>statics/dark/gradient-location.svg</file>
+        <file>statics/dark/telephone-forward-fill.svg</file>
+        <file>statics/dark/telephone-inbound-fill.svg</file>
+        <file>statics/dark/fluent-color--phone-16.svg</file>
+
         <!-- Operating System Icons -->
         <file>statics/light/android-icon.svg</file>
         <file>statics/light/apple.svg</file>
         <file>statics/light/windows.svg</file>
         <file>statics/light/linux.svg</file>
+        <file>statics/dark/android-icon.svg</file>
+        <file>statics/dark/apple.svg</file>
+        <file>statics/dark/windows.svg</file>
+        <file>statics/dark/linux.svg</file>
 
         <!-- Application Icons -->
         <file>statics/logo.png</file>
         <file>statics/logo-ui.png</file>
         <file>statics/light/app-name.svg</file>
+        <file>statics/dark/app-name.svg</file>
     </qresource>
 </RCC>

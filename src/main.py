@@ -9,10 +9,6 @@ from logger import setup_logger
 
 setup_logger()
 
-from controller.app_controller import AppController
-from core.models import CoreRuntimeModel
-from gui.window import MainWindow
-
 app = typer.Typer()
 
 
@@ -31,13 +27,24 @@ def main(
 ) -> None:
     """Start the application."""
 
-    qt_application = QtWidgets.QApplication([])
+    qt_application = QtWidgets.QApplication.instance()
+    if qt_application is None:
+        qt_application = QtWidgets.QApplication([])
 
     qt_application.setApplicationName(__application__)
 
     qt_application.setDesktopFileName(__application__)
 
     qt_application.setApplicationVersion(__version__)
+
+    # Bundled fonts need Qt GUI app + registration before stylesheet (imported with MainWindow).
+    from gui.fonts import register_bundled_fonts
+
+    register_bundled_fonts()
+
+    from controller.app_controller import AppController
+    from core.models import CoreRuntimeModel
+    from gui.window import MainWindow
 
     main_window = MainWindow(ui_constraints_disabled=interface_only)
 
@@ -57,7 +64,4 @@ def main(
 
 
 if __name__ == "__main__":
-
     app()
-
-    main()

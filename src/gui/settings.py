@@ -5,20 +5,18 @@ Settings are organized into logical groups for easy access and maintenance.
 
 from dataclasses import dataclass
 
-from PySide6.QtCore import QSize
-
 
 @dataclass(frozen=True)
 class FontSettings:
     """Font-related settings used throughout the application.
-    Uses system-installed fonts to avoid Qt looking up missing families (e.g. Inter) and the ~90ms cost.
+
+    Primary face is bundled Inter, registered at startup via ``gui.fonts.register_bundled_fonts``
+    (after ``QApplication`` exists). Stylesheet lists sensible system fallbacks if lookup fails.
     """
 
-    FAMILY: str = (
-        "Helvetica Neue"  # Primary for QFont; exists on macOS, fallback on Windows/Linux
-    )
+    FAMILY: str = "Inter"
     FAMILY_CSS: str = (
-        '"Helvetica Neue", "Helvetica", "Arial", "Liberation Sans", sans-serif'  # Stylesheet fallback chain
+        '"Inter", "Helvetica Neue", "Helvetica", "Arial", "Liberation Sans", sans-serif'
     )
     SIZE_DEFAULT: int = 16
     SIZE_SMALL: int = 8

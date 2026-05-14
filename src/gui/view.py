@@ -7,18 +7,24 @@ from gui.window import MainWindow
 
 if __name__ == "__main__":
 
-    application = QtWidgets.QApplication([])
+    qt_application: QtWidgets.QApplication = QtWidgets.QApplication.instance()
+    if qt_application is None:
+        qt_application = QtWidgets.QApplication([])
 
-    application.setApplicationName(__application__)
+    qt_application.setApplicationName(__application__)
 
-    application.setDesktopFileName(__application__)
+    qt_application.setDesktopFileName(__application__)
 
-    application.setApplicationVersion(__version__)
+    qt_application.setApplicationVersion(__version__)
+
+    from gui.fonts import register_bundled_fonts
+
+    register_bundled_fonts()
 
     main_window = MainWindow()
 
     main_window.show()
 
-    exit_code: int = application.exec()
+    exit_code: int = qt_application.exec()
 
     sys.exit(exit_code)

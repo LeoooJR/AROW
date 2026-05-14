@@ -18,15 +18,21 @@ class Icon:
         return self.light_mode_path if theme == "light" else self.dark_mode_path
 
 
-def _pair(filename: str, *, in_light_dir: bool = True) -> Icon:
+def _pair(filename: str, *, has_both_themes: bool = True) -> Icon:
     """Build an Icon that uses identical Qt paths for light and dark until dark assets exist.
 
     SVG icons live under ``statics/light/<filename>``. Files that remain at ``statics/<filename>``
-    (for example raster logos) pass ``in_light_dir=False``.
+    (for example raster logos) pass ``has_both_themes=False``.
     """
-    qt_path = f":/statics/light/{filename}" if in_light_dir else f":/statics/{filename}"
+    if has_both_themes:
+        qt_paths: tuple[str, str] = (
+            f":/statics/light/{filename}",
+            f":/statics/dark/{filename}",
+        )
+    else:
+        qt_paths: tuple[str, str] = (f":/statics/{filename}", f":/statics/{filename}")
     stem = filename.rsplit(".", 1)[0]
-    return Icon(stem.replace("-", " ").title(), qt_path, qt_path)
+    return Icon(stem.replace("-", " ").title(), *qt_paths)
 
 
 def icon_qt_path(
@@ -111,6 +117,6 @@ class OperatingSystemIcons(Enum):
 class ApplicationIcons(Enum):
     """Icons that are used to represent the application."""
 
-    LOGO = _pair("logo.png", in_light_dir=False)
-    LOGO_UI = _pair("logo-ui.png", in_light_dir=False)
+    LOGO = _pair("logo.png", has_both_themes=False)
+    LOGO_UI = _pair("logo-ui.png", has_both_themes=False)
     NAME = _pair("app-name.svg")
