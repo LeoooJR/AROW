@@ -203,6 +203,7 @@ class DeviceItem(QListWidgetItem):
         """
         super().__init__(parent)
 
+        self.ui: DeviceItem.UI
         self.texts: DeviceItem.Text = DeviceItem.Text()
 
         display_name = text if text is not None else self.texts.default_name
@@ -231,7 +232,6 @@ class DeviceItem(QListWidgetItem):
         self._last_communication_live_at: dt.datetime | None = (
             None if self._last_communication_is_static else last_communication
         )
-        self._alert_highlight: bool = alert_highlight
 
         # Device item UI properties
         self._is_extended: bool = False
@@ -420,6 +420,8 @@ class DeviceItem(QListWidgetItem):
         self._apply_badge()
         self._set_compact_badge_layout()
         self._refresh_subtitle()
+        self.alert_highlight = alert_highlight
+
         self._finalize_ui_hooks()
         self._sync_size_hint()
 

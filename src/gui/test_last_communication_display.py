@@ -93,6 +93,15 @@ def test_device_item_badge_stacks_in_compact_mode_and_restores_when_extended(
     assert item.ui.title_row.get_layout().indexOf(item.ui.badge_container) == -1
 
 
+def test_device_item_applies_alert_highlight_on_creation(qtbot) -> None:
+    item = DeviceItem(None, text="Unknown Device", alert_highlight=True)
+    qtbot.addWidget(item.ui.row)
+    qtbot.wait(0)
+
+    assert item.alert_highlight is True
+    assert item.ui.row.property("alert") is True
+
+
 def test_refresh_panel_timer_invokes_batch_refresh(qtbot, monkeypatch) -> None:
     calls: list[int] = []
     real = DeviceSelectionPanel.refresh_last_communication_timestamps
