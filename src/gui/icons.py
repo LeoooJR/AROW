@@ -13,8 +13,6 @@ class Icon:
     dark_mode_path: str
 
     def for_theme(self, theme: Theme) -> str:
-        # Dark-specific assets live under ``statics/dark/`` when added; until then `_same`
-        # points light and dark to the same ``statics/light/`` resources.
         return self.light_mode_path if theme == "light" else self.dark_mode_path
 
 
