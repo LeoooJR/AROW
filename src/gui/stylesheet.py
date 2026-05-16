@@ -8,18 +8,17 @@ from gui.settings import Settings
 
 
 def _build_stylesheet(palette) -> str:
-    """Build the full stylesheet string for the given color palette (light or dark)."""
-    # Pulse highlight levels 0–10 (soft red rgba from #E57373).
-    soft_red_rgba = "229, 115, 115"
+    """Build the full stylesheet string for the given color palette."""
+    soft_red_rgba = "217, 84, 77"
 
     def _pulse_rules(levels: int = 11) -> str:
         """Build shared pulse rules for device selection lists and OTP invalid state."""
         rules: list[str] = []
         for level in range(levels):
             if level == 0:
-                list_border = f"1px solid {palette.LIGHT_DIVIDER}"
-                otp_border = f"1px solid {palette.LIGHT_DIVIDER_HIGHLIGHT}"
-                helper_color = palette.HELPER_TEXT
+                list_border = f"1px solid {palette.BORDER_SUBTLE}"
+                otp_border = f"1px solid {palette.BORDER_SUBTLE}"
+                helper_color = palette.TEXT_MUTED
             else:
                 alpha = level / 10.0
                 list_border = f"2px solid rgba({soft_red_rgba}, {alpha:.1f})"
@@ -28,7 +27,7 @@ def _build_stylesheet(palette) -> str:
             rules.append(f"""
 QListWidget#availabe-device-list[device-list-highlight-level="{level}"] {{
     border: {list_border};
-    border-radius: {Settings.BORDER_RADIUS.SM}px;
+    border-radius: {Settings.BORDER_RADIUS.MD}px;
 }}
 QFrame#card QWidget#otp-input QLineEdit[otp-invalid-highlight-level="{level}"] {{
     border: {otp_border};
@@ -43,170 +42,116 @@ QFrame#card QLabel[otp-helper-invalid-highlight-level="{level}"] {{
 
     return f"""
 QMainWindow {{
+    background-color: {palette.CANVAS};
+    color: {palette.TEXT_PRIMARY};
     font-family: {Settings.FONT.FAMILY_CSS};
-    font-size: 16px;
-    font-weight: 400;
-    color: {palette.BLACK};
+    font-size: {Settings.FONT.SIZE_DEFAULT}px;
+    font-weight: {Settings.FONT.WEIGHT_NORMAL};
 }}
 
 QWidget {{
-    background-color: {palette.WHITE};
+    background-color: {palette.CANVAS};
+    color: {palette.TEXT_PRIMARY};
+    font-family: {Settings.FONT.FAMILY_CSS};
+    font-size: {Settings.FONT.SIZE_DEFAULT}px;
 }}
 
 QFrame {{
     background-color: {palette.TRANSPARENT};
 }}
 
-QFrame[panel="true"] {{
-    border: 1px solid {palette.PANEL_BORDER};
-    border-radius: 0px;
+QFrame[panel="true"],
+QFrame[main-panel="true"],
+QFrame#tabs-wrapper {{
+    background-color: {palette.SURFACE};
+    border: 1px solid {palette.BORDER_SUBTLE};
+    border-radius: {Settings.BORDER_RADIUS.SM}px;
+}}
+
+QFrame[panel-title="true"],
+QFrame[main-panel-title="true"] {{
+    border-bottom: 1px solid {palette.BORDER_SUBTLE} !important;
+}}
+
+QWidget#header {{
+    background-color: {palette.CANVAS};
+    border-bottom: none;
+}}
+
+QWidget#body {{
+    background-color: {palette.CANVAS};
+}}
+
+QWidget#left-panels-wrapper,
+QWidget#right-panels-wrapper {{
+    background-color: {palette.CANVAS};
 }}
 
 QFrame#palette-button-wrapper {{
-    background-color: {palette.COMPONENT_HIGHLIGHT};
-    border-radius: 14px;
+    background-color: {palette.SURFACE_MUTED};
+    border: 1px solid {palette.BORDER_SUBTLE};
+    border-radius: {Settings.BORDER_RADIUS.XL}px;
     padding: 2px;
 }}
 
-QFrame#palette-button-wrapper QToolButton {{
-    background-color: {palette.TRANSPARENT};
-}}
-
-QFrame#palette-button-wrapper QToolButton:hover {{
+QFrame#palette-button-wrapper QToolButton,
+QFrame#palette-button-wrapper QToolButton:hover,
+QFrame#palette-button-wrapper QToolButton:pressed {{
     background-color: {palette.TRANSPARENT};
 }}
 
 QFrame#palette-thumb {{
-    background-color: {palette.WHITE};
-    border: 1px solid {palette.LIGHT_DIVIDER};
-    border-radius: 14px;
+    background-color: {palette.SURFACE_ELEVATED};
+    border: 1px solid {palette.BORDER_SUBTLE};
+    border-radius: {Settings.BORDER_RADIUS.XL}px;
 }}
 
-QFrame#tabs-wrapper {{
-    background-color: {palette.COMPONENT_HIGHLIGHT};
-}}
-
-QWidget#authentification-overlay {{
-    background-color: rgba(0, 0, 0, 0.16);
-}}
-
-QFrame#card {{
-    background-color: {palette.WHITE};
-    border: 1px solid {palette.LIGHT_DIVIDER};
-    border-radius: {Settings.BORDER_RADIUS.LG}px;
-    padding: 20px;
-}}
-
-QFrame#card QLabel[demi-bold-text="true"] {{
-    color: {palette.BLACK};
-    font-size: {Settings.FONT.SIZE_TITLE}px;
-    font-weight: {Settings.FONT.WEIGHT_DEMIBOLD};
-}}
-
-QFrame#card QLabel[helper-text="true"] {{
-    color: {palette.HELPER_TEXT};
-    font-size: {Settings.FONT.SIZE_DEFAULT}px;
-    font-weight: {Settings.FONT.WEIGHT_NORMAL};
-}}
-
-QFrame#card QWidget#otp-input {{
+QLabel {{
     background-color: {palette.TRANSPARENT};
-}}
-
-QFrame#card QWidget#otp-input QLineEdit {{
-    background-color: {palette.WHITE};
-    color: {palette.BLACK};
-    border: 1px solid {palette.LIGHT_DIVIDER_HIGHLIGHT};
-    border-radius: {Settings.BORDER_RADIUS.MD}px;
-    font-size: {Settings.FONT.SIZE_DEFAULT}px;
-    font-weight: {Settings.FONT.WEIGHT_NORMAL};
-    padding: 6px 4px;
-}}
-
-QFrame#card QWidget#otp-input QLineEdit:focus {{
-    border: 1px solid {palette.PANEL_BORDER};
-}}
-
-/* Shared pulse highlight: device selection lists + OTP invalid state, level 0–10 */
-{pulse_section}
-
-QFrame#card QPushButton {{
-    background-color: {palette.PRIMARY};
-    color: {palette.BLACK};
     border: none;
-    border-radius: {Settings.BORDER_RADIUS.SM}px;
-    min-height: 40px;
+    color: {palette.TEXT_PRIMARY};
+    font-family: {Settings.FONT.FAMILY_CSS};
+    font-size: {Settings.FONT.SIZE_DEFAULT}px;
+    font-weight: {Settings.FONT.WEIGHT_NORMAL};
+}}
+
+QLabel[regular-text="true"] {{
+    font-size: {Settings.FONT.SIZE_DEFAULT}px;
+    font-weight: {Settings.FONT.WEIGHT_NORMAL};
+}}
+
+QLabel[demi-bold-text="true"] {{
+    color: {palette.TEXT_PRIMARY};
     font-size: {Settings.FONT.SIZE_DEFAULT}px;
     font-weight: {Settings.FONT.WEIGHT_DEMIBOLD};
 }}
 
-QFrame#card QPushButton:hover {{
-    background-color: {palette.PRIMARY_HOVER};
-}}
-
-QFrame#card QPushButton:pressed {{
-    background-color: {palette.PRIMARY};
-}}
-
-QFrame[panel-title="true"] {{
-    border-bottom: 1px solid {palette.LIGHT_DIVIDER} !important;
-}}
-
-QFrame[main-panel-title="true"] {{
-    border-bottom: 1px solid {palette.LIGHT_DIVIDER_HIGHLIGHT} !important;
-}}
-
-QFrame[place-holder="true"] {{
-    background-color: {palette.PLACEHOLDER};
-    border: 1px solid {palette.LIGHT_DIVIDER};
-    border-radius: 3px;
-    padding: 10px;
-    margin: 10px;
+QLabel[helper-text="true"] {{
+    color: {palette.TEXT_MUTED};
+    font-size: {Settings.FONT.SIZE_HELPER}px;
+    font-weight: {Settings.FONT.WEIGHT_NORMAL};
     text-align: center;
-    font-size: 16px;
-    font-weight: 400;
-    font-family: {Settings.FONT.FAMILY_CSS};
-    color: {palette.PLACEHOLDER_TEXT};
 }}
 
-QWidget#file-display {{
-    background-color: {palette.COMPONENT_HIGHLIGHT};
-    border-radius: 10px;
-    padding: 8px 12px;
+QLabel[section-title="true"] {{
+    color: {palette.TEXT_PRIMARY};
+    font-size: {Settings.FONT.SIZE_LARGE}px;
+    font-weight: {Settings.FONT.WEIGHT_DEMIBOLD};
 }}
 
-QWidget#file-icon-wrapper {{
-    background-color: {palette.PRIMARY};
-    border-radius: 6px;
-    min-width: 40px;
-    min-height: 40px;
-}}
-
-QWidget#file-icon-wrapper QLabel {{
-    color: {palette.WHITE};
-}}
-
-QWidget#file-description {{
+QSvgWidget {{
     background-color: {palette.TRANSPARENT};
-}}
-
-QLabel#file-name {{
-    background-color: {palette.TRANSPARENT};
-    font-weight: bold;
-    color: {palette.BLACK};
-}}
-
-/* Condition indicator: circle is drawn in paintEvent so it stays round at any size (border-radius unreliable on small widgets). */
-QFrame#condition-indicator {{
-    background-color: {palette.TRANSPARENT};
+    border: none;
 }}
 
 QPushButton {{
     background-color: {palette.PRIMARY};
-    border-radius: 6px;
-    color: {palette.BLACK};
+    border: none;
+    border-radius: {Settings.BORDER_RADIUS.SM}px;
+    color: #0A0A0A;
+    font-size: {Settings.FONT.SIZE_HELPER}px;
+    font-weight: {Settings.FONT.WEIGHT_DEMIBOLD};
     padding: 8px 16px;
-    font-size: 14px;
 }}
 
 QPushButton:hover {{
@@ -217,68 +162,42 @@ QPushButton:pressed {{
     background-color: {palette.PRIMARY};
 }}
 
-QPushButton#welcome-walkthrough-button,
-QPushButton[welcome-walkthrough-button="true"] {{
-    background-color: {palette.WHITE};
-    border: 1px solid {palette.LIGHT_DIVIDER};
-    border-radius: {Settings.BORDER_RADIUS.XL}px;
-    color: {palette.HELPER_TEXT};
-    padding: 0px;
-    font-size: {Settings.FONT.SIZE_HELPER}px;
-    font-weight: {Settings.FONT.WEIGHT_NORMAL};
-}}
-
-QPushButton#welcome-walkthrough-button:hover,
-QPushButton[welcome-walkthrough-button="true"]:hover {{
-    background-color: {palette.COMPONENT};
-    border: 1px solid {palette.LIGHT_DIVIDER_HIGHLIGHT};
-}}
-
-QPushButton#welcome-walkthrough-button:pressed,
-QPushButton[welcome-walkthrough-button="true"]:pressed {{
-    background-color: {palette.COMPONENT_HIGHLIGHT};
-    border: 1px solid {palette.LIGHT_DIVIDER};
-}}
-
-QPushButton#welcome-walkthrough-button:focus,
-QPushButton[welcome-walkthrough-button="true"]:focus {{
-    border: 1px solid {palette.PANEL_BORDER};
-}}
-
-QPushButton#welcome-walkthrough-button QLabel#walkthrough-card-label,
-QPushButton[welcome-walkthrough-button="true"] QLabel#walkthrough-card-label {{
-    color: {palette.HELPER_TEXT};
-    font-size: {Settings.FONT.SIZE_HELPER}px;
-    font-weight: {Settings.FONT.WEIGHT_NORMAL};
-    background-color: {palette.TRANSPARENT};
+QPushButton:disabled {{
+    background-color: {palette.SURFACE_MUTED};
+    color: {palette.TEXT_MUTED};
 }}
 
 QToolButton {{
     background-color: {palette.TRANSPARENT};
     border: none;
-    padding: 0px;
+    border-radius: {Settings.BORDER_RADIUS.SM}px;
+    color: {palette.TEXT_MUTED};
+    padding: 2px;
 }}
 
 QToolButton:hover {{
-    background-color: {palette.PRIMARY_HOVER};
-    border-radius: {Settings.BORDER_RADIUS.SM}px;
+    background-color: {palette.PRIMARY_SOFT};
 }}
 
 QToolButton:pressed {{
-    background-color: {palette.PRIMARY};
-    border-radius: {Settings.BORDER_RADIUS.SM}px;
+    background-color: {palette.PRIMARY_BORDER};
+}}
+
+QToolButton:disabled {{
+    background-color: {palette.TRANSPARENT};
+    color: {palette.TEXT_MUTED};
 }}
 
 QProgressBar {{
-    background-color: {palette.COMPONENT};
-    border: 1px solid {palette.LIGHT_DIVIDER};
+    background-color: {palette.SURFACE_MUTED};
+    border: 1px solid {palette.BORDER_SUBTLE};
     border-radius: {Settings.BORDER_RADIUS.SM}px;
-    text-align: center;
+    color: {palette.TEXT_MUTED};
     font-family: {Settings.FONT.FAMILY_CSS};
     font-size: {Settings.FONT.SIZE_HELPER}px;
-    font-weight: 400;
-    color: {palette.HELPER_TEXT};
+    font-weight: {Settings.FONT.WEIGHT_NORMAL};
     min-height: {Settings.DIMENSION.PROGRESSBAR_HEIGHT}px;
+    text-align: center;
 }}
 
 QProgressBar::chunk {{
@@ -286,217 +205,431 @@ QProgressBar::chunk {{
     border-radius: {Settings.BORDER_RADIUS.XS}px;
 }}
 
-QLabel {{
-    color: {palette.BLACK};
-    background-color: {palette.TRANSPARENT};
-    border: none;
-    font-family: {Settings.FONT.FAMILY_CSS};
-    font-size: 16px;
-    font-weight: 400;
+QLineEdit {{
+    background-color: {palette.SURFACE_ELEVATED};
+    border: 1px solid {palette.BORDER_SUBTLE};
+    border-radius: {Settings.BORDER_RADIUS.MD}px;
+    color: {palette.TEXT_PRIMARY};
+    padding: 8px 10px;
 }}
 
-QLabel[regular-text="true"] {{
-    font-family: {Settings.FONT.FAMILY_CSS};
-    font-size: 16px;
-    font-weight: 400;
+QLineEdit:focus {{
+    border: 1px solid {palette.PRIMARY};
 }}
 
-QLabel[demi-bold-text="true"] {{
-    font-family: {Settings.FONT.FAMILY_CSS};
-    font-size: 16px;
-    font-weight: 600;
-}}
-
-QLabel[helper-text="true"] {{
-    color: {palette.HELPER_TEXT};
-    font-family: {Settings.FONT.FAMILY_CSS};
-    font-size: 14px;
-    font-weight: 400;
+QComboBox {{
+    background-color: {palette.SURFACE_ELEVATED};
+    border: 1px solid {palette.BORDER_SUBTLE};
+    border-radius: {Settings.BORDER_RADIUS.MD}px;
+    color: {palette.TEXT_PRIMARY};
+    min-height: {Settings.COMBOBOX.MIN_HEIGHT}px;
+    min-width: 6em;
+    padding-left: {Settings.COMBOBOX.PADDING_LEFT}px;
+    padding-right: {Settings.COMBOBOX.PADDING_RIGHT}px;
+    padding-top: {Settings.COMBOBOX.PADDING_TOP}px;
+    padding-bottom: {Settings.COMBOBOX.PADDING_BOTTOM}px;
     text-align: center;
 }}
 
-QLabel[section-title="true"] {{
+QComboBox:hover {{
+    border: 1px solid {palette.BORDER_STRONG};
+    background-color: {palette.SURFACE_MUTED};
+}}
+
+QComboBox:focus {{
+    border: 1px solid {palette.PRIMARY};
+}}
+
+QComboBox::drop-down {{
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: {Settings.COMBOBOX.DROPDOWN_WIDTH}px;
+    border-left: 1px solid {palette.BORDER_SUBTLE};
+    border-top-right-radius: {Settings.BORDER_RADIUS.MD}px;
+    border-bottom-right-radius: {Settings.BORDER_RADIUS.MD}px;
+}}
+
+QComboBox QAbstractItemView {{
+    background-color: {palette.SURFACE_ELEVATED};
+    border: 1px solid {palette.BORDER_SUBTLE};
+    border-radius: {Settings.BORDER_RADIUS.MD}px;
+    color: {palette.TEXT_PRIMARY};
+    min-width: {Settings.COMBOBOX.ITEM_VIEW_MIN_WIDTH}px;
+    outline: none;
+    padding: 6px;
+    selection-background-color: {palette.PRIMARY_SOFT};
+    selection-color: {palette.TEXT_PRIMARY};
+}}
+
+QComboBox::item {{
+    background-color: {palette.TRANSPARENT};
+    color: {palette.TEXT_PRIMARY};
     font-family: {Settings.FONT.FAMILY_CSS};
-    font-size: 20px;
-    font-weight: 600;
-    color: {palette.BLACK};
+    font-size: {Settings.FONT.SIZE_DEFAULT}px;
+    padding: 8px 10px;
 }}
 
-QFrame#welcome-panel {{
-    background-color: {palette.COMPONENT};
-    border: none;
+QComboBox::item:selected,
+QComboBox::item:hover {{
+    background-color: {palette.PRIMARY_SOFT};
+    color: {palette.TEXT_PRIMARY};
+    border-radius: {Settings.BORDER_RADIUS.SM}px;
 }}
 
-QFrame#welcome-hero {{
+QLabel[selection-field="true"] {{
     background-color: {palette.TRANSPARENT};
     border: none;
 }}
 
-QFrame#welcome-centered-row {{
+QListWidget {{
+    background-color: {palette.SURFACE};
+    border: 1px solid {palette.BORDER_SUBTLE};
+    border-radius: {Settings.BORDER_RADIUS.MD}px;
+    outline: none;
+    padding: 4px;
+    alternate-background-color: {palette.SURFACE};
+    selection-background-color: {palette.PRIMARY_SOFT};
+    selection-color: {palette.TEXT_PRIMARY};
+}}
+
+QListWidget::item {{
+    background-color: {palette.TRANSPARENT};
+    border-radius: {Settings.BORDER_RADIUS.SM}px;
+    color: {palette.TEXT_PRIMARY};
+    font-family: {Settings.FONT.FAMILY_CSS};
+    font-size: {Settings.FONT.SIZE_DEFAULT}px;
+    font-weight: {Settings.FONT.WEIGHT_NORMAL};
+    margin: {Settings.LIST.ITEM_MARGIN_VERTICAL}px 0px;
+    min-height: {Settings.LIST.ITEM_MIN_HEIGHT}px;
+    padding: {Settings.LIST.ITEM_PADDING_VERTICAL}px {Settings.LIST.ITEM_PADDING_HORIZONTAL}px;
+}}
+
+QListWidget::item:selected {{
+    background-color: {palette.PRIMARY_SOFT};
+    color: {palette.TEXT_PRIMARY};
+    font-weight: 500;
+}}
+
+QListWidget::item:selected:active,
+QListWidget::item:selected:!active {{
+    background-color: {palette.PRIMARY_SOFT};
+    color: {palette.TEXT_PRIMARY};
+}}
+
+QListWidget::item:hover,
+QListWidget::item:selected:hover {{
+    background-color: {palette.SURFACE_MUTED};
+    color: {palette.TEXT_PRIMARY};
+}}
+
+QListWidget QScrollBar:vertical,
+QListWidget QScrollBar:horizontal {{
+    background-color: {palette.SURFACE};
+    border: none;
+    border-radius: {Settings.BORDER_RADIUS.SM}px;
+    margin: {Settings.LIST.SCROLLBAR_MARGIN}px;
+}}
+
+QListWidget QScrollBar:vertical {{
+    width: {Settings.LIST.SCROLLBAR_WIDTH}px;
+}}
+
+QListWidget QScrollBar:horizontal {{
+    height: {Settings.LIST.SCROLLBAR_WIDTH}px;
+}}
+
+QListWidget QScrollBar::handle:vertical,
+QListWidget QScrollBar::handle:horizontal {{
+    background-color: {palette.TEXT_MUTED};
+    border-radius: {Settings.BORDER_RADIUS.SM}px;
+    margin: {Settings.LIST.SCROLLBAR_HANDLE_MARGIN}px;
+}}
+
+QListWidget QScrollBar::handle:vertical {{
+    min-height: {Settings.LIST.SCROLLBAR_HANDLE_MIN_HEIGHT}px;
+}}
+
+QListWidget QScrollBar::handle:horizontal {{
+    min-width: {Settings.LIST.SCROLLBAR_HANDLE_MIN_WIDTH}px;
+}}
+
+QListWidget QScrollBar::handle:vertical:hover,
+QListWidget QScrollBar::handle:horizontal:hover {{
+    background-color: {palette.BORDER_STRONG};
+}}
+
+QListWidget QScrollBar::add-line,
+QListWidget QScrollBar::sub-line {{
+    border: none;
+    height: 0px;
+    width: 0px;
+}}
+
+QGroupBox {{
+    background-color: {palette.SURFACE_ELEVATED};
+    border: 1px solid {palette.BORDER_SUBTLE};
+    border-radius: {Settings.BORDER_RADIUS.LG}px;
+    color: {palette.TEXT_PRIMARY};
+    font-family: {Settings.FONT.FAMILY_CSS};
+    font-size: {Settings.FONT.SIZE_DEFAULT}px;
+    font-weight: {Settings.FONT.WEIGHT_NORMAL};
+    margin-top: {Settings.PANEL.SECTION_SPACING}px;
+    padding: {Settings.PANEL.CONTENT_PADDING}px;
+    padding-top: 18px;
+}}
+
+QGroupBox::title {{
+    background-color: {palette.SURFACE_ELEVATED};
+    border-radius: {Settings.BORDER_RADIUS.SM}px;
+    color: {palette.TEXT_PRIMARY};
+    font-size: {Settings.FONT.SIZE_DEFAULT}px;
+    font-weight: 500;
+    left: {Settings.PANEL.CONTENT_PADDING}px;
+    padding: 0 6px;
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    top: 4px;
+}}
+
+QGroupBox QListWidget {{
+    background-color: {palette.SURFACE_ELEVATED};
+    border: 1px solid {palette.BORDER_SUBTLE};
+    border-radius: {Settings.BORDER_RADIUS.MD}px;
+    margin: {Settings.SPACING.XS}px 0px 0px 0px;
+    padding: 4px;
+}}
+
+QGroupBox QToolButton {{
     background-color: {palette.TRANSPARENT};
     border: none;
 }}
 
-QWidget#welcome-content-inner {{
+QGroupBox QToolButton:hover {{
+    background-color: {palette.PRIMARY_SOFT};
+    border-radius: {Settings.BORDER_RADIUS.SM}px;
+}}
+
+QGroupBox QToolButton:pressed {{
+    background-color: {palette.PRIMARY_BORDER};
+}}
+
+QFrame#card {{
+    background-color: {palette.SURFACE_ELEVATED};
+    border: 1px solid {palette.BORDER_SUBTLE};
+    border-radius: {Settings.BORDER_RADIUS.LG}px;
+    padding: 20px;
+}}
+
+QFrame#card QLabel[demi-bold-text="true"] {{
+    color: {palette.TEXT_PRIMARY};
+    font-size: {Settings.FONT.SIZE_TITLE}px;
+    font-weight: {Settings.FONT.WEIGHT_DEMIBOLD};
+}}
+
+QFrame#card QLabel[helper-text="true"] {{
+    color: {palette.TEXT_MUTED};
+    font-size: {Settings.FONT.SIZE_DEFAULT}px;
+}}
+
+QFrame#card QWidget#otp-input,
+QFrame#card QWidget#otp-input QLineEdit {{
+    background-color: {palette.SURFACE_ELEVATED};
+}}
+
+QFrame#card QWidget#otp-input QLineEdit {{
+    border: 1px solid {palette.BORDER_SUBTLE};
+    border-radius: {Settings.BORDER_RADIUS.MD}px;
+    color: {palette.TEXT_PRIMARY};
+    padding: 6px 4px;
+}}
+
+QFrame#card QWidget#otp-input QLineEdit:focus {{
+    border: 1px solid {palette.PRIMARY};
+}}
+
+QFrame#card QPushButton {{
+    min-height: 40px;
+}}
+
+QWidget#authentification-overlay {{
+    background-color: rgba(0, 0, 0, 0.16);
+}}
+
+{pulse_section}
+
+QFrame[place-holder="true"],
+QWidget#available-device-empty-state,
+QFrame#map-placeholder {{
+    background-color: {palette.SURFACE_MUTED};
+    border: 1px solid {palette.BORDER_SUBTLE};
+    border-radius: {Settings.BORDER_RADIUS.MD}px;
+    color: {palette.TEXT_MUTED};
+    font-family: {Settings.FONT.FAMILY_CSS};
+    font-size: {Settings.FONT.SIZE_DEFAULT}px;
+    font-weight: {Settings.FONT.WEIGHT_NORMAL};
+    margin: {Settings.PLACEHOLDER.MARGIN}px;
+    padding: {Settings.PLACEHOLDER.PADDING}px;
+    text-align: center;
+}}
+
+QFrame[place-holder="true"] QLabel,
+QWidget#available-device-empty-state QLabel,
+QFrame#map-placeholder QLabel {{
+    color: {palette.TEXT_MUTED};
+    font-weight: {Settings.FONT.WEIGHT_NORMAL};
+}}
+
+QFrame#map-placeholder QLabel {{
+    color: {palette.PLACEHOLDER_TEXT};
+}}
+
+QWidget#file-display {{
+    background-color: {palette.SURFACE_MUTED};
+    border: 1px solid {palette.BORDER_SUBTLE};
+    border-radius: {Settings.BORDER_RADIUS.LG}px;
+    padding: 8px 12px;
+}}
+
+QWidget#file-display:hover {{
+    border: 1px solid {palette.PRIMARY_BORDER};
+}}
+
+QWidget#file-icon-wrapper {{
+    background-color: {palette.PRIMARY};
+    border-radius: {Settings.BORDER_RADIUS.SM}px;
+    min-height: 40px;
+    min-width: 40px;
+}}
+
+QWidget#file-icon-wrapper QLabel {{
+    color: #0A0A0A;
+}}
+
+QWidget#file-description {{
     background-color: {palette.TRANSPARENT};
 }}
 
-QFrame#welcome-start-card,
-QFrame#welcome-walkthrough-card,
-QFrame[welcome-card="true"] {{
-    background-color: {palette.WHITE};
-    border: 1px solid {palette.LIGHT_DIVIDER};
+QLabel#file-name {{
+    background-color: {palette.TRANSPARENT};
+    color: {palette.TEXT_PRIMARY};
+    font-family: {Settings.FONT.FAMILY_CSS};
+    font-weight: {Settings.FONT.WEIGHT_DEMIBOLD};
+}}
+
+QWidget#file-description QLabel[helper-text="true"] {{
+    font-family: {Settings.FONT.MONO_FAMILY_CSS};
+    font-size: {Settings.FONT.SIZE_HELPER}px;
+}}
+
+QFrame#condition-indicator,
+QFrame#host-identity-indicator,
+QFrame#adb-bridge-indicator {{
+    background-color: {palette.TRANSPARENT};
+    border: 1px solid {palette.SURFACE_ELEVATED};
     border-radius: {Settings.BORDER_RADIUS.XL}px;
 }}
 
+QFrame#welcome-panel {{
+    background-color: {palette.SURFACE};
+    border: none;
+}}
+
+QFrame#welcome-hero,
+QFrame#welcome-centered-row,
+QWidget#welcome-content-inner,
 QFrame#sections-wrapper {{
     background-color: {palette.TRANSPARENT};
     border: none;
 }}
 
+QFrame#welcome-start-card,
+QFrame#welcome-walkthrough-card,
+QFrame[welcome-card="true"] {{
+    background-color: {palette.SURFACE_ELEVATED};
+    border: 1px solid {palette.BORDER_SUBTLE};
+    border-radius: {Settings.BORDER_RADIUS.XL}px;
+}}
+
 QLabel[welcome-section-title="true"] {{
-    font-family: {Settings.FONT.FAMILY_CSS};
+    color: {palette.TEXT_PRIMARY};
     font-size: {Settings.FONT.SIZE_LARGE}px;
-    font-weight: 600;
-    color: {palette.BLACK};
-    margin-top: 0px;
+    font-weight: {Settings.FONT.WEIGHT_DEMIBOLD};
     margin-bottom: 0px;
+    margin-top: 0px;
     text-align: left;
 }}
 
 QLabel[welcome-tagline="true"] {{
-    color: {palette.BLACK};
-    font-family: {Settings.FONT.FAMILY_CSS};
+    background-color: {palette.TRANSPARENT};
+    color: {palette.TEXT_PRIMARY};
     font-size: {Settings.FONT.SIZE_LARGE}px;
     font-weight: {Settings.FONT.WEIGHT_DEMIBOLD};
-    background-color: {palette.TRANSPARENT};
     margin-top: 0px;
     padding-left: {Settings.SPACING.MD}px;
     padding-right: {Settings.SPACING.MD}px;
     text-align: center;
 }}
 
-QListWidget {{
-    background-color: {palette.COMPONENT};
-    border: 1px solid {palette.BLACK};
-    border-radius: 8px;
-    padding: 4px;
-    outline: none;
+QPushButton#welcome-walkthrough-button,
+QPushButton[welcome-walkthrough-button="true"] {{
+    background-color: {palette.SURFACE_ELEVATED};
+    border: 1px solid {palette.BORDER_SUBTLE};
+    border-radius: {Settings.BORDER_RADIUS.XL}px;
+    color: {palette.TEXT_MUTED};
+    font-size: {Settings.FONT.SIZE_HELPER}px;
+    font-weight: {Settings.FONT.WEIGHT_NORMAL};
+    padding: 0px;
 }}
 
-QListWidget::item {{
+QPushButton#welcome-walkthrough-button:hover,
+QPushButton[welcome-walkthrough-button="true"]:hover {{
+    background-color: {palette.SURFACE_MUTED};
+    border: 1px solid {palette.BORDER_STRONG};
+}}
+
+QPushButton#welcome-walkthrough-button:pressed,
+QPushButton[welcome-walkthrough-button="true"]:pressed {{
+    background-color: {palette.PRIMARY_SOFT};
+    border: 1px solid {palette.PRIMARY_BORDER};
+}}
+
+QPushButton#welcome-walkthrough-button:focus,
+QPushButton[welcome-walkthrough-button="true"]:focus {{
+    border: 1px solid {palette.PRIMARY};
+}}
+
+QPushButton#welcome-walkthrough-button QLabel#walkthrough-card-label,
+QPushButton[welcome-walkthrough-button="true"] QLabel#walkthrough-card-label {{
     background-color: {palette.TRANSPARENT};
-    color: {palette.BLACK};
-    font-size: 16px;
-    font-weight: 400;
-    font-family: {Settings.FONT.FAMILY_CSS};
-    padding: 10px 12px;
-    margin: 2px 0px;
-    border-radius: 6px;
-    min-height: 24px;
+    color: {palette.TEXT_MUTED};
+    font-size: {Settings.FONT.SIZE_HELPER}px;
+    font-weight: {Settings.FONT.WEIGHT_NORMAL};
 }}
 
-QListWidget::item:selected {{
-    background-color: {palette.PRIMARY};
-    color: {palette.WHITE};
-    border: none;
-    border-radius: 6px;
-    font-weight: 500;
+QPushButton#welcome-walkthrough-button QWidget,
+QPushButton[welcome-walkthrough-button="true"] QWidget,
+QPushButton#welcome-walkthrough-button QSvgWidget,
+QPushButton[welcome-walkthrough-button="true"] QSvgWidget {{
+    background-color: {palette.TRANSPARENT};
 }}
 
-QListWidget::item:hover {{
-    background-color: {palette.PRIMARY_HOVER};
-    color: {palette.WHITE};
-    border: none;
-    border-radius: 6px;
-}}
-
-QListWidget::item:selected:hover {{
-    background-color: {palette.PRIMARY_HOVER};
-    color: {palette.WHITE};
-    border: none;
-    border-radius: 6px;
-}}
-
-QListWidget::item:selected:!active {{
-    background-color: {palette.PRIMARY};
-    color: {palette.WHITE};
-}}
-
-QListWidget QScrollBar:vertical {{
-    background-color: {palette.COMPONENT};
-    width: 12px;
-    border: none;
-    border-radius: 6px;
-    margin: 4px;
-}}
-
-QListWidget QScrollBar::handle:vertical {{
-    background-color: {palette.HELPER_TEXT};
-    min-height: 30px;
-    border-radius: 6px;
-    margin: 2px;
-}}
-
-QListWidget QScrollBar::handle:vertical:hover {{
-    background-color: {palette.BLACK};
-}}
-
-QListWidget QScrollBar::add-line:vertical, QListWidget QScrollBar::sub-line:vertical {{
-    height: 0px;
-    border: none;
-}}
-
-QListWidget QScrollBar:horizontal {{
-    background-color: {palette.COMPONENT};
-    height: 12px;
-    border: none;
-    border-radius: 6px;
-    margin: 4px;
-}}
-
-QListWidget QScrollBar::handle:horizontal {{
-    background-color: {palette.HELPER_TEXT};
-    min-width: 30px;
-    border-radius: 6px;
-    margin: 2px;
-}}
-
-QListWidget QScrollBar::handle:horizontal:hover {{
-    background-color: {palette.BLACK};
-}}
-
-QListWidget QScrollBar::add-line:horizontal, QListWidget QScrollBar::sub-line:horizontal {{
-    width: 0px;
-    border: none;
-}}
-
-QGroupBox QListWidget {{
-    background-color: {palette.WHITE};
-    border: 1px solid {palette.LIGHT_DIVIDER};
-    border-radius: {Settings.BORDER_RADIUS.SM}px;
-    padding: 4px;
-    margin-top: {Settings.SPACING.XS}px;
-    margin-bottom: 0;
-    margin-left: 0;
-    margin-right: 0;
-}}
-
-QGroupBox QListWidget::item {{
-    margin: 2px 0px;
-}}
-
-QGroupBox#available-device-group-box {{
-    background-color: {palette.WHITE};
-    border: 1px solid {palette.LIGHT_DIVIDER};
-    border-radius: {Settings.BORDER_RADIUS.MD}px;
+QGroupBox#available-device-group-box,
+QGroupBox#identity-group-box,
+QGroupBox#adb-group-box,
+QGroupBox#logs-group-box {{
+    background-color: {palette.SURFACE_ELEVATED};
+    border: 1px solid {palette.BORDER_SUBTLE};
+    border-radius: {Settings.BORDER_RADIUS.LG}px;
     padding: {Settings.PANEL.CONTENT_PADDING}px;
     padding-top: 18px;
 }}
 
-QGroupBox#available-device-group-box::title {{
-    background-color: {palette.WHITE};
-    color: {palette.BLACK};
+QGroupBox#available-device-group-box::title,
+QGroupBox#identity-group-box::title,
+QGroupBox#adb-group-box::title,
+QGroupBox#logs-group-box::title {{
+    background-color: {palette.SURFACE_ELEVATED};
+    color: {palette.TEXT_PRIMARY};
     font-size: {Settings.FONT.SIZE_DEFAULT}px;
     font-weight: {Settings.FONT.WEIGHT_DEMIBOLD};
 }}
@@ -519,255 +652,124 @@ QGroupBox#available-device-group-box QWidget#available-device-actions {{
     background-color: {palette.TRANSPARENT};
 }}
 
-/* Device list row (custom item widget) */
 QWidget#device-item-row {{
-    background-color: {palette.WHITE};
-    border: 1px solid {palette.LIGHT_DIVIDER};
+    background-color: {palette.SURFACE_ELEVATED};
+    border: 1px solid {palette.BORDER_SUBTLE};
     border-radius: {Settings.BORDER_RADIUS.MD}px;
 }}
 
 QWidget#device-item-row[alert="true"] {{
-    background-color: rgba(255, 106, 0, 0.10);
-    border: 1px solid rgba(255, 106, 0, 0.16);
-    border-radius: {Settings.BORDER_RADIUS.MD}px;
+    background-color: {palette.PRIMARY_SOFT};
+    border: 1px solid {palette.PRIMARY_BORDER};
 }}
 
 QWidget#device-item-row[hovered="true"] {{
-    background-color: {palette.COMPONENT};
-    border: 1px solid {palette.LIGHT_DIVIDER_HIGHLIGHT};
-    border-radius: {Settings.BORDER_RADIUS.MD}px;
+    background-color: {palette.SURFACE_MUTED};
+    border: 1px solid {palette.BORDER_STRONG};
 }}
 
 QWidget#device-item-row[alert="true"][hovered="true"] {{
-    background-color: rgba(255, 106, 0, 0.16);
-    border: 1px solid rgba(255, 106, 0, 0.24);
-    border-radius: {Settings.BORDER_RADIUS.MD}px;
+    background-color: {palette.PRIMARY_SOFT};
+    border: 1px solid {palette.PRIMARY};
 }}
 
-/* Avoid global QWidget {{ white }} painting opaque blocks over list item hover/selection. */
 QWidget#device-item-center,
 QWidget#device-item-right-wrap,
 QWidget#device-item-title-row,
 QWidget#device-item-subtitle-host,
-QWidget#device-item-badge-container {{
-    background-color: {palette.TRANSPARENT};
-}}
-
-QWidget#device-item-subtitle-host QLabel {{
-    background-color: {palette.TRANSPARENT};
-}}
-
+QWidget#device-item-badge-container,
+QWidget#device-item-subtitle-host QLabel,
 QWidget#device-item-row QLabel#device-item-name,
 QWidget#device-item-row QLabel#device-item-time {{
     background-color: {palette.TRANSPARENT};
 }}
 
 QFrame#device-item-icon-frame {{
-    background-color: {palette.COMPONENT_HIGHLIGHT};
-    border: none;
+    background-color: {palette.SURFACE_MUTED};
+    border: 1px solid {palette.BORDER_SUBTLE};
     border-radius: {Settings.BORDER_RADIUS.SM}px;
-    min-width: {Settings.LIST.DEVICE_ITEM_ICON_FRAME}px;
+    max-height: {Settings.LIST.DEVICE_ITEM_ICON_FRAME}px;
     max-width: {Settings.LIST.DEVICE_ITEM_ICON_FRAME}px;
     min-height: {Settings.LIST.DEVICE_ITEM_ICON_FRAME}px;
-    max-height: {Settings.LIST.DEVICE_ITEM_ICON_FRAME}px;
+    min-width: {Settings.LIST.DEVICE_ITEM_ICON_FRAME}px;
 }}
 
 QLabel#device-item-name {{
+    color: {palette.TEXT_PRIMARY};
     font-weight: {Settings.FONT.WEIGHT_DEMIBOLD};
-    color: {palette.BLACK};
     padding: 1px 0px;
 }}
 
-QLabel[device-item-badge="active"] {{
-    background-color: {palette.COMPONENT_HIGHLIGHT};
-    color: {palette.SECONDARY};
-    border-radius: {Settings.BORDER_RADIUS.XS}px;
-    padding: 2px 8px;
-    font-size: {Settings.FONT.SIZE_HELPER}px;
-}}
-
-QLabel[device-item-badge="new"] {{
-    background-color: rgba(255, 106, 0, 0.18);
-    color: {palette.PRIMARY};
-    border-radius: {Settings.BORDER_RADIUS.XS}px;
-    padding: 2px 8px;
-    font-size: {Settings.FONT.SIZE_HELPER}px;
-    font-weight: {Settings.FONT.WEIGHT_DEMIBOLD};
-}}
-
-QLabel[device-item-badge="trusted-text"] {{
-    color: {palette.HELPER_TEXT};
-    font-size: {Settings.FONT.SIZE_HELPER}px;
-}}
-
-QLabel#device-item-subtitle {{
-    color: {palette.HELPER_TEXT};
+QLabel#device-item-subtitle,
+QLabel#device-item-time {{
+    color: {palette.TEXT_MUTED};
     font-size: {Settings.FONT.SIZE_HELPER}px;
     padding: 2px 0px;
 }}
 
-QLabel#device-item-time {{
-    color: {palette.HELPER_TEXT};
-    font-size: {Settings.FONT.SIZE_HELPER}px;
-    padding: 2px 0px 2px 8px;
-}}
-
-QToolButton#device-item-trash {{
-    background-color: {palette.TRANSPARENT};
-    border: none;
-    color: {palette.HELPER_TEXT};
-    padding: 2px;
-    min-width: {Settings.DIMENSION.TOOLBUTTON_HEIGHT}px;
-    max-width: {Settings.DIMENSION.TOOLBUTTON_HEIGHT}px;
-    min-height: {Settings.DIMENSION.TOOLBUTTON_HEIGHT}px;
-    max-height: {Settings.DIMENSION.TOOLBUTTON_HEIGHT}px;
-}}
-
-QToolButton#device-item-trash:hover {{
-    background-color: rgba(255, 106, 0, 0.12);
+QLabel[device-item-badge="trusted-text"] {{
+    background-color: {palette.SUCCESS_SOFT};
+    border: 1px solid {palette.SUCCESS_BORDER};
     border-radius: {Settings.BORDER_RADIUS.XS}px;
+    color: {palette.SUCCESS};
+    font-size: {Settings.FONT.SIZE_HELPER}px;
+    font-weight: {Settings.FONT.WEIGHT_DEMIBOLD};
+    padding: 2px 8px;
 }}
 
+QLabel[device-item-badge="active"] {{
+    background-color: {palette.SURFACE_MUTED};
+    border-radius: {Settings.BORDER_RADIUS.XS}px;
+    color: {palette.TEXT_PRIMARY};
+    font-size: {Settings.FONT.SIZE_HELPER}px;
+    padding: 2px 8px;
+}}
+
+QLabel[device-item-badge="new"] {{
+    background-color: {palette.PRIMARY_SOFT};
+    border: 1px solid {palette.PRIMARY_BORDER};
+    border-radius: {Settings.BORDER_RADIUS.XS}px;
+    color: {palette.PRIMARY};
+    font-size: {Settings.FONT.SIZE_HELPER}px;
+    font-weight: {Settings.FONT.WEIGHT_DEMIBOLD};
+    padding: 2px 8px;
+}}
+
+QToolButton#device-item-trash,
 QGroupBox QToolButton#device-item-trash {{
     background-color: {palette.TRANSPARENT};
     border: none;
-    color: {palette.HELPER_TEXT};
+    color: {palette.TEXT_MUTED};
+    max-height: {Settings.DIMENSION.TOOLBUTTON_HEIGHT}px;
+    max-width: {Settings.DIMENSION.TOOLBUTTON_HEIGHT}px;
+    min-height: {Settings.DIMENSION.TOOLBUTTON_HEIGHT}px;
+    min-width: {Settings.DIMENSION.TOOLBUTTON_HEIGHT}px;
+    padding: 2px;
 }}
 
+QToolButton#device-item-trash:hover,
 QGroupBox QToolButton#device-item-trash:hover {{
-    background-color: rgba(255, 106, 0, 0.12);
-    border-radius: {Settings.BORDER_RADIUS.XS}px;
+    background-color: rgba(217, 84, 77, 0.12);
+    border-radius: {Settings.BORDER_RADIUS.SM}px;
 }}
 
+QToolButton#device-item-trash:pressed,
 QGroupBox QToolButton#device-item-trash:pressed {{
-    background-color: rgba(255, 106, 0, 0.18);
+    background-color: rgba(217, 84, 77, 0.20);
 }}
 
-QGroupBox QToolButton {{
-    background-color: {palette.TRANSPARENT};
-    border: none;
-    padding: 0px;
-}}
-
-QGroupBox QToolButton:hover {{
-    background-color: {palette.PRIMARY_HOVER};
-    border-radius: {Settings.BORDER_RADIUS.SM}px;
-}}
-
-QGroupBox QToolButton:pressed {{
-    background-color: {palette.PRIMARY};
-    border-radius: {Settings.BORDER_RADIUS.SM}px;
-}}
-
-QSvgWidget {{
-    background-color: {palette.TRANSPARENT};
-    border: none;
-}}
-
-QComboBox {{
-    background-color: {palette.COMPONENT};
-    border: 1px solid {palette.BLACK};
-    border-radius: 3px;
-    color: {palette.BLACK};
-    padding-left: 30px;
-    padding-right: 30px;
-    padding-top: 8px;
-    padding-bottom: 8px;
-    text-align: center;
-    min-width: 6em;
-}}
-
-QLabel[selection-field="true"] {{
-    background-color: {palette.COMPONENT};
-    border: none;
-}}
-
-QComboBox::drop-down {{
-    subcontrol-origin: padding;
-    subcontrol-position: top right;
-    width: 15px;
-    border-left-width: 1px;
-    border-left-color: {palette.BLACK};
-    border-left-style: solid;
-    border-top-right-radius: 3px;
-    border-bottom-right-radius: 3px;
-}}
-
-QComboBox QAbstractItemView {{
-    min-width: 300px;
-    font-size: 16px;
-    padding: 8px 0px;
-}}
-
-QComboBox::item {{
-    background-color: {palette.TRANSPARENT};
-    color: {palette.BLACK};
-    font-size: 16px;
-    font-weight: 400;
-    font-family: {Settings.FONT.FAMILY_CSS};
-}}
-
-QComboBox::item:selected {{
-    background-color: {palette.PRIMARY};
-    color: {palette.WHITE};
-    border: 1px solid {palette.BLACK};
-    border-radius: 10px;
-}}
-
-QComboBox::item:hover {{
-    background-color: {palette.PRIMARY};
-    color: {palette.WHITE};
-    border: 1px solid {palette.BLACK};
-    border-radius: 10px;
-}}
-
-QComboBox::item:selected:hover {{
-    background-color: {palette.PRIMARY};
-    color: {palette.WHITE};
-    border: 1px solid {palette.BLACK};
-    border-radius: 10px;
-}}
-
-QMessageBox {{
-    color: {palette.BLACK};
-    background-color: {palette.COMPONENT};
-}}
-
-QLabel[messagebox-informative-text="true"] {{
-    color: {palette.HELPER_TEXT};
-    background-color: {palette.COMPONENT};
-    font-size: 14px;
-    font-weight: 400;
-    font-family: {Settings.FONT.FAMILY_CSS};
-}}
-
-QMessageBox QTextEdit {{
-    color: {palette.BLACK};
-    background-color: {palette.COMPONENT};
-}}
-
-QFrame[main-section-divider="true"] {{
-    border-top: 1px solid {palette.LIGHT_DIVIDER_HIGHLIGHT};
-    margin-top: 12px;
-    padding-top: 12px;
-}}
-
+QFrame[main-section-divider="true"],
 QFrame[section-divider="true"] {{
-    border-top: 1px solid {palette.LIGHT_DIVIDER};
-    margin-top: 12px;
-    padding-top: 12px;
+    border-top: 1px solid {palette.BORDER_SUBTLE};
+    margin-top: {Settings.PANEL.SECTION_SPACING}px;
+    padding-top: {Settings.PANEL.SECTION_SPACING}px;
 }}
 
-QFrame[main-section-divider-bottom="true"] {{
-    border-bottom: 1px solid {palette.LIGHT_DIVIDER_HIGHLIGHT};
-    margin-bottom: 12px;
-    padding-bottom: 12px;
-}}
-
+QFrame[main-section-divider-bottom="true"],
 QFrame[section-divider-bottom="true"] {{
-    border-bottom: 1px solid {palette.LIGHT_DIVIDER};
-    margin-bottom: 12px;
-    padding-bottom: 12px;
+    border-bottom: 1px solid {palette.BORDER_SUBTLE};
+    margin-bottom: {Settings.PANEL.SECTION_SPACING}px;
+    padding-bottom: {Settings.PANEL.SECTION_SPACING}px;
 }}
 
 QWidget#host-identity-section,
@@ -775,71 +777,44 @@ QWidget#adb-bridge-section {{
     margin-top: 0px;
 }}
 
-QGroupBox#identity-group-box,
-QGroupBox#adb-group-box {{
-    background-color: {palette.WHITE};
-    border: 1px solid {palette.LIGHT_DIVIDER};
-    border-radius: {Settings.BORDER_RADIUS.MD}px;
-    padding: {Settings.PANEL.CONTENT_PADDING}px;
-    padding-top: 18px;
-}}
-
-QGroupBox#identity-group-box::title,
-QGroupBox#adb-group-box::title {{
-    background-color: {palette.WHITE};
-    color: {palette.BLACK};
-    font-size: {Settings.FONT.SIZE_DEFAULT}px;
-    font-weight: {Settings.FONT.WEIGHT_DEMIBOLD};
-}}
-
-QWidget#host-identity-section QLabel[host-title="true"] {{
-    color: {palette.BLACK};
-    font-family: {Settings.FONT.FAMILY_CSS};
+QWidget#host-identity-section QLabel[host-title="true"],
+QWidget#host-identity-section QWidget#icon-label QLabel#label {{
+    color: {palette.TEXT_PRIMARY};
     font-size: {Settings.FONT.SIZE_DEFAULT}px;
     font-weight: {Settings.FONT.WEIGHT_DEMIBOLD};
 }}
 
 QLabel[host-supporting-text="true"] {{
-    color: {palette.HELPER_TEXT};
-    font-family: {Settings.FONT.FAMILY_CSS};
+    color: {palette.TEXT_MUTED};
     font-size: {Settings.FONT.SIZE_HELPER}px;
     font-weight: {Settings.FONT.WEIGHT_NORMAL};
-    line-height: 1.2;
-}}
-
-QWidget#host-identity-section QWidget#icon-label QLabel#label {{
-    color: {palette.BLACK};
-    font-family: {Settings.FONT.FAMILY_CSS};
-    font-size: {Settings.FONT.SIZE_DEFAULT}px;
-    font-weight: {Settings.FONT.WEIGHT_DEMIBOLD};
 }}
 
 QWidget[host-identity-metadata-row="true"] QLabel[host-metadata-key="true"],
 QWidget[adb-bridge-metadata-row="true"] QLabel[host-metadata-key="true"] {{
-    color: {palette.HELPER_TEXT};
-    font-family: {Settings.FONT.FAMILY_CSS};
+    color: {palette.TEXT_MUTED};
     font-size: {Settings.FONT.SIZE_HELPER}px;
     font-weight: {Settings.FONT.WEIGHT_NORMAL};
 }}
 
 QWidget[host-identity-metadata-row="true"] QLabel[host-metadata-value="true"],
 QWidget[adb-bridge-metadata-row="true"] QLabel[host-metadata-value="true"] {{
-    color: {palette.BLACK};
-    font-family: {Settings.FONT.FAMILY_CSS};
+    color: {palette.TEXT_PRIMARY};
+    font-family: {Settings.FONT.MONO_FAMILY_CSS};
     font-size: {Settings.FONT.SIZE_HELPER}px;
-    font-weight: 500;
+    font-weight: 600;
 }}
 
 QWidget[adb-bridge-metadata-row="true"] QLabel[host-metadata-value="true"][adb-server-state="running"] {{
-    color: {palette.SOFT_GREEN};
+    color: {palette.SUCCESS};
 }}
 
 QWidget[adb-bridge-metadata-row="true"] QLabel[host-metadata-value="true"][adb-server-state="stopped"] {{
-    color: {palette.SOFT_RED};
+    color: {palette.ERROR};
 }}
 
 QWidget[adb-bridge-metadata-row="true"] QLabel[host-metadata-value="true"][adb-server-state="starting"] {{
-    color: {palette.PRIMARY};
+    color: {palette.WARNING};
 }}
 
 QWidget[adb-bridge-metadata-row="true"] QLabel[host-metadata-value="true"][adb-server-state="error"] {{
@@ -847,29 +822,15 @@ QWidget[adb-bridge-metadata-row="true"] QLabel[host-metadata-value="true"][adb-s
 }}
 
 QWidget[adb-bridge-metadata-row="true"] QLabel[host-metadata-value="true"][adb-server-state="unknown"] {{
-    color: {palette.HELPER_TEXT};
+    color: {palette.TEXT_MUTED};
 }}
 
-QFrame#host-identity-indicator,
-QFrame#adb-bridge-indicator {{
-    background-color: {palette.TRANSPARENT};
-    border: 1px solid {palette.WHITE};
-    border-radius: {Settings.BORDER_RADIUS.XL}px;
-}}
-
-QFrame[panel-section="true"] {{
-    background-color: {palette.WHITE};
-    border: 1px solid {palette.LIGHT_DIVIDER};
-    border-radius: 6px;
-    padding: 10px 12px;
-    margin-top: 12px;
-}}
-
+QFrame[panel-section="true"],
 QFrame[panel-section-compact="true"] {{
-    background-color: {palette.WHITE};
-    border: 1px solid {palette.LIGHT_DIVIDER};
-    border-radius: 6px;
-    padding: 8px 12px;
+    background-color: {palette.SURFACE_ELEVATED};
+    border: 1px solid {palette.BORDER_SUBTLE};
+    border-radius: {Settings.BORDER_RADIUS.MD}px;
+    padding: 10px 12px;
 }}
 
 QFrame#host-identity-section,
@@ -880,39 +841,98 @@ QFrame#adb-bridge-section {{
     padding: 4px 8px 6px 8px;
 }}
 
-QGroupBox {{
-    background-color: {palette.COMPONENT};
-    border: 1px solid {palette.LIGHT_DIVIDER};
-    border-radius: {Settings.BORDER_RADIUS.SM}px;
-    margin-top: {Settings.PANEL.SECTION_SPACING}px;
-    padding: {Settings.PANEL.CONTENT_PADDING}px;
-    padding-top: 16px;
-    font-family: {Settings.FONT.FAMILY_CSS};
-    font-size: {Settings.FONT.SIZE_DEFAULT}px;
-    font-weight: 400;
-    color: {palette.BLACK};
+QListWidget#logs-list {{
+    background-color: {palette.SURFACE_ELEVATED};
+    border: 1px solid {palette.BORDER_SUBTLE};
+    border-radius: {Settings.BORDER_RADIUS.MD}px;
+    font-family: {Settings.FONT.MONO_FAMILY_CSS};
+    font-size: {Settings.FONT.SIZE_HELPER}px;
+    alternate-background-color: {palette.SURFACE_ELEVATED};
+    selection-background-color: {palette.SURFACE_MUTED};
+    selection-color: {palette.TEXT_PRIMARY};
 }}
 
-QGroupBox::title {{
-    subcontrol-origin: margin;
-    subcontrol-position: top left;
-    border-radius: {Settings.BORDER_RADIUS.SM}px;
-    left: {Settings.PANEL.CONTENT_PADDING}px;
-    top: 4px;
-    padding: 0 6px;
-    background-color: {palette.WHITE};
-    font-family: {Settings.FONT.FAMILY_CSS};
-    font-size: {Settings.FONT.SIZE_DEFAULT}px;
-    font-weight: 500;
-    color: {palette.BLACK};
+QListWidget#logs-list::item {{
+    color: {palette.TEXT_PRIMARY};
+    font-family: {Settings.FONT.MONO_FAMILY_CSS};
+    font-size: {Settings.FONT.SIZE_HELPER}px;
+    padding: 8px 10px;
 }}
 
-/* QTabWidget styling */
+QListWidget#logs-list::item:hover,
+QListWidget#logs-list::item:selected {{
+    background-color: {palette.SURFACE_MUTED};
+    color: {palette.TEXT_PRIMARY};
+}}
+
+QListWidget#logs-list::item:selected:active,
+QListWidget#logs-list::item:selected:!active {{
+    background-color: {palette.SURFACE_MUTED};
+    color: {palette.TEXT_PRIMARY};
+}}
+
+QFrame#map-panel {{
+    background-color: {palette.SURFACE};
+}}
+
+QWidget#map-canvas,
+QFrame#map-placeholder {{
+    background-color: {palette.SURFACE_MUTED};
+    border: 1px solid {palette.BORDER_SUBTLE};
+}}
+
+QWidget#map-legend,
+QWidget#map-coordinates {{
+    background-color: {palette.TRANSPARENT};
+}}
+
+QWidget#location-latitude-widget,
+QWidget#location-longitude-widget {{
+    background-color: {palette.SURFACE_ELEVATED};
+    border: 1px solid {palette.BORDER_SUBTLE};
+    border-radius: {Settings.BORDER_RADIUS.MD}px;
+}}
+
+QWidget#location-latitude-widget:hover,
+QWidget#location-longitude-widget:hover {{
+    border: 1px solid {palette.BORDER_STRONG};
+}}
+
+QWidget#location-latitude-widget QLabel,
+QWidget#location-longitude-widget QLabel {{
+    color: {palette.TEXT_MUTED};
+    font-size: {Settings.LOCATION.LABEL_FONT_SIZE}px;
+}}
+
+QMessageBox {{
+    background-color: {palette.SURFACE_ELEVATED};
+    color: {palette.TEXT_PRIMARY};
+}}
+
+QMessageBox QLabel,
+QMessageBox QTextEdit {{
+    background-color: {palette.SURFACE_ELEVATED};
+    color: {palette.TEXT_PRIMARY};
+}}
+
+QLabel[messagebox-informative-text="true"],
+QLabel[messagebox-detailed-text="true"] {{
+    background-color: {palette.SURFACE_ELEVATED};
+    color: {palette.TEXT_MUTED};
+    font-size: {Settings.FONT.SIZE_HELPER}px;
+}}
+
+QFrame#toast-inner {{
+    background-color: {palette.SURFACE_ELEVATED};
+    border: 1px solid {palette.BORDER_SUBTLE};
+    border-radius: {Settings.BORDER_RADIUS.LG}px;
+}}
+
 QTabWidget::pane {{
-    border: 1px solid {palette.PANEL_BORDER};
-    background-color: {palette.COMPONENT};
-    top: -1px;
+    background-color: {palette.SURFACE};
+    border: 1px solid {palette.BORDER_SUBTLE};
     position: absolute;
+    top: -1px;
 }}
 
 QTabWidget::tab-bar {{
@@ -920,42 +940,42 @@ QTabWidget::tab-bar {{
 }}
 
 QTabBar {{
-    background-color: {palette.COMPONENT_HIGHLIGHT};
-    border-bottom: 1px solid {palette.PANEL_BORDER};
+    background-color: {palette.SURFACE_MUTED};
+    border-bottom: 1px solid {palette.BORDER_STRONG};
 }}
 
 QTabBar::tab {{
-    background-color: {palette.COMPONENT_HIGHLIGHT};
-    border: 1px solid {palette.PANEL_BORDER};
+    background-color: {palette.SURFACE_MUTED};
+    border: 1px solid {palette.BORDER_SUBTLE};
     border-bottom: none;
-    border-top-left-radius: 6px;
-    border-top-right-radius: 6px;
+    border-top-left-radius: {Settings.BORDER_RADIUS.SM}px;
+    border-top-right-radius: {Settings.BORDER_RADIUS.SM}px;
+    color: {palette.TEXT_PRIMARY};
+    font-family: {Settings.FONT.FAMILY_CSS};
+    font-size: {Settings.FONT.SIZE_DEFAULT}px;
+    font-weight: {Settings.FONT.WEIGHT_NORMAL};
+    margin-right: 2px;
     min-width: 120px;
     padding: 10px 16px;
-    margin-right: 2px;
-    color: {palette.BLACK};
-    font-family: {Settings.FONT.FAMILY_CSS};
-    font-size: 16px;
-    font-weight: 400;
 }}
 
 QTabBar::tab:selected {{
-    background-color: {palette.COMPONENT};
-    border-color: {palette.PANEL_BORDER};
-    border-bottom: 1px solid {palette.PRIMARY};
-    color: {palette.BLACK};
-    font-weight: 500;
+    background-color: {palette.SURFACE};
+    border-color: {palette.BORDER_STRONG};
+    border-bottom: 2px solid {palette.PRIMARY};
+    color: {palette.TEXT_PRIMARY};
+    font-weight: {Settings.FONT.WEIGHT_DEMIBOLD};
     margin-bottom: -1px;
 }}
 
 QTabBar::tab:hover:!selected {{
-    background-color: {palette.COMPONENT};
-    border-color: {palette.PANEL_BORDER};
+    background-color: {palette.SURFACE_ELEVATED};
+    border-color: {palette.BORDER_STRONG};
 }}
 
 QTabBar::tab:!selected {{
-    margin-top: 2px;
     margin-bottom: -1px;
+    margin-top: 2px;
 }}
 
 QTabBar::tab:first {{
@@ -965,19 +985,9 @@ QTabBar::tab:first {{
 QTabBar::tab:last {{
     margin-right: 0px;
 }}
-
-QTabBar::close-button {{
-    image: url(close.png);
-    subcontrol-origin: padding;
-    subcontrol-position: right;
-    padding: 4px;
-}}
 """
 
 
-# Pre-built stylesheets: one per theme. Mode switch just assigns the right one (no runtime formatting).
 stylesheet_light = _build_stylesheet(get_palette("light"))
 stylesheet_dark = _build_stylesheet(get_palette("dark"))
-
-# Default stylesheet used by the application (light mode until theme switch is implemented).
 stylesheet = stylesheet_light

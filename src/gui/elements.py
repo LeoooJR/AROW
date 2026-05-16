@@ -847,7 +847,6 @@ class RegularText(QLabel, Element):
         self.texts = RegularText.Text(label=text)
         self.ui = RegularText.UI()
         self.setProperty("regular-text", True)
-        self.setStyleSheet(f"color: {get_current_palette().BLACK};")
         self.setFont(
             QFont(Settings.FONT.FAMILY, Settings.FONT.SIZE_DEFAULT, QFont.Weight.Normal)
         )
@@ -892,7 +891,6 @@ class DemiBoldText(QLabel, Element):
         self.texts = DemiBoldText.Text(label=text)
         self.ui = DemiBoldText.UI()
         self.setProperty("demi-bold-text", True)
-        self.setStyleSheet(f"color: {get_current_palette().BLACK};")
         self.setFont(
             QFont(
                 Settings.FONT.FAMILY, Settings.FONT.SIZE_DEFAULT, QFont.Weight.DemiBold
@@ -940,7 +938,6 @@ class HelperText(QLabel, Element):
         self.texts = HelperText.Text(label=text)
         self.ui = HelperText.UI()
         self.setProperty("helper-text", True)
-        self.setStyleSheet(f"color: {get_current_palette().HELPER_TEXT};")
         self.setFont(
             QFont(Settings.FONT.FAMILY, Settings.FONT.SIZE_HELPER, QFont.Weight.Normal)
         )
@@ -1202,7 +1199,6 @@ class PlaceHolder(QFrame, Element):
             label = text
 
         label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        label.setStyleSheet(f"color: {get_current_palette().PLACEHOLDER_TEXT};")
         layout.addWidget(label, int(stretch_widgets))
         layout.addStretch()
         self.setLayout(layout)

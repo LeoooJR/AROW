@@ -18,6 +18,9 @@ class FontSettings:
     FAMILY_CSS: str = (
         '"Inter", "Helvetica Neue", "Helvetica", "Arial", "Liberation Sans", sans-serif'
     )
+    MONO_FAMILY_CSS: str = (
+        '"Geist Mono", "SF Mono", "IBM Plex Mono", "Menlo", "Consolas", monospace'
+    )
     SIZE_DEFAULT: int = 16
     SIZE_SMALL: int = 8
     SIZE_HELPER: int = 14
