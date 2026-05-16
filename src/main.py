@@ -42,13 +42,14 @@ def main(
 
     register_bundled_fonts()
 
-    from controller.app_controller import AppController
-    from core.models import CoreRuntimeModel
     from gui.window import MainWindow
 
     main_window = MainWindow(ui_constraints_disabled=interface_only)
 
     if not interface_only:
+
+        from controller.app_controller import AppController
+        from core.models import CoreRuntimeModel
 
         simulation_model: CoreRuntimeModel = CoreRuntimeModel(use_mock_adb=mock_adb)
 
