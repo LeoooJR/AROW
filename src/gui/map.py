@@ -25,7 +25,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from gui.colors import Theme, get_current_palette
+from gui.colors import Theme
 from gui.elements import SVG, IconLabel, PanelTitle, PlaceHolder, ToolButton
 from gui.icons import GenericIcons, icon_qt_path, icon_qt_path_for_theme
 from gui.settings import Settings
@@ -249,10 +249,6 @@ class Location(QWidget):
 
         latitude_widget = QWidget(self)
         latitude_widget.setObjectName("location-latitude-widget")
-        palette = get_current_palette()
-        latitude_widget.setStyleSheet(
-            f"QWidget#location-latitude-widget {{ background-color: {palette.WHITE}; border: 1px solid {palette.PANEL_BORDER}; border-radius: {Settings.BORDER_RADIUS.SM}px; }}"
-        )
         latitude_widget.setMinimumWidth(Settings.LOCATION.WIDGET_MIN_WIDTH)
         latitude_widget.setMaximumHeight(Settings.LOCATION.WIDGET_MAX_HEIGHT)
         latitude_widget.setLayout(QVBoxLayout())
@@ -265,9 +261,6 @@ class Location(QWidget):
         latitude_widget.layout().setSpacing(Settings.LOCATION.WIDGET_SPACING)
 
         latitude_label = QLabel(self.texts.latitude_label)
-        latitude_label.setStyleSheet(
-            f"background-color: {palette.TRANSPARENT}; color: {palette.HELPER_TEXT}; font-size: {Settings.LOCATION.LABEL_FONT_SIZE}px;"
-        )
         latitude_label.setFont(
             QFont(Settings.FONT.FAMILY, Settings.FONT.SIZE_SMALL, QFont.Weight.Normal)
         )
@@ -285,9 +278,6 @@ class Location(QWidget):
 
         longitude_widget = QWidget(self)
         longitude_widget.setObjectName("location-longitude-widget")
-        longitude_widget.setStyleSheet(
-            f"QWidget#location-longitude-widget {{ background-color: {palette.WHITE}; border: 1px solid {palette.PANEL_BORDER}; border-radius: {Settings.BORDER_RADIUS.SM}px; }}"
-        )
         longitude_widget.setMinimumWidth(Settings.LOCATION.WIDGET_MIN_WIDTH)
         longitude_widget.setMaximumHeight(Settings.LOCATION.WIDGET_MAX_HEIGHT)
         longitude_widget.setLayout(QVBoxLayout())
@@ -300,9 +290,6 @@ class Location(QWidget):
         longitude_widget.layout().setSpacing(Settings.LOCATION.WIDGET_SPACING)
 
         longitude_label = QLabel(self.texts.longitude_label)
-        longitude_label.setStyleSheet(
-            f"background-color: {palette.TRANSPARENT}; color: {palette.HELPER_TEXT}; font-size: {Settings.LOCATION.LABEL_FONT_SIZE}px;"
-        )
         longitude_label.setFont(
             QFont(Settings.FONT.FAMILY, Settings.FONT.SIZE_SMALL, QFont.Weight.Normal)
         )

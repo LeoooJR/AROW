@@ -436,8 +436,13 @@ class Body(QWidget):
         self.setObjectName("body")
 
         layout = QHBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
+        layout.setContentsMargins(
+            Settings.SPACING.SM,
+            Settings.SPACING.SM,
+            Settings.SPACING.SM,
+            Settings.SPACING.SM,
+        )
+        layout.setSpacing(Settings.SPACING.SM)
 
         device_selection_panel = DeviceSelectionPanel(None)
         device_selection_panel.setVisible(True)
@@ -449,7 +454,7 @@ class Body(QWidget):
         left_panels_wrapper = VerticalLayoutWrapper(
             self,
             widgets=[device_selection_panel, location_panel],
-            spacing=0,
+            spacing=Settings.SPACING.SM,
             margins=(0, 0, 0, 0),
         )
         left_panels_wrapper.setObjectName("left-panels-wrapper")
@@ -509,7 +514,10 @@ class Body(QWidget):
 
         # Create right panels wrapper, a vertical layout wrapper that contains the host and log panels
         right_panels_wrapper = VerticalLayoutWrapper(
-            self, widgets=[host_panel, log_panel], spacing=0, margins=(0, 0, 0, 0)
+            self,
+            widgets=[host_panel, log_panel],
+            spacing=Settings.SPACING.SM,
+            margins=(0, 0, 0, 0),
         )
         right_panels_wrapper.setObjectName("right-panels-wrapper")
         # Visibility are True by default, but set it explicitly to ensure the panels are visible at application start
@@ -770,7 +778,9 @@ class MainContainer(QWidget):
         # Get palette from container
         # Set window color to white
         palette = self.palette()
-        palette.setColor(QPalette.ColorRole.Window, QColor(get_current_palette().WHITE))
+        palette.setColor(
+            QPalette.ColorRole.Window, QColor(get_current_palette().CANVAS)
+        )
         self.setPalette(palette)
 
         # Create vertical layout for container
@@ -1140,7 +1150,9 @@ class MainWindow(QMainWindow):
         set_current_theme(theme)
         self.setStyleSheet(stylesheet_light if theme == "light" else stylesheet_dark)
         palette = self.ui.container.palette()
-        palette.setColor(QPalette.ColorRole.Window, QColor(get_current_palette().WHITE))
+        palette.setColor(
+            QPalette.ColorRole.Window, QColor(get_current_palette().CANVAS)
+        )
         self.ui.container.setPalette(palette)
         self._refresh_theme_icons(theme)
         logger.info("MainWindow: palette updated", theme=str(theme))
