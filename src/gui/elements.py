@@ -1043,10 +1043,12 @@ class List(QListWidget, Element):
                 self.addItem(item)
 
     def iter_items(self) -> Iterator[QListWidgetItem]:
+        """Iterate over the items in the list."""
         for i in range(self.count()):
             yield self.item(i)
 
     def is_empty(self) -> bool:
+        """Check if the list is empty."""
         return self.count() == 0
 
 

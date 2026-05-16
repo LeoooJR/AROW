@@ -55,6 +55,7 @@ class AdbSubController(AppSubController):
         view_signals.RefreshDeviceListRequested.connect(
             self._on_refresh_device_list_requested
         )
+        view_signals.RemoveDeviceRequested.connect(self._on_remove_device_requested)
 
     def connect_model_signals(self) -> None:
         """Subscribe to core ADB and device events."""
@@ -160,6 +161,10 @@ class AdbSubController(AppSubController):
             on_completed=callback.on_completed,
             on_failed=callback.on_failed,
         )
+
+    def _on_remove_device_requested(self, id: str) -> None:
+        """Remove device from ADB on a worker."""
+        pass  # TODO: Implement the thread job to remove device
 
     @validate_model
     def _enqueue_close_core_runtime(

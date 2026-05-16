@@ -34,7 +34,9 @@ class AppController(Controller):
         # Subcontrollers need a fully constructed app reference; defer signal
         # wiring in Controller until children exist.
         super().__init__(model, view, defer_signal_connect=True)
-        self._simulation: SimulationSubController = SimulationSubController(self)
+        self._simulation: SimulationSubController = SimulationSubController(
+            self
+        )  # Create simulation subcontroller before adb subcontroller to avoid race condition, signals are connected in the order of creation
         self._adb: AdbSubController = AdbSubController(self)
         self._map: MapSubController = MapSubController(self)
         self._connect_view_signals()

@@ -5,6 +5,7 @@ This file contains all graphical elements related to the device panel.
 from __future__ import annotations
 
 import datetime as dt
+import uuid
 from dataclasses import dataclass, field
 from typing import Final, Literal, Optional
 
@@ -492,7 +493,7 @@ class DeviceItem(QListWidgetItem):
 
     def _connect_signals(self) -> None:
         """Signals for the device row (menu, future actions)."""
-        pass
+        self.ui.trash_button.clicked.connect(self._on_trash_button_clicked)
 
     @property
     def id(self) -> str | None:
@@ -796,6 +797,12 @@ class DeviceItem(QListWidgetItem):
         self.ui.time_label.hide()  # Hide the last communication time
         self._sync_size_hint()
 
+    ### Slots ###
+
+    def _on_trash_button_clicked(self) -> None:
+        """Handle the trash button click event."""
+        view_signals.RemoveDeviceRequested.emit(self._id)
+
 
 class DeviceState(QGroupBox):
 
@@ -1036,28 +1043,36 @@ class DeviceSelectionPanel(QFrame):
         empty_state: Final[str] = "No device found"
         add_device_tooltip: Final[str] = "Add a device"
         refresh_button_tooltip: Final[str] = "Refresh device list"
-        trash_button_tooltip: Final[str] = "Remove all devices"
         select_helper_text: Final[str] = "Select a device to work with"
         available_devices_group_title: Final[str] = "Available devices"
-        placeholder_primary_device: str = field(
+        placeholder_primary_device: Final[str] = field(
             default_factory=ui_faker.generate_android_device_model
         )
-        placeholder_secondary_device: str = field(
+        placeholder_secondary_device: Final[str] = field(
             default_factory=ui_faker.generate_android_device_model
         )
         placeholder_unknown_device: Final[str] = "Unknown Device"
-        placeholder_operating_system: str = field(
+        placeholder_operating_system: Final[str] = field(
             default_factory=ui_faker.generate_android_release_label
         )
-        placeholder_location_primary: str = field(
+        placeholder_location_primary: Final[str] = field(
             default_factory=ui_faker.generate_city_state_location
         )
-        placeholder_location_secondary: str = field(
+        placeholder_location_secondary: Final[str] = field(
             default_factory=ui_faker.generate_city_state_location
         )
         placeholder_last_communication_active: Final[str] = "Active now"
         placeholder_last_communication_recent: Final[str] = "30 min ago"
         placeholder_last_communication_old: Final[str] = "2 hours ago"
+        placeholder_primary_device_id: Final[str] = field(
+            default_factory=lambda: str(uuid.uuid4())
+        )
+        placeholder_secondary_device_id: Final[str] = field(
+            default_factory=lambda: str(uuid.uuid4())
+        )
+        placeholder_unknown_device_id: Final[str] = field(
+            default_factory=lambda: str(uuid.uuid4())
+        )
 
     @dataclass
     class UI:
@@ -1073,7 +1088,6 @@ class DeviceSelectionPanel(QFrame):
         available_device_group_box: GroupBox
         add_device_button: ToolButton
         refresh_button: ToolButton
-        trash_button: ToolButton
         buttons_wrapper: GridLayoutWrapper
         select_helper_text: HelperText
         device_state: DeviceState
@@ -1163,14 +1177,6 @@ class DeviceSelectionPanel(QFrame):
         refresh_button.setEnabled(True)
         refresh_button.setObjectName("refresh-button")
 
-        trash_button = ToolButton(
-            self,
-            icon_path=icon_qt_path(GenericIcons.TRASH),
-            tooltip=self.texts.trash_button_tooltip,
-        )
-        trash_button.setEnabled(True)
-        trash_button.setObjectName("trash-button")
-
         buttons_wrapper = GridLayoutWrapper(
             self,
             widgets=[
@@ -1180,7 +1186,6 @@ class DeviceSelectionPanel(QFrame):
             spacing=Settings.SPACING.SM,
         )
         buttons_wrapper.setObjectName("available-device-actions")
-        trash_button.hide()
 
         available_device_wrapper = HorizontalLayoutWrapper(
             self,
@@ -1227,7 +1232,6 @@ class DeviceSelectionPanel(QFrame):
             available_device_wrapper=available_device_wrapper,
             add_device_button=add_device_button,
             refresh_button=refresh_button,
-            trash_button=trash_button,
             buttons_wrapper=buttons_wrapper,
             select_helper_text=select_helper_text,
             device_state=device_state,
@@ -1338,7 +1342,7 @@ class DeviceSelectionPanel(QFrame):
         view_signals.DeviceSelectionFailed.connect(self._on_device_selection_failed)
         view_signals.DevicesUpdated.connect(self._on_devices_updated)
         self.ui.refresh_button.clicked.connect(self._on_refresh_button_clicked)
-        self.ui.trash_button.clicked.connect(self._on_trash_button_clicked)
+        view_signals.RemoveDeviceRequested.connect(self._on_remove_device_requested)
 
         #### Signals for toggling the device selection panel visibility ####
         self.ui.expand_button.clicked.connect(self.toggle_panel_visibility)
@@ -1454,19 +1458,18 @@ class DeviceSelectionPanel(QFrame):
         logger.info("Available device list refresh requested.")
         view_signals.RefreshDeviceListRequested.emit()
 
-    def _on_trash_button_clicked(self) -> None:
-        """Handle the trash button click event."""
-        logger.info("Remove all devices requested.")
-        self.ui.available_device_list.clear()
+    def _on_remove_device_requested(self, id: str) -> None:
+        """Handle the remove device requested event."""
+        logger.info("Remove device requested.", id=id)
+        for item_index, item in enumerate(
+            self.ui.available_device_list.iter_items(), start=0
+        ):
+            if item.id == id:
+                removed_item = self.ui.available_device_list.takeItem(item_index)
+                if removed_item is not None:
+                    del removed_item
+                    break
         self._on_available_device_list_model_changed()
-
-    def _sort_available_device_list(self) -> None:
-        """Sort the available device list."""
-        self.ui.available_device_list.sortItems()
-
-    def current_device(self) -> Optional[DeviceItem]:
-        """Get the current device item."""
-        return self.ui.available_device_list.currentItem()
 
     def is_panel_visible(self) -> bool:
         """Check if the device panel is visible."""
@@ -1489,7 +1492,6 @@ class DeviceSelectionPanel(QFrame):
         self.ui.refresh_button.set_icon(
             icon_qt_path_for_theme(theme, GenericIcons.ARROW_CLOCKWISE)
         )
-        self.ui.trash_button.set_icon(icon_qt_path_for_theme(theme, GenericIcons.TRASH))
         for lw_item in self.ui.available_device_list.iter_items():
             if isinstance(lw_item, DeviceItem):
                 lw_item.apply_theme_icons(theme)
@@ -1594,6 +1596,7 @@ class DeviceSelectionPanel(QFrame):
         """Add sample device rows for UI debugging (fake OS / location / activity)."""
         DeviceItem.add_to_list(
             list_widget,
+            id=self.texts.placeholder_primary_device_id,
             text=self.texts.placeholder_primary_device,
             type="available",
             device_kind="mobile",
@@ -1604,6 +1607,7 @@ class DeviceSelectionPanel(QFrame):
         )
         DeviceItem.add_to_list(
             list_widget,
+            id=self.texts.placeholder_secondary_device_id,
             text=self.texts.placeholder_secondary_device,
             type="available",
             device_kind="mobile",
@@ -1614,6 +1618,7 @@ class DeviceSelectionPanel(QFrame):
         )
         DeviceItem.add_to_list(
             list_widget,
+            id=self.texts.placeholder_unknown_device_id,
             text=self.texts.placeholder_unknown_device,
             type="available",
             device_kind="mobile",

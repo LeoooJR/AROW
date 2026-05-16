@@ -93,6 +93,9 @@ class SimulationSubController(AppSubController):
         view_signals.SimulationLogFileUpdateRequested.connect(
             self._on_simulation_log_file_update_requested
         )
+        view_signals.RemoveDeviceRequested.connect(
+            self._on_remove_device_requested
+        )  # Ensuring no simulation is running before device is removed by adb subcontroller
 
     def connect_model_signals(self) -> None:
         # Simulation-specific model subscriptions (none yet) — extension point.
@@ -154,19 +157,27 @@ class SimulationSubController(AppSubController):
 
     def run(self) -> None:
         """Run the simulation."""
-        pass
+        self._session.active = True
+        # self.view.forward_simulation_started() # TODO: Implement this
 
     def stop(self) -> None:
         """Stop the simulation."""
-        pass
+        self._session.active = False
+        # self.view.forward_simulation_stopped() # TODO: Implement this
 
     def pause(self) -> None:
         """Pause the simulation."""
-        pass
+        self._session.active = False
+        # self.view.forward_simulation_paused() # TODO: Implement this
 
     def resume(self) -> None:
         """Resume the simulation."""
-        pass
+        self._session.active = True
+        # self.view.forward_simulation_resumed() # TODO: Implement this
+
+    def is_simulation_active(self) -> bool:
+        """Check if the simulation is active."""
+        return self._session.active
 
     @validate_model
     def _on_device_selection_confirmed(self, device_id: str, device_name: str) -> None:
@@ -205,3 +216,13 @@ class SimulationSubController(AppSubController):
         )
         self._session.log_file = Path(filename)
         self._send_simulation_log_file_to_view()
+
+    def _on_remove_device_requested(self, id: str) -> None:
+        """Handle the remove device requested event."""
+        if self._session.device.id == id:
+            if self.is_simulation_active():
+                logger.info(
+                    f"Active device {id} is being removed, stopping simulation."
+                )
+                self.stop()
+            self._session.device = None

@@ -33,6 +33,7 @@ class ViewSignals(QObject):
     DeviceSelectionFailed = Signal(dict)
     RefreshDeviceListRequested = Signal()
     DevicesUpdated = Signal(object)
+    RemoveDeviceRequested = Signal(str)
 
     #### Host Signals ####
     HostDeviceInformationUpdated = Signal(str, str, str)
