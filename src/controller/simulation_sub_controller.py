@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Final
 from collection import Repository
 from controller.app_sub_controller import AppSubController
 from controller.helper import validate_model, validate_view
-from core.devices import Phone
+from core.devices import Phone, PhoneDescriptor
 from core.location import Location
 from gui.signals import view_signals
 from gui.window import MainWindow
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from controller.app_controller import AppController
 
 
-@dataclass(unsafe_hash=True, match_args=True)
+@dataclass(unsafe_hash=True, match_args=True, frozen=False)
 class Simulation:
     """Simulation."""
 
@@ -51,9 +51,12 @@ class Simulation:
     # When True, ``__setattr__`` logs changes to the public simulation fields.
     _fields_ready: bool = field(init=False, repr=False, compare=False, default=False)
 
+    # Setting _fields_ready to True to allow __setattr__ to log changes to the public simulation fields
+    # This is done in __post_init__ to avoid logging the initial values of the public simulation fields
     def __post_init__(self) -> None:
         object.__setattr__(self, "_fields_ready", True)
 
+    # Overriding __setattr__ to log changes to the public simulation fields
     def __setattr__(self, name: str, value: object) -> None:
         if name in self.__class__.__dataclass_fields__ and name != "_fields_ready":
             if self._fields_ready and hasattr(self, name):
@@ -80,8 +83,8 @@ class SimulationSubController(AppSubController):
 
     def __init__(self, app: AppController) -> None:
         super().__init__(app)
-        sim_id = uuid.uuid4().hex
-        self._session: Simulation = Simulation(
+        sim_id: Final[str] = uuid.uuid4().hex
+        self._session: Final[Simulation] = Simulation(
             id=sim_id,
             log_file=self.model.config_dir / "simulations" / f"{sim_id}.log",
         )
@@ -89,10 +92,10 @@ class SimulationSubController(AppSubController):
     def connect_view_signals(self) -> None:
         view_signals.DeviceSelectionConfirmed.connect(
             self._on_device_selection_confirmed
-        )
+        )  # Ensuring the device is selected when the user confirms the selection
         view_signals.SimulationLogFileUpdateRequested.connect(
             self._on_simulation_log_file_update_requested
-        )
+        )  # Ensuring the log file path is updated when the user requests it
         view_signals.RemoveDeviceRequested.connect(
             self._on_remove_device_requested
         )  # Ensuring no simulation is running before device is removed by adb subcontroller
@@ -127,8 +130,8 @@ class SimulationSubController(AppSubController):
 
     @validate_view
     def _send_simulation_log_file_to_view(self) -> None:
-        log = self._session.log_file
-        path_str = str(log) if log is not None else ""
+        log: Path = self._session.log_file
+        path_str: str = str(log) if log is not None else ""
         self.view.forward_simulation_log_file_updated(self._session.id, path_str)
 
     @property
@@ -188,9 +191,13 @@ class SimulationSubController(AppSubController):
             input_device_name=device_name,
         )
         try:
-            device: Phone = self.model.get_device(device_id)
-            self._session.device = device
-            desc = device.descriptor
+            device: Phone | None = self.model.get_device(device_id)
+            desc: PhoneDescriptor = (
+                device.descriptor
+            )  # Will raise AttributeError if the device is not found (AttributeError: 'NoneType' object has no attribute 'descriptor')
+            self._session.device: Phone = (
+                device  # At this point, the device is guaranteed to be found
+            )
             logger.success(
                 "SimulationSubController: active device set",
                 device_id=desc.id,
@@ -208,13 +215,13 @@ class SimulationSubController(AppSubController):
             )
 
     @validate_view
-    def _on_simulation_log_file_update_requested(self, filename: str) -> None:
-        """In-memory selection of the active device (UI thread)."""
+    def _on_simulation_log_file_update_requested(self, path: str) -> None:
+        """Update the log file path for the current simulation."""
         logger.debug(
             "SimulationSubController: simulation log file update requested",
-            filename=filename,
+            path=path,
         )
-        self._session.log_file = Path(filename)
+        self._session.log_file: Path = Path(path)
         self._send_simulation_log_file_to_view()
 
     def _on_remove_device_requested(self, id: str) -> None:

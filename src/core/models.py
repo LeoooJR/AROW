@@ -199,7 +199,9 @@ class CoreRuntimeModel(Model):
             raise AttributeError(
                 "ADB server and client must be initialized before getting a device"
             )
-        return self._adb_server.paired_devices.get(device_id)
+        return self._adb_server.paired_devices.get(
+            device_id
+        )  # Returns None if the device is not found
 
     def get_known_devices(self, server: AdbServer | None = None) -> list[Phone]:
         """
