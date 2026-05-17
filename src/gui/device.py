@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from typing import Final, Literal, Optional
 
 from PySide6.QtCore import QElapsedTimer, QEvent, QObject, QSize, Qt, QTimer
-from PySide6.QtGui import QFont, QIcon, QResizeEvent
+from PySide6.QtGui import QFont, QFontMetrics, QIcon, QResizeEvent
 from PySide6.QtWidgets import (
     QFrame,
     QGroupBox,
@@ -338,7 +338,7 @@ class DeviceItem(QListWidgetItem):
         )
         trash_button.setObjectName("device-item-trash")
         trash_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        trash_button.show()
+        trash_button.hide()
 
         ### Title row ###
 
@@ -501,12 +501,13 @@ class DeviceItem(QListWidgetItem):
 
     @property
     def name(self) -> str:
-        return self.ui.name_label.text().strip()
+        return self._text
 
     @name.setter
     def name(self, value: str) -> None:
         self._text = value
-        self.ui.name_label.setText(value)
+        self.setToolTip(value)
+        self._apply_text_display_mode()
         self._sync_size_hint()
 
     @property
@@ -531,13 +532,38 @@ class DeviceItem(QListWidgetItem):
 
     def _refresh_subtitle(self) -> None:
         """Refresh the subtitle label with the operating system and location."""
+        self._apply_text_display_mode()
+
+    def _subtitle_text(self) -> str:
         chunks: list[str] = []
         if self._operating_system:
             chunks.append(self._operating_system)
         if self._location:
             chunks.append(self._location)
-        self.ui.subtitle_label.setText(
-            " · ".join(chunks) if chunks else self.texts.empty_subtitle
+        return " · ".join(chunks) if chunks else self.texts.empty_subtitle
+
+    @staticmethod
+    def _elided_text(label: QLabel, text: str) -> str:
+        width = max(1, label.contentsRect().width())
+        return QFontMetrics(label.font()).elidedText(
+            text, Qt.TextElideMode.ElideRight, width
+        )
+
+    def _set_label_text(self, label: QLabel, text: str) -> None:
+        if label.text() != text:
+            label.setText(text)
+
+    def _apply_text_display_mode(self) -> None:
+        """List rows use single-line elision so cards keep a stable height."""
+        subtitle = self._subtitle_text()
+        self.ui.name_label.setWordWrap(False)
+        self.ui.subtitle_label.setWordWrap(False)
+        self._set_label_text(
+            self.ui.name_label, self._elided_text(self.ui.name_label, self._text)
+        )
+        self._set_label_text(
+            self.ui.subtitle_label,
+            self._elided_text(self.ui.subtitle_label, subtitle),
         )
 
     @property
@@ -724,9 +750,45 @@ class DeviceItem(QListWidgetItem):
     def set_hovered(self, hovered: bool) -> None:
         """Apply hover state to the custom list row widget."""
         self.ui.row.setProperty("hovered", hovered)
+        self._refresh_row_style()
+
+    def set_selected(self, selected: bool) -> None:
+        """Apply selection state to the custom row widget used by QListWidget."""
+        self.ui.row.setProperty("selected", selected)
+        self._refresh_row_style()
+
+    def _refresh_row_style(self) -> None:
         self.ui.row.style().unpolish(self.ui.row)
         self.ui.row.style().polish(self.ui.row)
         self.ui.row.update()
+
+    def _list_viewport_width(self) -> int | None:
+        lw = self.listWidget()
+        if lw is None:
+            return None
+        width = lw.viewport().width()
+        return width if width > 0 else None
+
+    def _can_request_expanded_list_width(self) -> bool:
+        lw = self.listWidget()
+        if lw is None:
+            return False
+        window = lw.window()
+        return window.width() >= Settings.DIMENSION.WINDOW_MIN_WIDTH
+
+    def _preferred_row_width(self, natural_width: int) -> int:
+        return (
+            Settings.LIST.DEVICE_ITEM_ROW_EXTENDED_PREFERRED_WIDTH
+            if self._is_extended
+            else Settings.LIST.DEVICE_ITEM_ROW_COMPACT_PREFERRED_WIDTH
+        )
+
+    def _prepare_text_measurement(self) -> None:
+        subtitle = self._subtitle_text()
+        self.ui.name_label.setWordWrap(False)
+        self.ui.subtitle_label.setWordWrap(False)
+        self._set_label_text(self.ui.name_label, self._text)
+        self._set_label_text(self.ui.subtitle_label, subtitle)
 
     def _sync_size_hint(self) -> None:
         if self._sync_size_hint_in_progress:
@@ -735,22 +797,57 @@ class DeviceItem(QListWidgetItem):
             self._sync_size_hint_in_progress = True
             row = self.ui.row
             lay = row.layout()
+            self._prepare_text_measurement()
             if lay is not None:
                 lay.invalidate()
                 lay.activate()
             row.updateGeometry()
 
-            # Extended: keep current behavior (size hint tracks the laid-out row).
+            viewport_width = self._list_viewport_width()
+            natural_width = max(1, row.minimumSizeHint().width())
+            preferred_width = self._preferred_row_width(natural_width)
+            if self._is_extended and self._can_request_expanded_list_width():
+                preferred_width = max(
+                    preferred_width,
+                    Settings.LIST.DEVICE_ITEM_ROW_EXTENDED_PREFERRED_WIDTH,
+                )
+            if (
+                viewport_width is not None
+                and not self._can_request_expanded_list_width()
+            ):
+                target_width = min(viewport_width, preferred_width)
+            else:
+                target_width = preferred_width
+
             if self._is_extended:
+                saved = QSize(row.width(), row.height())
+                if target_width > 0:
+                    row.resize(target_width, saved.height())
+                    if lay is not None:
+                        lay.activate()
+                    row.updateGeometry()
+                    self._apply_text_display_mode()
+                    if lay is not None:
+                        lay.activate()
+                    row.updateGeometry()
                 sh = row.sizeHint()
+                row.resize(saved)
+                if lay is not None:
+                    lay.activate()
+                row.updateGeometry()
                 h = max(Settings.LIST.DEVICE_ITEM_ROW_MIN_HEIGHT, sh.height())
-                self.setSizeHint(QSize(sh.width(), h))
+                w = target_width if target_width > 0 else sh.width()
+                self.setSizeHint(QSize(w, h))
             else:
                 # Shortened: do not carry over the row's stretched width from the extended
                 # state — width must match hidden right column so AdjustToContents can shrink.
-                mw = max(1, row.minimumSizeHint().width())
+                measure_width = target_width
                 saved = QSize(row.width(), row.height())
-                row.resize(mw, saved.height())
+                row.resize(measure_width, saved.height())
+                if lay is not None:
+                    lay.activate()
+                row.updateGeometry()
+                self._apply_text_display_mode()
                 if lay is not None:
                     lay.activate()
                 row.updateGeometry()
@@ -760,7 +857,7 @@ class DeviceItem(QListWidgetItem):
                     lay.activate()
                 row.updateGeometry()
                 h = max(Settings.LIST.DEVICE_ITEM_ROW_MIN_HEIGHT, sh.height())
-                self.setSizeHint(QSize(mw, h))
+                self.setSizeHint(QSize(measure_width, h))
         finally:
             self._sync_size_hint_in_progress = False
         lw = self.listWidget()
@@ -783,18 +880,26 @@ class DeviceItem(QListWidgetItem):
         if self._is_extended:
             return
         self._is_extended = True
-        self._set_extended_badge_layout()  # In extended mode, the badge is inline with the device name
+        self._set_compact_badge_layout()
+        self._apply_text_display_mode()
         self.ui.time_label.show()  # Show the last communication time
+        self.ui.trash_button.show()
         self._sync_size_hint()
 
     def shorten_device_item(self) -> None:
         """Shorten the device item to hide the last communication time"""
         if not self._is_extended:
             self._set_compact_badge_layout()  # In shortened mode, the badge is below the device name
+            self.ui.time_label.hide()
+            self.ui.trash_button.hide()
+            self._apply_text_display_mode()
+            self._sync_size_hint()
             return
         self._is_extended = False
         self._set_compact_badge_layout()  # In shortened mode, the badge is below the device name
+        self._apply_text_display_mode()
         self.ui.time_label.hide()  # Hide the last communication time
+        self.ui.trash_button.hide()
         self._sync_size_hint()
 
     ### Slots ###
@@ -1283,6 +1388,7 @@ class DeviceSelectionPanel(QFrame):
             QEvent.Type.Show,
         ):
             self._reposition_available_device_empty_state()
+            self._sync_available_device_item_size_hints()
         return super().eventFilter(watched, event)
 
     def _set_alignment(self) -> None:
@@ -1336,6 +1442,9 @@ class DeviceSelectionPanel(QFrame):
             self._on_authentification_succeeded
         )
         self.ui.available_device_list.itemClicked.connect(self._on_device_selected)
+        self.ui.available_device_list.itemSelectionChanged.connect(
+            self._sync_available_device_selection_state
+        )
         view_signals.DeviceSelectionSucceeded.connect(
             self._on_device_selection_succeeded
         )
@@ -1386,6 +1495,20 @@ class DeviceSelectionPanel(QFrame):
     def _on_available_device_list_model_changed(self, *args) -> None:
         """Qt model signal slot: keep empty-state visibility in sync after any list mutation."""
         self._update_available_device_empty_state_visibility()
+        self._sync_available_device_selection_state()
+        self._sync_available_device_item_size_hints()
+
+    def _sync_available_device_selection_state(self) -> None:
+        """Mirror QListWidget selection onto custom row widgets."""
+        for item in self.ui.available_device_list.iter_items():
+            if isinstance(item, DeviceItem):
+                item.set_selected(item.isSelected())
+
+    def _sync_available_device_item_size_hints(self) -> None:
+        """Re-measure custom rows when the list viewport width changes."""
+        for item in self.ui.available_device_list.iter_items():
+            if isinstance(item, DeviceItem):
+                item._sync_size_hint()
 
     def _on_ui_constraints_disabled(self) -> None:
         """Handle the UI constraints disabled event."""
