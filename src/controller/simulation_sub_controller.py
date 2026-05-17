@@ -219,7 +219,14 @@ class SimulationSubController(AppSubController):
 
     def _on_remove_device_requested(self, id: str) -> None:
         """Handle the remove device requested event."""
-        if self._session.device.id == id:
+        device = self._session.device
+        if (
+            device is None
+        ):  # Remove request has been made before a device has been selected
+            return
+        if device.id != id:  # Remove request has been made for a different device
+            return
+        else:  # Remove request has been made for the active device
             if self.is_simulation_active():
                 logger.info(
                     f"Active device {id} is being removed, stopping simulation."
