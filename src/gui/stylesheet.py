@@ -663,14 +663,25 @@ QWidget#device-item-row[alert="true"] {{
     border: 1px solid {palette.PRIMARY_BORDER};
 }}
 
+QWidget#device-item-row[selected="true"] {{
+    background-color: {palette.SURFACE_ELEVATED};
+    border: 2px solid {palette.PRIMARY};
+}}
+
 QWidget#device-item-row[hovered="true"] {{
     background-color: {palette.SURFACE_MUTED};
     border: 1px solid {palette.BORDER_STRONG};
 }}
 
+QWidget#device-item-row[selected="true"][hovered="true"] {{
+    background-color: {palette.SURFACE_MUTED};
+    border: 2px solid {palette.PRIMARY};
+}}
+
+QWidget#device-item-row[alert="true"][selected="true"],
 QWidget#device-item-row[alert="true"][hovered="true"] {{
     background-color: {palette.PRIMARY_SOFT};
-    border: 1px solid {palette.PRIMARY};
+    border: 2px solid {palette.PRIMARY};
 }}
 
 QWidget#device-item-center,
