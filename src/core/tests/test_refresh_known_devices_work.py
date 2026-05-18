@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+import pytest
+
 from core.adb import MockAdbClient, MockAdbServer, MockAdbState
 from core.devices import Phone
 from core.models import CoreRuntimeModel
@@ -13,6 +15,8 @@ from core.work.refresh_known_devices_work import (
     RefreshKnownDevicesWork,
     enrich_phones_with_adb_shell_properties,
 )
+
+pytestmark = [pytest.mark.devices]
 
 
 def test_enrich_phones_with_adb_shell_properties_empty_skips_adb_methods() -> None:

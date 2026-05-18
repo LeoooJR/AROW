@@ -6,7 +6,7 @@ import pytest
 
 from logger import _serialize_extras, maybe_redact_extra_value, redact_stable_identifier
 
-pytestmark = [pytest.mark.devices]
+pytestmark = [pytest.mark.logger_redaction]
 
 
 def test_stable_key_extra_fully_redacted() -> None:

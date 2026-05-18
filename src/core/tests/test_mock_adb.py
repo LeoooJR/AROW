@@ -4,6 +4,8 @@ Tests for faker-backed mock ADB (no real adb binary; not marked ``@pytest.mark.a
 
 from __future__ import annotations
 
+import pytest
+
 from core.adb import AdbClientException, MockAdbClient, MockAdbServer, MockAdbState
 from core.devices import Phone
 from core.models import CoreRuntimeModel
@@ -19,6 +21,8 @@ from core.work.authentificate_device_work import (
     AuthentificateDeviceOutcome,
 )
 from core.work.startup_work import StartupCoreRuntimeWork, StartupOutcome
+
+pytestmark = [pytest.mark.mock_adb]
 
 
 class RestartCountingMockAdbServer(MockAdbServer):

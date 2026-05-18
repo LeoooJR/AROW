@@ -7,6 +7,7 @@ Headless CI: use ``QT_QPA_PLATFORM=offscreen`` if the platform plugin fails.
 from __future__ import annotations
 
 import datetime as dt
+import locale
 
 import pytest
 
@@ -18,6 +19,9 @@ from gui.device import (
 
 pytestmark = pytest.mark.usefixtures("qapp")
 
+locale.setlocale(
+    locale.LC_TIME, "en_US.UTF-8"
+)  # Set locale to English for consistent formatting
 _NOW = dt.datetime(2026, 5, 7, 12, 0, 0)
 
 
