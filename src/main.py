@@ -1,3 +1,4 @@
+import locale
 import sys
 from typing import Annotated
 
@@ -6,6 +7,10 @@ from PySide6 import QtWidgets
 
 from __init__ import __application__, __version__
 from logger import setup_logger
+
+locale.setlocale(
+    locale.LC_ALL, "en_US.UTF-8"
+)  # Set locale to English for consistent formatting
 
 setup_logger()
 
