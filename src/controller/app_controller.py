@@ -155,7 +155,7 @@ class AppController(Controller):
 
         self.view = None  # Ensure the view is not accessible anymore, no data will be forwarded to it
 
-        self._wait_for_adb_bootstrap_jobs()
+        self._wait_for_adb_bootstrap_jobs()  # Waiting for ADB running jobs to finish before shutting down
 
         shutdown_loop = QEventLoop()
 

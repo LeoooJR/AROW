@@ -60,6 +60,7 @@ Apply these rules whenever you touch `src/geo`.
 - Create and run model-side heavy work, map creation, and I/O through `src/controller/async.py`.
 - Use `JobSpecification` and `AsyncRunner.submit(job)` for async execution.
 - Use the returned `JobHandler` and `runner.bind_handle_signals(handle)` when per-job signals are needed.
+- Implement core-runtime async job completion handlers (`on_completed` / `on_failed`) in `src/controller/core_work_callbacks.py`, wired to those handlers, instead of accumulating ad-hoc methods on large controllers.
 - Do not introduce ad-hoc threads or processes for model work; route it through `AsyncRunner` so cancellation, coalescing, and signals remain consistent.
 
 ## Qt model/view usage
