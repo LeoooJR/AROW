@@ -154,6 +154,8 @@ class LeadingIconLabel(QWidget, Component):
         # Initialize parent QWidget
         super().__init__(parent)
 
+        self.setObjectName("leading-icon-label")
+
         self.texts = LeadingIconLabel.Text(text=text if isinstance(text, str) else None)
 
         if icon is None:
@@ -169,10 +171,8 @@ class LeadingIconLabel(QWidget, Component):
         layout.setContentsMargins(*margins)
         layout.setSpacing(spacing)  # Spacing between icon and text
 
-        self.setObjectName("icon-label")
-
         svg = SVG(icon_qt_path(self._icon), self)
-        svg.setObjectName("icon")
+        svg.setObjectName("leading-icon")
         svg.setFixedSize(
             get_svg_size(Settings.FONT.SIZE_DEFAULT)
         )  # Set the size of the leading icon depending on the font size
@@ -378,32 +378,40 @@ class Button(QPushButton, Component):
 
         pass
 
-    def __init__(self, parent: QWidget | None, text: str, icon_path: str | None = None):
+    def __init__(
+        self,
+        parent: QWidget | None,
+        text: str,
+        icon: GenericIcons | OperatingSystemIcons | ApplicationIcons | None = None,
+    ):
         """Create a styled primary button with optional icon.
 
         Args:
             parent: Optional Qt parent widget for lifetime and hierarchy.
             text: Button label text.
-            icon_path: Optional icon asset path shown before the label.
+            icon: Optional GenericIcons | OperatingSystemIcons | ApplicationIcons shown before the label.
         """
-        self.texts = Button.Text(label=text)
-        self.ui = Button.UI()
-
-        if icon_path:
-            super().__init__(QIcon(icon_path), text, parent)
-            self.setIconSize(get_svg_size(self.font().pointSize()))
+        if icon is not None:
+            super().__init__(QIcon(icon_qt_path(icon)), text, parent)
+            self.setIconSize(get_svg_size(Settings.FONT.SIZE_DEFAULT))
+            self._icon = icon
         else:
             super().__init__(text, parent)
+            self._icon = None
 
         self.setProperty("button", True)
-        self.setFixedHeight(Settings.DIMENSION.BUTTON_HEIGHT)
-        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        # Set minimum width based on content, but allow horizontal expansion
-        self.setMinimumWidth(self.sizeHint().width())
+
+        self.texts = Button.Text(label=text)
+
+        self.ui = Button.UI()
+
         self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
-        pass
+        self.setFixedHeight(Settings.DIMENSION.BUTTON_HEIGHT)
+        # Set minimum width based on content, but allow horizontal expansion
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.setMinimumWidth(self.sizeHint().width())
 
     def _set_alignment(self) -> None:
         pass
@@ -412,7 +420,8 @@ class Button(QPushButton, Component):
         pass
 
     def apply_theme_icons(self, theme: Theme) -> None:
-        pass
+        if self._icon is not None:
+            self.setIcon(QIcon(icon_qt_path_for_theme(theme, self._icon)))
 
 
 class WalkthroughButton(QPushButton, Component):
@@ -432,28 +441,32 @@ class WalkthroughButton(QPushButton, Component):
     class UI:
         """Reserved for future explicit child references on the walkthrough button."""
 
-        pass
+        leading_svg: SVG
+        label: QLabel
+        trailing_svg: SVG
 
     def __init__(
         self,
         parent: QWidget | None,
         text: str,
-        lead_icon_path: str,
-        trailing_icon_path: str,
+        leading_icon: GenericIcons | OperatingSystemIcons | ApplicationIcons,
+        trailing_icon: GenericIcons | OperatingSystemIcons | ApplicationIcons,
     ):
         """Build the custom walkthrough card button layout.
 
         Args:
             parent: Optional Qt parent widget for lifetime and hierarchy.
             text: Main descriptive label (word-wrapped).
-            lead_icon_path: Left column SVG asset.
-            trailing_icon_path: Top-right hint SVG asset.
+            leading_icon: Left column SVG asset.
+            trailing_icon: Top-right hint SVG asset.
         """
         super().__init__(parent)
+
         self.texts = WalkthroughButton.Text(label=text)
-        self.ui = WalkthroughButton.UI()
+
         self.setObjectName("welcome-walkthrough-button")
         self.setProperty("welcome-walkthrough-button", True)
+
         self.setFlat(True)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setText("")
@@ -467,63 +480,66 @@ class WalkthroughButton(QPushButton, Component):
         row.setContentsMargins(pad_h, pad_v, pad_h, pad_v)
         row.setSpacing(Settings.SPACING.SM)
 
+        self._leading_icon = leading_icon
         lead_px = get_svg_size(Settings.FONT.SIZE_HELPER)
-        self._lead_icon = SVG(lead_icon_path, self)
-        self._lead_icon.setObjectName("walkthrough-card-lead-icon")
-        self._lead_icon.setFixedSize(lead_px)
-        self._lead_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        leading_svg = SVG(icon_qt_path(leading_icon), self)
+        leading_svg.setObjectName("walkthrough-card-lead-icon")
+        leading_svg.setFixedSize(lead_px)
 
-        self._label = QLabel(text, self)
-        self._label.setObjectName("walkthrough-card-label")
-        self._label.setWordWrap(True)
-        self._label.setAlignment(
-            Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft
-        )
+        label = QLabel(text, self)
+        label.setObjectName("walkthrough-card-label")
+        label.setWordWrap(True)
 
-        trail_px = max(get_svg_size(Settings.FONT.SIZE_HELPER).width(), 20)
         trailing_host = QWidget(self)
         trailing_host.setObjectName("walkthrough-card-trailing")
         trailing_col = QVBoxLayout(trailing_host)
         trailing_col.setContentsMargins(0, 0, 0, 0)
         trailing_col.setSpacing(0)
-        self._trail_icon = SVG(trailing_icon_path, self)
-        self._trail_icon.setObjectName("walkthrough-card-trail-icon")
-        self._trail_icon.setFixedSize(trail_px, trail_px)
-        self._trail_icon.setAlignment(
-            Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight
-        )
+
+        self._trailing_icon = trailing_icon
+        trail_px = max(get_svg_size(Settings.FONT.SIZE_HELPER).width(), 20)
+        trailing_svg = SVG(icon_qt_path(trailing_icon), self)
+        trailing_svg.setObjectName("walkthrough-card-trail-icon")
+        trailing_svg.setFixedSize(trail_px, trail_px)
+
         trailing_col.addWidget(
-            self._trail_icon, 0, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight
+            trailing_svg, 0, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight
         )
         trailing_col.addStretch(1)
 
-        row.addWidget(self._lead_icon, 0, Qt.AlignmentFlag.AlignVCenter)
-        row.addWidget(self._label, 1)
+        row.addWidget(leading_svg, 0, Qt.AlignmentFlag.AlignVCenter)
+        row.addWidget(label, 1)
         row.addWidget(
             trailing_host, 0, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight
         )
 
-        self.setMinimumHeight(Settings.DIMENSION.WELCOME_WALKTHROUGH_CARD_MIN_HEIGHT)
-        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
-        self.setMinimumWidth(self.sizeHint().width())
+        self.ui = WalkthroughButton.UI(
+            leading_svg=leading_svg, label=label, trailing_svg=trailing_svg
+        )
         self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
-        pass
+        self.setMinimumHeight(Settings.DIMENSION.WELCOME_WALKTHROUGH_CARD_MIN_HEIGHT)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        self.setMinimumWidth(self.sizeHint().width())
 
     def _set_alignment(self) -> None:
-        pass
+        self.ui.leading_svg.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.ui.label.setAlignment(
+            Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft
+        )
+        self.ui.trailing_svg.setAlignment(
+            Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight
+        )
 
     def _connect_signals(self) -> None:
         pass
 
     def apply_theme_icons(self, theme: Theme) -> None:
         """Refresh walkthrough row SVGs for the given palette."""
-        self._lead_icon.set_path(
-            icon_qt_path_for_theme(theme, OperatingSystemIcons.ANDROID)
-        )
-        self._trail_icon.set_path(
-            icon_qt_path_for_theme(theme, GenericIcons.HAND_INDEX)
+        self.ui.leading_svg.set_path(icon_qt_path_for_theme(theme, self._leading_icon))
+        self.ui.trailing_svg.set_path(
+            icon_qt_path_for_theme(theme, self._trailing_icon)
         )
 
 
@@ -544,32 +560,37 @@ class ToolButton(QToolButton, Component):
     def __init__(
         self,
         parent: QWidget | None,
-        icon_path: str | None = None,
-        icon_size: QSize | None = None,
+        icon: GenericIcons | OperatingSystemIcons | ApplicationIcons | None = None,
         tooltip: str | None = None,
     ):
         """Create a compact icon button with optional tooltip.
 
         Args:
             parent: Optional Qt parent widget for lifetime and hierarchy.
-            icon_path: Optional SVG or pixmap path for the button face.
-            icon_size: Fixed icon dimensions; derived when omitted.
+            icon: Optional GenericIcons | OperatingSystemIcons | ApplicationIcons for the button face.
             tooltip: Hover tooltip string.
         """
         super().__init__(parent)
-        self.texts = ToolButton.Text(tooltip=tooltip)
-        self.ui = ToolButton.UI()
+
         self.setProperty("tool-button", True)
-        self.set_icon(icon_path, icon_size)
-        self.setFixedHeight(Settings.DIMENSION.TOOLBUTTON_HEIGHT)
-        self.setFixedWidth(self.sizeHint().width())
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
-        if tooltip is not None:
-            self.setToolTip(tooltip)
+
+        self.texts = ToolButton.Text(tooltip=tooltip)
+
+        self._icon: GenericIcons | OperatingSystemIcons | ApplicationIcons | None = icon
+        if self._icon is not None:
+            self.setIcon(QIcon(icon_qt_path(self._icon)))
+            self.setIconSize(get_svg_size(Settings.FONT.SIZE_DEFAULT))
+            self.setCursor(Qt.CursorShape.PointingHandCursor)
+            if tooltip is not None:
+                self.setToolTip(tooltip)
+
+        self.ui = ToolButton.UI()
+
         self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
-        pass
+        self.setFixedHeight(Settings.DIMENSION.TOOLBUTTON_HEIGHT)
+        self.setFixedWidth(self.sizeHint().width())
 
     def _set_alignment(self) -> None:
         pass
@@ -578,69 +599,23 @@ class ToolButton(QToolButton, Component):
         pass
 
     def apply_theme_icons(self, theme: Theme) -> None:
-        pass
+        if self._icon is not None:
+            self.setIcon(QIcon(icon_qt_path_for_theme(theme, self._icon)))
 
     def set_icon(
-        self, icon_path: str | None = None, icon_size: QSize | int | None = None
+        self, icon: GenericIcons | OperatingSystemIcons | ApplicationIcons | None = None
     ):
         """Apply a new icon and optional size to the tool button.
 
         Args:
-            icon_path: Asset path for the icon; does nothing when omitted.
-            icon_size: QSize or point-size hint for ``get_svg_size`` when sizing SVGs.
+            icon: GenericIcons | OperatingSystemIcons | ApplicationIcons for the button face.
         """
-        if icon_path is None:
+        if icon is None:
             return
-        if icon_size is None:
-            icon_size = get_svg_size(self.font().pointSize())
-        else:
-            if isinstance(icon_size, int):
-                icon_size = get_svg_size(icon_size)
-        self.setIcon(QIcon(icon_path))
-        self.setIconSize(icon_size)
 
-
-class ButtonGroup(QButtonGroup, Component):
-
-    @dataclass(frozen=True)
-    class Text:
-        """Reserved for future user-visible strings on the button group."""
-
-        pass
-
-    @dataclass
-    class UI:
-        """Reserved for future explicit child references on the button group."""
-
-        pass
-
-    def __init__(self, parent: QWidget | None, buttons: list[QAbstractButton] = []):
-        """Create an exclusive button group and optionally register buttons.
-
-        Args:
-            parent: Optional Qt parent object for the group.
-            buttons: Initial member buttons added with ``addButton``.
-        """
-        super().__init__(parent)
-        self.texts = ButtonGroup.Text()
-        self.ui = ButtonGroup.UI()
-        self.setProperty("button-group", True)
-        self.setExclusive(True)
-        for button in buttons:
-            self.addButton(button)
-        self._finalize_ui_hooks()
-
-    def _set_size_policy(self) -> None:
-        pass
-
-    def _set_alignment(self) -> None:
-        pass
-
-    def _connect_signals(self) -> None:
-        pass
-
-    def apply_theme_icons(self, theme: Theme) -> None:
-        pass
+        self._icon: GenericIcons | OperatingSystemIcons | ApplicationIcons | None = icon
+        self.setIcon(QIcon(icon_qt_path(self._icon)))
+        self.setIconSize(get_svg_size(Settings.FONT.SIZE_DEFAULT))
 
 
 class SelectionField(QComboBox, Component):
@@ -1933,7 +1908,7 @@ class File(QWidget, Component):
         if self._file_save:
             save_as_button = ToolButton(
                 self,
-                icon_path=icon_qt_path(GenericIcons.SAVE_AS),
+                icon=GenericIcons.SAVE_AS,
                 tooltip=self.texts.save_as_tooltip,
             )
             layout.addWidget(save_as_button)
@@ -1959,9 +1934,7 @@ class File(QWidget, Component):
     def apply_theme_icons(self, theme: Theme) -> None:
         self._file_icon.set_path(icon_qt_path_for_theme(theme, GenericIcons.FILE))
         if hasattr(self, "_save_as_button"):
-            self._save_as_button.set_icon(
-                icon_qt_path_for_theme(theme, GenericIcons.SAVE_AS)
-            )
+            self._save_as_button.apply_theme_icons(theme)
 
     def _on_save_as_button_clicked(self) -> None:
         """Handle the save as button click event."""
@@ -2357,7 +2330,7 @@ class AuthentificationCard(QFrame, Component):
 
         close_button = ToolButton(
             self,
-            icon_path=icon_qt_path(GenericIcons.X),
+            icon=GenericIcons.X,
             tooltip=self.texts.close_button_tooltip,
         )
 
@@ -2570,7 +2543,7 @@ class AuthentificationCard(QFrame, Component):
         self.ui.close_button.clicked.connect(self._on_close_button_clicked)
 
     def apply_theme_icons(self, theme: Theme) -> None:
-        self.ui.close_button.set_icon(icon_qt_path_for_theme(theme, GenericIcons.X))
+        self.ui.close_button.apply_theme_icons(theme)
         self.ui.icon.set_path(icon_qt_path_for_theme(theme, GenericIcons.DEVICE))
 
     def _on_close_button_clicked(self) -> None:

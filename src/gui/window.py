@@ -21,6 +21,7 @@ from PySide6.QtGui import QColor, QFont, QIcon, QPalette, QPixmap, QScreen
 from PySide6.QtWidgets import (
     QAbstractButton,
     QApplication,
+    QButtonGroup,
     QFrame,
     QHBoxLayout,
     QMainWindow,
@@ -41,7 +42,6 @@ from gui.device import DeviceItem, DevicePairingPanel, DeviceSelectionPanel
 from gui.elements import (
     SVG,
     AuthentificationCard,
-    ButtonGroup,
     ProgressBar,
     QuestionDialog,
     Toast,
@@ -149,7 +149,7 @@ class Header(QWidget):
         name: SVG
         light_palette_button: ToolButton
         dark_palette_button: ToolButton
-        palette_button_group: ButtonGroup
+        palette_button_group: QButtonGroup
         palette_button_wrapper: HorizontalLayoutWrapper
         palette_thumb: QFrame
         left_panel_visibility_request_button: ToolButton
@@ -177,15 +177,17 @@ class Header(QWidget):
         layout = QHBoxLayout()
 
         # Create palette button group, containing light and dark mode buttons, exclusive to one of them being selected at a time
-        palette_button_group = ButtonGroup(self)
+        palette_button_group = QButtonGroup(self)
+        palette_button_group.setProperty("button-group", True)
+        palette_button_group.setExclusive(True)
         light_palette_button = ToolButton(
             self,
-            icon_path=icon_qt_path(GenericIcons.LIGHT_MODE),
+            icon=GenericIcons.LIGHT_MODE,
             tooltip=self.texts.light_palette_button_tooltip,
         )
         dark_palette_button = ToolButton(
             self,
-            icon_path=icon_qt_path(GenericIcons.DARK_MODE),
+            icon=GenericIcons.DARK_MODE,
             tooltip=self.texts.dark_palette_button_tooltip,
         )
         palette_button_group.addButton(light_palette_button, 0)
@@ -221,7 +223,7 @@ class Header(QWidget):
         # Left panels visibility button: toggles left sidebar (device + location panels). visibility=True => panels shown; at start panels are visible.
         left_panel_visibility_request_button = ToolButton(
             self,
-            icon_path=icon_qt_path(GenericIcons.LAYOUT_SIDEBAR_INSET),
+            icon=GenericIcons.LAYOUT_SIDEBAR_INSET,
             tooltip=self.texts.left_panel_visibility_button_tooltip,
         )
         left_panel_visibility_request_button.setObjectName(
@@ -233,7 +235,7 @@ class Header(QWidget):
         # Right panels visibility button: toggles right sidebar (host + log panels). visibility=True => panels shown; at start panels are visible.
         right_panel_visibility_request_button = ToolButton(
             self,
-            icon_path=icon_qt_path(GenericIcons.LAYOUT_SIDEBAR_INSET_REVERSE),
+            icon=GenericIcons.LAYOUT_SIDEBAR_INSET_REVERSE,
             tooltip=self.texts.right_panel_visibility_button_tooltip,
         )
         right_panel_visibility_request_button.setObjectName(
@@ -341,11 +343,11 @@ class Header(QWidget):
         if button.property("inset"):
             button.setProperty("inset", False)
             button.setProperty("visibility", False)
-            button.setIcon(QIcon(icon_qt_path(GenericIcons.LAYOUT_SIDEBAR)))
+            button.set_icon(GenericIcons.LAYOUT_SIDEBAR)
         else:
             button.setProperty("inset", True)
             button.setProperty("visibility", True)
-            button.setIcon(QIcon(icon_qt_path(GenericIcons.LAYOUT_SIDEBAR_INSET)))
+            button.set_icon(GenericIcons.LAYOUT_SIDEBAR_INSET)
 
     def toggle_right_panels_visibility_request_button(self) -> None:
         """Update right panels button icon and properties to the toggled state (call after body right panels visibility has been set).
@@ -360,47 +362,33 @@ class Header(QWidget):
         if button.property("inset"):
             button.setProperty("inset", False)
             button.setProperty("visibility", False)
-            button.setIcon(QIcon(icon_qt_path(GenericIcons.LAYOUT_SIDEBAR_REVERSE)))
+            button.set_icon(GenericIcons.LAYOUT_SIDEBAR_REVERSE)
         else:
             button.setProperty("inset", True)
             button.setProperty("visibility", True)
-            button.setIcon(
-                QIcon(icon_qt_path(GenericIcons.LAYOUT_SIDEBAR_INSET_REVERSE))
-            )
+            button.set_icon(GenericIcons.LAYOUT_SIDEBAR_INSET_REVERSE)
 
     def apply_theme_icons(self, theme: Theme) -> None:
         """Refresh header chrome icon resources for ``theme``."""
-        self.ui.light_palette_button.set_icon(
-            icon_qt_path_for_theme(theme, GenericIcons.LIGHT_MODE)
-        )
-        self.ui.dark_palette_button.set_icon(
-            icon_qt_path_for_theme(theme, GenericIcons.DARK_MODE)
-        )
+        self.ui.light_palette_button.apply_theme_icons(theme)
+        self.ui.dark_palette_button.apply_theme_icons(theme)
         self.ui.name.set_path(icon_qt_path_for_theme(theme, ApplicationIcons.NAME))
         left_btn = self.ui.left_panel_visibility_request_button
-        if left_btn.property("inset"):
-            left_btn.setIcon(
-                QIcon(icon_qt_path_for_theme(theme, GenericIcons.LAYOUT_SIDEBAR_INSET))
-            )
-        else:
-            left_btn.setIcon(
-                QIcon(icon_qt_path_for_theme(theme, GenericIcons.LAYOUT_SIDEBAR))
-            )
+        left_icon = (
+            GenericIcons.LAYOUT_SIDEBAR_INSET
+            if left_btn.property("inset")
+            else GenericIcons.LAYOUT_SIDEBAR
+        )
+        left_btn.set_icon(left_icon)
+        left_btn.apply_theme_icons(theme)
         right_btn = self.ui.right_panel_visibility_request_button
-        if right_btn.property("inset"):
-            right_btn.setIcon(
-                QIcon(
-                    icon_qt_path_for_theme(
-                        theme, GenericIcons.LAYOUT_SIDEBAR_INSET_REVERSE
-                    )
-                )
-            )
-        else:
-            right_btn.setIcon(
-                QIcon(
-                    icon_qt_path_for_theme(theme, GenericIcons.LAYOUT_SIDEBAR_REVERSE)
-                )
-            )
+        right_icon = (
+            GenericIcons.LAYOUT_SIDEBAR_INSET_REVERSE
+            if right_btn.property("inset")
+            else GenericIcons.LAYOUT_SIDEBAR_REVERSE
+        )
+        right_btn.set_icon(right_icon)
+        right_btn.apply_theme_icons(theme)
 
     #### Private methods ####
 

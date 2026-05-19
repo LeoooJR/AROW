@@ -24,8 +24,7 @@ def _build_stylesheet(palette) -> str:
                 list_border = f"2px solid rgba({soft_red_rgba}, {alpha:.1f})"
                 otp_border = f"2px solid rgba({soft_red_rgba}, {alpha:.1f})"
                 helper_color = f"rgba({soft_red_rgba}, {alpha:.1f})"
-            rules.append(
-                f"""
+            rules.append(f"""
 QListWidget#availabe-device-list[device-list-highlight-level="{level}"] {{
     border: {list_border};
     border-radius: {Settings.BORDER_RADIUS.MD}px;
@@ -36,8 +35,7 @@ QFrame#card QWidget#otp-input QLineEdit[otp-invalid-highlight-level="{level}"] {
 }}
 QFrame#card QLabel[otp-helper-invalid-highlight-level="{level}"] {{
     color: {helper_color};
-}}"""
-            )
+}}""")
         return "".join(rules)
 
     pulse_section = _pulse_rules()
@@ -791,7 +789,7 @@ QWidget#adb-bridge-section {{
 }}
 
 QWidget#host-identity-section QLabel[host-title="true"],
-QWidget#host-identity-section QWidget#icon-label QLabel#label {{
+QWidget#host-identity-section QWidget#leading-icon-label QLabel#label {{
     color: {palette.TEXT_PRIMARY};
     font-size: {Settings.FONT.SIZE_DEFAULT}px;
     font-weight: {Settings.FONT.WEIGHT_DEMIBOLD};

@@ -114,7 +114,7 @@ class LocationPanel(QFrame):
         )
         expand_button = ToolButton(
             self,
-            icon_path=icon_qt_path(GenericIcons.LAYOUT_BOTTOMBAR_INSET),
+            icon=GenericIcons.LAYOUT_BOTTOMBAR_INSET,
             tooltip=self.texts.expand_button_tooltip,
         )
         expand_button.setProperty("toggle", True)
@@ -130,23 +130,6 @@ class LocationPanel(QFrame):
         body_layout = QVBoxLayout(body)
         body_layout.setContentsMargins(*Settings.SPACING.MARGIN_NONE)
         body_layout.setSpacing(Settings.PANEL.SECTION_SPACING)
-
-        # table_placeholder = PlaceHolder(None, "No data available", minimum_width=Settings.DIMENSION.MIN_WIDTH_LARGE, minimum_height=Settings.DIMENSION.MIN_HEIGHT_SMALL, stretch_widgets=True)
-        # table_placeholder.setObjectName("table-placeholder")
-        # table_placeholder.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-
-        # table_helper_text = HelperText(None, "Upload a railway context file to get started")
-        # table_helper_text.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-
-        # table_wrapper = VerticalLayoutWrapper(self, widgets=[table_placeholder, table_helper_text], spacing=Settings.SPACING.XS, margins=Settings.SPACING.MARGIN_NONE)
-        # table_wrapper.setObjectName("table-wrapper")
-        # table_wrapper.layout().setAlignment(table_placeholder, Qt.AlignmentFlag.AlignCenter)
-        # table_wrapper.layout().setAlignment(table_helper_text, Qt.AlignmentFlag.AlignLeft)
-        # body_layout.addWidget(table_wrapper, 1)
-
-        # upload_button = Button(self, "Upload", icon_path=GenericIcons.UPLOAD.value)
-        # body_layout.addWidget(upload_button)
-        # body_layout.setAlignment(upload_button, Qt.AlignmentFlag.AlignCenter)
 
         # Railway section with divider
         railway_label = DemiBoldText(None, self.texts.railway_label)
@@ -201,7 +184,7 @@ class LocationPanel(QFrame):
         start_simulation_button = Button(
             self,
             self.texts.start_simulation_button,
-            icon_path=icon_qt_path(GenericIcons.START),
+            icon=GenericIcons.START,
         )
         body_layout.addWidget(start_simulation_button)
 
@@ -312,20 +295,16 @@ class LocationPanel(QFrame):
             icon_qt_path_for_theme(theme, GenericIcons.GEO)
         )
         inset = bool(self.ui.expand_button.property("toggle"))
-        ex = (
+        expand_icon = (
             GenericIcons.LAYOUT_BOTTOMBAR_INSET
             if inset
             else GenericIcons.LAYOUT_BOTTOMBAR
         )
-        self.ui.expand_button.setIcon(QIcon(icon_qt_path_for_theme(theme, ex)))
+        self.ui.expand_button.set_icon(expand_icon)
+        self.ui.expand_button.apply_theme_icons(theme)
         self.ui.railway_label_icon.apply_theme_icons(theme)
         self.ui.kilometric_label_icon.apply_theme_icons(theme)
-        self.ui.start_simulation_button.setIcon(
-            QIcon(icon_qt_path_for_theme(theme, GenericIcons.START))
-        )
-        self.ui.start_simulation_button.setIconSize(
-            get_svg_size(self.ui.start_simulation_button.font().pointSize())
-        )
+        self.ui.start_simulation_button.apply_theme_icons(theme)
 
     def is_panel_visible(self) -> bool:
         """Check if the location panel is visible."""
@@ -341,9 +320,7 @@ class LocationPanel(QFrame):
         """Show the location panel."""
         if not self.is_panel_visible():
             self.ui.expand_button.setProperty("toggle", True)
-            self.ui.expand_button.setIcon(
-                QIcon(icon_qt_path(GenericIcons.LAYOUT_BOTTOMBAR_INSET))
-            )
+            self.ui.expand_button.set_icon(GenericIcons.LAYOUT_BOTTOMBAR_INSET)
             animate_widget_visibility(
                 self,
                 visible=True,
@@ -356,9 +333,7 @@ class LocationPanel(QFrame):
         """Hide the location panel."""
         if self.is_panel_visible():
             self.ui.expand_button.setProperty("toggle", False)
-            self.ui.expand_button.setIcon(
-                QIcon(icon_qt_path(GenericIcons.LAYOUT_BOTTOMBAR))
-            )
+            self.ui.expand_button.set_icon(GenericIcons.LAYOUT_BOTTOMBAR)
             animate_widget_visibility(
                 self,
                 visible=False,
@@ -372,9 +347,7 @@ class LocationPanel(QFrame):
         if self.ui.expand_button.property("toggle"):
             # Reduce: hide body and constrain height so the panel under can grow.
             self.ui.expand_button.setProperty("toggle", False)
-            self.ui.expand_button.setIcon(
-                QIcon(icon_qt_path(GenericIcons.LAYOUT_BOTTOMBAR))
-            )
+            self.ui.expand_button.set_icon(GenericIcons.LAYOUT_BOTTOMBAR)
             animate_widget_visibility(
                 self,
                 visible=False,
@@ -385,9 +358,7 @@ class LocationPanel(QFrame):
         else:
             # Expand: show body and allow it to grow.
             self.ui.expand_button.setProperty("toggle", True)
-            self.ui.expand_button.setIcon(
-                QIcon(icon_qt_path(GenericIcons.LAYOUT_BOTTOMBAR_INSET))
-            )
+            self.ui.expand_button.set_icon(GenericIcons.LAYOUT_BOTTOMBAR_INSET)
             animate_widget_visibility(
                 self,
                 visible=True,

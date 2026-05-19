@@ -121,14 +121,14 @@ class WelcomePanel(QFrame):
         walkthrough_wifi_button = WalkthroughButton(
             self,
             self.texts.walkthrough_wifi_button,
-            lead_icon_path=icon_qt_path(OperatingSystemIcons.ANDROID),
-            trailing_icon_path=icon_qt_path(GenericIcons.HAND_INDEX),
+            leading_icon=OperatingSystemIcons.ANDROID,
+            trailing_icon=GenericIcons.HAND_INDEX,
         )
         walkthrough_usb_button = WalkthroughButton(
             self,
             self.texts.walkthrough_usb_button,
-            lead_icon_path=icon_qt_path(OperatingSystemIcons.ANDROID),
-            trailing_icon_path=icon_qt_path(GenericIcons.HAND_INDEX),
+            leading_icon=OperatingSystemIcons.ANDROID,
+            trailing_icon=GenericIcons.HAND_INDEX,
         )
         walkthrough_buttons_wrapper = VerticalLayoutWrapper(
             self,

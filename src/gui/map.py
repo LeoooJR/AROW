@@ -294,7 +294,7 @@ class Location(QWidget):
 
         crosshair_button = ToolButton(
             parent=self,
-            icon_path=icon_qt_path(GenericIcons.CROSSHAIR),
+            icon=GenericIcons.CROSSHAIR,
             tooltip=self.texts.crosshair_button_tooltip,
         )
         crosshair_button.setEnabled(False)
@@ -315,9 +315,7 @@ class Location(QWidget):
         """Update the coordinate row leading marker and crosshair for ``theme``."""
         if self._coordinate_lead_svg is not None:
             self._coordinate_lead_svg.set_path(icon_qt_path_for_theme(theme, lead))
-        self.ui.crosshair_button.set_icon(
-            icon_qt_path_for_theme(theme, GenericIcons.CROSSHAIR)
-        )
+        self.ui.crosshair_button.apply_theme_icons(theme)
 
     def _finalize_ui_hooks(self) -> None:
         """Run the final UI setup hooks for the location widget."""
@@ -456,8 +454,7 @@ class Coordinates(QFrame):
 
         play_button = ToolButton(
             parent=self,
-            icon_path=icon_qt_path(GenericIcons.PLAY),
-            icon_size=get_svg_size(Settings.FONT.SIZE_DEFAULT),
+            icon=GenericIcons.PLAY,
             tooltip=self.texts.play_button_tooltip,
         )
         play_button.setEnabled(True)
@@ -490,16 +487,8 @@ class Coordinates(QFrame):
         self.ui.simulation_state_off.apply_theme_icons(theme)
         self.ui.simulation_state_on.apply_theme_icons(theme)
         pb = self.ui.play_button
-        if pb.property("toggle"):
-            pb.set_icon(
-                icon_qt_path_for_theme(theme, GenericIcons.PAUSE),
-                Settings.FONT.SIZE_DEFAULT,
-            )
-        else:
-            pb.set_icon(
-                icon_qt_path_for_theme(theme, GenericIcons.PLAY),
-                Settings.FONT.SIZE_DEFAULT,
-            )
+        pb.set_icon(GenericIcons.PAUSE if pb.property("toggle") else GenericIcons.PLAY)
+        pb.apply_theme_icons(theme)
         self.ui.location_widget.apply_row_icons(theme, GenericIcons.LOCATION)
         self.ui.simulated_location_widget.apply_row_icons(
             theme, GenericIcons.FAKE_LOCATION
@@ -545,9 +534,7 @@ class Coordinates(QFrame):
         effect_on = self.ui.simulation_state_on.graphicsEffect()
 
         if state:
-            self.ui.play_button.set_icon(
-                icon_qt_path(GenericIcons.PAUSE), Settings.FONT.SIZE_DEFAULT
-            )
+            self.ui.play_button.set_icon(GenericIcons.PAUSE)
             self.ui.play_button.setToolTip(self.texts.pause_button_tooltip)
             anim_off = QPropertyAnimation(effect_off, b"opacity")
             anim_off.setDuration(duration)
@@ -560,9 +547,7 @@ class Coordinates(QFrame):
             anim_on.setEndValue(1.0)
             anim_on.setEasingCurve(easing)
         else:
-            self.ui.play_button.set_icon(
-                icon_qt_path(GenericIcons.PLAY), Settings.FONT.SIZE_DEFAULT
-            )
+            self.ui.play_button.set_icon(GenericIcons.PLAY)
             self.ui.play_button.setToolTip(self.texts.play_button_tooltip)
             anim_off = QPropertyAnimation(effect_off, b"opacity")
             anim_off.setDuration(duration)

@@ -334,7 +334,7 @@ class DeviceItem(QListWidgetItem):
 
         trash_button = ToolButton(
             row,
-            icon_path=icon_qt_path(GenericIcons.TRASH),
+            icon=GenericIcons.TRASH,
             tooltip=self.texts.trash_button_tooltip,
         )
         trash_button.setObjectName("device-item-trash")
@@ -873,7 +873,7 @@ class DeviceItem(QListWidgetItem):
         self.ui.icon_label.setPixmap(
             QIcon(p).pixmap(QSize(self._ICON_INNER_PX, self._ICON_INNER_PX))
         )
-        self.ui.trash_button.set_icon(icon_qt_path_for_theme(theme, GenericIcons.TRASH))
+        self.ui.trash_button.apply_theme_icons(theme)
         self._apply_badge()
 
     ### Extend / shorten core logic ###
@@ -1233,7 +1233,7 @@ class DeviceSelectionPanel(QFrame):
 
         expand_button = ToolButton(
             self,
-            icon_path=icon_qt_path(GenericIcons.LAYOUT_TOPBAR_INSET),
+            icon=GenericIcons.LAYOUT_TOPBAR_INSET,
             tooltip=self.texts.expand_button_tooltip,
         )
         expand_button.setProperty("toggle", True)
@@ -1271,7 +1271,7 @@ class DeviceSelectionPanel(QFrame):
 
         add_device_button = ToolButton(
             self,
-            icon_path=icon_qt_path(GenericIcons.PLUS),
+            icon=GenericIcons.PLUS,
             tooltip=self.texts.add_device_tooltip,
         )
         add_device_button.setEnabled(True)
@@ -1279,7 +1279,7 @@ class DeviceSelectionPanel(QFrame):
 
         refresh_button = ToolButton(
             self,
-            icon_path=icon_qt_path(GenericIcons.ARROW_CLOCKWISE),
+            icon=GenericIcons.ARROW_CLOCKWISE,
             tooltip=self.texts.refresh_button_tooltip,
         )
         refresh_button.setEnabled(True)
@@ -1607,17 +1607,16 @@ class DeviceSelectionPanel(QFrame):
             icon_qt_path_for_theme(theme, GenericIcons.DEVICE)
         )
         inset = bool(self.ui.expand_button.property("toggle"))
-        ex = GenericIcons.LAYOUT_TOPBAR_INSET if inset else GenericIcons.LAYOUT_TOPBAR
-        self.ui.expand_button.setIcon(QIcon(icon_qt_path_for_theme(theme, ex)))
+        expand_icon = (
+            GenericIcons.LAYOUT_TOPBAR_INSET if inset else GenericIcons.LAYOUT_TOPBAR
+        )
+        self.ui.expand_button.set_icon(expand_icon)
+        self.ui.expand_button.apply_theme_icons(theme)
         self.ui.available_device_empty_state.set_icon(
             icon_qt_path_for_theme(theme, GenericIcons.DEVICE_PLACEHOLDER)
         )
-        self.ui.add_device_button.set_icon(
-            icon_qt_path_for_theme(theme, GenericIcons.PLUS)
-        )
-        self.ui.refresh_button.set_icon(
-            icon_qt_path_for_theme(theme, GenericIcons.ARROW_CLOCKWISE)
-        )
+        self.ui.add_device_button.apply_theme_icons(theme)
+        self.ui.refresh_button.apply_theme_icons(theme)
         for lw_item in self.ui.available_device_list.iter_items():
             if isinstance(lw_item, DeviceItem):
                 lw_item.apply_theme_icons(theme)
@@ -1633,9 +1632,7 @@ class DeviceSelectionPanel(QFrame):
         """Show the device panel."""
         if not self.is_panel_visible():
             self.ui.expand_button.setProperty("toggle", True)
-            self.ui.expand_button.setIcon(
-                QIcon(icon_qt_path(GenericIcons.LAYOUT_TOPBAR_INSET))
-            )
+            self.ui.expand_button.set_icon(GenericIcons.LAYOUT_TOPBAR_INSET)
             animate_widget_visibility(
                 self,
                 visible=True,
@@ -1648,9 +1645,7 @@ class DeviceSelectionPanel(QFrame):
         """Hide the device panel."""
         if self.is_panel_visible():
             self.ui.expand_button.setProperty("toggle", False)
-            self.ui.expand_button.setIcon(
-                QIcon(icon_qt_path(GenericIcons.LAYOUT_TOPBAR))
-            )
+            self.ui.expand_button.set_icon(GenericIcons.LAYOUT_TOPBAR)
             animate_widget_visibility(
                 self,
                 visible=False,
@@ -1664,9 +1659,7 @@ class DeviceSelectionPanel(QFrame):
         if self.ui.expand_button.property("toggle"):
             # Reduce: hide body and constrain height so the panel under can grow.
             self.ui.expand_button.setProperty("toggle", False)
-            self.ui.expand_button.setIcon(
-                QIcon(icon_qt_path(GenericIcons.LAYOUT_TOPBAR))
-            )
+            self.ui.expand_button.set_icon(GenericIcons.LAYOUT_TOPBAR)
             animate_widget_visibility(
                 self,
                 visible=False,
@@ -1677,9 +1670,7 @@ class DeviceSelectionPanel(QFrame):
         else:
             # Expand: show body and allow panel to grow again.
             self.ui.expand_button.setProperty("toggle", True)
-            self.ui.expand_button.setIcon(
-                QIcon(icon_qt_path(GenericIcons.LAYOUT_TOPBAR_INSET))
-            )
+            self.ui.expand_button.set_icon(GenericIcons.LAYOUT_TOPBAR_INSET)
             animate_widget_visibility(
                 self,
                 visible=True,

@@ -643,7 +643,7 @@ class HostPanel(QFrame):
 
         expand_button = ToolButton(
             self,
-            icon_path=icon_qt_path(GenericIcons.LAYOUT_TOPBAR_INSET),
+            icon=GenericIcons.LAYOUT_TOPBAR_INSET,
             tooltip=self.texts.expand_button_tooltip,
         )
         expand_button.setProperty("toggle", True)
@@ -898,7 +898,8 @@ class HostPanel(QFrame):
         expand_icon = (
             GenericIcons.LAYOUT_TOPBAR_INSET if inset else GenericIcons.LAYOUT_TOPBAR
         )
-        self.ui.expand_button.setIcon(QIcon(icon_qt_path_for_theme(theme, expand_icon)))
+        self.ui.expand_button.set_icon(expand_icon)
+        self.ui.expand_button.apply_theme_icons(theme)
         self.ui.host_identity.ui.host_item.apply_theme_icons(theme)
         self.ui.adb_bridge.ui.android_svg.set_path(
             icon_qt_path_for_theme(theme, OperatingSystemIcons.ANDROID)
@@ -912,9 +913,7 @@ class HostPanel(QFrame):
         """Show the host panel."""
         if not self.is_panel_visible():
             self.ui.expand_button.setProperty("toggle", True)
-            self.ui.expand_button.setIcon(
-                QIcon(icon_qt_path(GenericIcons.LAYOUT_TOPBAR_INSET))
-            )
+            self.ui.expand_button.set_icon(GenericIcons.LAYOUT_TOPBAR_INSET)
             animate_widget_visibility(
                 self,
                 visible=True,
@@ -927,9 +926,7 @@ class HostPanel(QFrame):
         """Hide the host panel."""
         if self.is_panel_visible():
             self.ui.expand_button.setProperty("toggle", False)
-            self.ui.expand_button.setIcon(
-                QIcon(icon_qt_path(GenericIcons.LAYOUT_TOPBAR))
-            )
+            self.ui.expand_button.set_icon(GenericIcons.LAYOUT_TOPBAR)
             animate_widget_visibility(
                 self,
                 visible=False,
@@ -950,9 +947,7 @@ class HostPanel(QFrame):
         if self.ui.expand_button.property("toggle"):
             # Reduce: hide body and constrain height so the panel under can grow.
             self.ui.expand_button.setProperty("toggle", False)
-            self.ui.expand_button.setIcon(
-                QIcon(icon_qt_path(GenericIcons.LAYOUT_TOPBAR))
-            )
+            self.ui.expand_button.set_icon(GenericIcons.LAYOUT_TOPBAR)
             animate_widget_visibility(
                 self,
                 visible=False,
@@ -963,9 +958,7 @@ class HostPanel(QFrame):
         else:
             # Expand: show body and allow it to grow.
             self.ui.expand_button.setProperty("toggle", True)
-            self.ui.expand_button.setIcon(
-                QIcon(icon_qt_path(GenericIcons.LAYOUT_TOPBAR_INSET))
-            )
+            self.ui.expand_button.set_icon(GenericIcons.LAYOUT_TOPBAR_INSET)
             animate_widget_visibility(
                 self,
                 visible=True,
