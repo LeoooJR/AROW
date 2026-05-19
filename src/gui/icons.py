@@ -91,6 +91,7 @@ class GenericIcons(Enum):
     LIGHT_MODE = _pair("brightness-high.svg")
     DARK_MODE = _pair("moon.svg")
     FILE = _pair("file-earmark-text.svg")
+    FUNNEL = _pair("funnel.svg")
     INFO = _pair("info-circle.svg")
     CHECK = _pair("check-circle.svg")
     EXCLAMATION = _pair("exclamation-circle.svg")

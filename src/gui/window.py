@@ -2,6 +2,7 @@
 This file contains the main window of the application.
 """
 
+import os
 from collections import deque
 from dataclasses import dataclass, field
 from time import monotonic
@@ -68,6 +69,59 @@ from gui.wrapper import (
     VerticalLayoutWrapper,
 )
 from logger import logger
+
+_OFFSCREEN_PLATFORM_NAME: Final[str] = "offscreen"
+_OFFSCREEN_SCREEN_SIZE_ENV: Final[str] = "AROW_GUI_TEST_SCREEN_SIZE"
+_DEFAULT_OFFSCREEN_SCREEN_SIZE: Final[QSize] = QSize(1800, 1000)
+
+
+def _is_offscreen_platform() -> bool:
+    """Return True when Qt is explicitly configured for headless rendering."""
+    return (
+        os.environ.get("QT_QPA_PLATFORM", "").strip().lower()
+        == _OFFSCREEN_PLATFORM_NAME
+    )
+
+
+def _offscreen_screen_size_from_env() -> QSize:
+    """Parse the optional offscreen screenshot size, falling back on malformed values."""
+    raw = os.environ.get(_OFFSCREEN_SCREEN_SIZE_ENV, "").strip().lower()
+    if not raw:
+        return QSize(_DEFAULT_OFFSCREEN_SCREEN_SIZE)
+    try:
+        width_text, height_text = raw.split("x", maxsplit=1)
+        width = int(width_text)
+        height = int(height_text)
+    except (TypeError, ValueError):
+        logger.warning(
+            "MainWindow: invalid offscreen screen size, using fallback",
+            env_var=_OFFSCREEN_SCREEN_SIZE_ENV,
+            raw=raw,
+        )
+        return QSize(_DEFAULT_OFFSCREEN_SCREEN_SIZE)
+    if (
+        width < Settings.DIMENSION.WINDOW_MIN_WIDTH
+        or height < Settings.DIMENSION.WINDOW_MIN_HEIGHT
+    ):
+        logger.warning(
+            "MainWindow: offscreen screen size below minimum, using fallback",
+            env_var=_OFFSCREEN_SCREEN_SIZE_ENV,
+            raw=raw,
+            min_width=Settings.DIMENSION.WINDOW_MIN_WIDTH,
+            min_height=Settings.DIMENSION.WINDOW_MIN_HEIGHT,
+        )
+        return QSize(_DEFAULT_OFFSCREEN_SCREEN_SIZE)
+    return QSize(width, height)
+
+
+def _main_window_screen_size() -> QSize:
+    """Resolve the screen size used to initialize ``MainWindow``."""
+    if _is_offscreen_platform():
+        return _offscreen_screen_size_from_env()
+    screen = QApplication.primaryScreen()
+    if screen is not None:
+        return screen.availableSize()
+    raise RuntimeError("MainWindow requires a primary screen outside offscreen mode.")
 
 
 class Header(QWidget):
@@ -352,8 +406,12 @@ class Header(QWidget):
 
     def _update_palette_thumb_geometry(self) -> None:
         """Position the palette thumb over the light button (initial or after layout)."""
+        if not isValid(self):
+            return
         btn = self.ui.light_palette_button
         thumb = self.ui.palette_thumb
+        if not isValid(btn) or not isValid(thumb):
+            return
         tw, th = thumb.width(), thumb.height()
         g = btn.geometry()
         x = g.x() + (g.width() - tw) // 2
@@ -612,6 +670,7 @@ class Body(QWidget):
             self.ui.host_panel.extend_panel()
         else:
             self.ui.host_panel.shorten_panel()
+        self._refresh_log_panel_layout_later()
 
     def _on_host_panel_toggled(self, visible: bool) -> None:
         """Handle the host panel visibility request."""
@@ -619,6 +678,7 @@ class Body(QWidget):
             self.set_log_panel_visibility(
                 True
             )  # Show log panel when host panel is hidden, one panel must be visible at all times in UI
+        self._refresh_log_panel_layout_later()
 
     def _on_device_selection_panel_toggled(self, visible: bool) -> None:
         """Handle the device panel visibility request."""
@@ -666,6 +726,7 @@ class Body(QWidget):
             axis="horizontal",
             hide_widget_when_collapsed=True,
         )
+        self._refresh_log_panel_layout_later()
 
     def set_right_panels_visibility(self, visible: bool) -> None:
         """Set the right panels visibility."""
@@ -679,6 +740,7 @@ class Body(QWidget):
             self.ui.device_selection_panel.extend_list_items()
         else:
             self.ui.device_selection_panel.shorten_list_items()
+        self._refresh_log_panel_layout_later()
 
     def set_device_selection_panel_visibility(self, visible: bool) -> None:
         """Set the device selection panel visibility."""
@@ -693,6 +755,7 @@ class Body(QWidget):
             self.ui.log_panel.show_panel()
         else:
             self.ui.log_panel.hide_panel()
+        self._refresh_log_panel_layout_later()
 
     def set_location_panel_visibility(self, visible: bool) -> None:
         """Set the location panel visibility."""
@@ -707,6 +770,15 @@ class Body(QWidget):
             self.ui.host_panel.show_panel()
         else:
             self.ui.host_panel.hide_panel()
+        self._refresh_log_panel_layout_later()
+
+    def _refresh_log_panel_layout_later(self) -> None:
+        """Refresh activity rows after sidebar visibility animations update geometry."""
+        self.ui.log_panel.refresh_layout()
+        QTimer.singleShot(
+            Settings.ANIMATION.PANEL_VISIBILITY_DURATION + Settings.SPACING.SM,
+            self.ui.log_panel.refresh_layout,
+        )
 
     def get_current_device(self) -> DeviceItem:
         """Get the current device."""
@@ -1064,8 +1136,9 @@ class MainWindow(QMainWindow):
 
         self.setWindowTitle(self.texts.window_title)
 
-        # Get available screen size
-        screen_size = QScreen.availableSize(QApplication.primaryScreen())
+        # Get available screen size. In offscreen screenshot tests, Qt may not
+        # expose a primary screen, so a deterministic GUI-only fallback is used.
+        screen_size = _main_window_screen_size()
 
         # Resize window to available screen size
         self.resize(screen_size)

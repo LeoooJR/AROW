@@ -32,6 +32,7 @@
         <file>statics/light/brightness-high.svg</file>
         <file>statics/light/moon.svg</file>
         <file>statics/light/file-earmark-text.svg</file>
+        <file>statics/light/funnel.svg</file>
         <file>statics/light/info-circle.svg</file>
         <file>statics/light/check-circle.svg</file>
         <file>statics/light/exclamation-circle.svg</file>
@@ -76,6 +77,7 @@
         <file>statics/dark/brightness-high.svg</file>
         <file>statics/dark/moon.svg</file>
         <file>statics/dark/file-earmark-text.svg</file>
+        <file>statics/dark/funnel.svg</file>
         <file>statics/dark/info-circle.svg</file>
         <file>statics/dark/check-circle.svg</file>
         <file>statics/dark/exclamation-circle.svg</file>

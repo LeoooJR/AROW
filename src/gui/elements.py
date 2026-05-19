@@ -58,6 +58,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from shiboken6 import isValid
 
 from gui.animation import apply_highlight_level, compute_sine_pulse_level
 from gui.colors import Theme, get_current_palette
@@ -2049,6 +2050,7 @@ class File(QWidget, Element):
         file_description.layout().setAlignment(
             file_type_label, Qt.AlignmentFlag.AlignLeft
         )
+        self._file_description = file_description
         self._file_type_label = file_type_label
         layout.addWidget(file_description, 1)
         layout.setAlignment(
@@ -2068,6 +2070,7 @@ class File(QWidget, Element):
         self._file_name_label = file_name_label
         self.setLayout(layout)
         self._pending_name_elide_update: bool = False
+        self._pending_name_elide_retry: bool = False
         self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
@@ -2097,23 +2100,67 @@ class File(QWidget, Element):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
+        self.refresh_display()
+
+    def refresh_display(self) -> None:
+        """Refresh filename/type layout after parent geometry changes."""
+        if not isValid(self):
+            return
         if not self._file_name or not self._file_name_label:
             return
-        # Defer to ensure layout has fully updated; avoids using an intermediate width
-        # that could incorrectly trigger ellipsis on short filenames.
+        if not isValid(self._file_name_label):
+            return
+
+        if self._file_name_label.text() != self._file_name:
+            self._file_name_label.setText(self._file_name)
+
+        for widget in (self, self._file_description, self._file_name_label):
+            if widget.layout() is not None:
+                widget.layout().activate()
+            widget.updateGeometry()
+
         if not self._pending_name_elide_update:
             self._pending_name_elide_update = True
             QTimer.singleShot(0, self._update_file_name_display)
 
+    def _file_name_available_width(self) -> int:
+        """Best-effort content width for filename elision."""
+        widths: list[int] = []
+        if isValid(self._file_name_label):
+            widths.append(self._file_name_label.width())
+        if isValid(self._file_description):
+            widths.append(self._file_description.contentsRect().width())
+        positive_widths = [width for width in widths if width > 0]
+        return min(positive_widths) if positive_widths else 0
+
     def _update_file_name_display(self) -> None:
         self._pending_name_elide_update = False
+        if not isValid(self):
+            return
         if not self._file_name or not self._file_name_label:
+            return
+        if not isValid(self._file_name_label):
             return
 
         fm = QFontMetrics(self._file_name_label.font())
-        available_w = self._file_name_label.width()
-        if available_w <= 0:
-            available_w = self._file_name_label.sizeHint().width()
+        available_w = self._file_name_available_width()
+        if (
+            available_w <= 0
+            or not self.isVisible()
+            or not self._file_name_label.isVisible()
+        ):
+            if self._file_name_label.text() != self._file_name:
+                self._file_name_label.setText(self._file_name)
+            if (
+                self.isVisible()
+                and self._file_name_label.isVisible()
+                and not self._pending_name_elide_retry
+            ):
+                self._pending_name_elide_retry = True
+                self._pending_name_elide_update = True
+                QTimer.singleShot(0, self._update_file_name_display)
+            return
+        self._pending_name_elide_retry = False
 
         # Only elide when the full text doesn't fit in the current available width.
         # This preserves short filenames when there is enough space.
@@ -2135,7 +2182,8 @@ class File(QWidget, Element):
         self._file_name = file_name
         self.texts = File.Text(file_name=file_name, file_type=file_type)
         self._file_type_label.setText(file_type.upper())
-        self._update_file_name_display()
+        self._pending_name_elide_retry = False
+        self.refresh_display()
 
 
 class OTPType(Enum):
