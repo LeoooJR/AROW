@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from shiboken6 import isValid
 
 from gui import faker as ui_faker
 from gui.animation import (
@@ -796,6 +797,8 @@ class DeviceItem(QListWidgetItem):
         try:
             self._sync_size_hint_in_progress = True
             row = self.ui.row
+            if not isValid(row):
+                return
             lay = row.layout()
             self._prepare_text_measurement()
             if lay is not None:

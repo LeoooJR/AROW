@@ -24,7 +24,8 @@ def _build_stylesheet(palette) -> str:
                 list_border = f"2px solid rgba({soft_red_rgba}, {alpha:.1f})"
                 otp_border = f"2px solid rgba({soft_red_rgba}, {alpha:.1f})"
                 helper_color = f"rgba({soft_red_rgba}, {alpha:.1f})"
-            rules.append(f"""
+            rules.append(
+                f"""
 QListWidget#availabe-device-list[device-list-highlight-level="{level}"] {{
     border: {list_border};
     border-radius: {Settings.BORDER_RADIUS.MD}px;
@@ -35,7 +36,8 @@ QFrame#card QWidget#otp-input QLineEdit[otp-invalid-highlight-level="{level}"] {
 }}
 QFrame#card QLabel[otp-helper-invalid-highlight-level="{level}"] {{
     color: {helper_color};
-}}""")
+}}"""
+            )
         return "".join(rules)
 
     pulse_section = _pulse_rules()
@@ -853,33 +855,217 @@ QFrame#adb-bridge-section {{
 }}
 
 QListWidget#logs-list {{
-    background-color: {palette.SURFACE_ELEVATED};
-    border: 1px solid {palette.BORDER_SUBTLE};
+    background-color: {palette.TRANSPARENT};
+    border: none;
     border-radius: {Settings.BORDER_RADIUS.MD}px;
-    font-family: {Settings.FONT.MONO_FAMILY_CSS};
-    font-size: {Settings.FONT.SIZE_HELPER}px;
-    alternate-background-color: {palette.SURFACE_ELEVATED};
-    selection-background-color: {palette.SURFACE_MUTED};
+    padding: {Settings.SPACING.XS}px;
+    alternate-background-color: {palette.TRANSPARENT};
+    selection-background-color: {palette.TRANSPARENT};
     selection-color: {palette.TEXT_PRIMARY};
 }}
 
 QListWidget#logs-list::item {{
-    color: {palette.TEXT_PRIMARY};
-    font-family: {Settings.FONT.MONO_FAMILY_CSS};
-    font-size: {Settings.FONT.SIZE_HELPER}px;
-    padding: 8px 10px;
+    background-color: {palette.TRANSPARENT};
+    border: none;
+    margin: 0px 0px {Settings.SPACING.XS}px 0px;
+    padding: 0px;
 }}
 
 QListWidget#logs-list::item:hover,
 QListWidget#logs-list::item:selected {{
-    background-color: {palette.SURFACE_MUTED};
+    background-color: {palette.TRANSPARENT};
     color: {palette.TEXT_PRIMARY};
 }}
 
 QListWidget#logs-list::item:selected:active,
 QListWidget#logs-list::item:selected:!active {{
-    background-color: {palette.SURFACE_MUTED};
+    background-color: {palette.TRANSPARENT};
     color: {palette.TEXT_PRIMARY};
+}}
+
+QWidget#activity-log-header {{
+    background-color: {palette.TRANSPARENT};
+    padding: 0px {Settings.SPACING.XS}px;
+}}
+
+QLabel#activity-log-current-date {{
+    color: {palette.TEXT_PRIMARY};
+    font-size: {Settings.FONT.SIZE_HELPER}px;
+    font-weight: {Settings.FONT.WEIGHT_DEMIBOLD};
+}}
+
+QLabel#activity-log-event-count {{
+    background-color: {palette.SURFACE_MUTED};
+    border: 1px solid {palette.BORDER_SUBTLE};
+    border-radius: {Settings.BORDER_RADIUS.SM}px;
+    color: {palette.TEXT_MUTED};
+    font-family: {Settings.FONT.MONO_FAMILY_CSS};
+    font-size: {Settings.FONT.SIZE_HELPER}px;
+    padding: 4px 8px;
+}}
+
+QLabel#activity-log-date-header {{
+    background-color: {palette.TRANSPARENT};
+    color: {palette.TEXT_MUTED};
+    font-size: {Settings.FONT.SIZE_HELPER}px;
+    font-weight: {Settings.FONT.WEIGHT_DEMIBOLD};
+    padding: 4px 2px 2px 2px;
+}}
+
+QWidget#activity-log-item-row {{
+    background-color: {palette.SURFACE_ELEVATED};
+    border: 1px solid {palette.BORDER_SUBTLE};
+    border-radius: {Settings.BORDER_RADIUS.MD}px;
+}}
+
+QWidget#activity-log-item-row[selected="true"],
+QWidget#activity-log-item-row[hovered="true"] {{
+    background-color: {palette.SURFACE_MUTED};
+    border: 1px solid {palette.BORDER_STRONG};
+}}
+
+QWidget#activity-log-icon-frame {{
+    background-color: {palette.SURFACE_MUTED};
+    border: 1px solid {palette.BORDER_SUBTLE};
+    border-radius: {Settings.BORDER_RADIUS.SM}px;
+}}
+
+QWidget#activity-log-icon-frame[activity-level="success"],
+QWidget#activity-log-icon-frame[activity-level="start"] {{
+    background-color: {palette.SUCCESS_SOFT};
+    border-color: {palette.SUCCESS_BORDER};
+}}
+
+QWidget#activity-log-icon-frame[activity-level="warning"] {{
+    background-color: {palette.PRIMARY_SOFT};
+    border-color: {palette.PRIMARY_BORDER};
+}}
+
+QWidget#activity-log-icon-frame[activity-level="error"] {{
+    background-color: {palette.SURFACE_MUTED};
+    border-color: {palette.ERROR};
+}}
+
+QWidget#activity-log-icon-frame[activity-level="stop"] {{
+    background-color: {palette.SURFACE_MUTED};
+    border-color: {palette.BORDER_STRONG};
+}}
+
+QLabel#activity-log-message {{
+    color: {palette.TEXT_PRIMARY};
+    font-size: {Settings.FONT.SIZE_HELPER}px;
+    font-weight: {Settings.FONT.WEIGHT_DEMIBOLD};
+}}
+
+QLabel#activity-log-meta,
+QLabel#activity-log-time {{
+    color: {palette.TEXT_MUTED};
+    font-family: {Settings.FONT.MONO_FAMILY_CSS};
+    font-size: {Settings.FONT.SIZE_HELPER}px;
+}}
+
+QLabel#activity-log-level {{
+    background-color: {palette.SURFACE_MUTED};
+    border: 1px solid {palette.BORDER_SUBTLE};
+    border-radius: {Settings.BORDER_RADIUS.SM}px;
+    color: {palette.TEXT_MUTED};
+    font-size: {Settings.FONT.SIZE_HELPER}px;
+    padding: 2px 6px;
+}}
+
+QLabel#activity-log-level[activity-level="success"] {{
+    background-color: {palette.SUCCESS_SOFT};
+    border-color: {palette.SUCCESS_BORDER};
+    color: {palette.SUCCESS};
+}}
+
+QLabel#activity-log-level[activity-level="start"] {{
+    background-color: {palette.PRIMARY_SOFT};
+    border-color: {palette.PRIMARY_BORDER};
+    color: {palette.PRIMARY};
+}}
+
+QLabel#activity-log-level[activity-level="warning"] {{
+    background-color: {palette.PRIMARY_SOFT};
+    border-color: {palette.PRIMARY_BORDER};
+    color: {palette.WARNING};
+}}
+
+QLabel#activity-log-level[activity-level="error"] {{
+    background-color: {palette.SURFACE_MUTED};
+    border-color: {palette.ERROR};
+    color: {palette.ERROR};
+}}
+
+QLabel#activity-log-level[activity-level="stop"] {{
+    background-color: {palette.SURFACE_MUTED};
+    border-color: {palette.BORDER_STRONG};
+    color: {palette.TEXT_MUTED};
+}}
+
+QLabel#activity-log-detail {{
+    background-color: {palette.SURFACE_MUTED};
+    border: 1px solid {palette.BORDER_SUBTLE};
+    border-radius: {Settings.BORDER_RADIUS.SM}px;
+    color: {palette.TEXT_MUTED};
+    font-size: {Settings.FONT.SIZE_HELPER}px;
+    padding: {Settings.LIST.ACTIVITY_ITEM_DETAIL_PADDING}px;
+}}
+
+QToolButton#activity-log-filter-button::menu-indicator {{
+    image: none;
+    width: 0px;
+    height: 0px;
+}}
+
+QMenu#activity-log-filter-menu {{
+    background-color: {palette.SURFACE_ELEVATED};
+    border: 1px solid {palette.BORDER_SUBTLE};
+    border-radius: {Settings.BORDER_RADIUS.MD}px;
+    padding: {Settings.SPACING.XS}px;
+}}
+
+QMenu#activity-log-filter-menu::item {{
+    background-color: {palette.TRANSPARENT};
+    padding: 0px;
+    margin: 0px;
+}}
+
+QLabel#activity-log-filter-section {{
+    background-color: {palette.TRANSPARENT};
+    color: {palette.TEXT_MUTED};
+    font-family: {Settings.FONT.MONO_FAMILY_CSS};
+    font-size: {Settings.FONT.SIZE_HELPER}px;
+    font-weight: {Settings.FONT.WEIGHT_DEMIBOLD};
+    padding: 6px 10px 4px 10px;
+}}
+
+QFrame#activity-log-filter-separator {{
+    background-color: {palette.BORDER_SUBTLE};
+    border: none;
+    min-height: 1px;
+    max-height: 1px;
+    margin: 6px 8px;
+}}
+
+QCheckBox#activity-log-filter-option {{
+    background-color: {palette.TRANSPARENT};
+    border-radius: {Settings.BORDER_RADIUS.SM}px;
+    color: {palette.TEXT_PRIMARY};
+    font-family: {Settings.FONT.FAMILY_CSS};
+    font-size: {Settings.FONT.SIZE_HELPER}px;
+    font-weight: {Settings.FONT.WEIGHT_DEMIBOLD};
+    padding: 6px 10px;
+}}
+
+QCheckBox#activity-log-filter-option:hover {{
+    background-color: {palette.SURFACE_MUTED};
+}}
+
+QCheckBox#activity-log-filter-option::indicator {{
+    image: none;
+    width: 0px;
+    height: 0px;
 }}
 
 QFrame#map-panel {{
