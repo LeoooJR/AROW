@@ -2,10 +2,12 @@
 This file contains the generic graphical elements used in the application.
 """
 
+from __future__ import annotations
+
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Final, Iterator
+from typing import Final, Iterator
 
 from loguru import logger
 from PySide6.QtCore import (
@@ -32,7 +34,6 @@ from PySide6.QtGui import (
     QPainterPath,
     QPixmap,
     QShowEvent,
-    QValidator,
 )
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
@@ -63,6 +64,7 @@ from shiboken6 import isValid
 from gui.animation import apply_highlight_level, compute_sine_pulse_level
 from gui.colors import Theme, get_current_palette
 from gui.icons import (
+    ApplicationIcons,
     GenericIcons,
     OperatingSystemIcons,
     icon_qt_path,
@@ -75,14 +77,14 @@ from gui.wrapper import HorizontalLayoutWrapper, VerticalLayoutWrapper
 
 
 class QtABCMeta(type(QObject), ABCMeta):
-    """Merges QObject's metaclass with abc.ABCMeta so Qt widgets can inherit from Element."""
+    """Merges QObject's metaclass with abc.ABCMeta so Qt widgets can inherit from Component."""
 
     pass
 
 
-class Element(ABC, metaclass=QtABCMeta):
+class Component(ABC, metaclass=QtABCMeta):
     """
-    Abstract base for all graphical elements in this module.
+    Abstract base for all graphical components in this module.
     """
 
     def _finalize_ui_hooks(self) -> None:
@@ -93,310 +95,181 @@ class Element(ABC, metaclass=QtABCMeta):
 
     @abstractmethod
     def _set_size_policy(self) -> None:
-        """Set the size policy for the element."""
+        """Set the size policy for elements composing the widget."""
         ...
 
     @abstractmethod
     def _set_alignment(self) -> None:
-        """Set the alignment for the element."""
+        """Set the alignment for elements composing the widget."""
         ...
 
     @abstractmethod
     def _connect_signals(self) -> None:
-        """Connect signals for the element."""
+        """Connect signals for elements composing the widget."""
         ...
 
     @abstractmethod
     def apply_theme_icons(self, theme: Theme) -> None:
-        """Apply theme icons to the element."""
+        """Apply theme icons to elements composing the widget."""
         ...
 
 
-class Logo(QLabel, Element):
+class LeadingIconLabel(QWidget, Component):
     """
-    Label that displays the logo of the application.
-    """
-
-    @dataclass(frozen=True)
-    class Text:
-        """Reserved for future user-visible strings on the logo."""
-
-        pass
-
-    @dataclass
-    class UI:
-        """Reserved for future explicit child references on the logo."""
-
-        pass
-
-    def __init__(self, parent: QWidget | None, file: str):
-        """Load and display a pixmap scaled to the configured logo size.
-
-        Args:
-            parent: Optional Qt parent widget for lifetime and hierarchy.
-            file: Path to the raster image file for the logo.
-        """
-        # Initialize parent QLabel
-        super().__init__(parent)
-        self.texts = Logo.Text()
-        self.ui = Logo.UI()
-
-        # Load and scale pixmap to appropriate size
-        pixmap = QPixmap(file)
-        # Scale to logo size from settings while maintaining aspect ratio
-        logo_size = Settings.DIMENSION.LOGO_SIZE
-        scaled_pixmap = pixmap.scaled(
-            logo_size,
-            logo_size,
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation,
-        )
-
-        self.setPixmap(scaled_pixmap)
-        self._finalize_ui_hooks()
-
-    def _set_size_policy(self) -> None:
-        pass
-
-    def _set_alignment(self) -> None:
-        # Align the logo vertically centered with text.
-        self.setAlignment(Qt.AlignmentFlag.AlignVCenter)
-
-    def _connect_signals(self) -> None:
-        pass
-
-    def apply_theme_icons(self, theme: Theme) -> None:
-        pass
-
-
-class GradientText(QLabel, Element):
-    """
-    Label that displays text with a linear gradient color.
+    Widget that displays a leading icon and a label.
     """
 
     @dataclass(frozen=True)
     class Text:
-        """Initial label text mirrored for styling hooks."""
-
-        text: str = ""
-
-    @dataclass
-    class UI:
-        """Reserved for future explicit child references on gradient text."""
-
-        pass
-
-    def __init__(
-        self, parent: QWidget | None, text="", start_color=None, end_color=None
-    ):
-        """Paint the label text with a horizontal linear gradient.
-
-        Args:
-            parent: Optional Qt parent widget for lifetime and hierarchy.
-            text: String shown as the label content.
-            start_color: Gradient start color; defaults to theme white.
-            end_color: Gradient end color; defaults to theme black.
-        """
-        super().__init__(text, parent)
-        self.texts = GradientText.Text(text=text)
-        self.ui = GradientText.UI()
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
-        palette = get_current_palette()
-        self.set_gradient_colors(
-            start_color or palette.WHITE, end_color or palette.BLACK
-        )
-        self._finalize_ui_hooks()
-
-    def _set_size_policy(self) -> None:
-        pass
-
-    def _set_alignment(self) -> None:
-        pass
-
-    def _connect_signals(self) -> None:
-        pass
-
-    def apply_theme_icons(self, theme: Theme) -> None:
-        pass
-
-    def set_gradient_colors(self, start_color, end_color):
-        """Set the gradient colors for the text.
-
-        Args:
-            start_color: Color at the left edge of the gradient.
-            end_color: Color at the right edge of the gradient.
-        """
-        self.gradient_start = QColor(start_color)
-        self.gradient_end = QColor(end_color)
-        self.update()
-
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        painter.setRenderHint(QPainter.RenderHint.TextAntialiasing, True)
-
-        # Clear the background to avoid white pixels showing through
-        painter.fillRect(self.rect(), Qt.GlobalColor.transparent)
-
-        # Get text metrics to calculate position
-        font_metrics = painter.fontMetrics()
-        text = QLabel.text(self)
-        text_width = font_metrics.horizontalAdvance(text)
-        text_height = font_metrics.height()
-
-        # Calculate text position based on alignment
-        rect = self.rect()
-        if self.alignment() & Qt.AlignmentFlag.AlignLeft:
-            x = 0
-        elif self.alignment() & Qt.AlignmentFlag.AlignRight:
-            x = rect.width() - text_width
-        elif self.alignment() & Qt.AlignmentFlag.AlignHCenter:
-            x = (rect.width() - text_width) // 2
-        else:
-            x = 0
-
-        if self.alignment() & Qt.AlignmentFlag.AlignTop:
-            y = text_height
-        elif self.alignment() & Qt.AlignmentFlag.AlignBottom:
-            y = rect.height()
-        elif self.alignment() & Qt.AlignmentFlag.AlignVCenter:
-            y = (rect.height() + text_height) // 2
-        else:
-            y = text_height
-
-        # Round x position to avoid sub-pixel rendering issues
-        x = int(x)
-
-        # Create gradient with slight padding to ensure full coverage
-        gradient = QLinearGradient(x - 1, 0, x + text_width + 1, 0)
-        gradient.setColorAt(0, self.gradient_start)
-        gradient.setColorAt(1, self.gradient_end)
-
-        # Create path from text
-        path = QPainterPath()
-        path.addText(x, y, self.font(), text)
-
-        # Fill path with gradient using composition mode to avoid background bleeding
-        painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceOver)
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(gradient)
-        painter.drawPath(path)
-
-        painter.end()
-
-
-class IconLabel(QWidget, Element):
-    """
-    Widget that displays an icon and a label.
-    """
-
-    @dataclass(frozen=True)
-    class Text:
-        """Optional plain-text snapshot when the label is a string."""
+        """Optional plain-text snapshot when the text is a string."""
 
         text: str | None = None
 
     @dataclass
     class UI:
-        """Reserved for future explicit child references on the icon row."""
+        """Widgets composing the leading icon label."""
 
-        pass
+        svg: SVG
+        text: QLabel
 
     def __init__(
         self,
         parent: QWidget | None,
-        icon_path: str,
+        icon: GenericIcons | OperatingSystemIcons | ApplicationIcons,
         text: str | QLabel,
         font_weight: QFont.Weight = QFont.Weight.Normal,
         spacing: int = 0,
         margins: tuple = (0, 0, 0, 0),
     ):
-        """Lay out an SVG icon beside a string or external ``QLabel``.
+        """Lay out a leading SVG icon beside a string or external ``QLabel``.
 
         Args:
             parent: Optional Qt parent widget for lifetime and hierarchy.
-            icon_path: Path to the SVG asset for the lead icon.
-            text: Caption string or pre-built label widget.
+            icon: GenericIcons | OperatingSystemIcons | ApplicationIcons.
+            text: Caption string or pre-built text widget.
             font_weight: Font weight applied when ``text`` is a string.
             spacing: Pixels between icon and text.
             margins: Outer layout margins (left, top, right, bottom).
         """
         # Initialize parent QWidget
         super().__init__(parent)
-        self.texts = IconLabel.Text(text=text if isinstance(text, str) else None)
-        self.ui = IconLabel.UI()
+
+        self.texts = LeadingIconLabel.Text(text=text if isinstance(text, str) else None)
+
+        if icon is None:
+            raise ValueError("icon cannot be None")
+        if not isinstance(icon, GenericIcons | OperatingSystemIcons | ApplicationIcons):
+            raise ValueError(
+                "icon must be a GenericIcons | OperatingSystemIcons | ApplicationIcons"
+            )
+
+        self._icon: GenericIcons | OperatingSystemIcons | ApplicationIcons = icon
 
         layout = QHBoxLayout()
         layout.setContentsMargins(*margins)
         layout.setSpacing(spacing)  # Spacing between icon and text
 
         self.setObjectName("icon-label")
+
+        svg = SVG(icon_qt_path(self._icon), self)
+        svg.setObjectName("icon")
+        svg.setFixedSize(
+            get_svg_size(Settings.FONT.SIZE_DEFAULT)
+        )  # Set the size of the leading icon depending on the font size
+
+        layout.addWidget(svg)
+
+        if isinstance(text, str):
+            label = QLabel(text, self)
+        else:
+            label = text
+        label.setObjectName("label")
+        label.setFont(
+            QFont(
+                Settings.FONT.FAMILY,
+                Settings.FONT.SIZE_DEFAULT,
+                QFont.Weight.Normal,
+            )
+        )
+
+        layout.addWidget(label)
+
         self.setLayout(layout)
 
-        self.set_icon(icon_path)
+        self.ui: LeadingIconLabel.UI = LeadingIconLabel.UI(svg=svg, text=label)
 
-        self.set_text(text)
         self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
-        pass
+        """Set the size policy for elements composing the leading icon label."""
+        self.ui.svg.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
 
     def _set_alignment(self) -> None:
-        pass
+        """Set the alignment for elements composing the leading icon label."""
+        self.ui.svg.setAlignment(
+            Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignHCenter
+        )
+        self.layout().setAlignment(
+            self.ui.svg, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignHCenter
+        )
+        self.ui.text.setAlignment(
+            Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignHCenter
+        )
+        self.layout().setAlignment(
+            self.ui.text, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignHCenter
+        )
 
     def _connect_signals(self) -> None:
+        """Connect signals for elements composing the leading icon label."""
         pass
 
     def apply_theme_icons(self, theme: Theme) -> None:
-        pass
+        """Apply theme icons to elements composing the leading icon label."""
+        self.ui.svg.set_path(icon_qt_path_for_theme(theme, self._icon))
 
-    def set_icon(self, icon_path: str | None = None) -> None:
-        if icon_path is None:
+    def set_icon(
+        self, icon: GenericIcons | OperatingSystemIcons | ApplicationIcons
+    ) -> None:
+        """Set the leading icon path.
+
+        Args:
+            icon: GenericIcons | OperatingSystemIcons | ApplicationIcons.
+        """
+        if icon is None:
             return
-        svg = self.findChild(SVG, "icon")
-        if svg is None:
-            svg = SVG(icon_path, self)
-            svg.setObjectName("icon")
-            svg.setFixedSize(get_svg_size(Settings.FONT.SIZE_DEFAULT))
-            svg.setAlignment(
-                Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignHCenter
+        if not isinstance(icon, GenericIcons | OperatingSystemIcons | ApplicationIcons):
+            raise ValueError(
+                "icon must be a GenericIcons | OperatingSystemIcons | ApplicationIcons"
             )
-            self.layout().addWidget(svg)
-            self.layout().setAlignment(
-                svg, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignHCenter
-            )
-        else:
-            svg.set_path(icon_path)
+        self._icon = icon
+        self.ui.svg.set_path(icon_qt_path(self._icon))
 
     def set_text(self, text: QLabel | str | None = None) -> None:
+        """Set the text of the leading icon label.
+
+        Args:
+            text: Text string or pre-built text widget.
+        """
         if text is None:
             return
-        label = self.findChild(QLabel, "label")
-        if label is not None:
-            label.setText(text)
-        else:
-            if isinstance(text, str):
-                label = QLabel(text, self)
-            else:
-                label = text
-            label.setObjectName("label")
-            label.setFont(
-                QFont(
-                    Settings.FONT.FAMILY,
-                    Settings.FONT.SIZE_DEFAULT,
-                    QFont.Weight.Normal,
-                )
-            )
-            label.setAlignment(
-                Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignHCenter
-            )
-            self.layout().addWidget(label)
-            self.layout().setAlignment(
-                label, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignHCenter
-            )
+        if isinstance(text, str):
+            self.texts = LeadingIconLabel.Text(text=text)
+            self.ui.text.setText(text)
+            return
+
+        layout = self.layout()
+        layout.removeWidget(self.ui.text)
+        self.ui.text.deleteLater()
+
+        text.setParent(self)
+        text.setObjectName("label")
+        layout.addWidget(text)
+        self.ui.text = text
+        self.texts = LeadingIconLabel.Text(text=None)
+        self._finalize_ui_hooks()
 
 
-class PanelTitle(QFrame, Element):
+class PanelTitle(QFrame, Component):
     """
     Widget that displays a panel title.
     """
@@ -491,7 +364,7 @@ class PanelTitle(QFrame, Element):
         pass
 
 
-class Button(QPushButton, Element):
+class Button(QPushButton, Component):
 
     @dataclass(frozen=True)
     class Text:
@@ -542,7 +415,7 @@ class Button(QPushButton, Element):
         pass
 
 
-class WalkthroughButton(QPushButton, Element):
+class WalkthroughButton(QPushButton, Component):
     """
     Welcome walkthrough row styled as a large, soft card: lead icon (left, vertically centered),
     helper-colored text, small hand-index-style icon pinned to the top-right.
@@ -654,7 +527,7 @@ class WalkthroughButton(QPushButton, Element):
         )
 
 
-class ToolButton(QToolButton, Element):
+class ToolButton(QToolButton, Component):
 
     @dataclass(frozen=True)
     class Text:
@@ -727,7 +600,7 @@ class ToolButton(QToolButton, Element):
         self.setIconSize(icon_size)
 
 
-class ButtonGroup(QButtonGroup, Element):
+class ButtonGroup(QButtonGroup, Component):
 
     @dataclass(frozen=True)
     class Text:
@@ -770,7 +643,7 @@ class ButtonGroup(QButtonGroup, Element):
         pass
 
 
-class SelectionField(QComboBox, Element):
+class SelectionField(QComboBox, Component):
 
     @dataclass(frozen=True)
     class Text:
@@ -823,7 +696,7 @@ class SelectionField(QComboBox, Element):
         pass
 
 
-class RegularText(QLabel, Element):
+class RegularText(QLabel, Component):
 
     @dataclass(frozen=True)
     class Text:
@@ -867,7 +740,7 @@ class RegularText(QLabel, Element):
         pass
 
 
-class DemiBoldText(QLabel, Element):
+class DemiBoldText(QLabel, Component):
 
     @dataclass(frozen=True)
     class Text:
@@ -913,7 +786,7 @@ class DemiBoldText(QLabel, Element):
         pass
 
 
-class HelperText(QLabel, Element):
+class HelperText(QLabel, Component):
 
     @dataclass(frozen=True)
     class Text:
@@ -958,7 +831,7 @@ class HelperText(QLabel, Element):
         pass
 
 
-class List(QListWidget, Element):
+class List(QListWidget, Component):
 
     @dataclass(frozen=True)
     class Text:
@@ -1058,7 +931,7 @@ class List(QListWidget, Element):
 ########################################################################################################################
 
 
-class SVG(QLabel, Element):
+class SVG(QLabel, Component):
     """Custom QLabel that renders SVG using QSvgRenderer"""
 
     path: str
@@ -1128,7 +1001,7 @@ class SVG(QLabel, Element):
         self.update()
 
 
-class PlaceHolder(QFrame, Element):
+class PlaceHolder(QFrame, Component):
     """
     Empty-state placeholder: optional SVG on top, then centered text.
     Text uses a softer color (PLACEHOLDER_TEXT). Use icon_path to show an icon above the label.
@@ -1240,7 +1113,7 @@ class PlaceHolder(QFrame, Element):
         self.ui.icon.set_path(icon_path)
 
 
-class FileOpenDialog(QFileDialog, Element):
+class FileOpenDialog(QFileDialog, Component):
 
     @dataclass(frozen=True)
     class Text:
@@ -1290,7 +1163,7 @@ class FileOpenDialog(QFileDialog, Element):
         pass
 
 
-class FileSaveDialog(QFileDialog, Element):
+class FileSaveDialog(QFileDialog, Component):
 
     @dataclass(frozen=True)
     class Text:
@@ -1340,7 +1213,7 @@ class FileSaveDialog(QFileDialog, Element):
         pass
 
 
-class WarningDialog(QMessageBox, Element):
+class WarningDialog(QMessageBox, Component):
 
     @dataclass(frozen=True)
     class Text:
@@ -1406,7 +1279,7 @@ class WarningDialog(QMessageBox, Element):
         pass
 
 
-class QuestionDialog(QMessageBox, Element):
+class QuestionDialog(QMessageBox, Component):
 
     @dataclass(frozen=True)
     class Text:
@@ -1472,7 +1345,7 @@ class QuestionDialog(QMessageBox, Element):
         pass
 
 
-class Toast(QWidget, Element):
+class Toast(QWidget, Component):
 
     @dataclass(frozen=True)
     class Text:
@@ -1657,7 +1530,7 @@ class Toast(QWidget, Element):
         super().closeEvent(event)
 
 
-class ProgressBar(QProgressBar, Element):
+class ProgressBar(QProgressBar, Component):
     """
     Step-based progress bar for pre-simulation steps.
     """
@@ -1727,7 +1600,7 @@ class ProgressBar(QProgressBar, Element):
             self.setFormat("%v. Step %v")
 
 
-class Image(QLabel, Element):
+class Image(QLabel, Component):
     """
     Label that displays an image.
     """
@@ -1776,7 +1649,7 @@ class Image(QLabel, Element):
         pass
 
 
-class GroupBox(QGroupBox, Element):
+class GroupBox(QGroupBox, Component):
     """
     Group box that displays a title and a content area.
     """
@@ -1836,7 +1709,7 @@ class GroupBox(QGroupBox, Element):
 IndicatorState = str  # "default" | "valid" | "warning" | "error"
 
 
-class ConditionIndicator(QFrame, Element):
+class ConditionIndicator(QFrame, Component):
     """
     Small top-right indicator with four states: default (grey), valid (green), warning (orange), error (red).
     Used to show if a condition is met before simulation (e.g. host identity). Visible but soft.
@@ -1968,7 +1841,7 @@ class ConditionIndicator(QFrame, Element):
         return self._state
 
 
-class File(QWidget, Element):
+class File(QWidget, Component):
     """
     Widget that displays a file (icon, name, format). Styled via stylesheet (file-display, file-icon-wrapper, file-name).
     Filename is elided with ellipsis when too long. Do not add a close button.
@@ -2206,7 +2079,7 @@ class OTPValidator(Enum):
     ASSOCIATION_CODE = QIntValidator(0, 9)
 
 
-class OTPLineEdit(QLineEdit, Element):
+class OTPLineEdit(QLineEdit, Component):
     """
     QLineEdit subclass to handle backspace focus navigation and paste event for autofill.
     """
@@ -2288,7 +2161,7 @@ class OTPLineEdit(QLineEdit, Element):
             parent._otp_inputs[-1].setFocus()
 
 
-class OTPInput(QWidget, Element):
+class OTPInput(QWidget, Component):
     """
     OTP input widget.
     """
@@ -2418,7 +2291,7 @@ class OTPInput(QWidget, Element):
             otp_input.clear()
 
 
-class AuthentificationCard(QFrame, Element):
+class AuthentificationCard(QFrame, Component):
     """
     Card widget.
     """

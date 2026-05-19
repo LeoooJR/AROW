@@ -24,7 +24,7 @@ from gui.elements import (
     DemiBoldText,
     FileOpenDialog,
     HelperText,
-    IconLabel,
+    LeadingIconLabel,
     PanelTitle,
     PlaceHolder,
     SelectionField,
@@ -73,12 +73,12 @@ class LocationPanel(QFrame):
         header: QWidget
         body: QWidget
         railway_label: DemiBoldText
-        railway_label_icon: IconLabel
+        railway_label_icon: LeadingIconLabel
         railway_input: SelectionField
         railway_helper_text: HelperText
         railway_input_wrapper: VerticalLayoutWrapper
         kilometric_label: DemiBoldText
-        kilometric_label_icon: IconLabel
+        kilometric_label_icon: LeadingIconLabel
         kilometric_input: SelectionField
         kilometric_helper_text: HelperText
         kilometric_input_wrapper: VerticalLayoutWrapper
@@ -150,9 +150,9 @@ class LocationPanel(QFrame):
 
         # Railway section with divider
         railway_label = DemiBoldText(None, self.texts.railway_label)
-        railway_label_icon = IconLabel(
+        railway_label_icon = LeadingIconLabel(
             None,
-            icon_path=icon_qt_path(GenericIcons.RAILWAY),
+            icon=GenericIcons.RAILWAY,
             text=railway_label,
             spacing=Settings.SPACING.ICON_SPACING,
             margins=Settings.SPACING.MARGIN_NONE,
@@ -175,9 +175,9 @@ class LocationPanel(QFrame):
 
         # Kilometric section with divider
         kilometric_label = DemiBoldText(None, self.texts.kilometric_label)
-        kilometric_label_icon = IconLabel(
+        kilometric_label_icon = LeadingIconLabel(
             None,
-            icon_path=icon_qt_path(GenericIcons.MILESTONE),
+            icon=GenericIcons.MILESTONE,
             text=kilometric_label,
             spacing=Settings.SPACING.ICON_SPACING,
             margins=Settings.SPACING.MARGIN_NONE,
@@ -318,12 +318,8 @@ class LocationPanel(QFrame):
             else GenericIcons.LAYOUT_BOTTOMBAR
         )
         self.ui.expand_button.setIcon(QIcon(icon_qt_path_for_theme(theme, ex)))
-        self.ui.railway_label_icon.set_icon(
-            icon_qt_path_for_theme(theme, GenericIcons.RAILWAY)
-        )
-        self.ui.kilometric_label_icon.set_icon(
-            icon_qt_path_for_theme(theme, GenericIcons.MILESTONE)
-        )
+        self.ui.railway_label_icon.apply_theme_icons(theme)
+        self.ui.kilometric_label_icon.apply_theme_icons(theme)
         self.ui.start_simulation_button.setIcon(
             QIcon(icon_qt_path_for_theme(theme, GenericIcons.START))
         )

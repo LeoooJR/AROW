@@ -26,7 +26,7 @@ from PySide6.QtWidgets import (
 )
 
 from gui.colors import Theme
-from gui.elements import SVG, IconLabel, PanelTitle, PlaceHolder, ToolButton
+from gui.elements import SVG, LeadingIconLabel, PanelTitle, PlaceHolder, ToolButton
 from gui.icons import GenericIcons, icon_qt_path, icon_qt_path_for_theme
 from gui.settings import Settings
 from gui.signals import view_signals
@@ -100,10 +100,10 @@ class Legend(QFrame):
     class UI:
         """Icon+label rows composing the map legend."""
 
-        location_label_icon: IconLabel
-        simulated_location_label_icon: IconLabel
+        location_label_icon: LeadingIconLabel
+        simulated_location_label_icon: LeadingIconLabel
         legend_first_row: HorizontalLayoutWrapper
-        kilometric_point_label_icon: IconLabel
+        kilometric_point_label_icon: LeadingIconLabel
         legend_second_row: HorizontalLayoutWrapper
 
     def __init__(self, parent: QWidget = None):
@@ -129,16 +129,16 @@ class Legend(QFrame):
         )
         layout.setSpacing(Settings.MAP.LEGEND_SPACING)  # Spacing between legend items
 
-        location_label_icon = IconLabel(
+        location_label_icon = LeadingIconLabel(
             None,
-            icon_path=icon_qt_path(GenericIcons.LOCATION),
+            icon=GenericIcons.LOCATION,
             text=self.texts.location_label,
             spacing=Settings.SPACING.ICON_SPACING,
             margins=Settings.SPACING.MARGIN_NONE,
         )
-        simulated_location_label_icon = IconLabel(
+        simulated_location_label_icon = LeadingIconLabel(
             None,
-            icon_path=icon_qt_path(GenericIcons.FAKE_LOCATION),
+            icon=GenericIcons.FAKE_LOCATION,
             text=self.texts.simulated_location_label,
             spacing=Settings.SPACING.ICON_SPACING,
             margins=Settings.SPACING.MARGIN_NONE,
@@ -152,9 +152,9 @@ class Legend(QFrame):
             stretch_at_end=True,
         )
 
-        kilometric_point_label_icon = IconLabel(
+        kilometric_point_label_icon = LeadingIconLabel(
             None,
-            icon_path=icon_qt_path(GenericIcons.MILESTONE),
+            icon=GenericIcons.MILESTONE,
             text=self.texts.kilometric_point_label,
             spacing=Settings.SPACING.ICON_SPACING,
             margins=Settings.SPACING.MARGIN_NONE,
@@ -183,15 +183,9 @@ class Legend(QFrame):
         self._set_alignment()
 
     def apply_theme_icons(self, theme: Theme) -> None:
-        self.ui.location_label_icon.set_icon(
-            icon_qt_path_for_theme(theme, GenericIcons.LOCATION)
-        )
-        self.ui.simulated_location_label_icon.set_icon(
-            icon_qt_path_for_theme(theme, GenericIcons.FAKE_LOCATION)
-        )
-        self.ui.kilometric_point_label_icon.set_icon(
-            icon_qt_path_for_theme(theme, GenericIcons.MILESTONE)
-        )
+        self.ui.location_label_icon.apply_theme_icons(theme)
+        self.ui.simulated_location_label_icon.apply_theme_icons(theme)
+        self.ui.kilometric_point_label_icon.apply_theme_icons(theme)
 
     def _set_alignment(self) -> None:
         """Centralize layout alignment for the legend and its UI widgets."""
@@ -402,8 +396,8 @@ class Coordinates(QFrame):
         """Simulation toggle visuals, coordinate rows, and play control."""
 
         simulation_state_container: QWidget
-        simulation_state_off: IconLabel
-        simulation_state_on: IconLabel
+        simulation_state_off: LeadingIconLabel
+        simulation_state_on: LeadingIconLabel
         location_widget: Location
         simulated_location_widget: Location
         play_button: ToolButton
@@ -433,16 +427,16 @@ class Coordinates(QFrame):
             Settings.MAP.COORDINATES_SPACING
         )  # Spacing between location widgets
 
-        simulation_state_off = IconLabel(
+        simulation_state_off = LeadingIconLabel(
             self,
-            icon_path=icon_qt_path(GenericIcons.OFF),
+            icon=GenericIcons.OFF,
             text=self.texts.simulation_state_off,
             spacing=Settings.SPACING.ICON_SPACING,
             margins=Settings.SPACING.MARGIN_NONE,
         )
-        simulation_state_on = IconLabel(
+        simulation_state_on = LeadingIconLabel(
             self,
-            icon_path=icon_qt_path(GenericIcons.ON),
+            icon=GenericIcons.ON,
             text=self.texts.simulation_state_on,
             spacing=Settings.SPACING.ICON_SPACING,
             margins=Settings.SPACING.MARGIN_NONE,
@@ -493,12 +487,8 @@ class Coordinates(QFrame):
         self._finalize_ui_hooks()
 
     def apply_theme_icons(self, theme: Theme) -> None:
-        self.ui.simulation_state_off.set_icon(
-            icon_qt_path_for_theme(theme, GenericIcons.OFF)
-        )
-        self.ui.simulation_state_on.set_icon(
-            icon_qt_path_for_theme(theme, GenericIcons.ON)
-        )
+        self.ui.simulation_state_off.apply_theme_icons(theme)
+        self.ui.simulation_state_on.apply_theme_icons(theme)
         pb = self.ui.play_button
         if pb.property("toggle"):
             pb.set_icon(

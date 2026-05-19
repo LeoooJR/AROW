@@ -23,11 +23,12 @@ from gui.elements import (
     SVG,
     ConditionIndicator,
     GroupBox,
-    IconLabel,
+    LeadingIconLabel,
     PanelTitle,
     ToolButton,
 )
 from gui.icons import (
+    ApplicationIcons,
     GenericIcons,
     OperatingSystemIcons,
     icon_qt_path,
@@ -264,7 +265,7 @@ class HostIdentitySection(QFrame):
 
         host_name: QLabel
         host_summary: QLabel
-        host_item: IconLabel
+        host_item: LeadingIconLabel
         ip_address_row: HostIdentityMetadataRow
         platform_row: HostIdentityMetadataRow
 
@@ -288,9 +289,9 @@ class HostIdentitySection(QFrame):
         host_name = QLabel(self.texts.host_name, self)
         host_name.setProperty("host-title", True)
 
-        host_item = IconLabel(
+        host_item = LeadingIconLabel(
             self,
-            icon_path=icon_qt_path(OperatingSystemIcons.MACOS),
+            icon=OperatingSystemIcons.MACOS,
             text=host_name,
             spacing=Settings.SPACING.ICON_SPACING,
         )
@@ -358,7 +359,7 @@ class HostIdentitySection(QFrame):
         summary: str | None = None,
         ip_address: str | None = None,
         platform: str | None = None,
-        os_icon_path: str | None = None,
+        os_icon: GenericIcons | OperatingSystemIcons | ApplicationIcons | None = None,
     ) -> None:
         """Update displayed host fields; omit arguments to leave them unchanged.
 
@@ -367,7 +368,7 @@ class HostIdentitySection(QFrame):
             summary: Short supporting description under the title.
             ip_address: Local IP string for the IP row.
             platform: Platform string for the platform row.
-            os_icon_path: Filesystem path to the OS icon asset.
+            os_icon: Icon enum for the host operating system row.
         """
         if host_name is not None:
             self.ui.host_name.setText(host_name)
@@ -377,8 +378,8 @@ class HostIdentitySection(QFrame):
             self.ui.ip_address_row.set_value_text(ip_address)
         if platform is not None:
             self.ui.platform_row.set_value_text(platform)
-        if os_icon_path is not None:
-            self.ui.host_item.set_icon(os_icon_path)
+        if os_icon is not None:
+            self.ui.host_item.set_icon(os_icon)
 
 
 class AdbBridgeSection(QFrame):
@@ -802,7 +803,7 @@ class HostPanel(QFrame):
             summary=self.texts.placeholder_summary,
             ip_address=self.texts.placeholder_ip_address,
             platform=self.texts.placeholder_platform,
-            os_icon_path=icon_qt_path(OperatingSystemIcons.MACOS),
+            os_icon=OperatingSystemIcons.MACOS,
             identity_state="valid",
         )
         self.set_adb_bridge_values(
@@ -829,7 +830,7 @@ class HostPanel(QFrame):
         summary: str | None = None,
         ip_address: str | None = None,
         platform: str | None = None,
-        os_icon_path: str | None = None,
+        os_icon: GenericIcons | OperatingSystemIcons | ApplicationIcons | None = None,
         identity_state: str | None = None,
     ) -> None:
         """Set the values for the host identity section."""
@@ -838,7 +839,7 @@ class HostPanel(QFrame):
             summary=summary,
             ip_address=ip_address,
             platform=platform,
-            os_icon_path=os_icon_path,
+            os_icon=os_icon,
         )
         if identity_state is not None:
             self.ui.identity_indicator.set_state(identity_state)
@@ -872,31 +873,21 @@ class HostPanel(QFrame):
         assert os in ["linux", "windows", "darwin"]
         self._identity_os = os
         if os == "linux":
-            os_icon_path = icon_qt_path(OperatingSystemIcons.LINUX)
+            os_icon = OperatingSystemIcons.LINUX
         elif os == "windows":
-            os_icon_path = icon_qt_path(OperatingSystemIcons.WINDOWS)
+            os_icon = OperatingSystemIcons.WINDOWS
         elif os == "darwin":
-            os_icon_path = icon_qt_path(OperatingSystemIcons.MACOS)
+            os_icon = OperatingSystemIcons.MACOS
         else:
-            os_icon_path = icon_qt_path(GenericIcons.LAPTOP)
+            os_icon = GenericIcons.LAPTOP
         self.set_host_identity_values(
             host_name=name,
             summary=self.texts.placeholder_summary,
             ip_address=ip,
             platform=os,
-            os_icon_path=os_icon_path,
+            os_icon=os_icon,
             identity_state="valid",
         )
-
-    def _host_identity_icon_path(self, theme: Theme) -> str:
-        o = self._identity_os
-        if o == "linux":
-            return icon_qt_path_for_theme(theme, OperatingSystemIcons.LINUX)
-        if o == "windows":
-            return icon_qt_path_for_theme(theme, OperatingSystemIcons.WINDOWS)
-        if o == "darwin":
-            return icon_qt_path_for_theme(theme, OperatingSystemIcons.MACOS)
-        return icon_qt_path_for_theme(theme, GenericIcons.LAPTOP)
 
     def apply_theme_icons(self, theme: Theme) -> None:
         """Refresh header, host glyph, expand control, and ADB block icon for ``theme``."""
@@ -908,7 +899,7 @@ class HostPanel(QFrame):
             GenericIcons.LAYOUT_TOPBAR_INSET if inset else GenericIcons.LAYOUT_TOPBAR
         )
         self.ui.expand_button.setIcon(QIcon(icon_qt_path_for_theme(theme, expand_icon)))
-        self.set_host_identity_values(os_icon_path=self._host_identity_icon_path(theme))
+        self.ui.host_identity.ui.host_item.apply_theme_icons(theme)
         self.ui.adb_bridge.ui.android_svg.set_path(
             icon_qt_path_for_theme(theme, OperatingSystemIcons.ANDROID)
         )
