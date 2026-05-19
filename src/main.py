@@ -8,9 +8,11 @@ from PySide6 import QtWidgets
 from __init__ import __application__, __version__
 from logger import setup_logger
 
-locale.setlocale(
-    locale.LC_ALL, "en_US.UTF-8"
-)  # Set locale to English for consistent formatting
+try:
+    locale.setlocale(locale.LC_ALL, "en_US.UTF-8")
+except locale.Error:
+    # Locale setting failed (not available on this machine); fallback to default locale.
+    pass
 
 setup_logger()
 
