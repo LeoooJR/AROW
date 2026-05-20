@@ -2,12 +2,11 @@ from dataclasses import dataclass, field
 from typing import Final
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QFrame, QLabel, QSizePolicy, QVBoxLayout
 
 from gui import faker as ui_faker
 from gui.colors import Theme
-from gui.elements import DemiBoldText, File, Image, WalkthroughButton
+from gui.elements import File, Image, WalkthroughButton
 from gui.icons import (
     ApplicationIcons,
     GenericIcons,

@@ -629,7 +629,7 @@ class Map(QWidget):
             minimum_width=Settings.DIMENSION.MIN_WIDTH_LARGE,
             minimum_height=Settings.DIMENSION.MIN_HEIGHT_SMALL,
             stretch_widgets=False,
-            icon_path=icon_qt_path(GenericIcons.DEVICE_PLACEHOLDER),
+            icon=GenericIcons.DEVICE_PLACEHOLDER,
         )
         placeholder.setObjectName("map-placeholder")
         layout.addWidget(placeholder, 1)
@@ -680,12 +680,10 @@ class Map(QWidget):
 
         self._placeholder_icon = icon_member
         self.ui.placeholder.set_text(text)
-        self.ui.placeholder.set_icon(icon_qt_path(icon_member))
+        self.ui.placeholder.set_icon(icon_member)
 
     def apply_theme_icons(self, theme: Theme) -> None:
-        self.ui.placeholder.set_icon(
-            icon_qt_path_for_theme(theme, self._placeholder_icon)
-        )
+        self.ui.placeholder.apply_theme_icons(theme)
         self.ui.coordinates.apply_theme_icons(theme)
 
     def play_placeholder_helper_animation(self) -> None:

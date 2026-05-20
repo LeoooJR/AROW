@@ -641,8 +641,8 @@ class SelectionField(QComboBox, Component):
         """
 
         super().__init__(parent)
+
         self.texts = SelectionField.Text(placeholder=placeholder)
-        self.ui = SelectionField.UI()
 
         self.setProperty("selection-field", True)
         self.setEditable(False)
@@ -656,50 +656,8 @@ class SelectionField(QComboBox, Component):
 
         self.setPlaceholderText(placeholder)
         self.setCurrentIndex(0)
-        self._finalize_ui_hooks()
 
-    def _set_size_policy(self) -> None:
-        pass
-
-    def _set_alignment(self) -> None:
-        pass
-
-    def _connect_signals(self) -> None:
-        pass
-
-    def apply_theme_icons(self, theme: Theme) -> None:
-        pass
-
-
-class RegularText(QLabel, Component):
-
-    @dataclass(frozen=True)
-    class Text:
-        """Body text content for the label."""
-
-        label: str = ""
-
-    @dataclass
-    class UI:
-        """Reserved for future explicit child references on regular text."""
-
-        pass
-
-    def __init__(self, parent: QWidget | None, text: str):
-        """Create a default-weight body label.
-
-        Args:
-            parent: Optional Qt parent widget for lifetime and hierarchy.
-            text: Label string.
-        """
-        super().__init__(text, parent)
-        self.texts = RegularText.Text(label=text)
-        self.ui = RegularText.UI()
-        self.setProperty("regular-text", True)
-        self.setFont(
-            QFont(Settings.FONT.FAMILY, Settings.FONT.SIZE_DEFAULT, QFont.Weight.Normal)
-        )
-        self.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignHCenter)
+        self.ui = SelectionField.UI()
         self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
@@ -738,7 +696,7 @@ class DemiBoldText(QLabel, Component):
         """
         super().__init__(text, parent)
         self.texts = DemiBoldText.Text(label=text)
-        self.ui = DemiBoldText.UI()
+
         self.setProperty("demi-bold-text", True)
         self.setFont(
             QFont(
@@ -746,6 +704,8 @@ class DemiBoldText(QLabel, Component):
             )
         )
         self.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignHCenter)
+
+        self.ui = DemiBoldText.UI()
         self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
@@ -785,12 +745,14 @@ class HelperText(QLabel, Component):
 
         super().__init__(text, parent)
         self.texts = HelperText.Text(label=text)
-        self.ui = HelperText.UI()
+
         self.setProperty("helper-text", True)
         self.setFont(
             QFont(Settings.FONT.FAMILY, Settings.FONT.SIZE_HELPER, QFont.Weight.Normal)
         )
         self.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignHCenter)
+
+        self.ui = HelperText.UI()
         self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
@@ -846,7 +808,6 @@ class List(QListWidget, Component):
         """
         super().__init__(parent)
         self.texts = List.Text()
-        self.ui = List.UI()
         self.setProperty("list", True)
         for item in items:
             self.addItem(item)
@@ -855,9 +816,6 @@ class List(QListWidget, Component):
         )
         self.setMinimumWidth(minimum_width)
         self.setMinimumHeight(minimum_height)
-        self.setBaseSize(QSize(Settings.LIST.BASE_WIDTH, Settings.LIST.BASE_HEIGHT))
-        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.setSizeAdjustPolicy(QListWidget.SizeAdjustPolicy.AdjustToContents)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.setSelectionMode(selection_mode)
@@ -865,10 +823,14 @@ class List(QListWidget, Component):
         self.setEditTriggers(edit_triggers)
         self.setItemAlignment(item_alignment)
         self.setAlternatingRowColors(True)
+
+        self.ui = List.UI()
         self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
-        pass
+        self.setBaseSize(QSize(Settings.LIST.BASE_WIDTH, Settings.LIST.BASE_HEIGHT))
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.setSizeAdjustPolicy(QListWidget.SizeAdjustPolicy.AdjustToContents)
 
     def _set_alignment(self) -> None:
         pass
@@ -932,11 +894,12 @@ class SVG(QLabel, Component):
         """
         super().__init__(parent)
         self.texts = SVG.Text()
-        self.ui = SVG.UI()
         self.setProperty("svg", True)
         self.path = svg_path
         self.renderer: QSvgRenderer | None = None
         self.set_path(svg_path)
+
+        self.ui = SVG.UI()
         self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
@@ -993,7 +956,7 @@ class PlaceHolder(QFrame, Component):
         """Primary text label and optional top icon."""
 
         text: QLabel
-        icon: SVG
+        svg: SVG
 
     def __init__(
         self,
@@ -1002,7 +965,7 @@ class PlaceHolder(QFrame, Component):
         minimum_width: int = 180,
         minimum_height: int = 150,
         stretch_widgets: bool = False,
-        icon_path: str | None = None,
+        icon: GenericIcons | OperatingSystemIcons | ApplicationIcons | None = None,
     ):
         """Build a vertically centered empty-state block.
 
@@ -1012,11 +975,13 @@ class PlaceHolder(QFrame, Component):
             minimum_width: Minimum width before default placeholder sizing applies.
             minimum_height: Minimum height before default placeholder sizing applies.
             stretch_widgets: Layout stretch factor for the text row when True.
-            icon_path: Optional SVG shown above the text.
+            icon: Optional GenericIcons | OperatingSystemIcons | ApplicationIcons shown above the text.
         """
         super().__init__(parent)
         self.texts = PlaceHolder.Text(text=text if isinstance(text, str) else None)
         self.ui: PlaceHolder.UI
+
+        self.setProperty("place-holder", True)
 
         layout = QVBoxLayout()
         layout.setContentsMargins(
@@ -1027,7 +992,6 @@ class PlaceHolder(QFrame, Component):
         )
         layout.setSpacing(Settings.PLACEHOLDER.SPACING)
 
-        self.setProperty("place-holder", True)
         self.setMinimumWidth(
             minimum_width if minimum_width != 180 else Settings.PLACEHOLDER.MIN_WIDTH
         )
@@ -1037,9 +1001,12 @@ class PlaceHolder(QFrame, Component):
 
         layout.addStretch()
 
-        if icon_path is not None:
+        if icon is not None:
+            self._icon: (
+                GenericIcons | OperatingSystemIcons | ApplicationIcons | None
+            ) = icon
             icon_size = Settings.PLACEHOLDER.ICON_SIZE
-            svg = SVG(icon_path, self)
+            svg = SVG(icon_qt_path(icon), self)
             svg.setFixedSize(icon_size, icon_size)
             svg.setAlignment(Qt.AlignmentFlag.AlignCenter)
             layout.addWidget(svg)
@@ -1051,10 +1018,11 @@ class PlaceHolder(QFrame, Component):
 
         label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(label, int(stretch_widgets))
+
         layout.addStretch()
         self.setLayout(layout)
 
-        self.ui = PlaceHolder.UI(text=label, icon=svg)
+        self.ui = PlaceHolder.UI(text=label, svg=svg)
 
         self._finalize_ui_hooks()
 
@@ -1063,13 +1031,14 @@ class PlaceHolder(QFrame, Component):
 
     def _set_alignment(self) -> None:
         self.layout().setAlignment(self.ui.text, Qt.AlignmentFlag.AlignCenter)
-        self.layout().setAlignment(self.ui.icon, Qt.AlignmentFlag.AlignCenter)
+        self.layout().setAlignment(self.ui.svg, Qt.AlignmentFlag.AlignCenter)
 
     def _connect_signals(self) -> None:
         pass
 
     def apply_theme_icons(self, theme: Theme) -> None:
-        pass
+        if self._icon is not None:
+            self.ui.svg.set_path(icon_qt_path_for_theme(theme, self._icon))
 
     def set_text(self, text: str) -> None:
         """Update the placeholder message.
@@ -1079,13 +1048,19 @@ class PlaceHolder(QFrame, Component):
         """
         self.ui.text.setText(text)
 
-    def set_icon(self, icon_path: str) -> None:
+    def set_icon(
+        self, icon: GenericIcons | OperatingSystemIcons | ApplicationIcons | None = None
+    ) -> None:
         """Swap the illustration above the text.
 
         Args:
-            icon_path: Path to the replacement SVG asset.
+            icon: Optional GenericIcons | OperatingSystemIcons | ApplicationIcons shown above the text.
         """
-        self.ui.icon.set_path(icon_path)
+        if icon is None:
+            return
+
+        self._icon: GenericIcons | OperatingSystemIcons | ApplicationIcons | None = icon
+        self.ui.svg.set_path(icon_qt_path(self._icon))
 
 
 class FileOpenDialog(QFileDialog, Component):

@@ -6,9 +6,7 @@ from dataclasses import dataclass
 from typing import Final
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
-    QFileDialog,
     QFrame,
     QHBoxLayout,
     QMessageBox,
@@ -26,7 +24,6 @@ from gui.elements import (
     HelperText,
     LeadingIconLabel,
     PanelTitle,
-    PlaceHolder,
     SelectionField,
     ToolButton,
     WarningDialog,
@@ -34,7 +31,6 @@ from gui.elements import (
 from gui.icons import GenericIcons, icon_qt_path, icon_qt_path_for_theme
 from gui.settings import Settings
 from gui.signals import view_signals
-from gui.svg import get_svg_size
 from gui.wrapper import VerticalLayoutWrapper
 
 

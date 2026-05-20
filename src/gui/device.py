@@ -1253,7 +1253,7 @@ class DeviceSelectionPanel(QFrame):
             text=self.texts.empty_state,
             minimum_width=0,
             minimum_height=0,
-            icon_path=icon_qt_path(GenericIcons.DEVICE_PLACEHOLDER),
+            icon=GenericIcons.DEVICE_PLACEHOLDER,
         )
         available_device_empty_state.setObjectName("available-device-empty-state")
         available_device_empty_state.setProperty("place-holder", False)
@@ -1485,7 +1485,7 @@ class DeviceSelectionPanel(QFrame):
         # Adapt icon size to available room so it never collides with the label.
         min_side = max(0, min(geometry.width(), geometry.height()))
         icon_size = max(24, min(Settings.PLACEHOLDER.ICON_SIZE, int(min_side * 0.38)))
-        placeholder.ui.icon.setFixedSize(icon_size, icon_size)
+        placeholder.ui.svg.setFixedSize(icon_size, icon_size)
         placeholder.raise_()
 
     def _update_available_device_empty_state_visibility(self) -> None:
@@ -1612,9 +1612,7 @@ class DeviceSelectionPanel(QFrame):
         )
         self.ui.expand_button.set_icon(expand_icon)
         self.ui.expand_button.apply_theme_icons(theme)
-        self.ui.available_device_empty_state.set_icon(
-            icon_qt_path_for_theme(theme, GenericIcons.DEVICE_PLACEHOLDER)
-        )
+        self.ui.available_device_empty_state.apply_theme_icons(theme)
         self.ui.add_device_button.apply_theme_icons(theme)
         self.ui.refresh_button.apply_theme_icons(theme)
         for lw_item in self.ui.available_device_list.iter_items():
