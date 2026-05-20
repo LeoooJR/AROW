@@ -38,8 +38,7 @@ import gui.ressources_rc
 from gui.__init__ import __application__
 from gui.animation import animate_widget_visibility
 from gui.colors import Theme, get_current_palette, set_current_theme
-from gui.device import DeviceItem, DevicePairingPanel, DeviceSelectionPanel
-from gui.elements import (
+from gui.components import (
     SVG,
     AuthentificationCard,
     ProgressBar,
@@ -47,6 +46,7 @@ from gui.elements import (
     Toast,
     ToolButton,
 )
+from gui.device import DeviceItem, DevicePairingPanel, DeviceSelectionPanel
 from gui.event_filter import ActivityTracker
 from gui.host import HostPanel
 from gui.icons import (

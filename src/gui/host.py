@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
 from gui import faker as ui_faker
 from gui.animation import animate_widget_visibility
 from gui.colors import Theme
-from gui.elements import (
+from gui.components import (
     SVG,
     ConditionIndicator,
     GroupBox,

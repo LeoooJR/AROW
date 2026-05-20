@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from gui.elements import File
+from gui.components import File
 
 pytestmark = pytest.mark.usefixtures("qapp")
 

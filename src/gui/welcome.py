@@ -6,7 +6,7 @@ from PySide6.QtWidgets import QFrame, QLabel, QSizePolicy, QVBoxLayout
 
 from gui import faker as ui_faker
 from gui.colors import Theme
-from gui.elements import File, Image, WalkthroughButton
+from gui.components import File, Image, WalkthroughButton
 from gui.icons import (
     ApplicationIcons,
     GenericIcons,

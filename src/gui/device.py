@@ -32,7 +32,14 @@ from gui.animation import (
     compute_sine_pulse_level,
 )
 from gui.colors import Theme
-from gui.elements import GroupBox, HelperText, List, PanelTitle, PlaceHolder, ToolButton
+from gui.components import (
+    GroupBox,
+    HelperText,
+    List,
+    PanelTitle,
+    PlaceHolder,
+    ToolButton,
+)
 from gui.icons import GenericIcons, icon_qt_path, icon_qt_path_for_theme
 from gui.settings import Settings
 from gui.signals import view_signals

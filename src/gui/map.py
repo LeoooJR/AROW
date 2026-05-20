@@ -26,7 +26,7 @@ from PySide6.QtWidgets import (
 )
 
 from gui.colors import Theme
-from gui.elements import SVG, LeadingIconLabel, PanelTitle, PlaceHolder, ToolButton
+from gui.components import SVG, LeadingIconLabel, PanelTitle, PlaceHolder, ToolButton
 from gui.icons import GenericIcons, icon_qt_path, icon_qt_path_for_theme
 from gui.settings import Settings
 from gui.signals import view_signals
