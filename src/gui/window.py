@@ -651,7 +651,8 @@ class Body(QWidget):
             if not self.ui.map_panel.is_map_visible():  # Map not visible yet
                 if self.ui.progress_bar.value() == 0:  # No phone is connected yet
                     self.ui.map_panel.helper()
-                    self.ui.device_selection_panel.start_highlight_attention()
+                    if self.is_left_panels_visible():
+                        self.ui.device_selection_panel.start_highlight_attention()
                 elif self.ui.progress_bar.value() == 1:
                     pass
 
@@ -660,7 +661,8 @@ class Body(QWidget):
         if self.ui.progress_bar.value() == 0:
             if self.ui.tabs.currentIndex() == 1:
                 self.ui.map_panel.helper()
-                self.ui.device_selection_panel.start_highlight_attention()
+                if self.is_left_panels_visible():
+                    self.ui.device_selection_panel.start_highlight_attention()
         elif self.ui.progress_bar.value() == 1:
             pass
 

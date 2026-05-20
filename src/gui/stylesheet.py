@@ -16,7 +16,7 @@ def _build_stylesheet(palette) -> str:
         rules: list[str] = []
         for level in range(levels):
             if level == 0:
-                list_border = f"1px solid {palette.BORDER_SUBTLE}"
+                list_border = "none"
                 otp_border = f"1px solid {palette.BORDER_SUBTLE}"
                 helper_color = palette.TEXT_MUTED
             else:
@@ -25,7 +25,7 @@ def _build_stylesheet(palette) -> str:
                 otp_border = f"2px solid rgba({soft_red_rgba}, {alpha:.1f})"
                 helper_color = f"rgba({soft_red_rgba}, {alpha:.1f})"
             rules.append(f"""
-QListWidget#availabe-device-list[device-list-highlight-level="{level}"] {{
+QGroupBox#available-device-group-box QListWidget#available-device-list[device-list-highlight-level="{level}"] {{
     border: {list_border};
     border-radius: {Settings.BORDER_RADIUS.MD}px;
 }}
@@ -469,8 +469,6 @@ QWidget#authentification-overlay {{
     background-color: rgba(0, 0, 0, 0.16);
 }}
 
-{pulse_section}
-
 QFrame[place-holder="true"],
 QWidget#available-device-empty-state,
 QFrame#map-placeholder {{
@@ -648,14 +646,16 @@ QGroupBox#logs-group-box::title {{
     font-weight: {Settings.FONT.WEIGHT_DEMIBOLD};
 }}
 
-QGroupBox#available-device-group-box QListWidget#availabe-device-list {{
+QGroupBox#available-device-group-box QListWidget#available-device-list {{
     background-color: {palette.TRANSPARENT};
     border: none;
     border-radius: {Settings.BORDER_RADIUS.MD}px;
     padding: {Settings.SPACING.SM}px;
 }}
 
-QGroupBox#available-device-group-box QListWidget#availabe-device-list::item {{
+{pulse_section}
+
+QGroupBox#available-device-group-box QListWidget#available-device-list::item {{
     background-color: {palette.TRANSPARENT};
     border: none;
     margin: 0px 0px {Settings.SPACING.SM}px 0px;

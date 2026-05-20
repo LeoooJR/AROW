@@ -1278,7 +1278,7 @@ class DeviceSelectionPanel(QFrame):
         layout.addWidget(header)
 
         available_device_list = List(None)
-        available_device_list.setObjectName("availabe-device-list")
+        available_device_list.setObjectName("available-device-list")
         available_device_empty_state = PlaceHolder(
             available_device_list.viewport(),
             text=self.texts.empty_state,
