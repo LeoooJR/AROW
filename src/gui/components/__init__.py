@@ -21,7 +21,7 @@ from gui.components.inputs import (
     OTPValidator,
     SelectionField,
 )
-from gui.components.labels import DemiBoldText, HelperText, LeadingIconLabel, PanelTitle
+from gui.components.labels import DemiBoldText, HelperText, LeadingIconLabel
 from gui.components.lists import List
 from gui.components.media import SVG, Image
 
@@ -44,7 +44,6 @@ __all__ = [
     "OTPLineEdit",
     "OTPType",
     "OTPValidator",
-    "PanelTitle",
     "PlaceHolder",
     "ProgressBar",
     "QuestionDialog",

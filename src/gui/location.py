@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Final
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -23,12 +24,11 @@ from gui.components import (
     FileOpenDialog,
     HelperText,
     LeadingIconLabel,
-    PanelTitle,
     SelectionField,
     ToolButton,
     WarningDialog,
 )
-from gui.icons import GenericIcons, icon_qt_path, icon_qt_path_for_theme
+from gui.icons import GenericIcons
 from gui.settings import Settings
 from gui.signals import view_signals
 from gui.wrapper import VerticalLayoutWrapper
@@ -64,7 +64,7 @@ class LocationPanel(QFrame):
     class UI:
         """Widgets for the location panel header and form body."""
 
-        title: PanelTitle
+        title: LeadingIconLabel
         expand_button: ToolButton
         header: QWidget
         body: QWidget
@@ -105,8 +105,22 @@ class LocationPanel(QFrame):
             Settings.PANEL.SECTION_SPACING
         )  # Consistent spacing between major sections
 
-        title = PanelTitle(
-            parent=self, text=self.texts.title, icon_path=icon_qt_path(GenericIcons.GEO)
+        title = LeadingIconLabel(
+            parent=self,
+            icon=GenericIcons.GEO,
+            text=self.texts.title,
+            font_size=Settings.FONT.SIZE_TITLE,
+            font_weight=QFont.Weight.DemiBold,
+            spacing=Settings.PANEL.TITLE_ICON_SPACING,
+            margins=(
+                Settings.PANEL.TITLE_PADDING_LEFT,
+                Settings.PANEL.TITLE_PADDING_TOP,
+                Settings.PANEL.TITLE_PADDING_RIGHT,
+                Settings.PANEL.TITLE_PADDING_BOTTOM,
+            ),
+            text_alignment=Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
+            label_properties={"section-title": True},
+            constrain_to_size_hint=True,
         )
         expand_button = ToolButton(
             self,
@@ -115,6 +129,8 @@ class LocationPanel(QFrame):
         )
         expand_button.setProperty("toggle", True)
         header = QWidget(self)
+        header.setProperty("panel-title", True)
+        header.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         header_layout = QHBoxLayout(header)
         header_layout.setContentsMargins(*Settings.SPACING.MARGIN_NONE)
         header_layout.setSpacing(Settings.SPACING.NONE)
@@ -287,9 +303,7 @@ class LocationPanel(QFrame):
         )
 
     def apply_theme_icons(self, theme: Theme) -> None:
-        self.ui.title.set_leading_icon_path(
-            icon_qt_path_for_theme(theme, GenericIcons.GEO)
-        )
+        self.ui.title.apply_theme_icons(theme)
         inset = bool(self.ui.expand_button.property("toggle"))
         expand_icon = (
             GenericIcons.LAYOUT_BOTTOMBAR_INSET

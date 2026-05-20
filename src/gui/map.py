@@ -26,11 +26,11 @@ from PySide6.QtWidgets import (
 )
 
 from gui.colors import Theme
-from gui.components import SVG, LeadingIconLabel, PanelTitle, PlaceHolder, ToolButton
+from gui.components import SVG, LeadingIconLabel, PlaceHolder, ToolButton
 from gui.icons import GenericIcons, icon_qt_path, icon_qt_path_for_theme
 from gui.settings import Settings
 from gui.signals import view_signals
-from gui.svg import get_svg_size
+from gui.components.media import get_svg_size
 from gui.wrapper import GridLayoutWrapper, HorizontalLayoutWrapper
 from logger import logger
 
@@ -456,9 +456,11 @@ class Coordinates(QFrame):
             parent=self,
             icon=GenericIcons.PLAY,
             tooltip=self.texts.play_button_tooltip,
+            icon_size=Settings.DIMENSION.TOOLBUTTON_PROMINENT_ICON_SIZE,
         )
         play_button.setEnabled(True)
         play_button.setProperty("toggle", False)
+        play_button.setProperty("simulation-control", True)
         play_button.clicked.connect(self._on_play_button_clicked)
         layout.addWidget(play_button)
 
@@ -740,7 +742,7 @@ class MapPanel(QFrame):
     class UI:
         """Title, optional legend, and embedded map widget."""
 
-        title: PanelTitle
+        title: LeadingIconLabel
         legend: Legend
         map: Map
 
@@ -769,10 +771,24 @@ class MapPanel(QFrame):
             Settings.PANEL.SECTION_SPACING
         )  # Consistent spacing between major sections
 
-        title = PanelTitle(
-            parent=self, text=self.texts.title, icon_path=icon_qt_path(GenericIcons.MAP)
+        title = LeadingIconLabel(
+            parent=self,
+            icon=GenericIcons.MAP,
+            text=self.texts.title,
+            font_size=Settings.FONT.SIZE_TITLE,
+            font_weight=QFont.Weight.DemiBold,
+            spacing=Settings.PANEL.TITLE_ICON_SPACING,
+            margins=(
+                Settings.PANEL.TITLE_PADDING_LEFT,
+                Settings.PANEL.TITLE_PADDING_TOP,
+                Settings.PANEL.TITLE_PADDING_RIGHT,
+                Settings.PANEL.TITLE_PADDING_BOTTOM,
+            ),
+            text_alignment=Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
+            properties={"panel-title": True, "main-panel-title": True},
+            label_properties={"section-title": True},
+            constrain_to_size_hint=True,
         )
-        title.setProperty("main-panel-title", True)
         layout.addWidget(title)
 
         legend = Legend(self)
@@ -827,9 +843,7 @@ class MapPanel(QFrame):
         self.ui.map.play_placeholder_helper_animation()
 
     def apply_theme_icons(self, theme: Theme) -> None:
-        self.ui.title.set_leading_icon_path(
-            icon_qt_path_for_theme(theme, GenericIcons.MAP)
-        )
+        self.ui.title.apply_theme_icons(theme)
         self.ui.legend.apply_theme_icons(theme)
         self.ui.map.apply_theme_icons(theme)
 

@@ -19,7 +19,7 @@ from gui.icons import (
     icon_qt_path_for_theme,
 )
 from gui.settings import Settings
-from gui.svg import get_svg_size
+from gui.components.media import get_svg_size
 
 
 class LeadingIconLabel(QWidget, Component):
@@ -45,9 +45,15 @@ class LeadingIconLabel(QWidget, Component):
         parent: QWidget | None,
         icon: GenericIcons | OperatingSystemIcons | ApplicationIcons,
         text: str | QLabel,
+        font_size: int = Settings.FONT.SIZE_DEFAULT,
         font_weight: QFont.Weight = QFont.Weight.Normal,
+        icon_size=None,
         spacing: int = 0,
         margins: tuple = (0, 0, 0, 0),
+        text_alignment=Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignHCenter,
+        properties: dict[str, object] | None = None,
+        label_properties: dict[str, object] | None = None,
+        constrain_to_size_hint: bool = False,
     ):
         """Lay out a leading SVG icon beside a string or external ``QLabel``.
 
@@ -55,9 +61,15 @@ class LeadingIconLabel(QWidget, Component):
             parent: Optional Qt parent widget for lifetime and hierarchy.
             icon: GenericIcons | OperatingSystemIcons | ApplicationIcons.
             text: Caption string or pre-built text widget.
+            font_size: Font point size applied when ``text`` is a string.
             font_weight: Font weight applied when ``text`` is a string.
+            icon_size: Fixed icon size; derived from ``font_size`` when omitted.
             spacing: Pixels between icon and text.
             margins: Outer layout margins (left, top, right, bottom).
+            text_alignment: Alignment for the text label and its layout item.
+            properties: Dynamic properties to apply to the root widget.
+            label_properties: Dynamic properties to apply to the text label.
+            constrain_to_size_hint: When True, cap the widget to its layout size hint.
         """
         # Initialize parent QWidget
         super().__init__(parent)
@@ -74,6 +86,12 @@ class LeadingIconLabel(QWidget, Component):
             )
 
         self._icon: GenericIcons | OperatingSystemIcons | ApplicationIcons = icon
+        self._text_alignment = text_alignment
+        self._properties = properties or {}
+        self._label_properties = label_properties or {}
+
+        if icon_size is None:
+            icon_size = get_svg_size(font_size)
 
         layout = QHBoxLayout()
         layout.setContentsMargins(*margins)
@@ -81,9 +99,7 @@ class LeadingIconLabel(QWidget, Component):
 
         svg = SVG(icon_qt_path(self._icon), self)
         svg.setObjectName("leading-icon")
-        svg.setFixedSize(
-            get_svg_size(Settings.FONT.SIZE_DEFAULT)
-        )  # Set the size of the leading icon depending on the font size
+        svg.setFixedSize(icon_size)
 
         layout.addWidget(svg)
 
@@ -95,18 +111,28 @@ class LeadingIconLabel(QWidget, Component):
         label.setFont(
             QFont(
                 Settings.FONT.FAMILY,
-                Settings.FONT.SIZE_DEFAULT,
-                QFont.Weight.Normal,
+                font_size,
+                font_weight,
             )
         )
+        for key, value in self._label_properties.items():
+            label.setProperty(key, value)
+
+        for key, value in self._properties.items():
+            self.setProperty(key, value)
+        if self._properties:
+            self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
 
         layout.addWidget(label)
 
         self.setLayout(layout)
+        if constrain_to_size_hint:
+            self.setMaximumSize(layout.sizeHint())
 
         self.ui: LeadingIconLabel.UI = LeadingIconLabel.UI(svg=svg, text=label)
 
         self._finalize_ui_hooks()
+        self._refresh_stylesheet_properties()
 
     def _set_size_policy(self) -> None:
         """Set the size policy for elements composing the leading icon label."""
@@ -121,15 +147,22 @@ class LeadingIconLabel(QWidget, Component):
             self.ui.svg, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignHCenter
         )
         self.ui.text.setAlignment(
-            Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignHCenter
+            self._text_alignment
         )
         self.layout().setAlignment(
-            self.ui.text, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignHCenter
+            self.ui.text, self._text_alignment
         )
 
     def _connect_signals(self) -> None:
         """Connect signals for elements composing the leading icon label."""
         pass
+
+    def _refresh_stylesheet_properties(self) -> None:
+        """Re-polish after dynamic property changes so Qt refreshes QSS selectors."""
+        for widget in (self, self.ui.text):
+            widget.style().unpolish(widget)
+            widget.style().polish(widget)
+            widget.update()
 
     def apply_theme_icons(self, theme: Theme) -> None:
         """Apply theme icons to elements composing the leading icon label."""
@@ -171,7 +204,10 @@ class LeadingIconLabel(QWidget, Component):
 
         text.setParent(self)
         text.setObjectName("label")
+        for key, value in self._label_properties.items():
+            text.setProperty(key, value)
         layout.addWidget(text)
         self.ui.text = text
         self.texts = LeadingIconLabel.Text(text=None)
         self._finalize_ui_hooks()
+        self._refresh_stylesheet_properties()

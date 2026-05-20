@@ -63,6 +63,8 @@ class DimensionSettings:
     # Buttons
     BUTTON_HEIGHT: int = 30
     TOOLBUTTON_HEIGHT: int = 30
+    TOOLBUTTON_ICON_SIZE: int = 18
+    TOOLBUTTON_PROMINENT_ICON_SIZE: int = 22
     PALETTE_THUMB_SIZE: int = 28
 
     # Logo and branding

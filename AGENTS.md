@@ -9,6 +9,7 @@
 ## Repository structure
 
 - `src/gui`: graphical user interface
+- `src/gui/components`: reusable GUI component package, grouped by component category
 - `src/core`: model and core logic
 - `src/geo`: Leaflet map integration and map-specific assets
 - `src/controller`: communication layer between GUI and model
@@ -114,9 +115,26 @@ Apply these rules whenever you touch `src/gui`.
 - Use colors from `src/gui/colors.py`.
 - If a needed color does not exist, add or update it there rather than defining a one-off value locally.
 
-### Reusable elements and layouts
+### Components and layouts
 
-- Put reusable UI building blocks in `src/gui/elements.py`.
+- Put reusable GUI building blocks in `src/gui/components/`, not `src/gui/elements.py`.
+- Treat `src/gui/elements.py` as a backward-compatible re-export shim for legacy imports only; new code should import from `gui.components` or a category subpackage such as `gui.components.buttons`.
+- Keep components grouped by purpose in the existing category packages:
+  - `base`: shared component protocol and Qt/ABC metaclass helpers
+  - `buttons`: action and tool button widgets
+  - `containers`: composite card, group, and placeholder widgets
+  - `dialogs`: file and message dialogs
+  - `feedback`: transient feedback such as toasts
+  - `file_display`: file summary/display widgets
+  - `indicators`: progress and state indicators
+  - `inputs`: form/input widgets
+  - `labels`: reusable text and icon-label widgets
+  - `lists`: list widgets
+  - `media`: image and SVG rendering widgets
+- If a new reusable component does not fit an existing category, create a new category package under `src/gui/components/` instead of forcing it into an unrelated module.
+- Export new reusable components from their category `__init__.py` and from `src/gui/components/__init__.py` when they are intended for project-wide use.
+- Components should inherit from `Component` when they participate in the shared component lifecycle, implement `_set_size_policy`, `_set_alignment`, `_connect_signals`, and `apply_theme_icons`, and call `_finalize_ui_hooks()` after their child widgets and state are initialized.
+- Prefer component-local `Text` and `UI` dataclasses for stable labels and child-widget references when a component has user-facing text or meaningful internal widgets.
 - Use layout helpers from `src/gui/wrapper.py` when they fit:
   - `VerticalLayoutWrapper`
   - `HorizontalLayoutWrapper`

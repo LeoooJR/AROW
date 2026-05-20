@@ -4,12 +4,24 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from PySide6.QtCore import QSize
 from PySide6.QtGui import QPainter
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import QLabel, QWidget
 
 from gui.colors import Theme
 from gui.components.base.component import Component
+from gui.settings import Settings
+
+
+def get_svg_size(font_size: int) -> QSize:
+    """Return a square SVG size scaled from the given font size."""
+    if font_size < 20:
+        multiplier = Settings.SVG.MULTIPLIER_SMALL
+    else:
+        multiplier = Settings.SVG.MULTIPLIER_LARGE
+    size = int(multiplier * font_size)
+    return QSize(size, size)
 
 
 class SVG(QLabel, Component):

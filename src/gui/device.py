@@ -35,8 +35,8 @@ from gui.colors import Theme
 from gui.components import (
     GroupBox,
     HelperText,
+    LeadingIconLabel,
     List,
-    PanelTitle,
     PlaceHolder,
     ToolButton,
 )
@@ -1055,7 +1055,7 @@ class DevicePairingPanel(QFrame):
     class UI:
         """Chrome and body regions for pairing-specific content."""
 
-        title: PanelTitle
+        title: LeadingIconLabel
         header: HorizontalLayoutWrapper
         body: HorizontalLayoutWrapper
 
@@ -1084,12 +1084,24 @@ class DevicePairingPanel(QFrame):
             Settings.PANEL.SECTION_SPACING
         )  # Consistent spacing between major sections
 
-        title = PanelTitle(
+        title = LeadingIconLabel(
             parent=None,
+            icon=GenericIcons.DEVICE,
             text=self.texts.title,
-            icon_path=icon_qt_path(GenericIcons.DEVICE),
+            font_size=Settings.FONT.SIZE_TITLE,
+            font_weight=QFont.Weight.DemiBold,
+            spacing=Settings.PANEL.TITLE_ICON_SPACING,
+            margins=(
+                Settings.PANEL.TITLE_PADDING_LEFT,
+                Settings.PANEL.TITLE_PADDING_TOP,
+                Settings.PANEL.TITLE_PADDING_RIGHT,
+                Settings.PANEL.TITLE_PADDING_BOTTOM,
+            ),
+            text_alignment=Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
+            properties={"panel-title": True, "main-panel-title": True},
+            label_properties={"section-title": True},
+            constrain_to_size_hint=True,
         )
-        title.setProperty("main-panel-title", True)
 
         header = HorizontalLayoutWrapper(
             self,
@@ -1116,9 +1128,7 @@ class DevicePairingPanel(QFrame):
         self._finalize_ui_hooks()
 
     def apply_theme_icons(self, theme: Theme) -> None:
-        self.ui.title.set_leading_icon_path(
-            icon_qt_path_for_theme(theme, GenericIcons.DEVICE)
-        )
+        self.ui.title.apply_theme_icons(theme)
 
     def _finalize_ui_hooks(self) -> None:
         """Run the final UI setup hooks for the device pairing panel."""
@@ -1193,7 +1203,7 @@ class DeviceSelectionPanel(QFrame):
     class UI:
         """Full device selection UI: list, actions, helper text, and state box."""
 
-        title: PanelTitle
+        title: LeadingIconLabel
         expand_button: ToolButton
         header: QWidget
         body: VerticalLayoutWrapper
@@ -1232,10 +1242,22 @@ class DeviceSelectionPanel(QFrame):
             Settings.PANEL.SECTION_SPACING
         )  # Consistent spacing between major sections
 
-        title = PanelTitle(
+        title = LeadingIconLabel(
             parent=self,
+            icon=GenericIcons.DEVICE,
             text=self.texts.title,
-            icon_path=icon_qt_path(GenericIcons.DEVICE),
+            font_size=Settings.FONT.SIZE_TITLE,
+            font_weight=QFont.Weight.DemiBold,
+            spacing=Settings.PANEL.TITLE_ICON_SPACING,
+            margins=(
+                Settings.PANEL.TITLE_PADDING_LEFT,
+                Settings.PANEL.TITLE_PADDING_TOP,
+                Settings.PANEL.TITLE_PADDING_RIGHT,
+                Settings.PANEL.TITLE_PADDING_BOTTOM,
+            ),
+            text_alignment=Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
+            label_properties={"section-title": True},
+            constrain_to_size_hint=True,
         )
 
         expand_button = ToolButton(
@@ -1246,6 +1268,8 @@ class DeviceSelectionPanel(QFrame):
         expand_button.setProperty("toggle", True)
 
         header = QWidget(self)
+        header.setProperty("panel-title", True)
+        header.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         header_layout = QHBoxLayout(header)
         header_layout.setContentsMargins(*Settings.SPACING.MARGIN_NONE)
         header_layout.setSpacing(Settings.SPACING.NONE)
@@ -1254,7 +1278,7 @@ class DeviceSelectionPanel(QFrame):
         layout.addWidget(header)
 
         available_device_list = List(None)
-        available_device_list.setObjectName("availabe-device-list")
+        available_device_list.setObjectName("available-device-list")
         available_device_empty_state = PlaceHolder(
             available_device_list.viewport(),
             text=self.texts.empty_state,
@@ -1610,9 +1634,7 @@ class DeviceSelectionPanel(QFrame):
 
     def apply_theme_icons(self, theme: Theme) -> None:
         """Refresh toolbar, header, empty state, and row icons for ``theme``."""
-        self.ui.title.set_leading_icon_path(
-            icon_qt_path_for_theme(theme, GenericIcons.DEVICE)
-        )
+        self.ui.title.apply_theme_icons(theme)
         inset = bool(self.ui.expand_button.property("toggle"))
         expand_icon = (
             GenericIcons.LAYOUT_TOPBAR_INSET if inset else GenericIcons.LAYOUT_TOPBAR

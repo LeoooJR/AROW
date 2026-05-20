@@ -175,3 +175,22 @@ def test_device_item_extended_text_uses_single_line_elision(qtbot) -> None:
     assert "\n" not in item.ui.subtitle_label.text()
     assert item.ui.name_label.wordWrap() is False
     assert item.ui.subtitle_label.wordWrap() is False
+
+
+def test_device_selection_panel_highlight_attention_pulses_list(qtbot) -> None:
+    panel = DeviceSelectionPanel()
+    qtbot.addWidget(panel)
+    panel.show()
+
+    assert panel.ui.available_device_list.objectName() == "available-device-list"
+
+    panel.start_highlight_attention()
+    qtbot.wait(80)
+
+    level = panel.ui.available_device_list.property("device-list-highlight-level")
+    assert level is not None
+    assert level != "0"
+
+    panel.stop_highlight_attention()
+
+    assert panel.ui.available_device_list.property("device-list-highlight-level") == "0"

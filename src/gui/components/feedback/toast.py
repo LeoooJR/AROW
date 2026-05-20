@@ -15,12 +15,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from gui.colors import Theme, get_current_palette
+from gui.colors import Theme, get_current_theme, get_palette
 from gui.components.base.component import Component
 from gui.components.media.svg import SVG
 from gui.icons import GenericIcons, icon_qt_path
 from gui.settings import Settings
-from gui.svg import get_svg_size
+from gui.components.media import get_svg_size
 
 
 class Toast(QWidget, Component):
@@ -71,7 +71,8 @@ class Toast(QWidget, Component):
 
         # Set main widget styling (transparent to show shadow)
         self.setObjectName("toast")
-        palette = get_current_palette()
+        theme = get_current_theme()
+        palette = get_palette(theme)
         self.setStyleSheet(f"""
             QWidget#toast {{
                 background-color: {palette.TRANSPARENT};
@@ -87,28 +88,24 @@ class Toast(QWidget, Component):
         inner_widget = QWidget(self)
         inner_widget.setObjectName("toast-inner")
 
-        if level == "info":
-            color = palette.PRIMARY
-            icon_path = icon_qt_path(GenericIcons.INFO)
-        elif level == "success":
-            color = palette.SUCCESS
-            icon_path = icon_qt_path(GenericIcons.CHECK)
-        elif level == "warning":
-            color = palette.WARNING
-            icon_path = icon_qt_path(GenericIcons.EXCLAMATION)
-        elif level == "error":
-            color = palette.ERROR
-            icon_path = icon_qt_path(GenericIcons.X_CIRCLE)
+        level_styles = {
+            "info": (palette.INFO, GenericIcons.INFO),
+            "success": (palette.SUCCESS, GenericIcons.CHECK),
+            "warning": (palette.WARNING, GenericIcons.EXCLAMATION),
+            "error": (palette.ERROR, GenericIcons.X_CIRCLE),
+        }
+        color, icon = level_styles.get(level, level_styles["info"])
+        icon_path = icon_qt_path(icon)
 
         inner_widget.setStyleSheet(f"""
             QWidget#toast-inner {{
-                background-color: {palette.WHITE};
-                border: 1px solid {palette.LIGHT_DIVIDER};
+                background-color: {palette.SURFACE_ELEVATED};
+                border: 1px solid {palette.BORDER_SUBTLE};
                 border-left: 4px solid {color};
-                border-radius: 8px;
+                border-radius: {Settings.BORDER_RADIUS.LG}px;
             }}
             QLabel {{
-                color: {palette.BLACK};
+                color: {palette.TEXT_PRIMARY};
                 background-color: {palette.TRANSPARENT};
                 font-family: "{Settings.FONT.FAMILY}";
                 font-size: {Settings.FONT.SIZE_DEFAULT}px;

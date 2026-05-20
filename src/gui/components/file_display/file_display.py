@@ -19,7 +19,7 @@ from gui.components.media.svg import SVG
 from gui.icons import GenericIcons, icon_qt_path, icon_qt_path_for_theme
 from gui.settings import Settings
 from gui.signals import view_signals
-from gui.svg import get_svg_size
+from gui.components.media import get_svg_size
 
 
 class File(QWidget, Component):

@@ -69,6 +69,11 @@ class Colors(Enum):
     LIGHT_DIVIDER = Color("Light Divider", "#E7E7E2", "#363632")
     LIGHT_DIVIDER_HIGHLIGHT = Color("Light Divider Highlight", "#BDBDB7", "#55554E")
     PANEL_BORDER = Color("Panel Border", "#BDBDB7", "#55554E")
+    PANEL_TITLE_BACKGROUND = Color(
+        "Panel Title Background",
+        "rgba(247, 247, 246, 0.72)",
+        "rgba(23, 23, 22, 0.72)",
+    )
     SOFT_RED = Color("Soft Red", "#D9544D", "#F07167")
     SOFT_GREEN = Color("Soft Green", "#3FA66E", "#55C083")
 
@@ -108,6 +113,7 @@ class Palette:
     LIGHT_DIVIDER: str
     LIGHT_DIVIDER_HIGHLIGHT: str
     PANEL_BORDER: str
+    PANEL_TITLE_BACKGROUND: str
     SOFT_RED: str
     SOFT_GREEN: str
 

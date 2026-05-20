@@ -68,7 +68,15 @@ from gui.wrapper import (
     HorizontalLayoutWrapper,
     VerticalLayoutWrapper,
 )
+
 from logger import logger
+
+PRE_SIMULATION_PROGRESS_STEP_LABELS: Final[list[str]] = [
+    "Not started",
+    "Device selected",
+    "Location set",
+    "Ready to start",
+]
 
 _OFFSCREEN_PLATFORM_NAME: Final[str] = "offscreen"
 _OFFSCREEN_SCREEN_SIZE_ENV: Final[str] = "AROW_GUI_TEST_SCREEN_SIZE"
@@ -540,7 +548,14 @@ class Body(QWidget):
 
         tabs.setTabVisible(2, False)
 
-        progress_bar = ProgressBar(None)
+        progress_bar = ProgressBar(
+            None,
+            minimum=0,
+            maximum=3,
+            value=0,
+            orientation=Qt.Orientation.Horizontal,
+            step_labels=PRE_SIMULATION_PROGRESS_STEP_LABELS,
+        )
 
         tabs_wrapper = VerticalLayoutWrapper(self, widgets=[tabs, progress_bar])
 
@@ -636,7 +651,8 @@ class Body(QWidget):
             if not self.ui.map_panel.is_map_visible():  # Map not visible yet
                 if self.ui.progress_bar.value() == 0:  # No phone is connected yet
                     self.ui.map_panel.helper()
-                    self.ui.device_selection_panel.start_highlight_attention()
+                    if self.is_left_panels_visible():
+                        self.ui.device_selection_panel.start_highlight_attention()
                 elif self.ui.progress_bar.value() == 1:
                     pass
 
@@ -645,7 +661,8 @@ class Body(QWidget):
         if self.ui.progress_bar.value() == 0:
             if self.ui.tabs.currentIndex() == 1:
                 self.ui.map_panel.helper()
-                self.ui.device_selection_panel.start_highlight_attention()
+                if self.is_left_panels_visible():
+                    self.ui.device_selection_panel.start_highlight_attention()
         elif self.ui.progress_bar.value() == 1:
             pass
 

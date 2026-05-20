@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QToolButton, QWidget
 
@@ -18,7 +18,6 @@ from gui.icons import (
     icon_qt_path_for_theme,
 )
 from gui.settings import Settings
-from gui.svg import get_svg_size
 
 
 class ToolButton(QToolButton, Component):
@@ -40,6 +39,7 @@ class ToolButton(QToolButton, Component):
         parent: QWidget | None,
         icon: GenericIcons | OperatingSystemIcons | ApplicationIcons | None = None,
         tooltip: str | None = None,
+        icon_size: int | None = None,
     ):
         """Create a compact icon button with optional tooltip.
 
@@ -47,6 +47,7 @@ class ToolButton(QToolButton, Component):
             parent: Optional Qt parent widget for lifetime and hierarchy.
             icon: Optional GenericIcons | OperatingSystemIcons | ApplicationIcons for the button face.
             tooltip: Hover tooltip string.
+            icon_size: Optional square icon size override.
         """
         super().__init__(parent)
 
@@ -54,10 +55,11 @@ class ToolButton(QToolButton, Component):
 
         self.texts = ToolButton.Text(tooltip=tooltip)
 
+        self._icon_size_px = icon_size or Settings.DIMENSION.TOOLBUTTON_ICON_SIZE
         self._icon: GenericIcons | OperatingSystemIcons | ApplicationIcons | None = icon
         if self._icon is not None:
             self.setIcon(QIcon(icon_qt_path(self._icon)))
-            self.setIconSize(get_svg_size(Settings.FONT.SIZE_DEFAULT))
+            self.setIconSize(self._icon_size())
             self.setCursor(Qt.CursorShape.PointingHandCursor)
             if tooltip is not None:
                 self.setToolTip(tooltip)
@@ -80,6 +82,10 @@ class ToolButton(QToolButton, Component):
         if self._icon is not None:
             self.setIcon(QIcon(icon_qt_path_for_theme(theme, self._icon)))
 
+    def _icon_size(self) -> QSize:
+        size = self._icon_size_px
+        return QSize(size, size)
+
     def set_icon(
         self, icon: GenericIcons | OperatingSystemIcons | ApplicationIcons | None = None
     ):
@@ -93,4 +99,4 @@ class ToolButton(QToolButton, Component):
 
         self._icon: GenericIcons | OperatingSystemIcons | ApplicationIcons | None = icon
         self.setIcon(QIcon(icon_qt_path(self._icon)))
-        self.setIconSize(get_svg_size(Settings.FONT.SIZE_DEFAULT))
+        self.setIconSize(self._icon_size())
