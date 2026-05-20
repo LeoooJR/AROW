@@ -184,6 +184,19 @@ QToolButton:pressed {{
     background-color: {palette.PRIMARY_BORDER};
 }}
 
+QToolButton[simulation-control="true"] {{
+    background-color: {palette.PRIMARY_SOFT};
+    border: 1px solid {palette.PRIMARY_BORDER};
+}}
+
+QToolButton[simulation-control="true"]:hover {{
+    background-color: {palette.PRIMARY_BORDER};
+}}
+
+QToolButton[simulation-control="true"]:pressed {{
+    background-color: {palette.PRIMARY};
+}}
+
 QToolButton:disabled {{
     background-color: {palette.TRANSPARENT};
     color: {palette.TEXT_MUTED};

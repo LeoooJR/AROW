@@ -456,9 +456,11 @@ class Coordinates(QFrame):
             parent=self,
             icon=GenericIcons.PLAY,
             tooltip=self.texts.play_button_tooltip,
+            icon_size=Settings.DIMENSION.TOOLBUTTON_PROMINENT_ICON_SIZE,
         )
         play_button.setEnabled(True)
         play_button.setProperty("toggle", False)
+        play_button.setProperty("simulation-control", True)
         play_button.clicked.connect(self._on_play_button_clicked)
         layout.addWidget(play_button)
 
