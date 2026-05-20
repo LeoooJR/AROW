@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from typing import Final, Literal
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QFont, QIcon
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -24,7 +24,6 @@ from gui.components import (
     ConditionIndicator,
     GroupBox,
     LeadingIconLabel,
-    PanelTitle,
     ToolButton,
 )
 from gui.icons import (
@@ -596,7 +595,7 @@ class HostPanel(QFrame):
     class UI:
         """Composed widgets for host identity, ADB status, and panel chrome."""
 
-        title: PanelTitle
+        title: LeadingIconLabel
         expand_button: ToolButton
         header: QWidget
         body: VerticalLayoutWrapper
@@ -635,10 +634,22 @@ class HostPanel(QFrame):
         )
         layout.setSpacing(Settings.PANEL.SECTION_SPACING)
 
-        title = PanelTitle(
+        title = LeadingIconLabel(
             parent=self,
+            icon=GenericIcons.LAPTOP,
             text=self.texts.title,
-            icon_path=icon_qt_path(GenericIcons.LAPTOP),
+            font_size=Settings.FONT.SIZE_TITLE,
+            font_weight=QFont.Weight.DemiBold,
+            spacing=Settings.PANEL.TITLE_ICON_SPACING,
+            margins=(
+                Settings.PANEL.TITLE_PADDING_LEFT,
+                Settings.PANEL.TITLE_PADDING_TOP,
+                Settings.PANEL.TITLE_PADDING_RIGHT,
+                Settings.PANEL.TITLE_PADDING_BOTTOM,
+            ),
+            text_alignment=Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
+            label_properties={"section-title": True},
+            constrain_to_size_hint=True,
         )
 
         expand_button = ToolButton(
@@ -649,6 +660,8 @@ class HostPanel(QFrame):
         expand_button.setProperty("toggle", True)
 
         header = QWidget(self)
+        header.setProperty("panel-title", True)
+        header.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         header_layout = QHBoxLayout(header)
         header_layout.setContentsMargins(*Settings.SPACING.MARGIN_NONE)
         header_layout.setSpacing(Settings.SPACING.NONE)
@@ -891,9 +904,7 @@ class HostPanel(QFrame):
 
     def apply_theme_icons(self, theme: Theme) -> None:
         """Refresh header, host glyph, expand control, and ADB block icon for ``theme``."""
-        self.ui.title.set_leading_icon_path(
-            icon_qt_path_for_theme(theme, GenericIcons.LAPTOP)
-        )
+        self.ui.title.apply_theme_icons(theme)
         inset = bool(self.ui.expand_button.property("toggle"))
         expand_icon = (
             GenericIcons.LAYOUT_TOPBAR_INSET if inset else GenericIcons.LAYOUT_TOPBAR

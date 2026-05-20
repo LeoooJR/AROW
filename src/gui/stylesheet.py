@@ -68,8 +68,9 @@ QFrame#tabs-wrapper {{
     border-radius: {Settings.BORDER_RADIUS.SM}px;
 }}
 
-QFrame[panel-title="true"],
-QFrame[main-panel-title="true"] {{
+QWidget[panel-title="true"],
+QWidget[main-panel-title="true"] {{
+    background-color: {palette.PANEL_TITLE_BACKGROUND};
     border-bottom: 1px solid {palette.BORDER_SUBTLE} !important;
 }}
 
