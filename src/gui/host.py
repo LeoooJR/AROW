@@ -35,7 +35,7 @@ from gui.icons import (
 )
 from gui.settings import Settings
 from gui.signals import view_signals
-from gui.svg import get_svg_size
+from gui.components.media import get_svg_size
 from gui.wrapper import GridLayoutWrapper, VerticalLayoutWrapper
 
 ADB_SERVER_STATE = Literal["running", "stopped", "starting", "error", "unknown"]

@@ -19,7 +19,7 @@ from gui.icons import (
     icon_qt_path_for_theme,
 )
 from gui.settings import Settings
-from gui.svg import get_svg_size
+from gui.components.media import get_svg_size
 
 
 class LeadingIconLabel(QWidget, Component):
