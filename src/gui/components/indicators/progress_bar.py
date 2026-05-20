@@ -1,4 +1,4 @@
-"""Step-based progress bar component."""
+"""Reusable progress bar component."""
 
 from __future__ import annotations
 
@@ -14,15 +14,8 @@ from gui.settings import Settings
 
 class ProgressBar(QProgressBar, Component):
     """
-    Step-based progress bar for pre-simulation steps.
+    Reusable progress bar with optional labels for integer values.
     """
-
-    DEFAULT_STEP_LABELS: list[str] = [
-        "Not started",
-        "Device selected",
-        "Location set",
-        "Ready to start",
-    ]
 
     @dataclass(frozen=True)
     class Text:
@@ -36,12 +29,26 @@ class ProgressBar(QProgressBar, Component):
 
         pass
 
-    def __init__(self, parent: QWidget | None, step_labels: list[str] | None = None):
-        """Create a four-step horizontal progress indicator.
+    def __init__(
+        self,
+        parent: QWidget | None,
+        minimum: int = 0,
+        maximum: int = 100,
+        value: int = 0,
+        orientation: Qt.Orientation = Qt.Orientation.Horizontal,
+        step_labels: list[str] | None = None,
+        text_visible: bool = True,
+    ):
+        """Create a configurable progress indicator.
 
         Args:
             parent: Optional Qt parent widget for lifetime and hierarchy.
-            step_labels: Custom labels per step index; defaults to built-in list.
+            minimum: Lowest progress value.
+            maximum: Highest progress value.
+            value: Initial progress value.
+            orientation: Progress bar orientation.
+            step_labels: Optional labels per integer value.
+            text_visible: Whether progress text should be visible.
         """
         super().__init__(parent)
         self.texts = ProgressBar.Text()
@@ -50,16 +57,12 @@ class ProgressBar(QProgressBar, Component):
         self.setFixedHeight(Settings.DIMENSION.PROGRESSBAR_HEIGHT)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.setInvertedAppearance(False)
-        self.setMaximum(3)
-        self.setMinimum(0)
-        self.setOrientation(Qt.Orientation.Horizontal)
-        self.setValue(0)
-        self.setTextVisible(True)
-        self._step_labels: list[str] = (
-            step_labels
-            if step_labels is not None
-            else list(ProgressBar.DEFAULT_STEP_LABELS)
-        )
+        self.setMinimum(minimum)
+        self.setMaximum(maximum)
+        self.setOrientation(orientation)
+        self.setValue(value)
+        self.setTextVisible(text_visible)
+        self._step_labels: list[str] = list(step_labels) if step_labels else []
         self._update_format(self.value())
         self._finalize_ui_hooks()
 
@@ -79,4 +82,4 @@ class ProgressBar(QProgressBar, Component):
         if 0 <= value < len(self._step_labels):
             self.setFormat(f"{value}. {self._step_labels[value]}")
         else:
-            self.setFormat("%v. Step %v")
+            self.setFormat("%v")

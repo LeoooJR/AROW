@@ -68,7 +68,15 @@ from gui.wrapper import (
     HorizontalLayoutWrapper,
     VerticalLayoutWrapper,
 )
+
 from logger import logger
+
+PRE_SIMULATION_PROGRESS_STEP_LABELS: Final[list[str]] = [
+    "Not started",
+    "Device selected",
+    "Location set",
+    "Ready to start",
+]
 
 _OFFSCREEN_PLATFORM_NAME: Final[str] = "offscreen"
 _OFFSCREEN_SCREEN_SIZE_ENV: Final[str] = "AROW_GUI_TEST_SCREEN_SIZE"
@@ -540,7 +548,14 @@ class Body(QWidget):
 
         tabs.setTabVisible(2, False)
 
-        progress_bar = ProgressBar(None)
+        progress_bar = ProgressBar(
+            None,
+            minimum=0,
+            maximum=3,
+            value=0,
+            orientation=Qt.Orientation.Horizontal,
+            step_labels=PRE_SIMULATION_PROGRESS_STEP_LABELS,
+        )
 
         tabs_wrapper = VerticalLayoutWrapper(self, widgets=[tabs, progress_bar])
 
