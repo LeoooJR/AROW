@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import pytest
 
-from gui.device import DeviceItem, DeviceSelectionPanel
+from gui.device import DeviceSelectionPanel
+from gui.blocks.device import DeviceItem
 
 pytestmark = pytest.mark.usefixtures("qapp")
 
@@ -62,16 +63,16 @@ def test_device_selection_panel_syncs_custom_row_selection(qtbot) -> None:
     panel = DeviceSelectionPanel()
     qtbot.addWidget(panel)
     panel.show()
-    first = DeviceItem.add_to_list(panel.ui.available_device_list, text="Pixel 9")
-    second = DeviceItem.add_to_list(panel.ui.available_device_list, text="Zenfone 11")
+    first = DeviceItem.add_to_list(panel.available_device_list(), text="Pixel 9")
+    second = DeviceItem.add_to_list(panel.available_device_list(), text="Zenfone 11")
     qtbot.wait(0)
 
-    panel.ui.available_device_list.setCurrentItem(first)
+    panel.available_device_list().setCurrentItem(first)
     qtbot.wait(0)
     assert first.ui.row.property("selected") is True
     assert second.ui.row.property("selected") is False
 
-    panel.ui.available_device_list.setCurrentItem(second)
+    panel.available_device_list().setCurrentItem(second)
     qtbot.wait(0)
     assert first.ui.row.property("selected") is False
     assert second.ui.row.property("selected") is True
@@ -82,13 +83,13 @@ def test_alert_device_item_can_also_be_selected(qtbot) -> None:
     qtbot.addWidget(panel)
     panel.show()
     item = DeviceItem.add_to_list(
-        panel.ui.available_device_list,
+        panel.available_device_list(),
         text="Unknown Device",
         alert_highlight=True,
     )
     qtbot.wait(0)
 
-    panel.ui.available_device_list.setCurrentItem(item)
+    panel.available_device_list().setCurrentItem(item)
     qtbot.wait(0)
     assert item.ui.row.property("alert") is True
     assert item.ui.row.property("selected") is True
@@ -100,7 +101,7 @@ def test_device_item_compact_size_hint_stays_within_viewport(qtbot) -> None:
     panel.resize(340, 520)
     panel.show()
     item = DeviceItem.add_to_list(
-        panel.ui.available_device_list,
+        panel.available_device_list(),
         text="Samsung Galaxy S24 Ultra Developer Preview Lab Device With Very Long Friendly Name",
         operating_system="Android 15 Beta 4",
         location="North Charleston, South Carolina",
@@ -109,7 +110,7 @@ def test_device_item_compact_size_hint_stays_within_viewport(qtbot) -> None:
     qtbot.wait(0)
     item._sync_size_hint()
 
-    viewport_width = panel.ui.available_device_list.viewport().width()
+    viewport_width = panel.available_device_list().viewport().width()
     assert viewport_width > 0
     assert item.sizeHint().width() <= viewport_width
 
@@ -120,7 +121,7 @@ def test_device_item_extended_size_hint_stays_within_viewport(qtbot) -> None:
     panel.resize(340, 520)
     panel.show()
     item = DeviceItem.add_to_list(
-        panel.ui.available_device_list,
+        panel.available_device_list(),
         text="Samsung Galaxy S24 Ultra Developer Preview Lab Device With Very Long Friendly Name",
         operating_system="Android 15 Beta 4",
         location="North Charleston, South Carolina",
@@ -131,7 +132,7 @@ def test_device_item_extended_size_hint_stays_within_viewport(qtbot) -> None:
 
     item.extend_device_item()
     qtbot.wait(0)
-    viewport_width = panel.ui.available_device_list.viewport().width()
+    viewport_width = panel.available_device_list().viewport().width()
     assert viewport_width > 0
     assert item.sizeHint().width() <= viewport_width
 
@@ -143,7 +144,7 @@ def test_device_item_compact_text_uses_single_line_elision(qtbot) -> None:
     panel.show()
     full_name = "Unknown Device With A Very Long Friendly Name"
     item = DeviceItem.add_to_list(
-        panel.ui.available_device_list,
+        panel.available_device_list(),
         text=full_name,
         operating_system="Android 15",
         location="South Adrianstad, GA",
@@ -182,15 +183,15 @@ def test_device_selection_panel_highlight_attention_pulses_list(qtbot) -> None:
     qtbot.addWidget(panel)
     panel.show()
 
-    assert panel.ui.available_device_list.objectName() == "available-device-list"
+    assert panel.available_device_list().objectName() == "available-device-list"
 
     panel.start_highlight_attention()
     qtbot.wait(80)
 
-    level = panel.ui.available_device_list.property("device-list-highlight-level")
+    level = panel.available_device_list().property("device-list-highlight-level")
     assert level is not None
     assert level != "0"
 
     panel.stop_highlight_attention()
 
-    assert panel.ui.available_device_list.property("device-list-highlight-level") == "0"
+    assert panel.available_device_list().property("device-list-highlight-level") == "0"

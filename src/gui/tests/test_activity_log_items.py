@@ -86,11 +86,12 @@ def test_log_panel_public_api_updates_count_and_groups(qtbot) -> None:
     )
     qtbot.wait(0)
 
-    assert panel.ui.event_count_label.text() == "2 events"
-    assert panel.ui.logs_list.count() == 4  # two date headers + two rows
+    block = panel.ui.activity_log_block
+    assert block.ui.event_count_label.text() == "2 events"
+    assert block.logs_list().count() == 4  # two date headers + two rows
 
     assert panel.remove_activity(first_id) is True
-    assert panel.ui.event_count_label.text() == "1 event"
+    assert block.ui.event_count_label.text() == "1 event"
     assert panel.remove_activity("missing") is False
 
 
@@ -103,10 +104,11 @@ def test_log_panel_filter_hides_non_matching_entries(qtbot) -> None:
 
     panel.set_activity_filter(categories=["device"])
 
-    assert panel.ui.event_count_label.text() == "1 event"
+    block = panel.ui.activity_log_block
+    assert block.ui.event_count_label.text() == "1 event"
     visible_entries = [
         item.entry
-        for item in panel.ui.logs_list.iter_items()
+        for item in block.logs_list().iter_items()
         if isinstance(item, ActivityLogItem)
     ]
     assert [entry.category for entry in visible_entries] == ["device"]
@@ -119,12 +121,13 @@ def test_log_panel_filter_menu_uses_custom_styled_rows(qtbot) -> None:
 
     option_widgets = [
         action.defaultWidget()
-        for action in panel.ui.filter_menu.actions()
+        for action in panel.ui.activity_log_block.ui.filter_menu.actions()
         if isinstance(action, QWidgetAction)
         and isinstance(action.defaultWidget(), ActivityFilterOption)
     ]
 
-    assert panel.ui.filter_button.objectName() == "activity-log-filter-button"
+    block = panel.ui.activity_log_block
+    assert block.ui.filter_button.objectName() == "activity-log-filter-button"
     assert "QToolButton#activity-log-filter-button::menu-indicator" in stylesheet_light
     assert len(option_widgets) == 12
     assert all(
@@ -136,13 +139,14 @@ def test_log_panel_keeps_file_display_under_activity_list(qtbot) -> None:
     panel = LogPanel()
     qtbot.addWidget(panel)
 
-    assert panel.ui.logs_wrapper.get_layout().indexOf(panel.ui.logs_list) >= 0
-    assert panel.ui.logs_wrapper.get_layout().indexOf(panel.ui.file_display_widget) > (
-        panel.ui.logs_wrapper.get_layout().indexOf(panel.ui.logs_list)
+    block = panel.ui.activity_log_block
+    assert block.ui.logs_wrapper.get_layout().indexOf(block.logs_list()) >= 0
+    assert block.ui.logs_wrapper.get_layout().indexOf(block.file_display_widget()) > (
+        block.ui.logs_wrapper.get_layout().indexOf(block.logs_list())
     )
-    assert panel.ui.logs_wrapper.get_layout().indexOf(
-        panel.ui.logs_list_helper_text
-    ) > (panel.ui.logs_wrapper.get_layout().indexOf(panel.ui.file_display_widget))
+    assert block.ui.logs_wrapper.get_layout().indexOf(
+        block.ui.logs_list_helper_text
+    ) > (block.ui.logs_wrapper.get_layout().indexOf(block.file_display_widget()))
 
 
 def test_activity_item_size_hint_stays_within_narrow_panel(qtbot) -> None:
@@ -162,11 +166,11 @@ def test_activity_item_size_hint_stays_within_narrow_panel(qtbot) -> None:
 
     row = next(
         item
-        for item in panel.ui.logs_list.iter_items()
+        for item in panel.logs_list().iter_items()
         if isinstance(item, ActivityLogItem)
     )
     row._sync_size_hint()
-    viewport_width = panel.ui.logs_list.viewport().width()
+    viewport_width = panel.logs_list().viewport().width()
 
     assert viewport_width > 0
     assert row.sizeHint().width() <= viewport_width
@@ -197,11 +201,11 @@ def test_activity_log_resyncs_after_panel_visibility_sequence(monkeypatch) -> No
     app.processEvents()
     body.ui.log_panel.refresh_layout(deferred=False)
 
-    viewport_width = body.ui.log_panel.ui.logs_list.viewport().width()
-    file_display = body.ui.log_panel.ui.file_display_widget
+    viewport_width = body.ui.log_panel.logs_list().viewport().width()
+    file_display = body.ui.log_panel.file_display_widget()
     rows = [
         item
-        for item in body.ui.log_panel.ui.logs_list.iter_items()
+        for item in body.ui.log_panel.logs_list().iter_items()
         if isinstance(item, ActivityLogItem)
     ]
 
