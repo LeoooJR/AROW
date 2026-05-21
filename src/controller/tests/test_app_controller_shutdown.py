@@ -7,8 +7,8 @@ import pytest
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication
 
-import controller.app_controller as app_controller
-from controller.app_controller import AppController
+import controller.orchestration.app_controller as app_controller
+from controller.orchestration.app_controller import AppController
 
 _async_mod = importlib.import_module("controller.async")
 JobHandler = _async_mod.JobHandler

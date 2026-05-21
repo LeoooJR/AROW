@@ -8,11 +8,11 @@ from __future__ import annotations
 from PySide6.QtCore import QEventLoop, QTimer
 from PySide6.QtWidgets import QApplication
 
-from controller.adb_sub_controller import AdbSubController
 from controller.controller import Controller
+from controller.domains.adb_sub_controller import AdbSubController
+from controller.domains.map_sub_controller import MapSubController
+from controller.domains.simulation_sub_controller import SimulationSubController
 from controller.helper import watchdog
-from controller.map_sub_controller import MapSubController
-from controller.simulation_sub_controller import SimulationSubController
 from core.models import CoreRuntimeModel
 from gui.window import MainWindow
 from logger import logger
