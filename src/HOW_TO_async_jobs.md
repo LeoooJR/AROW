@@ -1,13 +1,13 @@
 # How to create and submit async jobs
 
-This guide describes how background work is queued in AROW, how results return to the Qt **main thread**, and how to plug in **custom callbacks**. It matches the implementation in `controller/async.py` and `controller/controller.py`.
+This guide describes how background work is queued in AROW, how results return to the Qt **main thread**, and how to plug in **custom callbacks**. It matches the implementation in `controller/async.py`, `controller/controller.py`, and domain wiring under `controller/orchestration/` and `controller/domains/`.
 
 ## Mental model
 
 | Layer | Role |
 |--------|------|
 | **View (`gui/`)** | Emits signals or calls controller methods in response to UI events. Must not block on slow I/O or CPU-heavy work. |
-| **Controller (`controller/`)** | Decides *when* to run work, builds `JobSpecification`, connects completion callbacks, and applies results to the model or view on the main thread. |
+| **Controller (`controller/`)** | Decides *when* to run work, builds `JobSpecification`, connects completion callbacks, and applies results to the model or view on the main thread. `AppController` lives in `controller/orchestration/`; domain slices in `controller/domains/`. |
 | **Core (`core/`)** | Holds domain logic: pure functions, model methods, or small helpers that perform the actual work (ADB, startup, pairing, etc.). |
 
 Heavy or blocking operations should run **outside** the GUI thread. The app routes them through a single **`AsyncRunner`** (typically owned by `AppController`), using **`JobSpecification`** and **`JobHandler`**.
@@ -65,7 +65,7 @@ handle = self._submit_model_async_call(
 - **Callbacks**: optional; each connected slot runs on the **Qt main thread** after the runner emits the corresponding signal (see docstring on `_submit_model_async_call` in `controller/controller.py`).
 - **Return value**: a **`JobHandler`** — use `handle.job_id` with `runner.cancel(job_id)` if you need to cancel (see “Cancellation” below).
 
-Subcontrollers that do not inherit `Controller` (e.g. `AdbSubController`) typically delegate with:
+Subcontrollers that do not inherit `Controller` (e.g. `AdbSubController` in `controller/domains/`) typically delegate with:
 
 ```python
 def _submit_model_async_call(self, *args, **kwargs):
@@ -140,9 +140,9 @@ This keeps async submission sites readable (only **`fn`** and callback reference
 |--------|--------|
 | `AsyncRunner`, `JobSpecification`, `JobHandler`, `JobHandlerSignals` | `controller.async` |
 | `JobError`, `ProgressEvent`, `CancelledError` | `controller.async` |
-| `_submit_model_async_call` | `Controller` subclasses (`AppController`, …) |
+| `_submit_model_async_call` | `Controller` subclasses (`controller.orchestration.AppController`, …) |
 
-Tests with a fake runner live under **`core/test_async_runner.py`** for behavioral examples.
+Tests with a fake runner live under **`src/core/tests/test_async_runner.py`** for behavioral examples.
 
 ## Checklist for a new async job
 

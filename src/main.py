@@ -55,7 +55,7 @@ def main(
 
     if not interface_only:
 
-        from controller.app_controller import AppController
+        from controller import AppController
         from core.models import CoreRuntimeModel
 
         simulation_model: CoreRuntimeModel = CoreRuntimeModel(use_mock_adb=mock_adb)
