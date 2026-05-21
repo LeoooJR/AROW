@@ -403,6 +403,20 @@ class ActivityLogItem(QListWidgetItem):
         self.ui.row.style().polish(self.ui.row)
         self.ui.row.update()
 
+    def apply_theme_icons(self, theme: Theme) -> None:
+        """Refresh the row leading icon after a global light/dark switch."""
+        icon_path = icon_qt_path_for_theme(
+            theme, self._CATEGORY_ICON[self.entry.category]
+        )
+        self.ui.icon_label.setPixmap(
+            QIcon(icon_path).pixmap(
+                QSize(
+                    Settings.LIST.ACTIVITY_ITEM_ICON_SIZE,
+                    Settings.LIST.ACTIVITY_ITEM_ICON_SIZE,
+                )
+            )
+        )
+
     def _list_viewport_width(self) -> int | None:
         lw = self.listWidget()
         if lw is None:
@@ -497,6 +511,7 @@ class ActivityLogBlock(QFrame, Block):
         self._level_filter_actions: dict[ActivityLevel, QAction] = {}
         self._category_filter_widgets: dict[ActivityCategory, QCheckBox] = {}
         self._level_filter_widgets: dict[ActivityLevel, QCheckBox] = {}
+        self._theme: Theme | None = None
 
         layout = QVBoxLayout()
         layout.setContentsMargins(*Settings.SPACING.MARGIN_NONE)
@@ -799,7 +814,9 @@ class ActivityLogBlock(QFrame, Block):
                     self.ui.logs_list,
                     _format_activity_date(entry.timestamp),
                 )
-            ActivityLogItem.add_to_list(self.ui.logs_list, entry)
+            item = ActivityLogItem.add_to_list(self.ui.logs_list, entry)
+            if self._theme is not None:
+                item.apply_theme_icons(self._theme)
         self._sync_activity_selection_state()
 
     def _refresh_event_count(self, visible_count: int) -> None:
@@ -842,6 +859,15 @@ class ActivityLogBlock(QFrame, Block):
         for item in self.ui.logs_list.iter_items():
             if isinstance(item, ActivityLogItem):
                 item._sync_size_hint()
+
+    def apply_theme_icons(self, theme: Theme) -> None:
+        """Refresh activity-log controls and visible row icons for ``theme``."""
+        self._theme = theme
+        self.ui.filter_button.apply_theme_icons(theme)
+        self.ui.file_display_widget.apply_theme_icons(theme)
+        for item in self.ui.logs_list.iter_items():
+            if isinstance(item, ActivityLogItem):
+                item.apply_theme_icons(theme)
 
     def refresh_layout(self, *, deferred: bool = True) -> None:
         """Refresh list geometry after panel/sidebar visibility changes."""

@@ -13,6 +13,7 @@ from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QWidgetAction
 
 import gui.ressources_rc
+import gui.blocks.activity.activity_log as activity_log_module
 from gui.fonts import register_bundled_fonts
 from gui.logs import ActivityFilterOption, ActivityLogEntry, ActivityLogItem, LogPanel
 from gui.settings import Settings
@@ -64,6 +65,26 @@ def test_activity_item_selection_and_hover_properties(qtbot) -> None:
 
     assert item.ui.row.property("selected") is True
     assert item.ui.row.property("hovered") is True
+
+
+def test_log_panel_theme_refresh_updates_activity_row_icons(monkeypatch, qtbot) -> None:
+    panel = LogPanel()
+    qtbot.addWidget(panel)
+    panel.clear_activities()
+    panel.add_activity("Device selected", "device", "success", timestamp=_NOW)
+
+    calls = []
+    original = activity_log_module.icon_qt_path_for_theme
+
+    def spy_icon_path(theme, member):  # type: ignore[no-untyped-def]
+        calls.append((theme, member))
+        return original(theme, member)
+
+    monkeypatch.setattr(activity_log_module, "icon_qt_path_for_theme", spy_icon_path)
+
+    panel.apply_theme_icons("dark")
+
+    assert ("dark", ActivityLogItem._CATEGORY_ICON["device"]) in calls
 
 
 def test_log_panel_public_api_updates_count_and_groups(qtbot) -> None:
