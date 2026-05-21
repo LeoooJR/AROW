@@ -64,6 +64,7 @@ def _coerce_activity_timestamp(timestamp: dt.datetime | None) -> dt.datetime:
 
 
 def _format_activity_date(timestamp: dt.datetime) -> str:
+    """Format an activity timestamp as the date header shown in the log list."""
     today = dt.datetime.now().date()
     if timestamp.date() == today:
         return f"Today, {timestamp:%d %b}"
@@ -77,6 +78,7 @@ class ActivityDateHeaderItem(QListWidgetItem):
     def add_to_list(
         cls, list_widget: QListWidget, label: str
     ) -> "ActivityDateHeaderItem":
+        """Insert a non-selectable date header row into ``list_widget``."""
         item = cls()
         item.setFlags(Qt.ItemFlag.NoItemFlags)
         row = QLabel(label)
@@ -107,6 +109,7 @@ class ActivityFilterSectionLabel(QLabel):
     """Small section label used in the activity filter popup."""
 
     def __init__(self, text: str, parent: QWidget | None = None):
+        """Create a section label for the activity filter menu."""
         super().__init__(text, parent)
         self.setObjectName("activity-log-filter-section")
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
@@ -123,6 +126,7 @@ class ActivityFilterSeparator(QFrame):
     """Subtle divider used between filter groups."""
 
     def __init__(self, parent: QWidget | None = None):
+        """Create a separator line for the activity filter menu."""
         super().__init__(parent)
         self.setObjectName("activity-log-filter-separator")
         self.setFrameShape(QFrame.Shape.HLine)
@@ -133,6 +137,7 @@ class ActivityFilterOption(QCheckBox):
     """Styled checkable row used by the activity filter popup."""
 
     def __init__(self, text: str, parent: QWidget | None = None):
+        """Create a checkable styled filter option row."""
         super().__init__(parent)
         self._label = text
         self.setObjectName("activity-log-filter-option")
@@ -148,6 +153,7 @@ class ActivityFilterOption(QCheckBox):
         self.sync_display()
 
     def sync_display(self) -> None:
+        """Refresh the visible check marker beside the option text."""
         marker = "✓" if self.isChecked() else " "
         self.setText(f"{marker} {self._label}")
 
@@ -156,18 +162,22 @@ class _ActivityLogItemRowWidget(QWidget):
     """Keep custom activity rows responsive to hover and width changes."""
 
     def __init__(self, activity_item: "ActivityLogItem"):
+        """Attach row events back to the owning activity item."""
         super().__init__()
         self._activity_item = activity_item
 
     def resizeEvent(self, event) -> None:
+        """Update the owning item size hint when the row is resized."""
         super().resizeEvent(event)
         self._activity_item._sync_size_hint()
 
     def enterEvent(self, event) -> None:
+        """Mark the owning activity item as hovered."""
         super().enterEvent(event)
         self._activity_item.set_hovered(True)
 
     def leaveEvent(self, event) -> None:
+        """Clear hover state on the owning activity item."""
         super().leaveEvent(event)
         self._activity_item.set_hovered(False)
 
@@ -206,6 +216,7 @@ class ActivityLogItem(QListWidgetItem):
         time_label: QLabel
 
     def __init__(self, entry: ActivityLogEntry):
+        """Build a rich activity row for ``entry``."""
         super().__init__()
         self.entry = entry
         self.ui: ActivityLogItem.UI
@@ -386,19 +397,23 @@ class ActivityLogItem(QListWidgetItem):
 
     @staticmethod
     def _meta_text(entry: ActivityLogEntry) -> str:
+        """Build the compact metadata line shown below the activity message."""
         chunks = [entry.category.upper()]
         chunks.extend(f"{key}: {value}" for key, value in entry.metadata.items())
         return " · ".join(chunks)
 
     def set_selected(self, selected: bool) -> None:
+        """Apply the visual selected state to the custom activity row."""
         self.ui.row.setProperty("selected", selected)
         self._refresh_row_style()
 
     def set_hovered(self, hovered: bool) -> None:
+        """Apply the visual hover state to the custom activity row."""
         self.ui.row.setProperty("hovered", hovered)
         self._refresh_row_style()
 
     def _refresh_row_style(self) -> None:
+        """Re-polish the custom row after a dynamic property change."""
         self.ui.row.style().unpolish(self.ui.row)
         self.ui.row.style().polish(self.ui.row)
         self.ui.row.update()
@@ -418,6 +433,7 @@ class ActivityLogItem(QListWidgetItem):
         )
 
     def _list_viewport_width(self) -> int | None:
+        """Return the list viewport width used to constrain row measurement."""
         lw = self.listWidget()
         if lw is None:
             return None
@@ -425,6 +441,7 @@ class ActivityLogItem(QListWidgetItem):
         return width if width > 0 else None
 
     def _sync_size_hint(self) -> None:
+        """Recalculate the custom item size hint for the current viewport width."""
         if self._sync_size_hint_in_progress:
             return
         try:
@@ -725,11 +742,13 @@ class ActivityLogBlock(QFrame, Block):
         return menu
 
     def _add_filter_section(self, menu: QMenu, text: str) -> None:
+        """Append a section label widget action to the filter menu."""
         action = QWidgetAction(menu)
         action.setDefaultWidget(ActivityFilterSectionLabel(text, menu))
         menu.addAction(action)
 
     def _add_filter_separator(self, menu: QMenu) -> None:
+        """Append a visual separator widget action to the filter menu."""
         action = QWidgetAction(menu)
         action.setDefaultWidget(ActivityFilterSeparator(menu))
         menu.addAction(action)
@@ -737,6 +756,7 @@ class ActivityLogBlock(QFrame, Block):
     def _add_filter_option(
         self, menu: QMenu, text: str
     ) -> tuple[QWidgetAction, QCheckBox]:
+        """Append a checkable filter option and return its action and checkbox."""
         action = QWidgetAction(menu)
         action.setCheckable(True)
         action.setChecked(True)
@@ -781,6 +801,7 @@ class ActivityLogBlock(QFrame, Block):
         ]
 
     def _visible_activities(self) -> list[ActivityLogEntry]:
+        """Return currently visible activities after category and level filtering."""
         entries = [
             entry
             for entry in self._activities
@@ -820,6 +841,7 @@ class ActivityLogBlock(QFrame, Block):
         self._sync_activity_selection_state()
 
     def _refresh_event_count(self, visible_count: int) -> None:
+        """Update the event count chip for the number of visible activities."""
         if visible_count == 0:
             self.ui.event_count_label.setText(self.texts.events_empty_count)
         elif visible_count == 1:
@@ -828,6 +850,7 @@ class ActivityLogBlock(QFrame, Block):
             self.ui.event_count_label.setText(f"{visible_count} events")
 
     def _on_filter_action_toggled(self) -> None:
+        """Recompute active filters from checked menu actions."""
         selected_categories = {
             category
             for category, action in self._category_filter_actions.items()
@@ -851,11 +874,13 @@ class ActivityLogBlock(QFrame, Block):
         self._render_activities()
 
     def _sync_activity_selection_state(self) -> None:
+        """Mirror QListWidget selection state onto each custom activity row."""
         for item in self.ui.logs_list.iter_items():
             if isinstance(item, ActivityLogItem):
                 item.set_selected(item.isSelected())
 
     def _sync_activity_item_size_hints(self) -> None:
+        """Recalculate custom row size hints after layout width changes."""
         for item in self.ui.logs_list.iter_items():
             if isinstance(item, ActivityLogItem):
                 item._sync_size_hint()
@@ -941,6 +966,7 @@ class ActivityLogBlock(QFrame, Block):
         self._render_activities()
 
     def _sync_filter_actions(self) -> None:
+        """Sync filter menu action and checkbox states from active filters."""
         for category, action in self._category_filter_actions.items():
             checkbox = self._category_filter_widgets[category]
             checked = self._category_filter is None or category in self._category_filter
@@ -963,6 +989,7 @@ class ActivityLogBlock(QFrame, Block):
             action.blockSignals(False)
 
     def _on_adb_server_started(self) -> None:
+        """Record an activity when the ADB server starts."""
         self.add_activity(
             "ADB server started",
             "adb",
@@ -971,6 +998,7 @@ class ActivityLogBlock(QFrame, Block):
         )
 
     def _on_adb_server_stopped(self) -> None:
+        """Record an activity when the ADB server stops."""
         self.add_activity(
             "ADB server stopped",
             "adb",
@@ -979,6 +1007,7 @@ class ActivityLogBlock(QFrame, Block):
         )
 
     def _on_authentification_succeeded(self, device: dict) -> None:
+        """Record an activity when device pairing succeeds."""
         name = str(device.get("name", "Android device"))
         self.add_activity(
             "Device paired",
@@ -991,6 +1020,7 @@ class ActivityLogBlock(QFrame, Block):
     def _on_authentification_failed(
         self, ip: str, port: int, association_code: str
     ) -> None:
+        """Record an activity when device pairing fails."""
         self.add_activity(
             "Pairing failed",
             "device",
@@ -1000,6 +1030,7 @@ class ActivityLogBlock(QFrame, Block):
         )
 
     def _on_device_selection_succeeded(self, device: dict) -> None:
+        """Record an activity when active-device selection succeeds."""
         name = str(device.get("name", "Android device"))
         self.add_activity(
             "Active device selected",
@@ -1009,6 +1040,7 @@ class ActivityLogBlock(QFrame, Block):
         )
 
     def _on_device_selection_failed(self, device: dict) -> None:
+        """Record an activity when active-device selection fails."""
         name = str(device.get("name", "Android device"))
         self.add_activity(
             "Device selection failed",
@@ -1038,7 +1070,9 @@ class ActivityLogBlock(QFrame, Block):
         )
 
     def logs_list(self) -> List:
+        """Return the activity list widget for panel facade methods and tests."""
         return self.ui.logs_list
 
     def file_display_widget(self) -> File:
+        """Return the simulation log file display widget."""
         return self.ui.file_display_widget

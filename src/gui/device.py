@@ -439,10 +439,6 @@ class DeviceSelectionPanel(QFrame):
 
     def _connect_signals(self) -> None:
         """Connect signals for the device selection panel and its UI widgets."""
-
-        #### Debugging signals ####
-        view_signals.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
-
         #### Signals for toggling the device selection panel visibility ####
         self.ui.expand_button.clicked.connect(self.toggle_panel_visibility)
         self.ui.expand_button.clicked.connect(
@@ -450,10 +446,6 @@ class DeviceSelectionPanel(QFrame):
                 self.is_panel_visible()
             )
         )
-
-    def _on_ui_constraints_disabled(self) -> None:
-        """Handle the UI constraints disabled event."""
-        self.add_list_items_placeholder()
 
     def is_panel_visible(self) -> bool:
         """Check if the device panel is visible."""

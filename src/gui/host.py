@@ -2,7 +2,7 @@
 This file contains all graphical elements related to the host panel.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Final, Literal
 
 from PySide6.QtCore import Qt
@@ -15,7 +15,6 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from gui import faker as ui_faker
 from gui.animation import animate_widget_visibility
 from gui.colors import Theme
 from gui.components import (
@@ -38,35 +37,10 @@ class HostPanel(QFrame):
 
     @dataclass(frozen=True)
     class Text:
-        """Titles, tooltips, and placeholder copy for the host panel."""
+        """Titles and tooltips owned by the host panel."""
 
         title: Final[str] = "Host device"
         expand_button_tooltip: Final[str] = "Toggle panel visibility"
-        placeholder_host_name: str = field(default_factory=ui_faker.generate_host_name)
-        placeholder_ip_address: str = field(
-            default_factory=ui_faker.generate_private_ipv4
-        )
-        placeholder_platform: str = field(
-            default_factory=ui_faker.generate_desktop_platform_label
-        )
-        placeholder_summary: str = field(
-            default_factory=ui_faker.generate_host_identity_summary
-        )
-        placeholder_server_state_text: str = field(
-            default_factory=ui_faker.generate_server_state_label
-        )
-        placeholder_adb_version: str = field(
-            default_factory=ui_faker.generate_adb_version_string
-        )
-        placeholder_daemon: str = field(
-            default_factory=ui_faker.generate_adb_daemon_endpoint
-        )
-        placeholder_connected_devices: str = field(
-            default_factory=ui_faker.generate_connected_device_count_str
-        )
-        placeholder_helper_note: str = field(
-            default_factory=ui_faker.generate_adb_bridge_helper_note
-        )
 
     @dataclass
     class UI:
@@ -91,7 +65,6 @@ class HostPanel(QFrame):
         self.texts = HostPanel.Text()
 
         self._is_extended = False
-        self._identity_os: Literal["linux", "windows", "darwin"] | None = "darwin"
 
         self.setObjectName("host-panel")
         self.setProperty("panel", True)
@@ -164,7 +137,6 @@ class HostPanel(QFrame):
         )
 
         self._finalize_ui_hooks()
-        self._set_placeholder_values()
 
     def _finalize_ui_hooks(self) -> None:
         """Run the final UI setup hooks for the host panel."""
@@ -205,9 +177,6 @@ class HostPanel(QFrame):
 
     def _connect_signals(self) -> None:
         """Connect signals for the host panel and its UI widgets."""
-        #### Debugging signals ####
-        view_signals.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
-
         #### Signals for toggling the host panel visibility ####
         self.ui.expand_button.clicked.connect(self.toggle_panel_visibility)
         self.ui.expand_button.clicked.connect(
@@ -221,31 +190,6 @@ class HostPanel(QFrame):
 
         view_signals.HostDeviceInformationUpdated.connect(
             self._on_host_device_information_updated
-        )
-
-    def _on_ui_constraints_disabled(self) -> None:
-        """Handle the UI constraints disabled event."""
-        self._set_placeholder_values()
-
-    def _set_placeholder_values(self) -> None:
-        """Populate placeholder values for the host identity and ADB bridge sections."""
-        self._identity_os = "darwin"
-        self.set_host_identity_values(
-            host_name=self.texts.placeholder_host_name,
-            summary=self.texts.placeholder_summary,
-            ip_address=self.texts.placeholder_ip_address,
-            platform=self.texts.placeholder_platform,
-            os_icon=OperatingSystemIcons.MACOS,
-            identity_state="valid",
-        )
-        self.set_adb_bridge_values(
-            server_state="running",
-            server_state_text=self.texts.placeholder_server_state_text.capitalize(),
-            adb_version=self.texts.placeholder_adb_version,
-            daemon=self.texts.placeholder_daemon,
-            connected_devices=self.texts.placeholder_connected_devices,
-            helper_note=self.texts.placeholder_helper_note,
-            indicator_state="valid",
         )
 
     def _on_adb_server_started(self) -> None:
@@ -301,7 +245,6 @@ class HostPanel(QFrame):
     ) -> None:
         """Handle the host device information updated."""
         assert os in ["linux", "windows", "darwin"]
-        self._identity_os = os
         if os == "linux":
             os_icon = OperatingSystemIcons.LINUX
         elif os == "windows":
@@ -312,7 +255,6 @@ class HostPanel(QFrame):
             os_icon = GenericIcons.LAPTOP
         self.set_host_identity_values(
             host_name=name,
-            summary=self.texts.placeholder_summary,
             ip_address=ip,
             platform=os,
             os_icon=os_icon,

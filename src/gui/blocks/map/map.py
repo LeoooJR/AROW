@@ -182,6 +182,7 @@ class Legend(QFrame):
         self._set_alignment()
 
     def apply_theme_icons(self, theme: Theme) -> None:
+        """Refresh legend row icons for the active theme."""
         self.ui.location_label_icon.apply_theme_icons(theme)
         self.ui.simulated_location_label_icon.apply_theme_icons(theme)
         self.ui.kilometric_point_label_icon.apply_theme_icons(theme)
@@ -371,9 +372,11 @@ class Location(QWidget):
         self.ui.longitude_widget.layout().addWidget(QLabel(str(longitude)))
 
     def clear_latitude(self):
+        """Clear latitude values from this location row placeholder."""
         pass
 
     def clear_longitude(self):
+        """Clear longitude values from this location row placeholder."""
         pass
 
 
@@ -485,6 +488,7 @@ class Coordinates(QFrame):
         self._finalize_ui_hooks()
 
     def apply_theme_icons(self, theme: Theme) -> None:
+        """Refresh coordinate controls and row icons for the active theme."""
         self.ui.simulation_state_off.apply_theme_icons(theme)
         self.ui.simulation_state_on.apply_theme_icons(theme)
         pb = self.ui.play_button
@@ -682,6 +686,7 @@ class MapBlock(QWidget):
         pass
 
     def is_canvas_visible(self) -> bool:
+        """Return whether the concrete map canvas is currently visible."""
         return self.ui.canvas.isVisible()
 
     def update_placeholder(self, text: str, icon_member: GenericIcons) -> None:
@@ -692,6 +697,7 @@ class MapBlock(QWidget):
         self.ui.placeholder.set_icon(icon_member)
 
     def apply_theme_icons(self, theme: Theme) -> None:
+        """Refresh theme-dependent icons for all map block children."""
         self.ui.legend.apply_theme_icons(theme)
         self.ui.placeholder.apply_theme_icons(theme)
         self.ui.coordinates.apply_theme_icons(theme)

@@ -104,14 +104,17 @@ class _DeviceItemRowWidget(QWidget):
         self._device_item = device_item
 
     def resizeEvent(self, event: QResizeEvent) -> None:
+        """Refresh the owning item size hint after row resize."""
         super().resizeEvent(event)
         self._device_item._sync_size_hint()
 
     def enterEvent(self, event: QEvent) -> None:
+        """Mark the owning item hovered when the mouse enters the row."""
         super().enterEvent(event)
         self._device_item.set_hovered(True)
 
     def leaveEvent(self, event: QEvent) -> None:
+        """Clear hover state when the mouse leaves the row."""
         super().leaveEvent(event)
         self._device_item.set_hovered(False)
 
@@ -481,14 +484,17 @@ class DeviceItem(QListWidgetItem):
 
     @property
     def id(self) -> str | None:
+        """Return the device identifier carried by this row."""
         return self._id
 
     @property
     def name(self) -> str:
+        """Return the display name shown by this row."""
         return self._text
 
     @name.setter
     def name(self, value: str) -> None:
+        """Update the display name and refresh row measurement."""
         self._text = value
         self.setToolTip(value)
         self._apply_text_display_mode()
@@ -496,20 +502,24 @@ class DeviceItem(QListWidgetItem):
 
     @property
     def operating_system(self) -> str:
+        """Return the operating-system subtitle value."""
         return self._operating_system
 
     @operating_system.setter
     def operating_system(self, value: str) -> None:
+        """Update the operating-system subtitle value."""
         self._operating_system = value
         self._refresh_subtitle()
         self._sync_size_hint()
 
     @property
     def location(self) -> str:
+        """Return the location subtitle value."""
         return self._location
 
     @location.setter
     def location(self, value: str) -> None:
+        """Update the location subtitle value."""
         self._location = value
         self._refresh_subtitle()
         self._sync_size_hint()
@@ -519,6 +529,7 @@ class DeviceItem(QListWidgetItem):
         self._apply_text_display_mode()
 
     def _subtitle_text(self) -> str:
+        """Compose the subtitle from operating system and location values."""
         chunks: list[str] = []
         if self._operating_system:
             chunks.append(self._operating_system)
@@ -528,12 +539,14 @@ class DeviceItem(QListWidgetItem):
 
     @staticmethod
     def _elided_text(label: QLabel, text: str) -> str:
+        """Return text elided to fit the current label width."""
         width = max(1, label.contentsRect().width())
         return QFontMetrics(label.font()).elidedText(
             text, Qt.TextElideMode.ElideRight, width
         )
 
     def _set_label_text(self, label: QLabel, text: str) -> None:
+        """Set label text only when it has changed."""
         if label.text() != text:
             label.setText(text)
 
@@ -552,6 +565,7 @@ class DeviceItem(QListWidgetItem):
 
     @property
     def last_communication(self) -> str | dt.datetime | None:
+        """Return the stored live last-communication instant, if any."""
         return self._last_communication_live_at
 
     @last_communication.setter
@@ -585,10 +599,12 @@ class DeviceItem(QListWidgetItem):
 
     @property
     def alert_highlight(self) -> bool:
+        """Return whether the row is rendered with alert styling."""
         return self._alert_highlight
 
     @alert_highlight.setter
     def alert_highlight(self, value: bool) -> None:
+        """Toggle alert styling on the custom row widget."""
         self._alert_highlight = value
         self.ui.row.setProperty("alert", value)
         self.ui.row.style().unpolish(self.ui.row)
@@ -597,15 +613,18 @@ class DeviceItem(QListWidgetItem):
 
     @property
     def badge(self) -> DeviceBadge:
+        """Return the current badge variant."""
         return self._badge
 
     @badge.setter
     def badge(self, value: DeviceBadge) -> None:
+        """Update the badge variant and refresh row measurement."""
         self._badge = value
         self._apply_badge()
         self._sync_size_hint()
 
     def _apply_badge(self) -> None:
+        """Rebuild the badge label area from the current badge variant."""
         layout = self.ui.badge_container.layout()
         assert layout is not None
         self._clear_layout(layout)
@@ -660,6 +679,7 @@ class DeviceItem(QListWidgetItem):
 
     @staticmethod
     def _clear_layout(layout: QLayout) -> None:
+        """Remove and delete every widget item from ``layout``."""
         while layout.count():
             item = layout.takeAt(0)
             w = item.widget()
@@ -688,10 +708,12 @@ class DeviceItem(QListWidgetItem):
 
     @property
     def device_kind(self) -> DeviceKind:
+        """Return the logical device kind represented by this row."""
         return self._device_kind
 
     @device_kind.setter
     def device_kind(self, value: DeviceKind) -> None:
+        """Update the logical device kind and leading icon."""
         self._device_kind = value
         path = icon_qt_path(GenericIcons.DEVICE)
         self.ui.icon_label.setPixmap(
@@ -742,11 +764,13 @@ class DeviceItem(QListWidgetItem):
         self._refresh_row_style()
 
     def _refresh_row_style(self) -> None:
+        """Re-polish the row after dynamic style properties change."""
         self.ui.row.style().unpolish(self.ui.row)
         self.ui.row.style().polish(self.ui.row)
         self.ui.row.update()
 
     def _list_viewport_width(self) -> int | None:
+        """Return the current list viewport width used for row measurement."""
         lw = self.listWidget()
         if lw is None:
             return None
@@ -754,6 +778,7 @@ class DeviceItem(QListWidgetItem):
         return width if width > 0 else None
 
     def _can_request_expanded_list_width(self) -> bool:
+        """Return whether the window is wide enough for expanded row width hints."""
         lw = self.listWidget()
         if lw is None:
             return False
@@ -761,6 +786,7 @@ class DeviceItem(QListWidgetItem):
         return window.width() >= Settings.DIMENSION.WINDOW_MIN_WIDTH
 
     def _preferred_row_width(self, natural_width: int) -> int:
+        """Return the preferred width for compact or expanded row presentation."""
         return (
             Settings.LIST.DEVICE_ITEM_ROW_EXTENDED_PREFERRED_WIDTH
             if self._is_extended
@@ -768,6 +794,7 @@ class DeviceItem(QListWidgetItem):
         )
 
     def _prepare_text_measurement(self) -> None:
+        """Prepare labels with unelided text before measuring natural row size."""
         subtitle = self._subtitle_text()
         self.ui.name_label.setWordWrap(False)
         self.ui.subtitle_label.setWordWrap(False)
@@ -775,6 +802,7 @@ class DeviceItem(QListWidgetItem):
         self._set_label_text(self.ui.subtitle_label, subtitle)
 
     def _sync_size_hint(self) -> None:
+        """Recalculate the item size hint for the current list width and state."""
         if self._sync_size_hint_in_progress:
             return
         try:
