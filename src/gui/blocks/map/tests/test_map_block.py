@@ -7,6 +7,7 @@ from PySide6.QtCore import QAbstractAnimation
 
 from gui.blocks.map import MapBlock
 from gui.icons import GenericIcons
+from gui.signals import view_signals
 
 pytestmark = pytest.mark.usefixtures("qapp")
 
@@ -24,15 +25,13 @@ def test_map_block_updates_placeholder_text_and_icon(qtbot) -> None:
 def test_map_block_placeholder_helper_animation_starts(qtbot) -> None:
     block = MapBlock()
     qtbot.addWidget(block)
+    block.show()
 
-    block.play_placeholder_helper_animation()
+    view_signals.MapTabActivated.emit()
     qtbot.wait(0)
 
     assert block._placeholder_helper_anim is not None
-    assert (
-        block._placeholder_helper_anim.state()
-        == QAbstractAnimation.State.Running
-    )
+    assert block._placeholder_helper_anim.state() == QAbstractAnimation.State.Running
 
 
 def test_map_block_placeholder_helper_animation_noops_without_svg(
@@ -40,8 +39,64 @@ def test_map_block_placeholder_helper_animation_noops_without_svg(
 ) -> None:
     block = MapBlock()
     qtbot.addWidget(block)
+    block.show()
     monkeypatch.setattr(block.ui.placeholder, "findChild", lambda *args: None)
 
-    block.play_placeholder_helper_animation()
+    view_signals.MapTabActivated.emit()
+
+    assert block._placeholder_helper_anim is None
+
+
+def test_map_block_connection_succeeded_updates_placeholder_and_animates(
+    qtbot,
+) -> None:
+    block = MapBlock()
+    qtbot.addWidget(block)
+    block.show()
+
+    view_signals.DeviceSelectionSucceeded.emit({"id": "d1", "name": "Phone"})
+    qtbot.wait(0)
+
+    assert block.ui.placeholder.ui.text.text() == block.texts.loading_placeholder
+    assert block._placeholder_icon == GenericIcons.MAP_PLACEHOLDER
+    assert block._placeholder_helper_anim is not None
+    assert block._placeholder_helper_anim.state() == QAbstractAnimation.State.Running
+
+
+def test_map_block_device_selection_failed_starts_helper_animation(qtbot) -> None:
+    block = MapBlock()
+    qtbot.addWidget(block)
+    block.show()
+
+    view_signals.DeviceSelectionFailed.emit({"id": "d1"})
+    qtbot.wait(0)
+
+    assert block._placeholder_helper_anim is not None
+    assert block._placeholder_helper_anim.state() == QAbstractAnimation.State.Running
+
+
+def test_map_block_authentification_failed_starts_helper_animation(qtbot) -> None:
+    block = MapBlock()
+    qtbot.addWidget(block)
+    block.show()
+
+    view_signals.AuthentificationFailed.emit("err", 1, "detail")
+    qtbot.wait(0)
+
+    assert block._placeholder_helper_anim is not None
+    assert block._placeholder_helper_anim.state() == QAbstractAnimation.State.Running
+
+
+def test_map_block_placeholder_helper_animation_noops_when_canvas_visible(
+    qtbot,
+) -> None:
+    block = MapBlock()
+    qtbot.addWidget(block)
+    block.show()
+    block.ui.canvas.setVisible(True)
+    block.ui.placeholder.setVisible(False)
+
+    view_signals.MapTabActivated.emit()
+    qtbot.wait(0)
 
     assert block._placeholder_helper_anim is None

@@ -6,12 +6,19 @@ from dataclasses import dataclass, field
 from typing import Final, Literal
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QSizePolicy, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
+)
 
 from gui import faker as ui_faker
 from gui.blocks.base import Block
 from gui.colors import Theme
-from gui.components import ConditionIndicator, GroupBox, SVG
+from gui.components import SVG, ConditionIndicator, GroupBox
 from gui.components.media import get_svg_size
 from gui.icons import OperatingSystemIcons, icon_qt_path, icon_qt_path_for_theme
 from gui.settings import Settings
@@ -357,6 +364,16 @@ class BridgeStatusCardBlock(QFrame, Block):
     def _connect_signals(self) -> None:
         """Connect card signals; placeholder/debug values are block-owned."""
         view_signals.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
+        view_signals.ADBServerStarted.connect(self._on_adb_server_started)
+        view_signals.ADBServerStopped.connect(self._on_adb_server_stopped)
+
+    def _on_adb_server_started(self) -> None:
+        """Update bridge card when the ADB server starts."""
+        self.set_adb_values(server_state="running", indicator_state="valid")
+
+    def _on_adb_server_stopped(self) -> None:
+        """Update bridge card when the ADB server stops."""
+        self.set_adb_values(server_state="stopped", indicator_state="error")
 
     def _on_ui_constraints_disabled(self) -> None:
         """Re-apply placeholder values when UI constraints are disabled."""

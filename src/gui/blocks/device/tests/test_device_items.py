@@ -15,6 +15,7 @@ from gui.blocks.device import (
     DeviceSelectionBlock,
     format_last_communication_short,
 )
+from gui.settings import Settings
 from gui.signals import view_signals
 
 pytestmark = pytest.mark.usefixtures("qapp")
@@ -191,16 +192,44 @@ def test_device_selection_block_highlight_attention_pulses_list(qtbot) -> None:
 
     assert block.device_list().objectName() == "available-device-list"
 
-    block.start_highlight_attention()
+    view_signals.MapTabActivated.emit()
     qtbot.wait(80)
 
     level = block.device_list().property("device-list-highlight-level")
     assert level is not None
     assert level != "0"
 
-    block.stop_highlight_attention()
+    qtbot.wait(Settings.ANIMATION.ATTENTION_HIGHLIGHT_DURATION + 100)
 
     assert block.device_list().property("device-list-highlight-level") == "0"
+
+
+def test_device_selection_block_map_tab_skips_highlight_when_device_selected(
+    qtbot,
+) -> None:
+    block = DeviceSelectionBlock()
+    qtbot.addWidget(block)
+    block.show()
+    item = DeviceItem.add_to_list(
+        block.device_list(),
+        id="device-1",
+        text="Phone",
+        type="available",
+        badge="new",
+        operating_system="Android",
+        location="N/A",
+        last_communication="Active now",
+    )
+    block.device_list().setCurrentItem(item)
+
+    view_signals.MapTabActivated.emit()
+    qtbot.wait(80)
+
+    assert block.device_list().property("device-list-highlight-level") in (
+        None,
+        "0",
+        0,
+    )
 
 
 @pytest.mark.parametrize(

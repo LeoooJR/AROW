@@ -4,23 +4,23 @@ This file contains all graphical elements related to the device panel.
 
 from __future__ import annotations
 
-import datetime as dt
 from dataclasses import dataclass
 from typing import Final
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QFrame,
-    QGroupBox,
     QHBoxLayout,
-    QLabel,
     QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
 
 from gui.animation import animate_widget_visibility
+from gui.blocks.device import (
+    DeviceSelectionBlock,
+)
 from gui.colors import Theme
 from gui.components import (
     LeadingIconLabel,
@@ -33,138 +33,6 @@ from gui.wrapper import (
     HorizontalLayoutWrapper,
     VerticalLayoutWrapper,
 )
-
-from gui.blocks.device import (
-    DeviceBadge,
-    DeviceItem,
-    DeviceKind,
-    DeviceSelectionBlock,
-    format_last_communication_short,
-)
-
-
-class DeviceState(QGroupBox):
-
-    @dataclass(frozen=True)
-    class Text:
-        """Template strings for the device state summary group."""
-
-        title: Final[str] = "About device"
-        state: Final[str] = "State: <state>"
-        operating_system: Final[str] = "Operating system: <operating_system>"
-        last_communication_prefix: Final[str] = "Last communication: "
-
-    @dataclass
-    class UI:
-        """State lines inside the about-device group box."""
-
-        state: QLabel
-        operating_system: QLabel
-        last_communication: QLabel
-
-    def __init__(self, parent=None):
-        """Build the grouped device state labels.
-
-        Args:
-            parent: Optional Qt parent widget for lifetime and hierarchy.
-        """
-        self.texts = DeviceState.Text()
-        super().__init__(
-            parent, title=self.texts.title, alignment=Qt.AlignmentFlag.AlignLeft
-        )
-
-        self.ui: DeviceState.UI
-
-        self.setProperty("panel-section", True)
-        self._last_communication_at: dt.datetime | None = None
-
-        layout = QVBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)  # Padding handled by panel-section style
-        layout.setSpacing(8)  # Spacing between state items
-
-        state = QLabel(self.texts.state, self)
-        state.setFont(
-            QFont(Settings.FONT.FAMILY, Settings.FONT.SIZE_DEFAULT, QFont.Weight.Normal)
-        )
-        layout.addWidget(state)
-
-        operating_system = QLabel(self.texts.operating_system, self)
-        operating_system.setFont(
-            QFont(Settings.FONT.FAMILY, Settings.FONT.SIZE_DEFAULT, QFont.Weight.Normal)
-        )
-        layout.addWidget(operating_system)
-
-        last_communication = QLabel(
-            self.texts.last_communication_prefix
-            + format_last_communication_short(None),
-            self,
-        )
-        last_communication.setFont(
-            QFont(Settings.FONT.FAMILY, Settings.FONT.SIZE_DEFAULT, QFont.Weight.Normal)
-        )
-        layout.addWidget(last_communication)
-
-        self.setLayout(layout)
-
-        self.ui: DeviceState.UI = DeviceState.UI(
-            state=state,
-            operating_system=operating_system,
-            last_communication=last_communication,
-        )
-        self._finalize_ui_hooks()
-
-    def set_last_communication(
-        self,
-        value: dt.datetime | None,
-        *,
-        now: dt.datetime | None = None,
-    ) -> None:
-        """Set the stored instant and refresh the about-device line."""
-        self._last_communication_at = value
-        self.ui.last_communication.setText(
-            self.texts.last_communication_prefix
-            + format_last_communication_short(value, now=now)
-        )
-
-    def refresh_last_communication_display(
-        self, *, now: dt.datetime | None = None
-    ) -> None:
-        """Re-apply formatting using the stored instant (for timer ticks)."""
-        self.set_last_communication(self._last_communication_at, now=now)
-
-    def _finalize_ui_hooks(self) -> None:
-        """Run the final UI setup hooks for the device state section."""
-        self._set_size_policy()
-        self._set_alignment()
-        self._connect_signals()
-
-    def _set_size_policy(self) -> None:
-        """Centralize size policies for the device state section."""
-        self.ui.state.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
-        )
-        self.ui.operating_system.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
-        )
-        self.ui.last_communication.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
-        )
-
-    def _set_alignment(self) -> None:
-        """Centralize alignment for the device state section."""
-        self.ui.state.setAlignment(
-            Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft
-        )
-        self.ui.operating_system.setAlignment(
-            Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft
-        )
-        self.ui.last_communication.setAlignment(
-            Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft
-        )
-
-    def _connect_signals(self) -> None:
-        """Connect signals for the device state section."""
-        pass
 
 
 class DevicePairingPanel(QFrame):
@@ -299,7 +167,6 @@ class DeviceSelectionPanel(QFrame):
         header: QWidget
         body: VerticalLayoutWrapper
         device_selection_block: DeviceSelectionBlock
-        device_state: DeviceState
 
     def __init__(self, parent: QWidget = None):
         """Build the device list panel with toolbar and state summary.
@@ -372,11 +239,6 @@ class DeviceSelectionPanel(QFrame):
         body.get_layout().setStretchFactor(device_selection_block, 1)
         layout.addWidget(body, 1)
 
-        device_state = DeviceState(self)
-        device_state.setObjectName("device-state")
-        device_state.setVisible(False)
-        layout.addWidget(device_state)
-
         self.setLayout(layout)
 
         self.ui: DeviceSelectionPanel.UI = DeviceSelectionPanel.UI(
@@ -385,28 +247,9 @@ class DeviceSelectionPanel(QFrame):
             header=header,
             body=body,
             device_selection_block=device_selection_block,
-            device_state=device_state,
         )
-
-        self._last_communication_refresh_timer = QTimer(self)
-        self._last_communication_refresh_timer.setSingleShot(False)
-        self._last_communication_refresh_timer.timeout.connect(
-            self.refresh_last_communication_timestamps
-        )
-        self._last_communication_refresh_timer.setInterval(
-            Settings.LIST.LAST_COMMUNICATION_REFRESH_MS
-        )
-        self._last_communication_refresh_timer.start()
 
         self._finalize_ui_hooks()
-
-    def refresh_last_communication_timestamps(
-        self, *, now: dt.datetime | None = None
-    ) -> None:
-        """Recompute all live last-communication labels (QTimer slot and tests)."""
-        ref = now if now is not None else dt.datetime.now()
-        self.ui.device_selection_block.refresh_last_communication_timestamps(now=now)
-        self.ui.device_state.refresh_last_communication_display(now=ref)
 
     def _finalize_ui_hooks(self) -> None:
         """Run the final UI setup hooks for the device selection panel."""
@@ -432,9 +275,6 @@ class DeviceSelectionPanel(QFrame):
         )
         self.ui.device_selection_block.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
-        )
-        self.ui.device_state.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
         )
 
     def _connect_signals(self) -> None:
@@ -522,18 +362,6 @@ class DeviceSelectionPanel(QFrame):
         # Notify parent layout so space is reallocated (panel below gets more height when reduced).
         self.updateGeometry()
 
-    def start_highlight_attention(self) -> None:
-        """Start smooth pulse highlight (soft red border) on paired and available device lists."""
-        self.ui.device_selection_block.start_highlight_attention()
-
-    def stop_highlight_attention(self) -> None:
-        """Stop the device list highlight animation and restore default border."""
-        self.ui.device_selection_block.stop_highlight_attention()
-
-    def add_list_items_placeholder(self) -> None:
-        """Add sample device rows for UI debugging (fake OS / location / activity)."""
-        self.ui.device_selection_block.add_list_items_placeholder()
-
     def extend_list_items(self) -> None:
         """Extend the list items to show the last communication time and menu button."""
         self.ui.device_selection_block.extend_list_items()
@@ -541,12 +369,3 @@ class DeviceSelectionPanel(QFrame):
     def shorten_list_items(self) -> None:
         """Shorten the list items to hide the last communication time and menu button."""
         self.ui.device_selection_block.shorten_list_items()
-
-    def available_device_list(self):
-        """Return the device list owned by the device selection block."""
-        return self.ui.device_selection_block.device_list()
-
-    def current_device(self) -> DeviceItem | None:
-        """Return the currently selected device item, if any."""
-        item = self.ui.device_selection_block.current_item()
-        return item if isinstance(item, DeviceItem) else None

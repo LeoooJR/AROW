@@ -3,7 +3,7 @@ This file contains all graphical elements related to the host panel.
 """
 
 from dataclasses import dataclass
-from typing import Final, Literal
+from typing import Final
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
@@ -16,21 +16,16 @@ from PySide6.QtWidgets import (
 )
 
 from gui.animation import animate_widget_visibility
+from gui.blocks.card import BridgeStatusCardBlock, IdentityCardBlock
 from gui.colors import Theme
 from gui.components import (
     LeadingIconLabel,
     ToolButton,
 )
-from gui.icons import (
-    ApplicationIcons,
-    GenericIcons,
-    OperatingSystemIcons,
-)
+from gui.icons import GenericIcons
 from gui.settings import Settings
 from gui.signals import view_signals
 from gui.wrapper import VerticalLayoutWrapper
-
-from gui.blocks.card import ADB_SERVER_STATE, BridgeStatusCardBlock, IdentityCardBlock
 
 
 class HostPanel(QFrame):
@@ -183,82 +178,6 @@ class HostPanel(QFrame):
             lambda: view_signals.HostPanelVisibilityRequested.emit(
                 self.is_panel_visible()
             )
-        )
-
-        view_signals.ADBServerStarted.connect(self._on_adb_server_started)
-        view_signals.ADBServerStopped.connect(self._on_adb_server_stopped)
-
-        view_signals.HostDeviceInformationUpdated.connect(
-            self._on_host_device_information_updated
-        )
-
-    def _on_adb_server_started(self) -> None:
-        """Handle the ADB server started event."""
-        self.set_adb_bridge_values(server_state="running", indicator_state="valid")
-
-    def _on_adb_server_stopped(self) -> None:
-        """Handle the ADB server stopped event."""
-        self.set_adb_bridge_values(server_state="stopped", indicator_state="error")
-
-    def set_host_identity_values(
-        self,
-        host_name: str | None = None,
-        summary: str | None = None,
-        ip_address: str | None = None,
-        platform: str | None = None,
-        os_icon: GenericIcons | OperatingSystemIcons | ApplicationIcons | None = None,
-        identity_state: str | None = None,
-    ) -> None:
-        """Set the values for the host identity section."""
-        self.ui.identity_card.set_host_values(
-            host_name=host_name,
-            summary=summary,
-            ip_address=ip_address,
-            platform=platform,
-            os_icon=os_icon,
-            identity_state=identity_state,
-        )
-
-    def set_adb_bridge_values(
-        self,
-        server_state: ADB_SERVER_STATE | None = None,
-        server_state_text: str | None = None,
-        adb_version: str | None = None,
-        daemon: str | None = None,
-        connected_devices: str | None = None,
-        helper_note: str | None = None,
-        indicator_state: str | None = None,
-    ) -> None:
-        """Set the values for the adb bridge section."""
-        self.ui.bridge_card.set_adb_values(
-            server_state=server_state,
-            server_state_text=server_state_text,
-            adb_version=adb_version,
-            daemon=daemon,
-            connected_devices=connected_devices,
-            helper_note=helper_note,
-            indicator_state=indicator_state,
-        )
-
-    def _on_host_device_information_updated(
-        self, name: str, os: Literal["linux", "windows", "darwin"] | None, ip: str
-    ) -> None:
-        """Handle the host device information updated."""
-        assert os in ["linux", "windows", "darwin"]
-        if os == "linux":
-            os_icon = OperatingSystemIcons.LINUX
-        elif os == "windows":
-            os_icon = OperatingSystemIcons.WINDOWS
-        elif os == "darwin":
-            os_icon = OperatingSystemIcons.MACOS
-        else:
-            os_icon = GenericIcons.LAPTOP
-        self.set_host_identity_values(
-            host_name=name,
-            ip_address=ip,
-            platform=os,
-            os_icon=os_icon,
-            identity_state="valid",
         )
 
     def apply_theme_icons(self, theme: Theme) -> None:

@@ -7,12 +7,20 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Final
 
-from PySide6.QtCore import QElapsedTimer, QEvent, QObject, Qt, QTimer
+from PySide6.QtCore import (
+    QElapsedTimer,
+    QEvent,
+    QItemSelectionModel,
+    QObject,
+    Qt,
+    QTimer,
+)
 from PySide6.QtWidgets import QFrame, QSizePolicy, QVBoxLayout, QWidget
 
 from gui import faker as ui_faker
 from gui.animation import apply_highlight_level, compute_sine_pulse_level
 from gui.blocks.base import Block
+from gui.blocks.device.device_item import DeviceItem
 from gui.colors import Theme
 from gui.components import GroupBox, HelperText, List, PlaceHolder, ToolButton
 from gui.icons import GenericIcons
@@ -20,8 +28,6 @@ from gui.settings import Settings
 from gui.signals import view_signals
 from gui.wrapper import GridLayoutWrapper, HorizontalLayoutWrapper
 from logger import logger
-
-from gui.blocks.device.device_item import DeviceItem
 
 
 class DeviceSelectionBlock(QFrame, Block):
@@ -173,8 +179,20 @@ class DeviceSelectionBlock(QFrame, Block):
         self._highlight_pulse_timer.timeout.connect(self._on_highlight_pulse_tick)
         self._highlight_stop_timer = QTimer(self)
         self._highlight_stop_timer.setSingleShot(True)
-        self._highlight_stop_timer.timeout.connect(self.stop_highlight_attention)
+        self._highlight_stop_timer.timeout.connect(self._stop_highlight_attention)
         self._highlight_elapsed = QElapsedTimer()
+
+        self._last_communication_refresh_timer = QTimer(self)
+        self._last_communication_refresh_timer.setSingleShot(False)
+        self._last_communication_refresh_timer.timeout.connect(
+            self._on_last_communication_refresh_timer_tick
+        )
+        self._last_communication_refresh_timer.setInterval(
+            Settings.LIST.LAST_COMMUNICATION_REFRESH_MS
+        )
+        self._last_communication_refresh_timer.start()
+
+        self._has_active_device = False
 
         self._finalize_ui_hooks()
         self._update_available_device_empty_state_visibility()
@@ -241,11 +259,14 @@ class DeviceSelectionBlock(QFrame, Block):
         model.layoutChanged.connect(self._on_available_device_list_model_changed)
         model.dataChanged.connect(self._on_available_device_list_model_changed)
 
+        view_signals.RunHelperAnimationRequested.connect(self._on_run_helper_animation)
+        view_signals.MapTabActivated.connect(self._on_map_tab_activated)
+
     def _on_ui_constraints_disabled(self) -> None:
         """Seed placeholder rows when UI constraints are disabled."""
         self.add_list_items_placeholder()
 
-    def refresh_last_communication_timestamps(
+    def _on_last_communication_refresh_timer_tick(
         self, *, now: dt.datetime | None = None
     ) -> None:
         """Refresh live last-communication labels on every device row."""
@@ -293,6 +314,7 @@ class DeviceSelectionBlock(QFrame, Block):
 
     def _on_authentification_succeeded(self, device: dict) -> None:
         """Add a newly authenticated device and mark it as the active selection."""
+        self._has_active_device = True
         for item in self.ui.available_device_list.iter_items():
             item.badge = "trusted"
         item = self._device_item_type.add_to_list(
@@ -306,7 +328,9 @@ class DeviceSelectionBlock(QFrame, Block):
             last_communication=device["last_communication"],
             alert_highlight=True,
         )
-        self.ui.available_device_list.setCurrentItem(item)
+        self.ui.available_device_list.setCurrentItem(
+            item, QItemSelectionModel.SelectionFlag.SelectCurrent
+        )
         self.ui.available_device_list.sortItems()
         self._on_available_device_list_model_changed()
 
@@ -318,6 +342,7 @@ class DeviceSelectionBlock(QFrame, Block):
 
     def _on_device_selection_succeeded(self, device: dict) -> None:
         """Mark the currently selected row active after selection succeeds."""
+        self._has_active_device = True
         selected_item = self.ui.available_device_list.currentItem()
         if selected_item is None:
             return
@@ -328,12 +353,16 @@ class DeviceSelectionBlock(QFrame, Block):
 
     def _on_device_selection_failed(self, device: dict) -> None:
         """Clear the current row selection after selection failure."""
-        self.ui.available_device_list.setCurrentItem(None)
+        self._has_active_device = False
+        self.ui.available_device_list.setCurrentItem(
+            None, QItemSelectionModel.SelectionFlag.Clear
+        )
         self.ui.available_device_list.sortItems()
         self._on_available_device_list_model_changed()
 
     def _on_devices_updated(self, devices: list[dict]) -> None:
         """Replace the available-device list from controller-provided device data."""
+        self._has_active_device = False
         self.ui.available_device_list.clear()
         for device in devices:
             self._device_item_type.add_to_list(
@@ -362,10 +391,20 @@ class DeviceSelectionBlock(QFrame, Block):
             self.ui.available_device_list.iter_items(), start=0
         ):
             if item.id == id:
-                removed_item = self.ui.available_device_list.takeItem(item_index)
+                removed_item: DeviceItem = self.ui.available_device_list.takeItem(
+                    item_index
+                )
                 if removed_item is not None:
+                    if (
+                        removed_item == self.current_item()
+                    ):  # The removed item was the current item
+                        self._has_active_device = False
+                        self.ui.available_device_list.setCurrentItem(
+                            None, QItemSelectionModel.SelectionFlag.Clear
+                        )
                     del removed_item
                     break
+        self.ui.available_device_list.sortItems()
         self._on_available_device_list_model_changed()
 
     def apply_theme_icons(self, theme: Theme) -> None:
@@ -386,9 +425,40 @@ class DeviceSelectionBlock(QFrame, Block):
             self.ui.available_device_list, "device-list-highlight-level", level
         )
 
-    def start_highlight_attention(self) -> None:
-        """Start a temporary highlight pulse on the available-device list."""
-        self.stop_highlight_attention()
+    def _is_block_visible_to_user(self) -> bool:
+        """Return whether the left sidebar ancestor chain is visible to the user."""
+        widget = self.parentWidget()
+        while widget is not None:
+            if widget.objectName() == "left-panels-wrapper":
+                return widget.isVisible()
+            widget = widget.parentWidget()
+        return self.isVisible()
+
+    def _should_run_device_attention_highlight(self) -> bool:
+        """True when the list is shown and no device row is selected yet."""
+        if not self._is_block_visible_to_user():
+            return False
+        if not self.ui.available_device_list.isVisible():
+            return False
+        if self._has_active_device:
+            return False
+        return True
+
+    def _on_run_helper_animation(self) -> None:
+        """Start attention pulse when idle helper is requested and guards pass."""
+        if not self._should_run_device_attention_highlight():
+            return
+        self._start_highlight_attention()
+
+    def _on_map_tab_activated(self) -> None:
+        """Start attention pulse when the Map tab is activated and guards pass."""
+        if not self._should_run_device_attention_highlight():
+            return
+        self._start_highlight_attention()
+
+    def _start_highlight_attention(self) -> None:
+        """Start the attention pulse and set the list highlight level."""
+        self._stop_highlight_attention()
         self._highlight_elapsed.start()
         self._highlight_pulse_timer.start(
             Settings.ANIMATION.ATTENTION_HIGHLIGHT_UPDATE_MS
@@ -397,7 +467,7 @@ class DeviceSelectionBlock(QFrame, Block):
             Settings.ANIMATION.ATTENTION_HIGHLIGHT_DURATION
         )
 
-    def stop_highlight_attention(self) -> None:
+    def _stop_highlight_attention(self) -> None:
         """Stop the attention pulse and reset the list highlight level."""
         self._highlight_pulse_timer.stop()
         self._highlight_stop_timer.stop()

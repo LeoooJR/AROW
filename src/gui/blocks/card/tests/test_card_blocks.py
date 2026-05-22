@@ -83,7 +83,9 @@ def test_bridge_status_card_seeds_placeholder_values_on_init(qtbot) -> None:
         card.ui.content.ui.version_row.ui.value.text()
         == card.texts.placeholder_adb_version
     )
-    assert card.ui.content.ui.daemon_row.ui.value.text() == card.texts.placeholder_daemon
+    assert (
+        card.ui.content.ui.daemon_row.ui.value.text() == card.texts.placeholder_daemon
+    )
     assert (
         card.ui.content.ui.devices_row.ui.value.text()
         == card.texts.placeholder_connected_devices
@@ -103,7 +105,9 @@ def test_bridge_status_card_setters_update_values_and_preserve_omitted_fields(
     card.set_adb_values(daemon="tcp:5037")
 
     assert card.ui.content.ui.status_row.ui.value.text() == "Stopped"
-    assert card.ui.content.ui.status_row.ui.value.property("adb-server-state") == "stopped"
+    assert (
+        card.ui.content.ui.status_row.ui.value.property("adb-server-state") == "stopped"
+    )
     assert card.ui.content.ui.version_row.ui.value.text() == "1.0.41"
     assert card.ui.content.ui.daemon_row.ui.value.text() == "tcp:5037"
     assert card.ui.content.ui.helper_note.text() == original_helper
@@ -139,5 +143,48 @@ def test_bridge_status_card_can_display_error_state(qtbot) -> None:
     card.set_adb_values(server_state="error", indicator_state="error")
 
     assert card.ui.content.ui.status_row.ui.value.text() == "Error"
-    assert card.ui.content.ui.status_row.ui.value.property("adb-server-state") == "error"
+    assert (
+        card.ui.content.ui.status_row.ui.value.property("adb-server-state") == "error"
+    )
     assert card.ui.indicator.property("indicator-state") == "error"
+
+
+def test_bridge_status_card_adb_server_started(qtbot) -> None:
+    card = BridgeStatusCardBlock()
+    qtbot.addWidget(card)
+
+    view_signals.ADBServerStarted.emit()
+    qtbot.wait(0)
+
+    assert card.ui.content.ui.status_row.ui.value.text() == "Running"
+    assert (
+        card.ui.content.ui.status_row.ui.value.property("adb-server-state") == "running"
+    )
+    assert card.ui.indicator.property("indicator-state") == "valid"
+
+
+def test_bridge_status_card_adb_server_stopped(qtbot) -> None:
+    card = BridgeStatusCardBlock()
+    qtbot.addWidget(card)
+
+    view_signals.ADBServerStopped.emit()
+    qtbot.wait(0)
+
+    assert card.ui.content.ui.status_row.ui.value.text() == "Stopped"
+    assert (
+        card.ui.content.ui.status_row.ui.value.property("adb-server-state") == "stopped"
+    )
+    assert card.ui.indicator.property("indicator-state") == "error"
+
+
+def test_identity_card_host_device_information_updated(qtbot) -> None:
+    card = IdentityCardBlock()
+    qtbot.addWidget(card)
+
+    view_signals.HostDeviceInformationUpdated.emit("Build Host", "linux", "192.168.1.1")
+    qtbot.wait(0)
+
+    assert card.ui.content.ui.host_name.text() == "Build Host"
+    assert card.ui.content.ui.ip_address_row.ui.value.text() == "192.168.1.1"
+    assert card.ui.content.ui.platform_row.ui.value.text() == "linux"
+    assert card.ui.indicator.property("indicator-state") == "valid"

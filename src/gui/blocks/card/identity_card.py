@@ -3,10 +3,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Final
+from typing import Final, Literal
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QSizePolicy, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
+)
 
 from gui import faker as ui_faker
 from gui.blocks.base import Block
@@ -313,6 +320,30 @@ class IdentityCardBlock(QFrame, Block):
     def _connect_signals(self) -> None:
         """Connect card signals; placeholder/debug values are block-owned."""
         view_signals.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
+        view_signals.HostDeviceInformationUpdated.connect(
+            self._on_host_device_information_updated
+        )
+
+    def _on_host_device_information_updated(
+        self, name: str, os: Literal["linux", "windows", "darwin"] | None, ip: str
+    ) -> None:
+        """Update host identity when controller reports host device metadata."""
+        assert os in ["linux", "windows", "darwin"]
+        if os == "linux":
+            os_icon = OperatingSystemIcons.LINUX
+        elif os == "windows":
+            os_icon = OperatingSystemIcons.WINDOWS
+        elif os == "darwin":
+            os_icon = OperatingSystemIcons.MACOS
+        else:
+            os_icon = GenericIcons.LAPTOP
+        self.set_host_values(
+            host_name=name,
+            ip_address=ip,
+            platform=os,
+            os_icon=os_icon,
+            identity_state="valid",
+        )
 
     def _on_ui_constraints_disabled(self) -> None:
         """Re-apply placeholder values when UI constraints are disabled."""

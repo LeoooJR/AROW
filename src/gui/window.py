@@ -27,6 +27,8 @@ import gui.faker as ui_faker
 import gui.ressources_rc
 from gui.__init__ import __application__
 from gui.animation import animate_widget_visibility
+from gui.blocks.device import DeviceItem
+from gui.blocks.top_bar import TopBar
 from gui.colors import Theme, get_current_palette, set_current_theme
 from gui.components import (
     AuthentificationCard,
@@ -34,7 +36,6 @@ from gui.components import (
     QuestionDialog,
     Toast,
 )
-from gui.blocks.device import DeviceItem
 from gui.device import DevicePairingPanel, DeviceSelectionPanel
 from gui.event_filter import ActivityTracker
 from gui.host import HostPanel
@@ -49,7 +50,6 @@ from gui.location import LocationPanel
 from gui.logs import LogPanel
 from gui.map import MapPanel
 from gui.settings import Settings
-from gui.blocks.top_bar import TopBar
 from gui.signals import view_signals
 from gui.stylesheet import stylesheet, stylesheet_dark, stylesheet_light
 from gui.welcome import WelcomePanel
@@ -57,7 +57,6 @@ from gui.wrapper import (
     HorizontalLayoutWrapper,
     VerticalLayoutWrapper,
 )
-
 from logger import logger
 
 PRE_SIMULATION_PROGRESS_STEP_LABELS: Final[list[str]] = [
@@ -122,6 +121,8 @@ def _main_window_screen_size() -> QSize:
 
 
 class Body(QWidget):
+
+    TAB_MAP = 1
 
     @dataclass(frozen=True)
     class Text:
@@ -300,9 +301,6 @@ class Body(QWidget):
         view_signals.AuthentificationSucceeded.connect(self._on_device_connected)
         view_signals.DeviceSelectionSucceeded.connect(self._on_device_connected)
 
-        #### Signals for handling the helper animation ####
-        view_signals.RunHelperAnimationRequested.connect(self._on_run_helper_animation)
-
     def _set_alignment(self) -> None:
         pass
 
@@ -318,24 +316,9 @@ class Body(QWidget):
         )
 
     def _on_tab_changed(self, index: int) -> None:
-        if index == 1:  # Map tab
-            if not self.ui.map_panel.is_map_visible():  # Map not visible yet
-                if self.ui.progress_bar.value() == 0:  # No phone is connected yet
-                    self.ui.map_panel.helper()
-                    if self.is_left_panels_visible():
-                        self.ui.device_selection_panel.start_highlight_attention()
-                elif self.ui.progress_bar.value() == 1:
-                    pass
-
-    def _on_run_helper_animation(self) -> None:
-        """Run application helper animation."""
-        if self.ui.progress_bar.value() == 0:
-            if self.ui.tabs.currentIndex() == 1:
-                self.ui.map_panel.helper()
-                if self.is_left_panels_visible():
-                    self.ui.device_selection_panel.start_highlight_attention()
-        elif self.ui.progress_bar.value() == 1:
-            pass
+        if index != self.TAB_MAP:
+            return
+        view_signals.MapTabActivated.emit()
 
     def _on_log_panel_toggled(self, visible: bool) -> None:
         """Handle the log panel visibility request."""
@@ -455,10 +438,6 @@ class Body(QWidget):
             Settings.ANIMATION.PANEL_VISIBILITY_DURATION + Settings.SPACING.SM,
             self.ui.log_panel.refresh_layout,
         )
-
-    def get_current_device(self) -> DeviceItem:
-        """Get the current device."""
-        return self.ui.device_selection_panel.current_device()
 
     def apply_theme_icons(self, theme: Theme) -> None:
         """Re-resolve tab and side-panel icon resources for ``theme``."""

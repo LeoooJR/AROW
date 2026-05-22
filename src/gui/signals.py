@@ -14,6 +14,7 @@ class ViewSignals(QObject):
     HostPanelVisibilityRequested = Signal(bool)
     LogPanelVisibilityRequested = Signal(bool)
     RunHelperAnimationRequested = Signal()
+    MapTabActivated = Signal()
 
     #### ADB Server Signals ####
     ADBServerStarted = Signal()

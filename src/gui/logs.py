@@ -229,37 +229,6 @@ class LogPanel(QFrame):
     def refresh_layout(self, *, deferred: bool = True) -> None:
         self.ui.activity_log_block.refresh_layout(deferred=deferred)
 
-    def add_activity(
-        self,
-        message: str,
-        category: ActivityCategory,
-        level: ActivityLevel = "info",
-        detail: str | None = None,
-        timestamp: dt.datetime | None = None,
-        metadata: dict[str, str] | None = None,
-    ) -> str:
-        return self.ui.activity_log_block.add_activity(
-            message,
-            category,
-            level,
-            detail=detail,
-            timestamp=timestamp,
-            metadata=metadata,
-        )
-
-    def remove_activity(self, activity_id: str) -> bool:
-        return self.ui.activity_log_block.remove_activity(activity_id)
-
-    def clear_activities(self) -> None:
-        self.ui.activity_log_block.clear_activities()
-
-    def set_activity_filter(
-        self,
-        categories: set[ActivityCategory] | list[ActivityCategory] | None = None,
-        levels: set[ActivityLevel] | list[ActivityLevel] | None = None,
-    ) -> None:
-        self.ui.activity_log_block.set_activity_filter(categories, levels)
-
     def logs_list(self) -> List:
         return self.ui.activity_log_block.logs_list()
 

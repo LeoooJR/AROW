@@ -31,8 +31,10 @@ from gui.components import SVG, LeadingIconLabel, PlaceHolder, ToolButton
 from gui.components.media import get_svg_size
 from gui.icons import GenericIcons, icon_qt_path, icon_qt_path_for_theme
 from gui.settings import Settings
+from gui.signals import view_signals
 from gui.wrapper import GridLayoutWrapper, HorizontalLayoutWrapper
 from logger import logger
+
 
 class Canvas(QWebEngineView):
     """Map canvas: web engine view."""
@@ -596,6 +598,7 @@ class MapBlock(QWidget):
         """Placeholder copy when the map cannot load yet."""
 
         placeholder: Final[str] = "Select a device to get started..."
+        loading_placeholder: Final[str] = "Map is being loaded..."
 
     @dataclass
     class UI:
@@ -683,7 +686,12 @@ class MapBlock(QWidget):
 
     def _connect_signals(self) -> None:
         """Connect signals for the map view and its UI widgets."""
-        pass
+        view_signals.RunHelperAnimationRequested.connect(self._on_run_helper_animation)
+        view_signals.MapTabActivated.connect(self._on_run_helper_animation)
+        view_signals.AuthentificationSucceeded.connect(self._on_connection_succeeded)
+        view_signals.DeviceSelectionSucceeded.connect(self._on_connection_succeeded)
+        view_signals.AuthentificationFailed.connect(self._on_authentification_failed)
+        view_signals.DeviceSelectionFailed.connect(self._on_device_selection_failed)
 
     def is_canvas_visible(self) -> bool:
         """Return whether the concrete map canvas is currently visible."""
@@ -702,7 +710,28 @@ class MapBlock(QWidget):
         self.ui.placeholder.apply_theme_icons(theme)
         self.ui.coordinates.apply_theme_icons(theme)
 
-    def play_placeholder_helper_animation(self) -> None:
+    def _on_connection_succeeded(self, device: dict) -> None:
+        """Update placeholder after auth or device selection succeeds."""
+        self.update_placeholder(
+            self.texts.loading_placeholder, GenericIcons.MAP_PLACEHOLDER
+        )
+        self._on_run_helper_animation()
+
+    def _on_device_selection_failed(self, device: dict) -> None:
+        """Pulse placeholder when device selection fails."""
+        self._on_run_helper_animation()
+
+    def _on_authentification_failed(self, *_args) -> None:
+        """Pulse placeholder when authentification fails."""
+        self._on_run_helper_animation()
+
+    def _on_run_helper_animation(self) -> None:
+        """Run the placeholder helper animation."""
+        if not self.ui.placeholder.isVisible():
+            return  # Placeholder is not visible, no need to animate
+        self._play_placeholder_helper_animation()
+
+    def _play_placeholder_helper_animation(self) -> None:
         """
         Run a one-shot opacity pulse on the canvas placeholder. Help to draw attention of the user to the placeholder.
         """

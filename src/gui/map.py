@@ -9,12 +9,11 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QFrame, QSizePolicy, QVBoxLayout
 
+from gui.blocks.map import MapBlock
 from gui.colors import Theme
 from gui.components import LeadingIconLabel
 from gui.icons import GenericIcons
 from gui.settings import Settings
-from gui.signals import view_signals
-from gui.blocks.map import MapBlock
 
 
 class MapPanel(QFrame):
@@ -24,10 +23,9 @@ class MapPanel(QFrame):
 
     @dataclass(frozen=True)
     class Text:
-        """Panel title and loading placeholder for the map tab."""
+        """Panel title for the map tab."""
 
         title: Final[str] = "Map"
-        loading_placeholder: Final[str] = "Map is being loaded..."
 
     @dataclass
     class UI:
@@ -103,30 +101,7 @@ class MapPanel(QFrame):
 
     def _connect_signals(self) -> None:
         """Connect signals for the map panel and its UI widgets."""
-        #### Signals for handling the step transition from authentification to map display ####
-        view_signals.AuthentificationSucceeded.connect(
-            self._on_device_selection_succeeded
-        )
-        view_signals.DeviceSelectionSucceeded.connect(
-            self._on_device_selection_succeeded
-        )
-        view_signals.AuthentificationFailed.connect(self._on_authentification_failed)
-        view_signals.DeviceSelectionFailed.connect(self._on_device_selection_failed)
-
-    def _on_device_selection_succeeded(self, device: dict) -> None:
-        """Handle map UI updates for any successful connection flow."""
-        self.ui.map_block.update_placeholder(
-            self.texts.loading_placeholder, GenericIcons.MAP_PLACEHOLDER
-        )
-        self.ui.map_block.play_placeholder_helper_animation()
-
-    def _on_device_selection_failed(self, device: dict) -> None:
-        """Handle the device selection failed event."""
-        self.ui.map_block.play_placeholder_helper_animation()
-
-    def _on_authentification_failed(self) -> None:
-        """Handle the authentification failed event."""
-        self.ui.map_block.play_placeholder_helper_animation()
+        pass
 
     def apply_theme_icons(self, theme: Theme) -> None:
         self.ui.title.apply_theme_icons(theme)
@@ -141,10 +116,3 @@ class MapPanel(QFrame):
         self.ui.map_block.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
-
-    def is_map_visible(self) -> bool:
-        return self.ui.map_block.is_canvas_visible()
-
-    def helper(self) -> None:
-        """Run the one-shot helper animation (e.g. placeholder phone icon pulse) when the map tab is displayed."""
-        self.ui.map_block.play_placeholder_helper_animation()

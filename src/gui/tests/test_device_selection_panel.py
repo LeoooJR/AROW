@@ -37,13 +37,3 @@ def test_refresh_panel_timer_invokes_batch_refresh(qtbot, monkeypatch) -> None:
 
     qtbot.waitUntil(done, timeout=3000)
     assert len(calls) >= 1
-
-
-def test_device_selection_panel_facade_delegates_placeholder_rows(qtbot) -> None:
-    panel = DeviceSelectionPanel()
-    qtbot.addWidget(panel)
-
-    panel.add_list_items_placeholder()
-
-    assert panel.available_device_list().count() == 3
-    assert panel.current_device() is None
