@@ -10,6 +10,7 @@
 
 - `src/gui`: graphical user interface
 - `src/gui/components`: reusable GUI component package, grouped by component category
+- `src/gui/blocks`: reusable GUI block package for widgets composed from multiple components, grouped by block category
 - `src/core`: model and core logic
 - `src/geo`: Leaflet map integration and map-specific assets
 - `src/controller`: communication layer between GUI and model
@@ -142,6 +143,28 @@ Apply these rules whenever you touch `src/gui`.
   - `VerticalLayoutWrapper`
   - `HorizontalLayoutWrapper`
   - `GridLayoutWrapper`
+
+### Blocks and panels
+
+- Put reusable multi-component GUI widgets in `src/gui/blocks/`. A block is larger than a component and is composed from multiple components or helper widgets.
+- Keep blocks grouped by category. Current block categories include:
+  - `base`: shared `Block` lifecycle protocol
+  - `activity`: activity log stream, filtering, rows, file display, and activity storage
+  - `card`: reusable card/groupbox-style information blocks such as identity and bridge status cards
+  - `device`: device selection block, device list rows, badges, timestamps, placeholder rows, and selection helpers
+  - `map`: map canvas, placeholder, legend, coordinates, and simulation controls
+  - `start`: welcome start/recent-file and walkthrough blocks
+  - `top_bar`: application header, palette controls, title, and sidebar visibility controls
+- Prefer one block per file. Keep block-specific helper classes beside the block they serve, and avoid aggregate compatibility files that only re-export renamed blocks.
+- Export reusable blocks from their category `__init__.py` and from `src/gui/blocks/__init__.py` when they are intended for project-wide use.
+- Blocks should inherit from `Block` when they participate in the shared block lifecycle, implement `_set_size_policy`, `_set_alignment`, `_connect_signals`, and `apply_theme_icons`, and call `_finalize_ui_hooks()` after their child widgets and state are initialized.
+- Prefer block-local `Text` and `UI` dataclasses for stable copy and child-widget references. Placeholder, demo, default, and generated values owned by a block must live under the block `Text` dataclass.
+- Blocks own block-specific widgets, helper rows/classes, placeholder seeding, row rendering, filtering, list item sizing, selection/highlight behavior, theme-icon propagation, and block-specific signal handlers.
+- Panels should remain thin shells for panel chrome and orchestration: title/header widgets, expand/collapse behavior, visibility handling, routing real data into blocks, and public facade methods required by `window.py` or tests.
+- Panel `UI` dataclasses may store direct block instances, but should not duplicate or expose widgets owned by those blocks. Prefer explicit panel facade methods over reaching through chained block UI references from outside the block.
+- Keep `src/gui/location.py` out of the blocks refactor until the location panel receives its planned dedicated refactor.
+- Put block-internal tests under each block category's `tests/` directory inside `src/gui/blocks/`. Keep panel, window, component, and end-to-end GUI integration tests under `src/gui/tests/`.
+- When behavior moves from a panel into a block, move or add the matching tests under the block category and cover both successful behavior and error or state-regression paths.
 
 ### Icons
 
