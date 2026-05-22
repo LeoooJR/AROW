@@ -235,23 +235,34 @@ class DeviceSelectionBlock(QFrame, Block):
 
     def _connect_signals(self) -> None:
         """Wire device list actions, selection events, and model-change refresh hooks."""
+
+        #### Signals for handling the device list actions ####
         self.ui.add_device_button.clicked.connect(view_signals.AddDeviceRequested.emit)
-        view_signals.AuthentificationSucceeded.connect(
-            self._on_authentification_succeeded
-        )
+        self.ui.refresh_button.clicked.connect(self._on_refresh_button_clicked)
         self.ui.available_device_list.itemClicked.connect(self._on_device_selected)
         self.ui.available_device_list.itemSelectionChanged.connect(
             self._sync_available_device_selection_state
+        )
+
+        #### Signals for handling the device selection panel visibility requests ####
+        view_signals.ExtendDeviceSelectionPanelRequested.connect(self.extend)
+        view_signals.ShortenDeviceSelectionPanelRequested.connect(self.shorten)
+
+        #### Signals for handling the authentification / selection workflow ####
+        view_signals.AuthentificationSucceeded.connect(
+            self._on_authentification_succeeded
         )
         view_signals.DeviceSelectionSucceeded.connect(
             self._on_device_selection_succeeded
         )
         view_signals.DeviceSelectionFailed.connect(self._on_device_selection_failed)
         view_signals.DevicesUpdated.connect(self._on_devices_updated)
-        self.ui.refresh_button.clicked.connect(self._on_refresh_button_clicked)
         view_signals.RemoveDeviceRequested.connect(self._on_remove_device_requested)
+
+        #### Signals for handling the UI constraints disabled ####
         view_signals.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
 
+        #### Signals for handling the device list model changes ####
         model = self.ui.available_device_list.model()
         model.rowsInserted.connect(self._on_available_device_list_model_changed)
         model.rowsRemoved.connect(self._on_available_device_list_model_changed)
@@ -259,6 +270,7 @@ class DeviceSelectionBlock(QFrame, Block):
         model.layoutChanged.connect(self._on_available_device_list_model_changed)
         model.dataChanged.connect(self._on_available_device_list_model_changed)
 
+        #### Signals for handling the helper animation requests ####
         view_signals.RunHelperAnimationRequested.connect(self._on_run_helper_animation)
         view_signals.MapTabActivated.connect(self._on_map_tab_activated)
 
@@ -513,17 +525,17 @@ class DeviceSelectionBlock(QFrame, Block):
         )
         self._on_available_device_list_model_changed()
 
-    def extend_list_items(self) -> None:
+    def extend(self) -> None:
         """Expand all device rows to show extended metadata and actions."""
         for item in self.ui.available_device_list.iter_items():
             if isinstance(item, self._device_item_type):
-                item.extend_device_item()
+                item.extend()
 
-    def shorten_list_items(self) -> None:
+    def shorten(self) -> None:
         """Collapse all device rows back to their compact presentation."""
         for item in self.ui.available_device_list.iter_items():
             if isinstance(item, self._device_item_type):
-                item.shorten_device_item()
+                item.shorten()
 
     def current_item(self):
         """Return the current QListWidget item from the available-device list."""

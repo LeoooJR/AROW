@@ -353,30 +353,6 @@ class Body(QWidget):
                 True
             )  # Show device panel when location panel is hidden, one panel must be visible at all times in UI
 
-    def is_left_panels_visible(self) -> bool:
-        """Check if the left panels are visible."""
-        return self.ui.left_panels_wrapper.isVisible()
-
-    def is_right_panels_visible(self) -> bool:
-        """Check if the right panels are visible."""
-        return self.ui.right_panels_wrapper.isVisible()
-
-    def is_device_selection_panel_visible(self) -> bool:
-        """Check if the device selection panel is visible."""
-        return self.ui.device_selection_panel.is_panel_visible()
-
-    def is_location_panel_visible(self) -> bool:
-        """Check if the location panel is visible."""
-        return self.ui.location_panel.is_panel_visible()
-
-    def is_host_panel_visible(self) -> bool:
-        """Check if the host panel is visible."""
-        return self.ui.host_panel.is_panel_visible()
-
-    def is_log_panel_visible(self) -> bool:
-        """Check if the log panel is visible."""
-        return self.ui.log_panel.is_panel_visible()
-
     def set_left_panels_visibility(self, visible: bool) -> None:
         """Set the left panels visibility."""
         animate_widget_visibility(
@@ -396,9 +372,9 @@ class Body(QWidget):
             hide_widget_when_collapsed=True,
         )
         if not visible:
-            self.ui.device_selection_panel.extend_list_items()
+            view_signals.ExtendDeviceSelectionPanelRequested.emit()
         else:
-            self.ui.device_selection_panel.shorten_list_items()
+            view_signals.ShortenDeviceSelectionPanelRequested.emit()
         self._refresh_log_panel_layout_later()
 
     def set_device_selection_panel_visibility(self, visible: bool) -> None:

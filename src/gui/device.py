@@ -288,7 +288,7 @@ class DeviceSelectionPanel(QFrame):
         )
 
     def is_panel_visible(self) -> bool:
-        """Check if the device panel is visible."""
+        """Check if the device selection panel is visible."""
         return bool(self.ui.expand_button.property("toggle"))
 
     def apply_theme_icons(self, theme: Theme) -> None:
@@ -310,7 +310,7 @@ class DeviceSelectionPanel(QFrame):
         return 2 * Settings.PANEL.CONTENT_PADDING + height
 
     def show_panel(self) -> None:
-        """Show the device panel."""
+        """Show the device selection panel."""
         if not self.is_panel_visible():
             self.ui.expand_button.setProperty("toggle", True)
             self.ui.expand_button.set_icon(GenericIcons.LAYOUT_TOPBAR_INSET)
@@ -323,7 +323,7 @@ class DeviceSelectionPanel(QFrame):
             )
 
     def hide_panel(self) -> None:
-        """Hide the device panel."""
+        """Hide the device selection panel."""
         if self.is_panel_visible():
             self.ui.expand_button.setProperty("toggle", False)
             self.ui.expand_button.set_icon(GenericIcons.LAYOUT_TOPBAR)
@@ -336,36 +336,12 @@ class DeviceSelectionPanel(QFrame):
             )
 
     def toggle_panel_visibility(self) -> None:
-        """Toggle the visibility of the device panel."""
-        if self.ui.expand_button.property("toggle"):
+        """Toggle the visibility of the device selection panel."""
+        if self.is_panel_visible():
             # Reduce: hide body and constrain height so the panel under can grow.
-            self.ui.expand_button.setProperty("toggle", False)
-            self.ui.expand_button.set_icon(GenericIcons.LAYOUT_TOPBAR)
-            animate_widget_visibility(
-                self,
-                visible=False,
-                axis="vertical",
-                collapsed_size=self._reduced_height(),
-                content_widget=self.ui.body,
-            )
+            self.hide_panel()
         else:
             # Expand: show body and allow panel to grow again.
-            self.ui.expand_button.setProperty("toggle", True)
-            self.ui.expand_button.set_icon(GenericIcons.LAYOUT_TOPBAR_INSET)
-            animate_widget_visibility(
-                self,
-                visible=True,
-                axis="vertical",
-                collapsed_size=self._reduced_height(),
-                content_widget=self.ui.body,
-            )
+            self.show_panel()
         # Notify parent layout so space is reallocated (panel below gets more height when reduced).
         self.updateGeometry()
-
-    def extend_list_items(self) -> None:
-        """Extend the list items to show the last communication time and menu button."""
-        self.ui.device_selection_block.extend_list_items()
-
-    def shorten_list_items(self) -> None:
-        """Shorten the list items to hide the last communication time and menu button."""
-        self.ui.device_selection_block.shorten_list_items()

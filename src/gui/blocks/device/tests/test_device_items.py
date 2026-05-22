@@ -31,11 +31,11 @@ def test_device_item_badge_stays_stacked_in_compact_and_extended_modes(qtbot) ->
     assert item.ui.center.get_layout().indexOf(item.ui.badge_container) == 1
     assert item.ui.title_row.get_layout().indexOf(item.ui.badge_container) == -1
 
-    item.extend_device_item()
+    item.extend()
     assert item.ui.center.get_layout().indexOf(item.ui.badge_container) == 1
     assert item.ui.title_row.get_layout().indexOf(item.ui.badge_container) == -1
 
-    item.shorten_device_item()
+    item.shorten()
     assert item.ui.center.get_layout().indexOf(item.ui.badge_container) == 1
     assert item.ui.title_row.get_layout().indexOf(item.ui.badge_container) == -1
 
@@ -48,11 +48,11 @@ def test_device_item_actions_show_only_in_extended_mode(qtbot) -> None:
     assert item.ui.time_label.isHidden() is True
     assert item.ui.trash_button.isHidden() is True
 
-    item.extend_device_item()
+    item.extend()
     assert item.ui.time_label.isHidden() is False
     assert item.ui.trash_button.isHidden() is False
 
-    item.shorten_device_item()
+    item.shorten()
     assert item.ui.time_label.isHidden() is True
     assert item.ui.trash_button.isHidden() is True
 
@@ -83,6 +83,72 @@ def test_device_selection_block_syncs_custom_row_selection(qtbot) -> None:
     qtbot.wait(0)
     assert first.ui.row.property("selected") is False
     assert second.ui.row.property("selected") is True
+
+
+def _device_rows(block: DeviceSelectionBlock) -> list[DeviceItem]:
+    """Return custom device rows from the block list."""
+    return [
+        item
+        for item in block.device_list().iter_items()
+        if isinstance(item, DeviceItem)
+    ]
+
+
+def test_device_selection_block_extend_signal_expands_all_rows(qtbot) -> None:
+    block = DeviceSelectionBlock()
+    qtbot.addWidget(block)
+    block.show()
+    DeviceItem.add_to_list(
+        block.device_list(),
+        text="Pixel 9",
+        last_communication="Active now",
+    )
+    DeviceItem.add_to_list(
+        block.device_list(),
+        text="Zenfone 11",
+        last_communication="30 min ago",
+    )
+    qtbot.wait(0)
+
+    for item in _device_rows(block):
+        assert item.ui.time_label.isHidden() is True
+        assert item.ui.trash_button.isHidden() is True
+
+    view_signals.ExtendDeviceSelectionPanelRequested.emit()
+    qtbot.wait(0)
+
+    for item in _device_rows(block):
+        assert item.ui.time_label.isHidden() is False
+        assert item.ui.trash_button.isHidden() is False
+
+
+def test_device_selection_block_shorten_signal_collapses_all_rows(qtbot) -> None:
+    block = DeviceSelectionBlock()
+    qtbot.addWidget(block)
+    block.show()
+    DeviceItem.add_to_list(
+        block.device_list(),
+        text="Pixel 9",
+        last_communication="Active now",
+    )
+    DeviceItem.add_to_list(
+        block.device_list(),
+        text="Zenfone 11",
+        last_communication="30 min ago",
+    )
+    qtbot.wait(0)
+
+    view_signals.ExtendDeviceSelectionPanelRequested.emit()
+    qtbot.wait(0)
+    for item in _device_rows(block):
+        assert item.ui.time_label.isHidden() is False
+
+    view_signals.ShortenDeviceSelectionPanelRequested.emit()
+    qtbot.wait(0)
+
+    for item in _device_rows(block):
+        assert item.ui.time_label.isHidden() is True
+        assert item.ui.trash_button.isHidden() is True
 
 
 def test_alert_device_item_can_also_be_selected(qtbot) -> None:
@@ -137,7 +203,7 @@ def test_device_item_extended_size_hint_stays_within_viewport(qtbot) -> None:
     )
     qtbot.wait(0)
 
-    item.extend_device_item()
+    item.extend()
     qtbot.wait(0)
     viewport_width = block.device_list().viewport().width()
     assert viewport_width > 0
@@ -176,7 +242,7 @@ def test_device_item_extended_text_uses_single_line_elision(qtbot) -> None:
         badge="new",
     )
     qtbot.addWidget(item.ui.row)
-    item.extend_device_item()
+    item.extend()
 
     assert item.name == "Unknown Device With A Very Long Friendly Name"
     assert "\n" not in item.ui.name_label.text()

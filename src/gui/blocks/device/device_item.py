@@ -889,7 +889,7 @@ class DeviceItem(QListWidgetItem):
 
     ### Extend / shorten core logic ###
 
-    def extend_device_item(self) -> None:
+    def extend(self) -> None:
         """Extend the device item to show the last communication time."""
         if self._is_extended:
             return
@@ -900,7 +900,7 @@ class DeviceItem(QListWidgetItem):
         self.ui.trash_button.show()
         self._sync_size_hint()
 
-    def shorten_device_item(self) -> None:
+    def shorten(self) -> None:
         """Shorten the device item to hide the last communication time"""
         if not self._is_extended:
             self._set_compact_badge_layout()  # In shortened mode, the badge is below the device name

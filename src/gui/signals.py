@@ -10,6 +10,8 @@ class ViewSignals(QObject):
     LeftPanelsVisibilityRequested = Signal(bool)
     RightPanelsVisibilityRequested = Signal(bool)
     DeviceSelectionPanelVisibilityRequested = Signal(bool)
+    ExtendDeviceSelectionPanelRequested = Signal()
+    ShortenDeviceSelectionPanelRequested = Signal()
     LocationPanelVisibilityRequested = Signal(bool)
     HostPanelVisibilityRequested = Signal(bool)
     LogPanelVisibilityRequested = Signal(bool)

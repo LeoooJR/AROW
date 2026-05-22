@@ -16,8 +16,8 @@ class Icon:
         return self.light_mode_path if theme == "light" else self.dark_mode_path
 
 
-def _pair(filename: str, *, has_both_themes: bool = True) -> Icon:
-    """Build an Icon that uses identical Qt paths for light and dark until dark assets exist.
+def _create_icon(filename: str, *, has_both_themes: bool = True) -> Icon:
+    """Build an Icon with references to light and dark theme asset files.
 
     SVG icons live under ``statics/light/<filename>``. Files that remain at ``statics/<filename>``
     (for example raster logos) pass ``has_both_themes=False``.
@@ -61,61 +61,61 @@ def icons_need_theme_updates() -> bool:
 class GenericIcons(Enum):
     """Icons that are used to represent generic elements."""
 
-    LOCATION = _pair("location.svg")
-    FAKE_LOCATION = _pair("fake-location.svg")
-    CROSSHAIR = _pair("crosshair.svg")
-    MILESTONE = _pair("milestone.svg")
-    RAILWAY = _pair("railway.svg")
-    MAP = _pair("globe-central-south-asia.svg")
-    MAP_PLACEHOLDER = _pair("globe-central-south-asia-placeholder.svg")
-    GEO = _pair("geo-fill.svg")
-    LAPTOP = _pair("laptop.svg")
-    DEVICE = _pair("phone.svg")
-    DEVICE_PLACEHOLDER = _pair("device-placeholder.svg")
-    ARROW_CLOCKWISE = _pair("arrow-clockwise.svg")
-    LOGS = _pair("substack.svg")
-    UPLOAD = _pair("upload.svg")
-    START = _pair("start.svg")
-    OFF = _pair("off.svg")
-    ON = _pair("on.svg")
-    PLAY = _pair("play-circle.svg")
-    PAUSE = _pair("pause-circle.svg")
-    LAYOUT_SIDEBAR = _pair("layout-sidebar.svg")
-    LAYOUT_SIDEBAR_REVERSE = _pair("layout-sidebar-reverse.svg")
-    LAYOUT_SIDEBAR_INSET = _pair("layout-sidebar-inset.svg")
-    LAYOUT_SIDEBAR_INSET_REVERSE = _pair("layout-sidebar-inset-reverse.svg")
-    LAYOUT_TOPBAR = _pair("layout-topbar.svg")
-    LAYOUT_TOPBAR_INSET = _pair("layout-topbar-inset.svg")
-    LAYOUT_BOTTOMBAR = _pair("layout-bottombar.svg")
-    LAYOUT_BOTTOMBAR_INSET = _pair("layout-bottombar-inset.svg")
-    LIGHT_MODE = _pair("brightness-high.svg")
-    DARK_MODE = _pair("moon.svg")
-    FILE = _pair("file-earmark-text.svg")
-    FUNNEL = _pair("funnel.svg")
-    INFO = _pair("info-circle.svg")
-    CHECK = _pair("check-circle.svg")
-    EXCLAMATION = _pair("exclamation-circle.svg")
-    X_CIRCLE = _pair("x-circle.svg")
-    HAND_INDEX = _pair("hand-index.svg")
-    SAVE_AS = _pair("save-as.svg")
-    PLUS = _pair("plus.svg")
-    X = _pair("x.svg")
-    TRASH = _pair("trash.svg")
-    HAND_RAISED = _pair("person-raised-hand.svg")
+    LOCATION = _create_icon("location.svg")
+    FAKE_LOCATION = _create_icon("fake-location.svg")
+    CROSSHAIR = _create_icon("crosshair.svg")
+    MILESTONE = _create_icon("milestone.svg")
+    RAILWAY = _create_icon("railway.svg")
+    MAP = _create_icon("globe-central-south-asia.svg")
+    MAP_PLACEHOLDER = _create_icon("globe-central-south-asia-placeholder.svg")
+    GEO = _create_icon("geo-fill.svg")
+    LAPTOP = _create_icon("laptop.svg")
+    DEVICE = _create_icon("phone.svg")
+    DEVICE_PLACEHOLDER = _create_icon("device-placeholder.svg")
+    ARROW_CLOCKWISE = _create_icon("arrow-clockwise.svg")
+    LOGS = _create_icon("substack.svg")
+    UPLOAD = _create_icon("upload.svg")
+    START = _create_icon("start.svg")
+    OFF = _create_icon("off.svg")
+    ON = _create_icon("on.svg")
+    PLAY = _create_icon("play-circle.svg")
+    PAUSE = _create_icon("pause-circle.svg")
+    LAYOUT_SIDEBAR = _create_icon("layout-sidebar.svg")
+    LAYOUT_SIDEBAR_REVERSE = _create_icon("layout-sidebar-reverse.svg")
+    LAYOUT_SIDEBAR_INSET = _create_icon("layout-sidebar-inset.svg")
+    LAYOUT_SIDEBAR_INSET_REVERSE = _create_icon("layout-sidebar-inset-reverse.svg")
+    LAYOUT_TOPBAR = _create_icon("layout-topbar.svg")
+    LAYOUT_TOPBAR_INSET = _create_icon("layout-topbar-inset.svg")
+    LAYOUT_BOTTOMBAR = _create_icon("layout-bottombar.svg")
+    LAYOUT_BOTTOMBAR_INSET = _create_icon("layout-bottombar-inset.svg")
+    LIGHT_MODE = _create_icon("brightness-high.svg")
+    DARK_MODE = _create_icon("moon.svg")
+    FILE = _create_icon("file-earmark-text.svg")
+    FUNNEL = _create_icon("funnel.svg")
+    INFO = _create_icon("info-circle.svg")
+    CHECK = _create_icon("check-circle.svg")
+    EXCLAMATION = _create_icon("exclamation-circle.svg")
+    X_CIRCLE = _create_icon("x-circle.svg")
+    HAND_INDEX = _create_icon("hand-index.svg")
+    SAVE_AS = _create_icon("save-as.svg")
+    PLUS = _create_icon("plus.svg")
+    X = _create_icon("x.svg")
+    TRASH = _create_icon("trash.svg")
+    HAND_RAISED = _create_icon("person-raised-hand.svg")
 
 
 class OperatingSystemIcons(Enum):
     """Icons that are used to represent operating systems."""
 
-    ANDROID = _pair("android-icon.svg")
-    MACOS = _pair("apple.svg")
-    WINDOWS = _pair("windows.svg")
-    LINUX = _pair("linux.svg")
+    ANDROID = _create_icon("android-icon.svg")
+    MACOS = _create_icon("apple.svg")
+    WINDOWS = _create_icon("windows.svg")
+    LINUX = _create_icon("linux.svg")
 
 
 class ApplicationIcons(Enum):
     """Icons that are used to represent the application."""
 
-    LOGO = _pair("logo.png", has_both_themes=False)
-    LOGO_UI = _pair("logo-ui.png", has_both_themes=False)
-    NAME = _pair("app-name.svg")
+    LOGO = _create_icon("logo.png", has_both_themes=False)
+    LOGO_UI = _create_icon("logo-ui.png", has_both_themes=False)
+    NAME = _create_icon("app-name.svg")
