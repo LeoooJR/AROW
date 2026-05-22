@@ -14,6 +14,9 @@
 - `src/core`: model and core logic
 - `src/geo`: Leaflet map integration and map-specific assets
 - `src/controller`: communication layer between GUI and model
+  - `src/controller/orchestration/`: top-level coordinators (e.g. `AppController`)
+  - `src/controller/domains/`: domain sub-controllers (`AdbSubController`, `SimulationSubController`, `MapSubController`)
+  - `src/controller/async.py`, `helper.py`, `core_work_callbacks.py`, `controller.py`: shared async, validation, callbacks, and MVC base at package root
 
 Follow the project MVC split:
 

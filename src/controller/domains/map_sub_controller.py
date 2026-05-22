@@ -9,10 +9,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from controller.app_sub_controller import AppSubController
+from controller.domains.app_sub_controller import AppSubController
 
 if TYPE_CHECKING:
-    from controller.app_controller import AppController
+    from controller.orchestration.app_controller import AppController
 
 
 class MapSubController(AppSubController):

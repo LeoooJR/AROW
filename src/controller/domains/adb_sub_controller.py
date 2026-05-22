@@ -7,7 +7,6 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from controller.app_sub_controller import AppSubController
 from controller.core_work_callbacks import (
     AdbAsyncJobCallbacks,
     AuthentificateDeviceCallback,
@@ -15,6 +14,7 @@ from controller.core_work_callbacks import (
     RefreshDeviceListCallback,
     StartupCoreRuntimeCallback,
 )
+from controller.domains.app_sub_controller import AppSubController
 from controller.helper import validate_model, validate_view
 from core.signals import (
     AdbServerStartedPayload,
@@ -29,7 +29,7 @@ from gui.window import MainWindow
 from logger import logger
 
 if TYPE_CHECKING:
-    from controller.app_controller import AppController
+    from controller.orchestration.app_controller import AppController
 
 
 class AdbSubController(AppSubController):

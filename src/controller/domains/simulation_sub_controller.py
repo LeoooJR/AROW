@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
 from collection import Repository
-from controller.app_sub_controller import AppSubController
+from controller.domains.app_sub_controller import AppSubController
 from controller.helper import validate_model, validate_view
 from core.devices import Phone, PhoneDescriptor
 from core.location import Location
@@ -19,7 +19,7 @@ from gui.window import MainWindow
 from logger import logger
 
 if TYPE_CHECKING:
-    from controller.app_controller import AppController
+    from controller.orchestration.app_controller import AppController
 
 
 @dataclass(unsafe_hash=True, match_args=True, frozen=False)

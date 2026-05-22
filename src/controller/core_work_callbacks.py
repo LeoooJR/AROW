@@ -20,7 +20,7 @@ from core.work.startup_work import StartupOutcome
 from logger import logger
 
 if TYPE_CHECKING:
-    from controller.adb_sub_controller import AdbSubController
+    from controller.domains.adb_sub_controller import AdbSubController
 
 _async = importlib.import_module("controller.async")
 JobError = _async.JobError

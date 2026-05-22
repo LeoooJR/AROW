@@ -9,7 +9,7 @@ from core.models import CoreRuntimeModel
 from gui.window import MainWindow
 
 if TYPE_CHECKING:
-    from controller.app_controller import AppController
+    from controller.orchestration.app_controller import AppController
 
 
 class AppSubController(ABC):
