@@ -397,18 +397,21 @@ class DeviceSelectionBlock(QFrame, Block):
         view_signals.RefreshDeviceListRequested.emit()
 
     def _on_remove_device_requested(self, id: str) -> None:
-        """Remove the matching device row when a row-level delete action is requested."""
+        """Remove the matching device row when a row-level delete action is requested.
+        id: The id of the device to remove.
+        """
         logger.info("Remove device requested.", id=id)
+        current_item_before_removal = self.ui.available_device_list.currentItem()
         for item_index, item in enumerate(
             self.ui.available_device_list.iter_items(), start=0
         ):
-            if item.id == id:
+            if isinstance(item, self._device_item_type) and item.id == id:
                 removed_item: DeviceItem = self.ui.available_device_list.takeItem(
                     item_index
                 )
                 if removed_item is not None:
                     if (
-                        removed_item == self.current_item()
+                        removed_item == current_item_before_removal
                     ):  # The removed item was the current item
                         self._has_active_device = False
                         self.ui.available_device_list.setCurrentItem(
