@@ -6,17 +6,13 @@ from dataclasses import dataclass
 from typing import Final
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
-    QFrame,
-    QHBoxLayout,
     QMessageBox,
     QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
 
-from gui.animation import animate_widget_visibility
 from gui.colors import Theme
 from gui.components import (
     Button,
@@ -29,12 +25,13 @@ from gui.components import (
     WarningDialog,
 )
 from gui.icons import GenericIcons
+from gui.panel import CollapsiblePanel, CollapsiblePanelConfig
 from gui.settings import Settings
 from gui.signals import view_signals
 from gui.wrapper import VerticalLayoutWrapper
 
 
-class LocationPanel(QFrame):
+class LocationPanel(CollapsiblePanel):
     """
     Panel that displays the location settings.
     """
@@ -86,297 +83,176 @@ class LocationPanel(QFrame):
         Args:
             parent: Optional Qt parent widget for lifetime and hierarchy.
         """
-        super().__init__(parent)
-
-        self.ui: LocationPanel.UI
         self.texts = LocationPanel.Text()
-
-        self.setObjectName("location-panel")
-        self.setProperty("panel", True)
-
-        layout = QVBoxLayout()
-        layout.setContentsMargins(
-            Settings.PANEL.CONTENT_PADDING,
-            Settings.PANEL.CONTENT_PADDING,
-            Settings.PANEL.CONTENT_PADDING,
-            Settings.PANEL.CONTENT_PADDING,
-        )
-        layout.setSpacing(
-            Settings.PANEL.SECTION_SPACING
-        )  # Consistent spacing between major sections
-
-        title = LeadingIconLabel(
-            parent=self,
-            icon=GenericIcons.GEO,
-            text=self.texts.title,
-            font_size=Settings.FONT.SIZE_TITLE,
-            font_weight=QFont.Weight.DemiBold,
-            spacing=Settings.PANEL.TITLE_ICON_SPACING,
-            margins=(
-                Settings.PANEL.TITLE_PADDING_LEFT,
-                Settings.PANEL.TITLE_PADDING_TOP,
-                Settings.PANEL.TITLE_PADDING_RIGHT,
-                Settings.PANEL.TITLE_PADDING_BOTTOM,
+        self.ui: LocationPanel.UI
+        self._railway_label: DemiBoldText
+        self._railway_label_icon: LeadingIconLabel
+        self._railway_input: SelectionField
+        self._railway_helper_text: HelperText
+        self._railway_input_wrapper: VerticalLayoutWrapper
+        self._kilometric_label: DemiBoldText
+        self._kilometric_label_icon: LeadingIconLabel
+        self._kilometric_input: SelectionField
+        self._kilometric_helper_text: HelperText
+        self._kilometric_input_wrapper: VerticalLayoutWrapper
+        self._start_simulation_button: Button
+        super().__init__(
+            CollapsiblePanelConfig(
+                object_name="location-panel",
+                title=self.texts.title,
+                title_icon=GenericIcons.GEO,
+                expanded_icon=GenericIcons.LAYOUT_BOTTOMBAR_INSET,
+                collapsed_icon=GenericIcons.LAYOUT_BOTTOMBAR,
+                visibility_signal=view_signals.LocationPanelVisibilityRequested,
+                expand_button_tooltip=self.texts.expand_button_tooltip,
             ),
-            text_alignment=Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
-            label_properties={"section-title": True},
-            constrain_to_size_hint=True,
+            parent,
         )
-        expand_button = ToolButton(
-            self,
-            icon=GenericIcons.LAYOUT_BOTTOMBAR_INSET,
-            tooltip=self.texts.expand_button_tooltip,
+        self.ui = LocationPanel.UI(
+            title=self.panel_title,
+            expand_button=self.expand_button,
+            header=self.header,
+            body=self.body,
+            railway_label=self._railway_label,
+            railway_label_icon=self._railway_label_icon,
+            railway_input=self._railway_input,
+            railway_helper_text=self._railway_helper_text,
+            railway_input_wrapper=self._railway_input_wrapper,
+            kilometric_label=self._kilometric_label,
+            kilometric_label_icon=self._kilometric_label_icon,
+            kilometric_input=self._kilometric_input,
+            kilometric_helper_text=self._kilometric_helper_text,
+            kilometric_input_wrapper=self._kilometric_input_wrapper,
+            start_simulation_button=self._start_simulation_button,
         )
-        expand_button.setProperty("toggle", True)
-        header = QWidget(self)
-        header.setProperty("panel-title", True)
-        header.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(*Settings.SPACING.MARGIN_NONE)
-        header_layout.setSpacing(Settings.SPACING.NONE)
-        header_layout.addWidget(title, 1)
-        header_layout.addWidget(expand_button)
-        layout.addWidget(header)
 
+    def _build_body(self) -> QWidget:
+        """Build the location form body."""
         body = QWidget(self)
         body_layout = QVBoxLayout(body)
         body_layout.setContentsMargins(*Settings.SPACING.MARGIN_NONE)
         body_layout.setSpacing(Settings.PANEL.SECTION_SPACING)
 
-        # Railway section with divider
-        railway_label = DemiBoldText(None, self.texts.railway_label)
-        railway_label_icon = LeadingIconLabel(
+        self._railway_label = DemiBoldText(None, self.texts.railway_label)
+        self._railway_label_icon = LeadingIconLabel(
             None,
             icon=GenericIcons.RAILWAY,
-            text=railway_label,
+            text=self._railway_label,
             spacing=Settings.SPACING.ICON_SPACING,
             margins=Settings.SPACING.MARGIN_NONE,
         )
-
-        railway_input = SelectionField(None, self.texts.railway_input)
-
-        railway_helper_text = HelperText(self, self.texts.railway_helper_text)
-
-        railway_input_wrapper = VerticalLayoutWrapper(
+        self._railway_input = SelectionField(None, self.texts.railway_input)
+        self._railway_helper_text = HelperText(self, self.texts.railway_helper_text)
+        self._railway_input_wrapper = VerticalLayoutWrapper(
             self,
-            widgets=[railway_label_icon, railway_input, railway_helper_text],
+            widgets=[
+                self._railway_label_icon,
+                self._railway_input,
+                self._railway_helper_text,
+            ],
             spacing=Settings.SPACING.XS,
             margins=Settings.SPACING.MARGIN_NONE,
         )
-        railway_input_wrapper.setObjectName("railway-input-wrapper")
-        railway_input_wrapper.setProperty("section-divider-bottom", True)
+        self._railway_input_wrapper.setObjectName("railway-input-wrapper")
+        self._railway_input_wrapper.setProperty("section-divider-bottom", True)
+        body_layout.addWidget(self._railway_input_wrapper)
 
-        body_layout.addWidget(railway_input_wrapper)
-
-        # Kilometric section with divider
-        kilometric_label = DemiBoldText(None, self.texts.kilometric_label)
-        kilometric_label_icon = LeadingIconLabel(
+        self._kilometric_label = DemiBoldText(None, self.texts.kilometric_label)
+        self._kilometric_label_icon = LeadingIconLabel(
             None,
             icon=GenericIcons.MILESTONE,
-            text=kilometric_label,
+            text=self._kilometric_label,
             spacing=Settings.SPACING.ICON_SPACING,
             margins=Settings.SPACING.MARGIN_NONE,
         )
-
-        kilometric_input = SelectionField(self, self.texts.kilometric_input)
-
-        kilometric_helper_text = HelperText(self, self.texts.kilometric_helper_text)
-
-        kilometric_input_wrapper = VerticalLayoutWrapper(
+        self._kilometric_input = SelectionField(self, self.texts.kilometric_input)
+        self._kilometric_helper_text = HelperText(
+            self, self.texts.kilometric_helper_text
+        )
+        self._kilometric_input_wrapper = VerticalLayoutWrapper(
             self,
-            widgets=[kilometric_label_icon, kilometric_input, kilometric_helper_text],
+            widgets=[
+                self._kilometric_label_icon,
+                self._kilometric_input,
+                self._kilometric_helper_text,
+            ],
             spacing=Settings.SPACING.XS,
             margins=Settings.SPACING.MARGIN_NONE,
         )
-        kilometric_input_wrapper.setObjectName("kilometric-input-wrapper")
-        kilometric_input_wrapper.setProperty("section-divider-bottom", True)
+        self._kilometric_input_wrapper.setObjectName("kilometric-input-wrapper")
+        self._kilometric_input_wrapper.setProperty("section-divider-bottom", True)
+        body_layout.addWidget(self._kilometric_input_wrapper)
 
-        body_layout.addWidget(kilometric_input_wrapper)
-
-        start_simulation_button = Button(
+        self._start_simulation_button = Button(
             self,
             self.texts.start_simulation_button,
             icon=GenericIcons.START,
         )
-        body_layout.addWidget(start_simulation_button)
+        body_layout.addWidget(self._start_simulation_button)
+        return body
 
-        layout.addWidget(body, 1)
-        self.setLayout(layout)
-
-        self.ui: LocationPanel.UI = LocationPanel.UI(
-            title=title,
-            expand_button=expand_button,
-            header=header,
-            body=body,
-            railway_label=railway_label,
-            railway_label_icon=railway_label_icon,
-            railway_input=railway_input,
-            railway_helper_text=railway_helper_text,
-            railway_input_wrapper=railway_input_wrapper,
-            kilometric_label=kilometric_label,
-            kilometric_label_icon=kilometric_label_icon,
-            kilometric_input=kilometric_input,
-            kilometric_helper_text=kilometric_helper_text,
-            kilometric_input_wrapper=kilometric_input_wrapper,
-            start_simulation_button=start_simulation_button,
-        )
-
-        self._finalize_ui_hooks()
-
-    def _finalize_ui_hooks(self) -> None:
-        """Run the final UI setup hooks for the location panel."""
-        self._set_size_policy()
-        self._set_alignment()
-        self._connect_signals()
-
-    def _set_alignment(self) -> None:
+    def _set_body_alignment(self) -> None:
         """Centralize layout alignment for the panel and its UI widgets."""
-        self.ui.header.layout().setAlignment(
-            self.ui.expand_button,
-            Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight,
+        self._railway_input_wrapper.get_layout().setAlignment(
+            self._railway_label_icon, Qt.AlignmentFlag.AlignCenter
         )
-        self.ui.railway_input_wrapper.get_layout().setAlignment(
-            self.ui.railway_label_icon, Qt.AlignmentFlag.AlignCenter
+        self._railway_input_wrapper.get_layout().setAlignment(
+            self._railway_input, Qt.AlignmentFlag.AlignCenter
         )
-        self.ui.railway_input_wrapper.get_layout().setAlignment(
-            self.ui.railway_input, Qt.AlignmentFlag.AlignCenter
+        self._railway_input_wrapper.get_layout().setAlignment(
+            self._railway_helper_text, Qt.AlignmentFlag.AlignLeft
         )
-        self.ui.railway_input_wrapper.get_layout().setAlignment(
-            self.ui.railway_helper_text, Qt.AlignmentFlag.AlignLeft
+        self.body.layout().setAlignment(
+            self._railway_input_wrapper, Qt.AlignmentFlag.AlignCenter
         )
-        self.ui.body.layout().setAlignment(
-            self.ui.railway_input_wrapper, Qt.AlignmentFlag.AlignCenter
+        self._kilometric_input_wrapper.get_layout().setAlignment(
+            self._kilometric_label_icon, Qt.AlignmentFlag.AlignCenter
         )
-        self.ui.kilometric_input_wrapper.get_layout().setAlignment(
-            self.ui.kilometric_label_icon, Qt.AlignmentFlag.AlignCenter
+        self._kilometric_input_wrapper.get_layout().setAlignment(
+            self._kilometric_input, Qt.AlignmentFlag.AlignCenter
         )
-        self.ui.kilometric_input_wrapper.get_layout().setAlignment(
-            self.ui.kilometric_input, Qt.AlignmentFlag.AlignCenter
+        self._kilometric_input_wrapper.get_layout().setAlignment(
+            self._kilometric_helper_text, Qt.AlignmentFlag.AlignLeft
         )
-        self.ui.kilometric_input_wrapper.get_layout().setAlignment(
-            self.ui.kilometric_helper_text, Qt.AlignmentFlag.AlignLeft
+        self.body.layout().setAlignment(
+            self._kilometric_input_wrapper, Qt.AlignmentFlag.AlignCenter
         )
-        self.ui.body.layout().setAlignment(
-            self.ui.kilometric_input_wrapper, Qt.AlignmentFlag.AlignCenter
-        )
-        self.ui.body.layout().setAlignment(
-            self.ui.start_simulation_button, Qt.AlignmentFlag.AlignCenter
+        self.body.layout().setAlignment(
+            self._start_simulation_button, Qt.AlignmentFlag.AlignCenter
         )
 
-    def _set_size_policy(self) -> None:
+    def _set_body_size_policy(self) -> None:
         """Centralize size policies for the panel and its UI widgets (window resizing)."""
-        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
-        self.ui.header.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
-        )
-        self.ui.body.setSizePolicy(
+        self.body.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
-        self.ui.railway_label_icon.setSizePolicy(
+        self._railway_label_icon.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
         )
-        self.ui.railway_input.setSizePolicy(
+        self._railway_input.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
         )
-        self.ui.railway_helper_text.setSizePolicy(
+        self._railway_helper_text.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
         )
-        self.ui.kilometric_label_icon.setSizePolicy(
+        self._kilometric_label_icon.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
         )
-        self.ui.kilometric_input.setSizePolicy(
+        self._kilometric_input.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
         )
-        self.ui.kilometric_helper_text.setSizePolicy(
+        self._kilometric_helper_text.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
         )
 
-    def _connect_signals(self) -> None:
+    def _connect_body_signals(self) -> None:
         """Connect signals for the location panel and its UI widgets."""
-        # self.ui.upload_button.clicked.connect(self.open_file_dialog)
-        self.ui.start_simulation_button.clicked.connect(self._on_simulation_start)
-        self.ui.expand_button.clicked.connect(self.toggle_panel_visibility)
-        self.ui.expand_button.clicked.connect(
-            lambda: view_signals.LocationPanelVisibilityRequested.emit(
-                self.is_panel_visible()
-            )
-        )
+        self._start_simulation_button.clicked.connect(self._on_simulation_start)
 
-    def apply_theme_icons(self, theme: Theme) -> None:
-        self.ui.title.apply_theme_icons(theme)
-        inset = bool(self.ui.expand_button.property("toggle"))
-        expand_icon = (
-            GenericIcons.LAYOUT_BOTTOMBAR_INSET
-            if inset
-            else GenericIcons.LAYOUT_BOTTOMBAR
-        )
-        self.ui.expand_button.set_icon(expand_icon)
-        self.ui.expand_button.apply_theme_icons(theme)
-        self.ui.railway_label_icon.apply_theme_icons(theme)
-        self.ui.kilometric_label_icon.apply_theme_icons(theme)
-        self.ui.start_simulation_button.apply_theme_icons(theme)
-
-    def is_panel_visible(self) -> bool:
-        """Check if the location panel is visible."""
-        return bool(self.ui.expand_button.property("toggle"))
-
-    def _reduced_height(self) -> int:
-        height = self.ui.header.sizeHint().height()
-        if height <= 0:
-            height = Settings.DIMENSION.TOOLBUTTON_HEIGHT
-        return 2 * Settings.PANEL.CONTENT_PADDING + height
-
-    def show_panel(self) -> None:
-        """Show the location panel."""
-        if not self.is_panel_visible():
-            self.ui.expand_button.setProperty("toggle", True)
-            self.ui.expand_button.set_icon(GenericIcons.LAYOUT_BOTTOMBAR_INSET)
-            animate_widget_visibility(
-                self,
-                visible=True,
-                axis="vertical",
-                collapsed_size=self._reduced_height(),
-                content_widget=self.ui.body,
-            )
-
-    def hide_panel(self) -> None:
-        """Hide the location panel."""
-        if self.is_panel_visible():
-            self.ui.expand_button.setProperty("toggle", False)
-            self.ui.expand_button.set_icon(GenericIcons.LAYOUT_BOTTOMBAR)
-            animate_widget_visibility(
-                self,
-                visible=False,
-                axis="vertical",
-                collapsed_size=self._reduced_height(),
-                content_widget=self.ui.body,
-            )
-
-    def toggle_panel_visibility(self) -> None:
-        """Toggle the visibility of the location panel."""
-        if self.ui.expand_button.property("toggle"):
-            # Reduce: hide body and constrain height so the panel under can grow.
-            self.ui.expand_button.setProperty("toggle", False)
-            self.ui.expand_button.set_icon(GenericIcons.LAYOUT_BOTTOMBAR)
-            animate_widget_visibility(
-                self,
-                visible=False,
-                axis="vertical",
-                collapsed_size=self._reduced_height(),
-                content_widget=self.ui.body,
-            )
-        else:
-            # Expand: show body and allow it to grow.
-            self.ui.expand_button.setProperty("toggle", True)
-            self.ui.expand_button.set_icon(GenericIcons.LAYOUT_BOTTOMBAR_INSET)
-            animate_widget_visibility(
-                self,
-                visible=True,
-                axis="vertical",
-                collapsed_size=self._reduced_height(),
-                content_widget=self.ui.body,
-            )
-        self.updateGeometry()
+    def _apply_body_theme_icons(self, theme: Theme) -> None:
+        self._railway_label_icon.apply_theme_icons(theme)
+        self._kilometric_label_icon.apply_theme_icons(theme)
+        self._start_simulation_button.apply_theme_icons(theme)
 
     def open_file_dialog(self) -> None:
         """Open the file dialog."""
