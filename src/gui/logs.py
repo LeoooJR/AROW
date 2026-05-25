@@ -230,10 +230,10 @@ class LogPanel(QFrame):
         self.ui.activity_log_block.refresh_layout(deferred=deferred)
 
     def logs_list(self) -> List:
-        return self.ui.activity_log_block.logs_list()
+        return self.ui.activity_log_block.logs_list
 
     def file_display_widget(self) -> File:
-        return self.ui.activity_log_block.file_display_widget()
+        return self.ui.activity_log_block.file_display_widget
 
 
 __all__ = [

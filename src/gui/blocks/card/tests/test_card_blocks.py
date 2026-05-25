@@ -15,31 +15,30 @@ def test_identity_card_seeds_placeholder_values_on_init(qtbot) -> None:
     card = IdentityCardBlock()
     qtbot.addWidget(card)
 
-    assert card.ui.content.ui.host_name.text() == card.texts.placeholder_host_name
-    assert card.ui.content.ui.host_summary.text() == card.texts.placeholder_summary
+    assert card.content.host_name_label.text() == card.texts.placeholder_host_name
+    assert card.content.host_summary_label.text() == card.texts.placeholder_summary
     assert (
-        card.ui.content.ui.ip_address_row.ui.value.text()
+        card.content.ip_address_row.value_label.text()
         == card.texts.placeholder_ip_address
     )
     assert (
-        card.ui.content.ui.platform_row.ui.value.text()
-        == card.texts.placeholder_platform
+        card.content.platform_row.value_label.text() == card.texts.placeholder_platform
     )
-    assert card.ui.indicator.property("indicator-state") == "valid"
+    assert card.indicator.property("indicator-state") == "valid"
 
 
 def test_identity_card_setters_update_values_and_preserve_omitted_fields(qtbot) -> None:
     card = IdentityCardBlock()
     qtbot.addWidget(card)
-    original_summary = card.ui.content.ui.host_summary.text()
+    original_summary = card.content.host_summary_label.text()
 
     card.set_host_values(host_name="Build Host", ip_address="10.0.0.5")
     card.set_host_values(platform="linux")
 
-    assert card.ui.content.ui.host_name.text() == "Build Host"
-    assert card.ui.content.ui.host_summary.text() == original_summary
-    assert card.ui.content.ui.ip_address_row.ui.value.text() == "10.0.0.5"
-    assert card.ui.content.ui.platform_row.ui.value.text() == "linux"
+    assert card.content.host_name_label.text() == "Build Host"
+    assert card.content.host_summary_label.text() == original_summary
+    assert card.content.ip_address_row.value_label.text() == "10.0.0.5"
+    assert card.content.platform_row.value_label.text() == "linux"
 
 
 def test_identity_card_debug_signal_restores_placeholder_values(qtbot) -> None:
@@ -57,9 +56,9 @@ def test_identity_card_debug_signal_restores_placeholder_values(qtbot) -> None:
     view_signals.UiConstraintsDisabled.emit()
     qtbot.wait(0)
 
-    assert card.ui.content.ui.host_name.text() == card.texts.placeholder_host_name
-    assert card.ui.content.ui.host_summary.text() == card.texts.placeholder_summary
-    assert card.ui.indicator.property("indicator-state") == "valid"
+    assert card.content.host_name_label.text() == card.texts.placeholder_host_name
+    assert card.content.host_summary_label.text() == card.texts.placeholder_summary
+    assert card.indicator.property("indicator-state") == "valid"
 
 
 def test_identity_card_can_display_error_state(qtbot) -> None:
@@ -68,7 +67,7 @@ def test_identity_card_can_display_error_state(qtbot) -> None:
 
     card.set_host_values(identity_state="error")
 
-    assert card.ui.indicator.property("indicator-state") == "error"
+    assert card.indicator.property("indicator-state") == "error"
 
 
 def test_bridge_status_card_seeds_placeholder_values_on_init(qtbot) -> None:
@@ -76,22 +75,20 @@ def test_bridge_status_card_seeds_placeholder_values_on_init(qtbot) -> None:
     qtbot.addWidget(card)
 
     assert (
-        card.ui.content.ui.status_row.ui.value.text()
+        card.content.status_row.value_label.text()
         == card.texts.placeholder_server_state_text.capitalize()
     )
     assert (
-        card.ui.content.ui.version_row.ui.value.text()
+        card.content.version_row.value_label.text()
         == card.texts.placeholder_adb_version
     )
+    assert card.content.daemon_row.value_label.text() == card.texts.placeholder_daemon
     assert (
-        card.ui.content.ui.daemon_row.ui.value.text() == card.texts.placeholder_daemon
-    )
-    assert (
-        card.ui.content.ui.devices_row.ui.value.text()
+        card.content.devices_row.value_label.text()
         == card.texts.placeholder_connected_devices
     )
-    assert card.ui.content.ui.helper_note.text() == card.texts.placeholder_helper_note
-    assert card.ui.indicator.property("indicator-state") == "valid"
+    assert card.content.helper_note.text() == card.texts.placeholder_helper_note
+    assert card.indicator.property("indicator-state") == "valid"
 
 
 def test_bridge_status_card_setters_update_values_and_preserve_omitted_fields(
@@ -99,18 +96,16 @@ def test_bridge_status_card_setters_update_values_and_preserve_omitted_fields(
 ) -> None:
     card = BridgeStatusCardBlock()
     qtbot.addWidget(card)
-    original_helper = card.ui.content.ui.helper_note.text()
+    original_helper = card.content.helper_note.text()
 
     card.set_adb_values(server_state="stopped", adb_version="1.0.41")
     card.set_adb_values(daemon="tcp:5037")
 
-    assert card.ui.content.ui.status_row.ui.value.text() == "Stopped"
-    assert (
-        card.ui.content.ui.status_row.ui.value.property("adb-server-state") == "stopped"
-    )
-    assert card.ui.content.ui.version_row.ui.value.text() == "1.0.41"
-    assert card.ui.content.ui.daemon_row.ui.value.text() == "tcp:5037"
-    assert card.ui.content.ui.helper_note.text() == original_helper
+    assert card.content.status_row.value_label.text() == "Stopped"
+    assert card.content.status_row.value_label.property("adb-server-state") == "stopped"
+    assert card.content.version_row.value_label.text() == "1.0.41"
+    assert card.content.daemon_row.value_label.text() == "tcp:5037"
+    assert card.content.helper_note.text() == original_helper
 
 
 def test_bridge_status_card_debug_signal_restores_placeholder_values(qtbot) -> None:
@@ -129,11 +124,11 @@ def test_bridge_status_card_debug_signal_restores_placeholder_values(qtbot) -> N
     qtbot.wait(0)
 
     assert (
-        card.ui.content.ui.version_row.ui.value.text()
+        card.content.version_row.value_label.text()
         == card.texts.placeholder_adb_version
     )
-    assert card.ui.content.ui.helper_note.text() == card.texts.placeholder_helper_note
-    assert card.ui.indicator.property("indicator-state") == "valid"
+    assert card.content.helper_note.text() == card.texts.placeholder_helper_note
+    assert card.indicator.property("indicator-state") == "valid"
 
 
 def test_bridge_status_card_can_display_error_state(qtbot) -> None:
@@ -142,11 +137,9 @@ def test_bridge_status_card_can_display_error_state(qtbot) -> None:
 
     card.set_adb_values(server_state="error", indicator_state="error")
 
-    assert card.ui.content.ui.status_row.ui.value.text() == "Error"
-    assert (
-        card.ui.content.ui.status_row.ui.value.property("adb-server-state") == "error"
-    )
-    assert card.ui.indicator.property("indicator-state") == "error"
+    assert card.content.status_row.value_label.text() == "Error"
+    assert card.content.status_row.value_label.property("adb-server-state") == "error"
+    assert card.indicator.property("indicator-state") == "error"
 
 
 def test_bridge_status_card_adb_server_started(qtbot) -> None:
@@ -156,11 +149,9 @@ def test_bridge_status_card_adb_server_started(qtbot) -> None:
     view_signals.ADBServerStarted.emit()
     qtbot.wait(0)
 
-    assert card.ui.content.ui.status_row.ui.value.text() == "Running"
-    assert (
-        card.ui.content.ui.status_row.ui.value.property("adb-server-state") == "running"
-    )
-    assert card.ui.indicator.property("indicator-state") == "valid"
+    assert card.content.status_row.value_label.text() == "Running"
+    assert card.content.status_row.value_label.property("adb-server-state") == "running"
+    assert card.indicator.property("indicator-state") == "valid"
 
 
 def test_bridge_status_card_adb_server_stopped(qtbot) -> None:
@@ -170,11 +161,9 @@ def test_bridge_status_card_adb_server_stopped(qtbot) -> None:
     view_signals.ADBServerStopped.emit()
     qtbot.wait(0)
 
-    assert card.ui.content.ui.status_row.ui.value.text() == "Stopped"
-    assert (
-        card.ui.content.ui.status_row.ui.value.property("adb-server-state") == "stopped"
-    )
-    assert card.ui.indicator.property("indicator-state") == "error"
+    assert card.content.status_row.value_label.text() == "Stopped"
+    assert card.content.status_row.value_label.property("adb-server-state") == "stopped"
+    assert card.indicator.property("indicator-state") == "error"
 
 
 def test_identity_card_host_device_information_updated(qtbot) -> None:
@@ -184,7 +173,7 @@ def test_identity_card_host_device_information_updated(qtbot) -> None:
     view_signals.HostDeviceInformationUpdated.emit("Build Host", "linux", "192.168.1.1")
     qtbot.wait(0)
 
-    assert card.ui.content.ui.host_name.text() == "Build Host"
-    assert card.ui.content.ui.ip_address_row.ui.value.text() == "192.168.1.1"
-    assert card.ui.content.ui.platform_row.ui.value.text() == "linux"
-    assert card.ui.indicator.property("indicator-state") == "valid"
+    assert card.content.host_name_label.text() == "Build Host"
+    assert card.content.ip_address_row.value_label.text() == "192.168.1.1"
+    assert card.content.platform_row.value_label.text() == "linux"
+    assert card.indicator.property("indicator-state") == "valid"

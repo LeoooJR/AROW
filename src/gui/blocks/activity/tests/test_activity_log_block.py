@@ -46,7 +46,7 @@ def test_activity_item_exposes_entry_and_detail(qtbot) -> None:
             level="success",
         )
     )
-    qtbot.addWidget(item.ui.row)
+    qtbot.addWidget(item.row_widget)
     qtbot.wait(0)
 
     assert item.entry.message == "Simulation started"
@@ -57,14 +57,14 @@ def test_activity_item_exposes_entry_and_detail(qtbot) -> None:
 
 def test_activity_item_selection_and_hover_properties(qtbot) -> None:
     item = ActivityLogItem(_entry())
-    qtbot.addWidget(item.ui.row)
+    qtbot.addWidget(item.row_widget)
     qtbot.wait(0)
 
     item.set_selected(True)
     item.set_hovered(True)
 
-    assert item.ui.row.property("selected") is True
-    assert item.ui.row.property("hovered") is True
+    assert item.row_widget.property("selected") is True
+    assert item.row_widget.property("hovered") is True
 
 
 def test_activity_log_block_theme_refresh_updates_activity_row_icons(
@@ -110,7 +110,7 @@ def test_activity_log_block_public_api_updates_count_and_groups(qtbot) -> None:
     qtbot.wait(0)
 
     assert block.ui.event_count_label.text() == "2 events"
-    assert block.logs_list().count() == 4  # two date headers + two rows
+    assert block.logs_list.count() == 4  # two date headers + two rows
 
     assert block.remove_activity(first_id) is True
     assert block.ui.event_count_label.text() == "1 event"
@@ -129,7 +129,7 @@ def test_activity_log_block_filter_hides_non_matching_entries(qtbot) -> None:
     assert block.ui.event_count_label.text() == "1 event"
     visible_entries = [
         item.entry
-        for item in block.logs_list().iter_items()
+        for item in block.logs_list.iter_items()
         if isinstance(item, ActivityLogItem)
     ]
     assert [entry.category for entry in visible_entries] == ["device"]
@@ -159,13 +159,13 @@ def test_activity_log_block_keeps_file_display_under_activity_list(qtbot) -> Non
     block = ActivityLogBlock()
     qtbot.addWidget(block)
 
-    assert block.ui.logs_wrapper.get_layout().indexOf(block.logs_list()) >= 0
-    assert block.ui.logs_wrapper.get_layout().indexOf(block.file_display_widget()) > (
-        block.ui.logs_wrapper.get_layout().indexOf(block.logs_list())
+    assert block.ui.logs_wrapper.get_layout().indexOf(block.logs_list) >= 0
+    assert block.ui.logs_wrapper.get_layout().indexOf(block.file_display_widget) > (
+        block.ui.logs_wrapper.get_layout().indexOf(block.logs_list)
     )
-    assert block.ui.logs_wrapper.get_layout().indexOf(
-        block.ui.logs_list_helper_text
-    ) > (block.ui.logs_wrapper.get_layout().indexOf(block.file_display_widget()))
+    assert block.ui.logs_wrapper.get_layout().indexOf(block.logs_list_helper_text) > (
+        block.ui.logs_wrapper.get_layout().indexOf(block.file_display_widget)
+    )
 
 
 def test_activity_item_size_hint_stays_within_narrow_block(qtbot) -> None:
@@ -184,10 +184,12 @@ def test_activity_item_size_hint_stays_within_narrow_block(qtbot) -> None:
     qtbot.wait(0)
 
     row = next(
-        item for item in block.logs_list().iter_items() if isinstance(item, ActivityLogItem)
+        item
+        for item in block.logs_list.iter_items()
+        if isinstance(item, ActivityLogItem)
     )
     row._sync_size_hint()
-    viewport_width = block.logs_list().viewport().width()
+    viewport_width = block.logs_list.viewport().width()
 
     assert viewport_width > 0
     assert row.sizeHint().width() <= viewport_width

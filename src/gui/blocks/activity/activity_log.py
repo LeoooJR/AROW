@@ -395,6 +395,11 @@ class ActivityLogItem(QListWidgetItem):
         item._sync_size_hint()
         return item
 
+    @property
+    def row_widget(self) -> QWidget:
+        """Return the custom row widget embedded in the activity list."""
+        return self.ui.row
+
     @staticmethod
     def _meta_text(entry: ActivityLogEntry) -> str:
         """Build the compact metadata line shown below the activity message."""
@@ -1069,10 +1074,22 @@ class ActivityLogBlock(QFrame, Block):
             metadata={"file": file_name},
         )
 
+    @property
     def logs_list(self) -> List:
         """Return the activity list widget for panel facade methods and tests."""
         return self.ui.logs_list
 
+    @property
     def file_display_widget(self) -> File:
         """Return the simulation log file display widget."""
         return self.ui.file_display_widget
+
+    @property
+    def logs_list_helper_text(self) -> HelperText:
+        """Return the helper text displayed below the activity list."""
+        return self.ui.logs_list_helper_text
+
+    @property
+    def filter_button(self) -> ToolButton:
+        """Return the activity filter button."""
+        return self.ui.filter_button

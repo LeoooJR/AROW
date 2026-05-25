@@ -107,6 +107,16 @@ class WalkthroughBlock(VerticalLayoutWrapper, Block):
         """Connect block signals; walkthrough actions are currently static."""
         pass
 
+    @property
+    def walkthrough_wifi_button(self) -> WalkthroughButton:
+        """Return the Wi-Fi walkthrough button."""
+        return self.ui.walkthrough_wifi_button
+
+    @property
+    def walkthrough_usb_button(self) -> WalkthroughButton:
+        """Return the USB walkthrough button."""
+        return self.ui.walkthrough_usb_button
+
     def apply_theme_icons(self, theme: Theme) -> None:
         """Refresh leading and trailing icons on walkthrough buttons."""
         self.ui.walkthrough_wifi_button.apply_theme_icons(theme)

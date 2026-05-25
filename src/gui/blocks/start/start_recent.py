@@ -116,6 +116,11 @@ class StartRecentBlock(VerticalLayoutWrapper, Block):
         """Connect block signals; this static welcome card currently has none."""
         pass
 
+    @property
+    def recent_files_wrapper(self) -> VerticalLayoutWrapper:
+        """Return the recent-files wrapper."""
+        return self.ui.recent_files_wrapper
+
     def apply_theme_icons(self, theme: Theme) -> None:
         """Refresh icons for recent-file display rows."""
         lay = self.ui.recent_files_wrapper.get_layout()

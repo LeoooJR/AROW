@@ -104,6 +104,11 @@ class HostIdentityMetadataRow(QWidget):
         """Update the row value label."""
         self.ui.value.setText(text)
 
+    @property
+    def value_label(self) -> QLabel:
+        """Return the row value label."""
+        return self.ui.value
+
 
 class IdentityCardContent(QFrame, Block):
     """Inner host identity content used by the grouped card block."""
@@ -213,6 +218,26 @@ class IdentityCardContent(QFrame, Block):
     def apply_theme_icons(self, theme: Theme) -> None:
         """Refresh the operating-system icon used by the host title row."""
         self.ui.host_item.apply_theme_icons(theme)
+
+    @property
+    def host_name_label(self) -> QLabel:
+        """Return the host name label."""
+        return self.ui.host_name
+
+    @property
+    def host_summary_label(self) -> QLabel:
+        """Return the host summary label."""
+        return self.ui.host_summary
+
+    @property
+    def ip_address_row(self) -> HostIdentityMetadataRow:
+        """Return the local IP metadata row."""
+        return self.ui.ip_address_row
+
+    @property
+    def platform_row(self) -> HostIdentityMetadataRow:
+        """Return the platform metadata row."""
+        return self.ui.platform_row
 
     def set_host_values(
         self,
@@ -383,6 +408,16 @@ class IdentityCardBlock(QFrame, Block):
     def apply_theme_icons(self, theme: Theme) -> None:
         """Refresh theme-dependent icons inside the identity card."""
         self.ui.content.apply_theme_icons(theme)
+
+    @property
+    def content(self) -> IdentityCardContent:
+        """Return the identity card content widget."""
+        return self.ui.content
+
+    @property
+    def indicator(self) -> ConditionIndicator:
+        """Return the identity card state indicator."""
+        return self.ui.indicator
 
 
 HostIdentityMetadataRowBlock = HostIdentityMetadataRow

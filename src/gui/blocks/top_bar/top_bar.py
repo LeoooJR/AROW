@@ -26,10 +26,16 @@ from shiboken6 import isValid
 from gui.blocks.base import Block
 from gui.colors import Theme
 from gui.components import SVG, ToolButton
-from gui.icons import ApplicationIcons, GenericIcons, icon_qt_path, icon_qt_path_for_theme
+from gui.icons import (
+    ApplicationIcons,
+    GenericIcons,
+    icon_qt_path,
+    icon_qt_path_for_theme,
+)
 from gui.settings import Settings
 from gui.signals import view_signals
 from gui.wrapper import GridLayoutWrapper, HorizontalLayoutWrapper
+
 
 class TopBar(QWidget, Block):
     """
@@ -236,6 +242,26 @@ class TopBar(QWidget, Block):
         self.ui.palette_button_wrapper.setSizePolicy(
             QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred
         )
+
+    @property
+    def left_panel_visibility_request_button(self) -> ToolButton:
+        """Return the left panels visibility request button."""
+        return self.ui.left_panel_visibility_request_button
+
+    @property
+    def right_panel_visibility_request_button(self) -> ToolButton:
+        """Return the right panels visibility request button."""
+        return self.ui.right_panel_visibility_request_button
+
+    @property
+    def light_palette_button(self) -> ToolButton:
+        """Return the light palette button."""
+        return self.ui.light_palette_button
+
+    @property
+    def dark_palette_button(self) -> ToolButton:
+        """Return the dark palette button."""
+        return self.ui.dark_palette_button
 
     def toggle_left_panels_visibility_request_button(self) -> None:
         """Update left panels button icon and properties to the toggled state (call after body left panels visibility has been set).

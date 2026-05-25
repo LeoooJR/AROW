@@ -319,6 +319,11 @@ class Location(QWidget):
             self._coordinate_lead_svg.set_path(icon_qt_path_for_theme(theme, lead))
         self.ui.crosshair_button.apply_theme_icons(theme)
 
+    @property
+    def crosshair_button(self) -> ToolButton:
+        """Return the coordinate row recenter button."""
+        return self.ui.crosshair_button
+
     def _finalize_ui_hooks(self) -> None:
         """Run the final UI setup hooks for the location widget."""
         self._set_alignment()
@@ -500,6 +505,21 @@ class Coordinates(QFrame):
         self.ui.simulated_location_widget.apply_row_icons(
             theme, GenericIcons.FAKE_LOCATION
         )
+
+    @property
+    def play_button(self) -> ToolButton:
+        """Return the simulation play/pause button."""
+        return self.ui.play_button
+
+    @property
+    def location_widget(self) -> Location:
+        """Return the real-location coordinate widget."""
+        return self.ui.location_widget
+
+    @property
+    def simulated_location_widget(self) -> Location:
+        """Return the simulated-location coordinate widget."""
+        return self.ui.simulated_location_widget
 
     def _finalize_ui_hooks(self) -> None:
         """Run the final UI setup hooks for the coordinates section."""
@@ -696,6 +716,26 @@ class MapBlock(QWidget):
     def is_canvas_visible(self) -> bool:
         """Return whether the concrete map canvas is currently visible."""
         return self.ui.canvas.isVisible()
+
+    @property
+    def legend(self) -> Legend:
+        """Return the map legend widget."""
+        return self.ui.legend
+
+    @property
+    def canvas(self) -> Canvas:
+        """Return the map canvas widget."""
+        return self.ui.canvas
+
+    @property
+    def coordinates(self) -> Coordinates:
+        """Return the map coordinates widget."""
+        return self.ui.coordinates
+
+    @property
+    def placeholder(self) -> PlaceHolder:
+        """Return the map placeholder widget."""
+        return self.ui.placeholder
 
     def update_placeholder(self, text: str, icon_member: GenericIcons) -> None:
         """Update the placeholder text and symbology for the given logical icon."""

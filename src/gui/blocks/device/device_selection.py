@@ -540,10 +540,7 @@ class DeviceSelectionBlock(QFrame, Block):
             if isinstance(item, self._device_item_type):
                 item.shorten()
 
-    def current_item(self):
-        """Return the current QListWidget item from the available-device list."""
-        return self.ui.available_device_list.currentItem()
-
-    def device_list(self) -> List:
-        """Return the internal list widget for tests and panel facade methods."""
+    @property
+    def available_device_list(self) -> List:
+        """Return the available-device list widget."""
         return self.ui.available_device_list
