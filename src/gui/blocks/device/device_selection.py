@@ -243,6 +243,7 @@ class DeviceSelectionBlock(QFrame, Block):
         self.ui.available_device_list.itemSelectionChanged.connect(
             self._sync_available_device_selection_state
         )
+        view_signals.RemoveDeviceRequested.connect(self._on_remove_device_requested)
 
         #### Signals for handling the device selection panel visibility requests ####
         view_signals.ExtendDeviceSelectionPanelRequested.connect(self.extend)
@@ -257,7 +258,6 @@ class DeviceSelectionBlock(QFrame, Block):
         )
         view_signals.DeviceSelectionFailed.connect(self._on_device_selection_failed)
         view_signals.DevicesUpdated.connect(self._on_devices_updated)
-        view_signals.RemoveDeviceRequested.connect(self._on_remove_device_requested)
 
         #### Signals for handling the UI constraints disabled ####
         view_signals.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
@@ -454,6 +454,8 @@ class DeviceSelectionBlock(QFrame, Block):
         if not self._is_block_visible_to_user():
             return False
         if not self.ui.available_device_list.isVisible():
+            return False
+        if self.ui.available_device_list.currentItem() is not None:
             return False
         if self._has_active_device:
             return False
