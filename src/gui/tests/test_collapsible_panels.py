@@ -7,10 +7,10 @@ import pytest
 from gui.blocks.activity import ActivityLogBlock
 from gui.blocks.card import BridgeStatusCardBlock, IdentityCardBlock
 from gui.blocks.device import DeviceSelectionBlock
-from gui.device import DeviceSelectionPanel
-from gui.host import HostPanel
-from gui.location import LocationPanel
-from gui.logs import LogPanel
+from gui.device_panel import DeviceSelectionPanel
+from gui.host_panel import HostPanel
+from gui.location_panel import LocationPanel
+from gui.log_panel import LogPanel
 from gui.signals import view_signals
 
 pytestmark = pytest.mark.usefixtures("qapp")

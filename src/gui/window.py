@@ -36,9 +36,9 @@ from gui.components import (
     QuestionDialog,
     Toast,
 )
-from gui.device import DevicePairingPanel, DeviceSelectionPanel
+from gui.device_panel import DevicePairingPanel, DeviceSelectionPanel
 from gui.event_filter import ActivityTracker
-from gui.host import HostPanel
+from gui.host_panel import HostPanel
 from gui.icons import (
     ApplicationIcons,
     GenericIcons,
@@ -46,8 +46,8 @@ from gui.icons import (
     icon_qt_path_for_theme,
     icons_need_theme_updates,
 )
-from gui.location import LocationPanel
-from gui.logs import LogPanel
+from gui.location_panel import LocationPanel
+from gui.log_panel import LogPanel
 from gui.map import MapPanel
 from gui.settings import Settings
 from gui.signals import view_signals
