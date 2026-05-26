@@ -73,11 +73,13 @@ class Toast(QWidget, Component):
         self.setObjectName("toast")
         theme = get_current_theme()
         palette = get_palette(theme)
-        self.setStyleSheet(f"""
+        self.setStyleSheet(
+            f"""
             QWidget#toast {{
                 background-color: {palette.TRANSPARENT};
             }}
-        """)
+        """
+        )
 
         # Create label with proper styling
         label = QLabel(message, self)
@@ -97,7 +99,8 @@ class Toast(QWidget, Component):
         color, icon = level_styles.get(level, level_styles["info"])
         icon_path = icon_qt_path(icon)
 
-        inner_widget.setStyleSheet(f"""
+        inner_widget.setStyleSheet(
+            f"""
             QWidget#toast-inner {{
                 background-color: {palette.SURFACE_ELEVATED};
                 border: 1px solid {palette.BORDER_SUBTLE};
@@ -113,7 +116,8 @@ class Toast(QWidget, Component):
                 padding: 0px;
                 margin: 0px;
             }}
-        """)
+        """
+        )
 
         inner_layout = QHBoxLayout(inner_widget)
         inner_layout.setContentsMargins(*Settings.SPACING.MARGIN_TOAST)

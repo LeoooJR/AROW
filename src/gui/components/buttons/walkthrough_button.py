@@ -66,6 +66,16 @@ class WalkthroughButton(QPushButton, Component):
         """
         super().__init__(parent)
 
+        valid_icon_types = GenericIcons | OperatingSystemIcons | ApplicationIcons
+        if not isinstance(leading_icon, valid_icon_types):
+            raise ValueError(
+                "leading_icon must be a GenericIcons | OperatingSystemIcons | ApplicationIcons"
+            )
+        if not isinstance(trailing_icon, valid_icon_types):
+            raise ValueError(
+                "trailing_icon must be a GenericIcons | OperatingSystemIcons | ApplicationIcons"
+            )
+
         self.texts = WalkthroughButton.Text(label=text)
 
         self.setObjectName("welcome-walkthrough-button")

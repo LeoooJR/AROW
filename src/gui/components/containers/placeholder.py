@@ -61,6 +61,7 @@ class PlaceHolder(QFrame, Component):
         super().__init__(parent)
         self.texts = PlaceHolder.Text(text=text if isinstance(text, str) else None)
         self.ui: PlaceHolder.UI
+        self._icon: GenericIcons | OperatingSystemIcons | ApplicationIcons | None = icon
 
         self.setProperty("place-holder", True)
 
@@ -82,14 +83,14 @@ class PlaceHolder(QFrame, Component):
 
         layout.addStretch()
 
+        svg = SVG("", self)
+        svg.hide()
         if icon is not None:
-            self._icon: (
-                GenericIcons | OperatingSystemIcons | ApplicationIcons | None
-            ) = icon
             icon_size = Settings.PLACEHOLDER.ICON_SIZE
-            svg = SVG(icon_qt_path(icon), self)
+            svg.set_path(icon_qt_path(icon))
             svg.setFixedSize(icon_size, icon_size)
             svg.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            svg.show()
             layout.addWidget(svg)
 
         if isinstance(text, str):

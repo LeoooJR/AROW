@@ -115,6 +115,11 @@ class AdbBridgeMetadataRow(QWidget):
         self.ui.value.style().polish(self.ui.value)
         self.ui.value.update()
 
+    @property
+    def value_label(self) -> QLabel:
+        """Return the row value label."""
+        return self.ui.value
+
 
 class BridgeStatusContent(QFrame, Block):
     """Inner ADB bridge status content used by the grouped card block."""
@@ -244,6 +249,31 @@ class BridgeStatusContent(QFrame, Block):
         self.ui.android_svg.set_path(
             icon_qt_path_for_theme(theme, OperatingSystemIcons.ANDROID)
         )
+
+    @property
+    def status_row(self) -> AdbBridgeMetadataRow:
+        """Return the ADB server-state metadata row."""
+        return self.ui.status_row
+
+    @property
+    def version_row(self) -> AdbBridgeMetadataRow:
+        """Return the ADB version metadata row."""
+        return self.ui.version_row
+
+    @property
+    def daemon_row(self) -> AdbBridgeMetadataRow:
+        """Return the daemon metadata row."""
+        return self.ui.daemon_row
+
+    @property
+    def devices_row(self) -> AdbBridgeMetadataRow:
+        """Return the connected-devices metadata row."""
+        return self.ui.devices_row
+
+    @property
+    def helper_note(self) -> QLabel:
+        """Return the ADB bridge helper note label."""
+        return self.ui.helper_note
 
     def set_server_state(
         self, state: ADB_SERVER_STATE, text: str | None = None
@@ -416,6 +446,16 @@ class BridgeStatusCardBlock(QFrame, Block):
     def apply_theme_icons(self, theme: Theme) -> None:
         """Refresh theme-dependent icons inside the ADB bridge card."""
         self.ui.content.apply_theme_icons(theme)
+
+    @property
+    def content(self) -> BridgeStatusContent:
+        """Return the ADB bridge card content widget."""
+        return self.ui.content
+
+    @property
+    def indicator(self) -> ConditionIndicator:
+        """Return the ADB bridge state indicator."""
+        return self.ui.indicator
 
 
 AdbBridgeMetadataRowBlock = AdbBridgeMetadataRow

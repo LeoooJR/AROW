@@ -18,7 +18,7 @@ def test_map_block_updates_placeholder_text_and_icon(qtbot) -> None:
 
     block.update_placeholder("Map is being loaded...", GenericIcons.MAP_PLACEHOLDER)
 
-    assert block.ui.placeholder.ui.text.text() == "Map is being loaded..."
+    assert block.placeholder.ui.text.text() == "Map is being loaded..."
     assert block._placeholder_icon == GenericIcons.MAP_PLACEHOLDER
 
 
@@ -40,7 +40,7 @@ def test_map_block_placeholder_helper_animation_noops_without_svg(
     block = MapBlock()
     qtbot.addWidget(block)
     block.show()
-    monkeypatch.setattr(block.ui.placeholder, "findChild", lambda *args: None)
+    monkeypatch.setattr(block.placeholder, "findChild", lambda *args: None)
 
     view_signals.MapTabActivated.emit()
 
@@ -57,7 +57,7 @@ def test_map_block_connection_succeeded_updates_placeholder_and_animates(
     view_signals.DeviceSelectionSucceeded.emit({"id": "d1", "name": "Phone"})
     qtbot.wait(0)
 
-    assert block.ui.placeholder.ui.text.text() == block.texts.loading_placeholder
+    assert block.placeholder.ui.text.text() == block.texts.loading_placeholder
     assert block._placeholder_icon == GenericIcons.MAP_PLACEHOLDER
     assert block._placeholder_helper_anim is not None
     assert block._placeholder_helper_anim.state() == QAbstractAnimation.State.Running
@@ -93,8 +93,8 @@ def test_map_block_placeholder_helper_animation_noops_when_canvas_visible(
     block = MapBlock()
     qtbot.addWidget(block)
     block.show()
-    block.ui.canvas.setVisible(True)
-    block.ui.placeholder.setVisible(False)
+    block.canvas.setVisible(True)
+    block.placeholder.setVisible(False)
 
     view_signals.MapTabActivated.emit()
     qtbot.wait(0)

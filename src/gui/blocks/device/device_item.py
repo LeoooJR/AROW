@@ -753,6 +753,16 @@ class DeviceItem(QListWidgetItem):
         QTimer.singleShot(0, item._sync_size_hint)
         return item
 
+    @property
+    def row_widget(self) -> QWidget:
+        """Return the custom row widget embedded in the device list."""
+        return self.ui.row
+
+    @property
+    def trash_button(self) -> ToolButton:
+        """Return the row remove-device button."""
+        return self.ui.trash_button
+
     def set_hovered(self, hovered: bool) -> None:
         """Apply hover state to the custom list row widget."""
         self.ui.row.setProperty("hovered", hovered)

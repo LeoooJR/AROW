@@ -96,9 +96,12 @@ class AuthentificationCard(QFrame, Component):
             tooltip=self.texts.close_button_tooltip,
         )
 
+        icon = SVG("", self)
+        icon.hide()
         if icon_path:
-            icon = SVG(icon_path, self)
+            icon.set_path(icon_path)
             icon.setFixedSize(get_svg_size(Settings.FONT.SIZE_TITLE))
+            icon.show()
 
         icon_center_row = HorizontalLayoutWrapper(
             self,
@@ -113,13 +116,17 @@ class AuthentificationCard(QFrame, Component):
         icon_wrapper.get_layout().setStretch(0, 1)
         layout.addWidget(icon_wrapper, 1)
 
+        title_label = DemiBoldText(self, title or "")
         if title:
-            title_label = DemiBoldText(self, title)
             layout.addWidget(title_label)
+        else:
+            title_label.hide()
 
+        description_label = HelperText(self, description or "")
         if description:
-            description_label = HelperText(self, description)
             layout.addWidget(description_label)
+        else:
+            description_label.hide()
 
         helper_ip_otp_input = HelperText(self, self.texts.helper_ip_otp_input)
         ip_otp_input = OTPInput(

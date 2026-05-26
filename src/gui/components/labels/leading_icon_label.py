@@ -146,12 +146,8 @@ class LeadingIconLabel(QWidget, Component):
         self.layout().setAlignment(
             self.ui.svg, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignHCenter
         )
-        self.ui.text.setAlignment(
-            self._text_alignment
-        )
-        self.layout().setAlignment(
-            self.ui.text, self._text_alignment
-        )
+        self.ui.text.setAlignment(self._text_alignment)
+        self.layout().setAlignment(self.ui.text, self._text_alignment)
 
     def _connect_signals(self) -> None:
         """Connect signals for elements composing the leading icon label."""
