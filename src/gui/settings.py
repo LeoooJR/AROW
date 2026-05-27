@@ -209,6 +209,7 @@ class WelcomeSettings:
     """Welcome tab (IDE-style) layout: hero, max-width content row, section cards."""
 
     CONTENT_MAX_WIDTH: int = 880
+    EXPANDED_CONTENT_MAX_WIDTH: int = 1420
     CARD_PADDING_LEFT: int = 20
     CARD_PADDING_TOP: int = 18
     CARD_PADDING_RIGHT: int = 20

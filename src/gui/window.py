@@ -158,6 +158,8 @@ class Body(QWidget):
 
         self.ui: Body.UI
         self.texts = Body.Text()
+        self._left_panels_visible = True
+        self._right_panels_visible = True
 
         self.setObjectName("body")
 
@@ -355,16 +357,22 @@ class Body(QWidget):
 
     def set_left_panels_visibility(self, visible: bool) -> None:
         """Set the left panels visibility."""
+        self._left_panels_visible = visible
         animate_widget_visibility(
             self.ui.left_panels_wrapper,
             visible=visible,
             axis="horizontal",
             hide_widget_when_collapsed=True,
         )
+        self._sync_welcome_workspace_mode_later(
+            left_visible=visible,
+            right_visible=self._right_panels_visible,
+        )
         self._refresh_log_panel_layout_later()
 
     def set_right_panels_visibility(self, visible: bool) -> None:
         """Set the right panels visibility."""
+        self._right_panels_visible = visible
         animate_widget_visibility(
             self.ui.right_panels_wrapper,
             visible=visible,
@@ -375,6 +383,10 @@ class Body(QWidget):
             view_signals.ExtendDeviceSelectionPanelRequested.emit()
         else:
             view_signals.ShortenDeviceSelectionPanelRequested.emit()
+        self._sync_welcome_workspace_mode_later(
+            left_visible=self._left_panels_visible,
+            right_visible=visible,
+        )
         self._refresh_log_panel_layout_later()
 
     def set_device_selection_panel_visibility(self, visible: bool) -> None:
@@ -414,6 +426,23 @@ class Body(QWidget):
             Settings.ANIMATION.PANEL_VISIBILITY_DURATION + Settings.SPACING.SM,
             self.ui.log_panel.refresh_layout,
         )
+
+    def _sync_welcome_workspace_mode_later(
+        self, *, left_visible: bool, right_visible: bool
+    ) -> None:
+        """Update welcome-only wide layout after sidebar visibility changes."""
+        enabled = not left_visible and not right_visible
+        delay_ms = Settings.ANIMATION.PANEL_VISIBILITY_DURATION + Settings.SPACING.SM
+        if enabled:
+            self._set_welcome_workspace_mode(True)
+            QTimer.singleShot(delay_ms, lambda: self._set_welcome_workspace_mode(True))
+            return
+        QTimer.singleShot(delay_ms, lambda: self._set_welcome_workspace_mode(False))
+
+    def _set_welcome_workspace_mode(self, enabled: bool) -> None:
+        welcome = self.ui.tabs.widget(0)
+        if welcome is not None and hasattr(welcome, "set_expanded_workspace_mode"):
+            welcome.set_expanded_workspace_mode(enabled)
 
     def apply_theme_icons(self, theme: Theme) -> None:
         """Re-resolve tab and side-panel icon resources for ``theme``."""

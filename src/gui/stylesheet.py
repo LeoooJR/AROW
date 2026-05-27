@@ -533,6 +533,12 @@ QWidget#file-description QLabel[helper-text="true"] {{
     font-size: {Settings.FONT.SIZE_HELPER}px;
 }}
 
+QWidget#file-description QLabel[file-date="true"] {{
+    color: {palette.TEXT_MUTED};
+    font-family: {Settings.FONT.FAMILY_CSS};
+    font-size: {Settings.FONT.SIZE_HELPER}px;
+}}
+
 QFrame#condition-indicator,
 QFrame#host-identity-indicator,
 QFrame#adb-bridge-indicator {{
@@ -549,13 +555,21 @@ QFrame#welcome-panel {{
 QFrame#welcome-hero,
 QFrame#welcome-centered-row,
 QWidget#welcome-content-inner,
-QFrame#sections-wrapper {{
+QFrame#sections-wrapper,
+QFrame#welcome-top-row,
+QFrame#welcome-content-wrapper,
+QFrame#readiness-rows-wrapper,
+QFrame#readiness-row-text,
+QFrame#connection-actions-wrapper,
+QFrame#connection-actions-body {{
     background-color: {palette.TRANSPARENT};
     border: none;
 }}
 
 QFrame#welcome-start-card,
 QFrame#welcome-walkthrough-card,
+QFrame#welcome-operator-readiness-card,
+QFrame#welcome-connection-actions-card,
 QFrame[welcome-card="true"] {{
     background-color: {palette.SURFACE_ELEVATED};
     border: 1px solid {palette.BORDER_SUBTLE};
@@ -582,6 +596,49 @@ QLabel[welcome-tagline="true"] {{
     text-align: center;
 }}
 
+QFrame#readiness-row {{
+    background-color: {palette.SURFACE_MUTED};
+    border: 1px solid {palette.BORDER_SUBTLE};
+    border-radius: {Settings.BORDER_RADIUS.LG}px;
+}}
+
+QFrame#readiness-row:hover {{
+    border: 1px solid {palette.PRIMARY_BORDER};
+}}
+
+QLabel[readiness-row-label="true"] {{
+    color: {palette.TEXT_PRIMARY};
+    font-size: {Settings.FONT.SIZE_DEFAULT}px;
+    font-weight: {Settings.FONT.WEIGHT_DEMIBOLD};
+}}
+
+QLabel[readiness-row-detail="true"] {{
+    color: {palette.TEXT_MUTED};
+    font-family: {Settings.FONT.MONO_FAMILY_CSS};
+    font-size: {Settings.FONT.SIZE_HELPER}px;
+    font-weight: {Settings.FONT.WEIGHT_NORMAL};
+}}
+
+QLabel#readiness-status-chip {{
+    border-radius: {Settings.BORDER_RADIUS.SM}px;
+    font-family: {Settings.FONT.MONO_FAMILY_CSS};
+    font-size: {Settings.FONT.SIZE_HELPER}px;
+    font-weight: {Settings.FONT.WEIGHT_DEMIBOLD};
+    padding: 3px 8px;
+}}
+
+QLabel#readiness-status-chip[readiness-status-chip="ready"] {{
+    background-color: {palette.SUCCESS_SOFT};
+    border: 1px solid {palette.SUCCESS_BORDER};
+    color: {palette.SUCCESS};
+}}
+
+QLabel#readiness-status-chip[readiness-status-chip="muted"] {{
+    background-color: {palette.SURFACE_ELEVATED};
+    border: 1px solid {palette.BORDER_SUBTLE};
+    color: {palette.TEXT_MUTED};
+}}
+
 QPushButton#welcome-walkthrough-button,
 QPushButton[welcome-walkthrough-button="true"] {{
     background-color: {palette.SURFACE_ELEVATED};
@@ -593,16 +650,31 @@ QPushButton[welcome-walkthrough-button="true"] {{
     padding: 0px;
 }}
 
+QPushButton[welcome-connection-button="true"] {{
+    background-color: {palette.SURFACE_MUTED};
+    border: 1px solid {palette.BORDER_SUBTLE};
+}}
+
 QPushButton#welcome-walkthrough-button:hover,
 QPushButton[welcome-walkthrough-button="true"]:hover {{
     background-color: {palette.SURFACE_MUTED};
     border: 1px solid {palette.BORDER_STRONG};
 }}
 
+QPushButton[welcome-connection-button="true"]:hover {{
+    background-color: {palette.PRIMARY_SOFT};
+    border: 1px solid {palette.PRIMARY_BORDER};
+}}
+
 QPushButton#welcome-walkthrough-button:pressed,
 QPushButton[welcome-walkthrough-button="true"]:pressed {{
     background-color: {palette.PRIMARY_SOFT};
     border: 1px solid {palette.PRIMARY_BORDER};
+}}
+
+QPushButton[welcome-connection-button="true"]:pressed {{
+    background-color: {palette.PRIMARY_BORDER};
+    border: 1px solid {palette.PRIMARY};
 }}
 
 QPushButton#welcome-walkthrough-button:focus,

@@ -34,6 +34,7 @@ class File(QWidget, Component):
 
         file_name: str = ""
         file_type: str = ""
+        date_text: str | None = None
         save_as_tooltip: Final[str] = "Save as"
 
     @dataclass
@@ -48,6 +49,7 @@ class File(QWidget, Component):
         file_name: str,
         file_type: str,
         file_save: bool = False,
+        date_text: str | None = None,
     ):
         """Render a file summary row with optional save-as affordance.
 
@@ -56,9 +58,12 @@ class File(QWidget, Component):
             file_name: Display name for the file.
             file_type: Short type label (e.g. extension category).
             file_save: When True, show a save-as tool button.
+            date_text: Optional secondary date/session metadata.
         """
         super().__init__(parent)
-        self.texts = File.Text(file_name=file_name, file_type=file_type)
+        self.texts = File.Text(
+            file_name=file_name, file_type=file_type, date_text=date_text
+        )
         self.ui = File.UI()
 
         self.setProperty("file", True)
@@ -66,6 +71,7 @@ class File(QWidget, Component):
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self._file_name = file_name
         self._file_save = file_save
+        self._date_text = date_text
 
         layout = QHBoxLayout()
         layout.setContentsMargins(*Settings.SPACING.MARGIN_SMALL)
@@ -100,12 +106,23 @@ class File(QWidget, Component):
         )
 
         file_type_label = HelperText(file_description, file_type.upper())
+        file_type_label.setObjectName("file-type")
         file_description.layout().addWidget(file_type_label)
         file_description.layout().setAlignment(
             file_type_label, Qt.AlignmentFlag.AlignLeft
         )
+        file_date_label: HelperText | None = None
+        if date_text:
+            file_date_label = HelperText(file_description, date_text)
+            file_date_label.setObjectName("file-date")
+            file_date_label.setProperty("file-date", True)
+            file_description.layout().addWidget(file_date_label)
+            file_description.layout().setAlignment(
+                file_date_label, Qt.AlignmentFlag.AlignLeft
+            )
         self._file_description = file_description
         self._file_type_label = file_type_label
+        self._file_date_label = file_date_label
         layout.addWidget(file_description, 1)
         layout.setAlignment(
             file_description, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft
@@ -229,10 +246,26 @@ class File(QWidget, Component):
         if self._file_name_label.text() != elided:
             self._file_name_label.setText(elided)
 
-    def set_file_display(self, file_name: str, file_type: str) -> None:
+    def set_file_display(
+        self, file_name: str, file_type: str, date_text: str | None = None
+    ) -> None:
         """Update the displayed file name and type (labels and elision state)."""
         self._file_name = file_name
-        self.texts = File.Text(file_name=file_name, file_type=file_type)
+        self._date_text = date_text
+        self.texts = File.Text(
+            file_name=file_name, file_type=file_type, date_text=date_text
+        )
         self._file_type_label.setText(file_type.upper())
+        if date_text:
+            if self._file_date_label is None:
+                self._file_date_label = HelperText(self._file_description, date_text)
+                self._file_date_label.setObjectName("file-date")
+                self._file_date_label.setProperty("file-date", True)
+                self._file_description.layout().addWidget(self._file_date_label)
+            else:
+                self._file_date_label.setText(date_text)
+            self._file_date_label.setVisible(True)
+        elif self._file_date_label is not None:
+            self._file_date_label.setVisible(False)
         self._pending_name_elide_retry = False
         self.refresh_display()

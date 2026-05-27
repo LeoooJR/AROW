@@ -21,6 +21,40 @@ def test_file_display_updates_name_and_type(qtbot) -> None:
 
     assert file_widget._file_name == "latest.txt"
     assert file_widget._file_type_label.text() == "TXT"
+    assert file_widget._file_date_label is None
+
+
+def test_file_display_renders_optional_date_text(qtbot) -> None:
+    file_widget = File(
+        None,
+        "kilometer-marker_128450.log",
+        "log",
+        date_text="Last opened 2026-05-26",
+    )
+    qtbot.addWidget(file_widget)
+
+    assert file_widget._file_type_label.text() == "LOG"
+    assert file_widget._file_date_label is not None
+    assert file_widget._file_date_label.text() == "Last opened 2026-05-26"
+
+
+def test_file_display_updates_optional_date_text(qtbot) -> None:
+    file_widget = File(None, "simulation.log", "log")
+    qtbot.addWidget(file_widget)
+
+    file_widget.set_file_display(
+        "inspection-context.kml", "kml", "Last opened 2026-05-21"
+    )
+
+    assert file_widget._file_name == "inspection-context.kml"
+    assert file_widget._file_type_label.text() == "KML"
+    assert file_widget._file_date_label is not None
+    assert file_widget._file_date_label.text() == "Last opened 2026-05-21"
+
+    file_widget.set_file_display("inspection-context.kml", "kml")
+
+    assert file_widget._file_date_label is not None
+    assert file_widget._file_date_label.isHidden() is True
 
 
 def test_file_display_without_save_button_and_empty_name_refreshes_safely(
