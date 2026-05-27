@@ -3,16 +3,11 @@ This file contains all graphical elements related to the map panel.
 """
 
 from dataclasses import dataclass
-from typing import Final
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QFrame, QSizePolicy, QVBoxLayout
 
 from gui.blocks.map import MapBlock
 from gui.colors import Theme
-from gui.components import LeadingIconLabel
-from gui.icons import GenericIcons
 from gui.settings import Settings
 
 
@@ -25,13 +20,12 @@ class MapPanel(QFrame):
     class Text:
         """Panel title for the map tab."""
 
-        title: Final[str] = "Map"
+        pass
 
     @dataclass
     class UI:
         """Panel title and embedded map block."""
 
-        title: LeadingIconLabel
         map_block: MapBlock
 
     def __init__(self, parent=None):
@@ -59,33 +53,13 @@ class MapPanel(QFrame):
             Settings.PANEL.SECTION_SPACING
         )  # Consistent spacing between major sections
 
-        title = LeadingIconLabel(
-            parent=self,
-            icon=GenericIcons.MAP,
-            text=self.texts.title,
-            font_size=Settings.FONT.SIZE_TITLE,
-            font_weight=QFont.Weight.DemiBold,
-            spacing=Settings.PANEL.TITLE_ICON_SPACING,
-            margins=(
-                Settings.PANEL.TITLE_PADDING_LEFT,
-                Settings.PANEL.TITLE_PADDING_TOP,
-                Settings.PANEL.TITLE_PADDING_RIGHT,
-                Settings.PANEL.TITLE_PADDING_BOTTOM,
-            ),
-            text_alignment=Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
-            properties={"panel-title": True, "main-panel-title": True},
-            label_properties={"section-title": True},
-            constrain_to_size_hint=True,
-        )
-        layout.addWidget(title)
-
         map_block = MapBlock(self)
         layout.addWidget(map_block, 1)
         map_block.setVisible(True)
 
         self.setLayout(layout)
 
-        self.ui: MapPanel.UI = MapPanel.UI(title=title, map_block=map_block)
+        self.ui: MapPanel.UI = MapPanel.UI(map_block=map_block)
 
         self._finalize_ui_hooks()
 
@@ -104,15 +78,11 @@ class MapPanel(QFrame):
         pass
 
     def apply_theme_icons(self, theme: Theme) -> None:
-        self.ui.title.apply_theme_icons(theme)
         self.ui.map_block.apply_theme_icons(theme)
 
     def _set_size_policy(self) -> None:
         """Centralize size policies for the panel and its UI widgets (window resizing)."""
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.ui.title.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
-        )
         self.ui.map_block.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )

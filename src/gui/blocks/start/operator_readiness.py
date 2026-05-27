@@ -11,6 +11,7 @@ from PySide6.QtWidgets import QLabel, QSizePolicy, QWidget
 from gui.blocks.base import Block
 from gui.colors import Theme
 from gui.settings import Settings
+from gui.signals import view_signals
 from gui.wrapper import HorizontalLayoutWrapper, VerticalLayoutWrapper
 
 
@@ -78,16 +79,47 @@ class ReadinessRow(HorizontalLayoutWrapper):
         self.get_layout().setStretchFactor(text_wrapper, 1)
         self.get_layout().setAlignment(status_widget, Qt.AlignmentFlag.AlignVCenter)
 
+    def update(
+        self, label: str, detail: str, status: str, status_kind: str = "muted"
+    ) -> None:
+        """Update the readiness row."""
+        self._set_label(label)
+        self._set_detail(detail)
+        self._set_status(status, status_kind)
+
+    def _set_label(self, label: str) -> None:
+        """Update the label label."""
+        self.ui.label.setText(label)
+
+    def _set_detail(self, detail: str) -> None:
+        """Update the detail label."""
+        self.ui.detail.setText(detail)
+
+    def _set_status(self, status: str, status_kind: str = "muted") -> None:
+        """Update the status label."""
+        self.ui.status.setText(status)
+        self.ui.status.setProperty("readiness-status-chip", status_kind)
+        self.ui.status.style().unpolish(self.ui.status)
+        self.ui.status.style().polish(self.ui.status)
+        self.ui.status.update()
+
 
 class OperatorReadinessBlock(VerticalLayoutWrapper, Block):
     """Welcome card summarizing operator workflow readiness."""
 
+    ROWS_INDEX_MAPPING: dict[str, int] = {
+        "host": 0,
+        "device": 1,
+        "location": 2,
+        "simulation": 3,
+    }
+
     @dataclass(frozen=True)
     class Text:
         title: Final[str] = "Operator readiness"
-        rows: tuple[tuple[str, str, str, str], ...] = (
-            ("Host ready", "ADB bridge standing by", "READY", "ready"),
-            ("Device link", "Awaiting trusted Android target", "OPEN", "muted"),
+        default_rows: tuple[tuple[str, str, str, str], ...] = (
+            ("Host", "ADB bridge booting up", "PENDING", "ready"),
+            ("Device link", "Awaiting trusted Android target", "PENDING", "muted"),
             ("Location set", "Railway milestone not assigned", "PENDING", "muted"),
             (
                 "Simulation armed",
@@ -117,7 +149,7 @@ class OperatorReadinessBlock(VerticalLayoutWrapper, Block):
                 status=status,
                 status_kind=status_kind,
             )
-            for label, detail, status, status_kind in block_texts.rows
+            for label, detail, status, status_kind in block_texts.default_rows
         ]
         rows_wrapper = VerticalLayoutWrapper(
             parent,
@@ -160,10 +192,66 @@ class OperatorReadinessBlock(VerticalLayoutWrapper, Block):
         )
 
     def _connect_signals(self) -> None:
-        pass
+        view_signals.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
+
+        view_signals.ADBServerStarted.connect(self._on_adb_server_started)
+        view_signals.ADBServerStopped.connect(self._on_adb_server_stopped)
+
+        view_signals.AuthentificationSucceeded.connect(
+            self._on_authentification_succeeded
+        )
+        view_signals.DeviceSelectionSucceeded.connect(
+            self._on_device_selection_succeeded
+        )
+        view_signals.ActiveDeviceRemoved.connect(self._on_active_device_removed)
 
     def apply_theme_icons(self, theme: Theme) -> None:
         pass
+
+    def _on_ui_constraints_disabled(self) -> None:
+        pass
+
+    def _on_adb_server_started(self) -> None:
+        """Update the readiness row when the ADB server starts."""
+        self.ui.rows[self.ROWS_INDEX_MAPPING["host"]].update(
+            label="Host",
+            detail="ADB bridge standing by",
+            status="READY",
+            status_kind="ready",
+        )
+
+    def _on_adb_server_stopped(self) -> None:
+        """Update the readiness row when the ADB server stops."""
+        self.ui.rows[self.ROWS_INDEX_MAPPING["host"]].update(
+            label="Host",
+            detail="ADB bridge stopped",
+            status="ERROR",
+            status_kind="error",
+        )
+
+    def _on_authentification_succeeded(self, device: dict) -> None:
+        """Update the readiness row when the authentification succeeds."""
+        self.ui.rows[self.ROWS_INDEX_MAPPING["device"]].update(
+            label="Device",
+            detail="Device linked",
+            status="READY",
+            status_kind="ready",
+        )
+
+    def _on_device_selection_succeeded(self, device: dict) -> None:
+        """Update the readiness row when the device selection succeeds."""
+        self.ui.rows[self.ROWS_INDEX_MAPPING["device"]].update(
+            label="Device",
+            detail="Device linked",
+            status="READY",
+            status_kind="ready",
+        )
+
+    def _on_active_device_removed(self) -> None:
+        """Update the readiness row when the active device is removed."""
+        self.ui.rows[self.ROWS_INDEX_MAPPING["device"]].update(
+            *self.texts.default_rows[self.ROWS_INDEX_MAPPING["device"]]
+        )
 
 
 __all__ = ["OperatorReadinessBlock", "ReadinessRow"]

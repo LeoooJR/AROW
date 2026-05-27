@@ -42,7 +42,7 @@ from gui.signals import view_signals
 from gui.wrapper import HorizontalLayoutWrapper, VerticalLayoutWrapper
 
 ActivityCategory = Literal["simulation", "device", "location", "adb", "file", "system"]
-ActivityLevel = Literal["info", "success", "warning", "error", "start", "stop"]
+ActivityLevel = Literal["info", "success", "warning", "error"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -198,8 +198,6 @@ class ActivityLogItem(QListWidgetItem):
         "success": "OK",
         "warning": "Warn",
         "error": "Error",
-        "start": "Start",
-        "stop": "Stop",
     }
 
     @dataclass
@@ -633,7 +631,6 @@ class ActivityLogBlock(QFrame, Block):
         )
 
         self.setLayout(layout)
-        self._seed_placeholder_activities()
         self._render_activities()
 
         self._finalize_ui_hooks()
@@ -690,6 +687,7 @@ class ActivityLogBlock(QFrame, Block):
 
     def _connect_signals(self) -> None:
         """Connect signals for the activity log block."""
+        view_signals.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
         view_signals.SimulationLogFileUpdated.connect(
             self._on_simulation_log_file_updated
         )
@@ -726,8 +724,6 @@ class ActivityLogBlock(QFrame, Block):
             "success",
             "warning",
             "error",
-            "start",
-            "stop",
         )
 
         self._add_filter_section(menu, "Categories")
@@ -993,6 +989,10 @@ class ActivityLogBlock(QFrame, Block):
             checkbox.blockSignals(False)
             action.blockSignals(False)
 
+    def _on_ui_constraints_disabled(self) -> None:
+        """Record an activity when the UI constraints are disabled."""
+        self._seed_placeholder_activities()
+
     def _on_adb_server_started(self) -> None:
         """Record an activity when the ADB server starts."""
         self.add_activity(
@@ -1041,7 +1041,8 @@ class ActivityLogBlock(QFrame, Block):
             "Active device selected",
             "device",
             "success",
-            metadata={"device": name},
+            detail=f"{name} has been selected for the simulation.",
+            metadata={"target": name},
         )
 
     def _on_device_selection_failed(self, device: dict) -> None:
@@ -1052,7 +1053,7 @@ class ActivityLogBlock(QFrame, Block):
             "device",
             "error",
             detail=f"{name} could not be selected for the simulation.",
-            metadata={"device": name},
+            metadata={"target": name},
         )
 
     def _on_simulation_log_file_updated(

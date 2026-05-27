@@ -192,6 +192,7 @@ class DeviceSelectionBlock(QFrame, Block):
         )
         self._last_communication_refresh_timer.start()
 
+        self.ui.available_device_list.selectionModel().clear()  # Clear the selection model to avoid any residual selection when the list is empty.
         self._has_active_device = False
 
         self._finalize_ui_hooks()
@@ -350,7 +351,12 @@ class DeviceSelectionBlock(QFrame, Block):
         """Request selection of the clicked device item."""
         if item is None:
             return
-        view_signals.DeviceSelectionRequested.emit(item.id, item.name)
+        if isinstance(item, self._device_item_type):
+            view_signals.DeviceSelectionRequested.emit(item.id, item.name)
+        else:
+            logger.warning(
+                "DeviceSelectionBlock: device item is not a DeviceItem", item=item
+            )
 
     def _on_device_selection_succeeded(self, device: dict) -> None:
         """Mark the currently selected row active after selection succeeds."""

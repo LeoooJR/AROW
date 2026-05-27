@@ -37,6 +37,7 @@ class ViewSignals(QObject):
     RefreshDeviceListRequested = Signal()
     DevicesUpdated = Signal(object)
     RemoveDeviceRequested = Signal(str)
+    ActiveDeviceRemoved = Signal()
 
     #### Host Signals ####
     HostDeviceInformationUpdated = Signal(str, str, str)

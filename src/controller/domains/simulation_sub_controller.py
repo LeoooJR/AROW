@@ -240,3 +240,4 @@ class SimulationSubController(AppSubController):
                 )
                 self.stop()
             self._session.device = None
+            self.view.forward_active_device_removed()

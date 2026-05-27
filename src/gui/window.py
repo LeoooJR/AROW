@@ -302,6 +302,7 @@ class Body(QWidget):
         #### Signals for handling the step transition from authentification to map display ####
         view_signals.AuthentificationSucceeded.connect(self._on_device_connected)
         view_signals.DeviceSelectionSucceeded.connect(self._on_device_connected)
+        view_signals.ActiveDeviceRemoved.connect(self._on_active_device_removed)
 
     def _set_alignment(self) -> None:
         pass
@@ -467,6 +468,13 @@ class Body(QWidget):
         self.ui.progress_bar.setValue(1)
         self.ui.tabs.setCurrentIndex(1)
         self.ui.tabs.setTabVisible(2, True)
+
+    def _on_active_device_removed(self) -> None:
+        """Handle the active device removed."""
+        logger.info("Body: active device removed")
+        self.ui.progress_bar.setValue(0)
+        self.ui.tabs.setCurrentIndex(0)
+        self.ui.tabs.setTabVisible(2, False)
 
 
 class MainContainer(QWidget):
@@ -1042,6 +1050,11 @@ class MainWindow(QMainWindow):
             device_descriptors=devices,
         )
         view_signals.DevicesUpdated.emit(devices)
+
+    def forward_active_device_removed(self) -> None:
+        """Handle the active device removed."""
+        logger.info("MainWindow: active device removed")
+        view_signals.ActiveDeviceRemoved.emit()
 
     def forward_host_device_information_updated(
         self, name: str, os: str, ip: str
