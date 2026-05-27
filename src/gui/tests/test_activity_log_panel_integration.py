@@ -84,6 +84,10 @@ def test_welcome_workspace_mode_tracks_outer_sidebars(monkeypatch) -> None:
 
     body.set_left_panels_visibility(True)
     app.processEvents()
+    assert welcome._expanded_workspace_mode is True
+
+    QTest.qWait(Settings.ANIMATION.PANEL_VISIBILITY_DURATION + Settings.SPACING.SM + 20)
+    app.processEvents()
     assert welcome._expanded_workspace_mode is False
 
     window.close()

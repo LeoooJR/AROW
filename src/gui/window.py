@@ -432,11 +432,12 @@ class Body(QWidget):
     ) -> None:
         """Update welcome-only wide layout after sidebar visibility changes."""
         enabled = not left_visible and not right_visible
-        self._set_welcome_workspace_mode(enabled)
-        QTimer.singleShot(
-            Settings.ANIMATION.PANEL_VISIBILITY_DURATION + Settings.SPACING.SM,
-            lambda: self._set_welcome_workspace_mode(enabled),
-        )
+        delay_ms = Settings.ANIMATION.PANEL_VISIBILITY_DURATION + Settings.SPACING.SM
+        if enabled:
+            self._set_welcome_workspace_mode(True)
+            QTimer.singleShot(delay_ms, lambda: self._set_welcome_workspace_mode(True))
+            return
+        QTimer.singleShot(delay_ms, lambda: self._set_welcome_workspace_mode(False))
 
     def _set_welcome_workspace_mode(self, enabled: bool) -> None:
         welcome = self.ui.tabs.widget(0)
