@@ -2,12 +2,14 @@ from dataclasses import dataclass
 from typing import Final
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QFrame, QLabel, QSizePolicy, QVBoxLayout
+from PySide6.QtWidgets import QFrame, QSizePolicy, QVBoxLayout
 
-from gui.blocks.start import StartRecentBlock, WalkthroughBlock
+from gui.blocks.start import (
+    ConnectionActionsBlock,
+    OperatorReadinessBlock,
+    StartRecentBlock,
+)
 from gui.colors import Theme
-from gui.components import Image
-from gui.icons import ApplicationIcons, icon_qt_path, icon_qt_path_for_theme
 from gui.settings import Settings
 from gui.wrapper import HorizontalLayoutWrapper, VerticalLayoutWrapper
 
@@ -16,25 +18,22 @@ class WelcomePanel(QFrame):
 
     @dataclass(frozen=True)
     class Text:
-        """Copy for the welcome hero, sections, walkthrough buttons, and recent placeholders."""
+        """Copy for the welcome operator briefing layout."""
 
-        tagline: Final[str] = (
-            "Connect your Android device and simulate GPS location from your computer."
-        )
+        title: Final[str] = "Operator briefing"
 
     @dataclass
     class UI:
         """Composed widgets for the welcome screen layout."""
 
-        image: Image
-        tagline: QLabel
-        hero: VerticalLayoutWrapper
+        briefing_card: OperatorReadinessBlock
+        connection_card: ConnectionActionsBlock
         start_card: StartRecentBlock
-        walkthrough_card: WalkthroughBlock
-        sections_wrapper: HorizontalLayoutWrapper
+        top_row: HorizontalLayoutWrapper
+        content_wrapper: VerticalLayoutWrapper
 
     def __init__(self, parent=None):
-        """Build hero, start/recent, and walkthrough sections.
+        """Build operator readiness, connection actions, and recent sessions.
 
         Args:
             parent: Optional Qt parent widget for lifetime and hierarchy.
@@ -47,36 +46,28 @@ class WelcomePanel(QFrame):
         self.setObjectName("welcome-panel")
         self.setProperty("welcome-panel", True)
 
-        image = Image(self, icon_qt_path(ApplicationIcons.LOGO_UI))
-        image.setFixedSize(
-            Settings.DIMENSION.WELCOME_LOGO_SIZE, Settings.DIMENSION.WELCOME_LOGO_SIZE
-        )
-
-        tagline = QLabel(self.texts.tagline, self)
-        tagline.setWordWrap(True)
-        tagline.setProperty("welcome-tagline", True)
-
-        hero = VerticalLayoutWrapper(
-            self,
-            widgets=[image, tagline],
-            spacing=Settings.WELCOME.HERO_ELEMENT_SPACING,
-            margins=(0, 0, 0, 0),
-        )
-        hero.setObjectName("welcome-hero")
-        hero.get_layout().setStretchFactor(tagline, 1)
-
+        briefing_card = OperatorReadinessBlock(self)
+        connection_card = ConnectionActionsBlock(self)
         start_card = StartRecentBlock(self)
-        walkthrough_card = WalkthroughBlock(self)
 
-        sections_wrapper = HorizontalLayoutWrapper(
+        top_row = HorizontalLayoutWrapper(
             self,
-            widgets=[start_card, walkthrough_card],
+            widgets=[briefing_card, connection_card],
             spacing=Settings.PANEL.SECTION_SPACING,
+            margins=Settings.SPACING.MARGIN_NONE,
         )
-        sections_wrapper.setObjectName("sections-wrapper")
-        sl = sections_wrapper.get_layout()
-        sl.setStretchFactor(start_card, 1)
-        sl.setStretchFactor(walkthrough_card, 1)
+        top_row.setObjectName("welcome-top-row")
+        top_layout = top_row.get_layout()
+        top_layout.setStretchFactor(briefing_card, 3)
+        top_layout.setStretchFactor(connection_card, 2)
+
+        content_wrapper = VerticalLayoutWrapper(
+            self,
+            widgets=[top_row, start_card],
+            spacing=Settings.PANEL.SECTION_SPACING,
+            margins=Settings.SPACING.MARGIN_NONE,
+        )
+        content_wrapper.setObjectName("welcome-content-wrapper")
 
         layout = QVBoxLayout()
         layout.setContentsMargins(
@@ -85,28 +76,60 @@ class WelcomePanel(QFrame):
             Settings.PANEL.CONTENT_PADDING,
             Settings.PANEL.CONTENT_PADDING,
         )
-        layout.setSpacing(Settings.SPACING.XS)
-        layout.addWidget(hero)
-        layout.addWidget(sections_wrapper)
+        layout.setSpacing(Settings.PANEL.SECTION_SPACING)
+        layout.addWidget(content_wrapper)
+        layout.addStretch(1)
         self.setLayout(layout)
+        self._expanded_workspace_mode = False
 
         self.ui: WelcomePanel.UI = WelcomePanel.UI(
-            image=image,
-            tagline=tagline,
-            hero=hero,
+            briefing_card=briefing_card,
+            connection_card=connection_card,
             start_card=start_card,
-            walkthrough_card=walkthrough_card,
-            sections_wrapper=sections_wrapper,
+            top_row=top_row,
+            content_wrapper=content_wrapper,
         )
 
         self._finalize_ui_hooks()
 
     def apply_theme_icons(self, theme: Theme) -> None:
-        self.ui.image.set_pixmap_path(
-            icon_qt_path_for_theme(theme, ApplicationIcons.LOGO_UI)
-        )
+        self.ui.briefing_card.apply_theme_icons(theme)
+        self.ui.connection_card.apply_theme_icons(theme)
         self.ui.start_card.apply_theme_icons(theme)
-        self.ui.walkthrough_card.apply_theme_icons(theme)
+
+    def set_expanded_workspace_mode(self, enabled: bool) -> None:
+        """Center and cap welcome content when both app sidebars are hidden."""
+        if self._expanded_workspace_mode == enabled:
+            return
+        self._expanded_workspace_mode = enabled
+        if enabled:
+            self.layout().setAlignment(
+                self.ui.content_wrapper,
+                Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter,
+            )
+            self._apply_expanded_workspace_width()
+        else:
+            self.ui.content_wrapper.setMinimumWidth(0)
+            self.ui.content_wrapper.setMaximumWidth(Settings.PANEL.UNBOUNDED_HEIGHT)
+            self.layout().setAlignment(
+                self.ui.content_wrapper, Qt.AlignmentFlag.AlignTop
+            )
+        self.ui.content_wrapper.updateGeometry()
+        self.updateGeometry()
+
+    def _apply_expanded_workspace_width(self) -> None:
+        """Use available tab width while preventing ultra-wide card stretching."""
+        target_width = min(
+            Settings.WELCOME.EXPANDED_CONTENT_MAX_WIDTH,
+            max(0, self.contentsRect().width() - (Settings.PANEL.CONTENT_PADDING * 2)),
+        )
+        self.ui.content_wrapper.setMinimumWidth(target_width)
+        self.ui.content_wrapper.setMaximumWidth(target_width)
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        if getattr(self, "_expanded_workspace_mode", False):
+            self._apply_expanded_workspace_width()
 
     def _finalize_ui_hooks(self) -> None:
         """Run the final UI setup hooks for the welcome panel."""
@@ -120,28 +143,28 @@ class WelcomePanel(QFrame):
 
     def _set_alignment(self) -> None:
         """Centralize layout alignment for the panel and its UI widgets."""
-        self.ui.hero.get_layout().setAlignment(
-            self.ui.image, Qt.AlignmentFlag.AlignCenter
+        self.layout().setAlignment(self.ui.content_wrapper, Qt.AlignmentFlag.AlignTop)
+        self.ui.content_wrapper.get_layout().setAlignment(
+            self.ui.top_row, Qt.AlignmentFlag.AlignTop
         )
-        self.ui.hero.get_layout().setAlignment(
-            self.ui.tagline, Qt.AlignmentFlag.AlignCenter
+        self.ui.content_wrapper.get_layout().setAlignment(
+            self.ui.start_card, Qt.AlignmentFlag.AlignTop
         )
 
     def _set_size_policy(self) -> None:
         """Centralize size policies for the panel and its UI widgets (window resizing)."""
-        self.ui.hero.setSizePolicy(
+        self.ui.briefing_card.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
         )
-        self.ui.image.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        self.ui.tagline.setSizePolicy(
-            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred
+        self.ui.connection_card.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
         )
         self.ui.start_card.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
         )
-        self.ui.walkthrough_card.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        self.ui.top_row.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
         )
-        self.ui.sections_wrapper.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        self.ui.content_wrapper.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
         )

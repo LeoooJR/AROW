@@ -39,6 +39,8 @@
         <file>statics/light/x-circle.svg</file>
         <file>statics/light/hand-index.svg</file>
         <file>statics/light/save-as.svg</file>
+        <file>statics/light/wifi.svg</file>
+        <file>statics/light/usb.svg</file>
         <file>statics/light/plus.svg</file>
         <file>statics/light/x.svg</file>
         <file>statics/light/trash.svg</file>
@@ -85,6 +87,7 @@
         <file>statics/dark/x-circle.svg</file>
         <file>statics/dark/hand-index.svg</file>
         <file>statics/dark/save-as.svg</file>
+        <file>statics/dark/usb.svg</file>
         <file>statics/dark/plus.svg</file>
         <file>statics/dark/x.svg</file>
         <file>statics/dark/trash.svg</file>

@@ -60,3 +60,31 @@ def test_activity_log_resyncs_after_panel_visibility_sequence(monkeypatch) -> No
     assert window.grab().isNull() is False
     window.close()
     app.processEvents()
+
+
+def test_welcome_workspace_mode_tracks_outer_sidebars(monkeypatch) -> None:
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.delenv("AROW_GUI_TEST_SCREEN_SIZE", raising=False)
+    app = QApplication.instance() or QApplication([])
+    register_bundled_fonts()
+
+    window = MainWindow(ui_constraints_disabled=True)
+    window.show()
+    app.processEvents()
+    body = window.ui.container.ui.body
+    welcome = body.ui.tabs.widget(0)
+
+    body.set_left_panels_visibility(False)
+    app.processEvents()
+    assert welcome._expanded_workspace_mode is False
+
+    body.set_right_panels_visibility(False)
+    app.processEvents()
+    assert welcome._expanded_workspace_mode is True
+
+    body.set_left_panels_visibility(True)
+    app.processEvents()
+    assert welcome._expanded_workspace_mode is False
+
+    window.close()
+    app.processEvents()

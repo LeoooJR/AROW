@@ -98,6 +98,8 @@ class GenericIcons(Enum):
     X_CIRCLE = _create_icon("x-circle.svg")
     HAND_INDEX = _create_icon("hand-index.svg")
     SAVE_AS = _create_icon("save-as.svg")
+    WIFI = _create_icon("wifi.svg")
+    USB = _create_icon("usb.svg")
     PLUS = _create_icon("plus.svg")
     X = _create_icon("x.svg")
     TRASH = _create_icon("trash.svg")
