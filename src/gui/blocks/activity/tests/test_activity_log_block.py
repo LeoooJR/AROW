@@ -30,7 +30,7 @@ def _entry(**overrides) -> ActivityLogEntry:  # type: ignore[no-untyped-def]
         "id": "activity-1",
         "timestamp": _NOW,
         "category": "simulation",
-        "level": "start",
+        "level": "info",
         "message": "Simulation started",
         "detail": None,
         "metadata": {"device": "Pixel 8 Pro"},
@@ -122,7 +122,7 @@ def test_activity_log_block_filter_hides_non_matching_entries(qtbot) -> None:
     qtbot.addWidget(block)
     block.clear_activities()
     block.add_activity("Device selected", "device", "success", timestamp=_NOW)
-    block.add_activity("ADB stopped", "adb", "stop", timestamp=_NOW)
+    block.add_activity("ADB stopped", "adb", "warning", timestamp=_NOW)
 
     block.set_activity_filter(categories=["device"])
 
@@ -149,7 +149,7 @@ def test_activity_log_block_filter_menu_uses_custom_styled_rows(qtbot) -> None:
 
     assert block.ui.filter_button.objectName() == "activity-log-filter-button"
     assert "QToolButton#activity-log-filter-button::menu-indicator" in stylesheet_light
-    assert len(option_widgets) == 12
+    assert len(option_widgets) == 10
     assert all(
         widget.objectName() == "activity-log-filter-option" for widget in option_widgets
     )
@@ -209,3 +209,15 @@ def test_activity_log_block_rejects_unknown_level(qtbot) -> None:
 
     with pytest.raises(ValueError, match="Unknown activity level"):
         block.add_activity("Mystery", "device", "mystery")  # type: ignore[arg-type]
+
+
+def test_activity_log_block_records_adb_server_stop_as_warning(qtbot) -> None:
+    block = ActivityLogBlock()
+    qtbot.addWidget(block)
+    block.clear_activities()
+
+    block._on_adb_server_stopped()
+
+    assert len(block._activities) == 1
+    assert block._activities[0].message == "ADB server stopped"
+    assert block._activities[0].level == "warning"
