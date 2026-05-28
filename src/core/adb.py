@@ -8,10 +8,18 @@ from collections import OrderedDict
 from dataclasses import dataclass, field
 from enum import Enum, member
 from pathlib import Path
-from typing import Any, Callable, Final, Optional
+from typing import Any, Callable, Final, Literal, Optional
 
 from faker import Faker
 from faker.providers import DynamicProvider
+from tenacity import (
+    Retrying,
+    retry_if_exception,
+    stop_after_attempt,
+    stop_after_delay,
+    wait_exponential_jitter,
+    wait_fixed,
+)
 
 ParserFn = Callable[[str], Any]
 
@@ -100,6 +108,120 @@ class AdbCommandResult:
     return_code: int = field(
         metadata={"description": "The return code of the command execution"}, default=1
     )
+
+
+# Substrings that indicate a transient ADB failure worth retrying (case-insensitive).
+_RETRYABLE_ADB_MESSAGE_FRAGMENTS: Final[tuple[str, ...]] = (
+    "protocol fault",
+    "connection reset",
+    "error: closed",
+    "broken pipe",
+    "connection refused",
+    "cannot connect",
+    "no connection could be made",
+    "failed to connect",
+    "device offline",
+    "device not found",
+    "daemon not running",
+    "server version mismatch",
+    "timed out",
+    "timeout",
+)
+
+# Substrings that indicate a permanent failure; never retry even if mixed with noise.
+_PERMANENT_ADB_MESSAGE_FRAGMENTS: Final[tuple[str, ...]] = (
+    "wrong pairing code",
+    "wrong",
+    "invalid",
+    "failed to authenticate",
+    "incorrect",
+    "pairing code",
+    "unauthorized",
+    "permission denied",
+    "insufficient permissions",
+    "failed to run adb binary",
+)
+
+
+@dataclass(frozen=True)
+class _AdbRetryProfile:
+    """Per-command Tenacity stop/wait boundaries and subprocess timeout."""
+
+    stop: Any
+    wait: Any
+    timeout_seconds: float
+
+
+_AdbRetryScope = Literal["client", "server"]
+
+
+def _is_retryable_adb_exception(exc: BaseException) -> bool:
+    """
+    Return True when an ADB subprocess failure is likely transient.
+
+    Missing binaries (``OSError``) and user-action failures (auth, permissions) are excluded.
+    """
+    if isinstance(exc, OSError):
+        return False
+    if not isinstance(exc, (AdbClientException, AdbServerException)):
+        return False
+    message = str(exc).casefold()
+    for fragment in _PERMANENT_ADB_MESSAGE_FRAGMENTS:
+        if fragment in message:
+            return False
+    for fragment in _RETRYABLE_ADB_MESSAGE_FRAGMENTS:
+        if fragment in message:
+            return True
+    return False
+
+
+def _make_adb_retry_before(
+    *,
+    scope: _AdbRetryScope,
+    command_name: str,
+    phone_id: str | None,
+) -> Callable[[Any], None]:
+    """Build a Tenacity ``before`` callback that logs attempt start and elapsed time."""
+
+    def _before(retry_state: Any) -> None:
+        elapsed = retry_state.seconds_since_start
+        logger.debug(
+            "ADB retry: attempt starting",
+            scope=scope,
+            command=command_name,
+            phone_id=phone_id,
+            attempt=retry_state.attempt_number,
+            elapsed_s=round(elapsed, 3) if elapsed is not None else 0.0,
+        )
+
+    return _before
+
+
+def _make_adb_retry_after(
+    *,
+    scope: _AdbRetryScope,
+    command_name: str,
+    phone_id: str | None,
+) -> Callable[[Any], None]:
+    """Build a Tenacity ``after`` callback that logs attempt outcome and elapsed time."""
+
+    def _after(retry_state: Any) -> None:
+        outcome = retry_state.outcome
+        failed = outcome is not None and outcome.failed
+        error = str(outcome.exception()) if failed else None
+        elapsed = retry_state.seconds_since_start
+        logger.debug(
+            "ADB retry: attempt finished",
+            scope=scope,
+            command=command_name,
+            phone_id=phone_id,
+            attempt=retry_state.attempt_number,
+            elapsed_s=round(elapsed, 3) if elapsed is not None else 0.0,
+            failed=failed,
+            error=error,
+        )
+
+    return _after
 
 
 def _make_strip_parser() -> ParserFn:
@@ -301,6 +423,46 @@ class AdbCommand:
     )
     sending_rate: int = field(
         metadata={"description": "The sending rate of the command"}, default=0
+    )
+
+
+def _retry_profile_for(
+    command: AdbCommand, *, scope: _AdbRetryScope
+) -> _AdbRetryProfile:
+    """
+    Select optimized retry boundaries by ADB subcommand shape.
+
+    ``pair`` gets a wider window; shell getters stay short; kill-server is minimal.
+    """
+    cmd = command.command
+    if cmd == "pair":
+        return _AdbRetryProfile(
+            stop=stop_after_attempt(3) | stop_after_delay(8),
+            wait=wait_exponential_jitter(initial=0.3, max=2.0, jitter=0.2),
+            timeout_seconds=15.0,
+        )
+    if cmd == "kill-server":
+        return _AdbRetryProfile(
+            stop=stop_after_attempt(2) | stop_after_delay(3),
+            wait=wait_fixed(0.5),
+            timeout_seconds=5.0,
+        )
+    if cmd in ("start-server", "get-state", "devices"):
+        return _AdbRetryProfile(
+            stop=stop_after_attempt(3) | stop_after_delay(5),
+            wait=wait_exponential_jitter(initial=0.2, max=1.5, jitter=0.1),
+            timeout_seconds=10.0,
+        )
+    if cmd == "shell" or scope == "client":
+        return _AdbRetryProfile(
+            stop=stop_after_attempt(2) | stop_after_delay(3),
+            wait=wait_exponential_jitter(initial=0.15, max=1.0, jitter=0.1),
+            timeout_seconds=8.0,
+        )
+    return _AdbRetryProfile(
+        stop=stop_after_attempt(3) | stop_after_delay(5),
+        wait=wait_exponential_jitter(initial=0.2, max=1.5, jitter=0.1),
+        timeout_seconds=10.0,
     )
 
 
@@ -639,43 +801,74 @@ class AdbClient:
         positional_arguments: list[str] | None = None,
     ) -> AdbCommandResult:
         """
-        Execute a command
+        Execute a command with Tenacity-backed retries on transient subprocess failures.
         """
         positional_arguments = positional_arguments or []
         argv: list[str] = [str(self.binary.path)]
         if phone is not None:
             argv.extend(["-s", phone.descriptor.id])
         argv.extend([command.command, *command.args, *positional_arguments])
-        try:
+        phone_id = phone.descriptor.id if phone else None
+        profile = _retry_profile_for(command, scope="client")
+
+        def _attempt() -> subprocess.CompletedProcess[str]:
             logger.debug(
                 "AdbClient: executing command",
                 adb_path=str(self.binary.path),
                 command=command.command,
-                phone_id=phone.descriptor.id if phone else None,
+                phone_id=phone_id,
                 argv=argv,
                 command_line=" ".join(shlex.quote(arg) for arg in argv),
+                timeout_s=profile.timeout_seconds,
             )
-            result = subprocess.run(argv, capture_output=True, text=True)
+            try:
+                completed = subprocess.run(
+                    argv,
+                    capture_output=True,
+                    text=True,
+                    timeout=profile.timeout_seconds,
+                )
+            except subprocess.TimeoutExpired as exc:
+                raise AdbClientException(
+                    f"Failed to execute command: {command.command} {command.args}: "
+                    f"timed out after {profile.timeout_seconds}s"
+                ) from exc
+            except subprocess.CalledProcessError as exc:
+                raise AdbClientException(
+                    f"Failed to execute command: {command.command} {command.args}"
+                ) from exc
+            except OSError as exc:
+                raise AdbClientException(
+                    f"Failed to run ADB binary {self.binary.path}"
+                ) from exc
             logger.debug(
                 "AdbClient: command completed",
                 adb_path=str(self.binary.path),
                 command=command.command,
-                return_code=result.returncode,
-                stdout=result.stdout.strip(),
-                stderr=result.stderr.strip(),
+                return_code=completed.returncode,
+                stdout=completed.stdout.strip(),
+                stderr=completed.stderr.strip(),
             )
-            if result.returncode != 0:
+            if completed.returncode != 0:
                 raise AdbClientException(
-                    f"Failed to execute command: {command.command} {command.args}: {result.stderr or result.stdout}"
+                    f"Failed to execute command: {command.command} {command.args}: "
+                    f"{completed.stderr or completed.stdout}"
                 )
-        except subprocess.CalledProcessError as e:
-            raise AdbClientException(
-                f"Failed to execute command: {command.command} {command.args}"
-            ) from e
-        except OSError as e:
-            raise AdbClientException(
-                f"Failed to run ADB binary {self.binary.path}"
-            ) from e
+            return completed
+
+        retryer = Retrying(
+            stop=profile.stop,
+            wait=profile.wait,
+            retry=retry_if_exception(_is_retryable_adb_exception),
+            reraise=True,
+            before=_make_adb_retry_before(
+                scope="client", command_name=command.command, phone_id=phone_id
+            ),
+            after=_make_adb_retry_after(
+                scope="client", command_name=command.command, phone_id=phone_id
+            ),
+        )
+        result = retryer(_attempt)
         cmd_result = AdbCommandResult(
             status=AdbCommandResultStatus.SUCCESS,
             phone=phone,
@@ -838,38 +1031,68 @@ class AdbServer:
 
     def _execute(self, command: AdbCommand) -> AdbCommandResult:
         """
-        Execute a command
+        Execute a command with Tenacity-backed retries on transient subprocess failures.
         """
         argv: list[str] = [str(self.binary.path), command.command, *command.args]
-        try:
+        profile = _retry_profile_for(command, scope="server")
+
+        def _attempt() -> subprocess.CompletedProcess[str]:
             logger.debug(
                 "AdbServer: executing command",
                 adb_path=str(self.binary.path),
                 command=command.command,
                 argv=argv,
                 command_line=" ".join(shlex.quote(arg) for arg in argv),
+                timeout_s=profile.timeout_seconds,
             )
-            result = subprocess.run(argv, capture_output=True, text=True)
+            try:
+                completed = subprocess.run(
+                    argv,
+                    capture_output=True,
+                    text=True,
+                    timeout=profile.timeout_seconds,
+                )
+            except subprocess.TimeoutExpired as exc:
+                raise AdbServerException(
+                    f"Failed to execute command: {command.command} {command.args}: "
+                    f"timed out after {profile.timeout_seconds}s"
+                ) from exc
+            except subprocess.CalledProcessError as exc:
+                raise AdbServerException(
+                    f"Failed to execute command: {command.command} {command.args}"
+                ) from exc
+            except OSError as exc:
+                raise AdbServerException(
+                    f"Failed to run ADB binary {self.binary.path}"
+                ) from exc
             logger.debug(
                 "AdbServer: command completed",
                 adb_path=str(self.binary.path),
                 command=command.command,
-                return_code=result.returncode,
-                stdout=result.stdout.strip(),
-                stderr=result.stderr.strip(),
+                return_code=completed.returncode,
+                stdout=completed.stdout.strip(),
+                stderr=completed.stderr.strip(),
             )
-            if result.returncode != 0:
+            if completed.returncode != 0:
                 raise AdbServerException(
-                    f"Failed to execute command: {command.command} {command.args}: {result.stderr or result.stdout}"
+                    f"Failed to execute command: {command.command} {command.args}: "
+                    f"{completed.stderr or completed.stdout}"
                 )
-        except subprocess.CalledProcessError as e:
-            raise AdbServerException(
-                f"Failed to execute command: {command.command} {command.args}"
-            ) from e
-        except OSError as e:
-            raise AdbServerException(
-                f"Failed to run ADB binary {self.binary.path}"
-            ) from e
+            return completed
+
+        retryer = Retrying(
+            stop=profile.stop,
+            wait=profile.wait,
+            retry=retry_if_exception(_is_retryable_adb_exception),
+            reraise=True,
+            before=_make_adb_retry_before(
+                scope="server", command_name=command.command, phone_id=None
+            ),
+            after=_make_adb_retry_after(
+                scope="server", command_name=command.command, phone_id=None
+            ),
+        )
+        result = retryer(_attempt)
         cmd_result = AdbCommandResult(
             status=AdbCommandResultStatus.SUCCESS,
             phone=None,
