@@ -7,6 +7,7 @@ import pytest
 from gui.blocks.activity import ActivityLogBlock
 from gui.blocks.card import BridgeStatusCardBlock, IdentityCardBlock
 from gui.blocks.device import DeviceSelectionBlock
+from gui.blocks.location import MilestoneTargetBlock
 from gui.device_panel import DeviceSelectionPanel
 from gui.host_panel import HostPanel
 from gui.location_panel import LocationPanel
@@ -79,12 +80,7 @@ def test_concrete_panels_keep_expected_body_widgets(qtbot) -> None:
         log_panel.file_display_widget()
         is log_panel.ui.activity_log_block.file_display_widget
     )
-    assert location_panel.ui.railway_input.placeholderText() == (
-        location_panel.texts.railway_input
-    )
-    assert location_panel.ui.kilometric_input.placeholderText() == (
-        location_panel.texts.kilometric_input
-    )
+    assert isinstance(location_panel.ui.milestone_target_block, MilestoneTargetBlock)
 
 
 def test_host_panel_extend_and_shorten_control_bridge_card(qtbot) -> None:

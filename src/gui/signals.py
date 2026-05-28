@@ -13,6 +13,7 @@ class ViewSignals(QObject):
     ExtendDeviceSelectionPanelRequested = Signal()
     ShortenDeviceSelectionPanelRequested = Signal()
     LocationPanelVisibilityRequested = Signal(bool)
+    TargetSelectionRequested = Signal()
     HostPanelVisibilityRequested = Signal(bool)
     LogPanelVisibilityRequested = Signal(bool)
     RunHelperAnimationRequested = Signal()

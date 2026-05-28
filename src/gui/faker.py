@@ -132,6 +132,30 @@ _LOG_PLACEHOLDER_VERBS: Final[tuple[str, ...]] = (
     "spoof",
 )
 
+_MILESTONE_LINE_LABELS: Final[tuple[str, ...]] = (
+    "Ligne 830000",
+    "A",
+    "LGV Atlantique - branche ouest",
+    "North-Yard / Test Branch 42",
+    "Voie d'essai interconnexion très longue",
+)
+
+_MILESTONE_TYPE_LABELS: Final[tuple[str, ...]] = (
+    "Kilomètre",
+    "PK",
+    "Point remarquable",
+    "Repère d'ouvrage",
+    "Signalisation - limite technique",
+)
+
+_MILESTONE_SOURCE_LABELS: Final[tuple[str, ...]] = (
+    "Referentiel PK GPS",
+    "Manual",
+    "Imported GeoJSON",
+    "SNCF-OPEN-DATA:pk-gps-v2026",
+    "QA synthetic / edge-case label",
+)
+
 faker.add_provider(
     DynamicProvider(
         provider_name="host_identity_summary",
@@ -178,6 +202,24 @@ faker.add_provider(
     DynamicProvider(
         provider_name="log_placeholder_verb",
         elements=list(_LOG_PLACEHOLDER_VERBS),
+    )
+)
+faker.add_provider(
+    DynamicProvider(
+        provider_name="milestone_line_label",
+        elements=list(_MILESTONE_LINE_LABELS),
+    )
+)
+faker.add_provider(
+    DynamicProvider(
+        provider_name="milestone_type_label",
+        elements=list(_MILESTONE_TYPE_LABELS),
+    )
+)
+faker.add_provider(
+    DynamicProvider(
+        provider_name="milestone_source_label",
+        elements=list(_MILESTONE_SOURCE_LABELS),
     )
 )
 
@@ -256,3 +298,29 @@ def generate_activity_log_filename() -> str:
 
 def generate_activity_log_file_type() -> str:
     return faker.activity_log_file_type()
+
+
+def generate_milestone_line_label() -> str:
+    return faker.milestone_line_label()
+
+
+def generate_milestone_km_label() -> str:
+    kilometer = faker.random_int(0, 999)
+    meters = faker.random_int(0, 999)
+    return f"{kilometer}+{meters:03d}"
+
+
+def generate_milestone_longitude() -> float:
+    return faker.pyfloat(left_digits=2, right_digits=10, min_value=-5, max_value=9)
+
+
+def generate_milestone_latitude() -> float:
+    return faker.pyfloat(left_digits=2, right_digits=10, min_value=41, max_value=51)
+
+
+def generate_milestone_type_label() -> str:
+    return faker.milestone_type_label()
+
+
+def generate_milestone_source_label() -> str:
+    return faker.milestone_source_label()

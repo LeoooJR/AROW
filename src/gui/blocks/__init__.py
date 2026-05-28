@@ -4,6 +4,7 @@ from gui.blocks.activity import ActivityLogBlock
 from gui.blocks.base import Block
 from gui.blocks.card import BridgeStatusCardBlock, IdentityCardBlock
 from gui.blocks.device import DeviceSelectionBlock
+from gui.blocks.location import MilestoneTargetBlock
 from gui.blocks.map import MapBlock
 from gui.blocks.start import (
     ConnectionActionsBlock,
@@ -21,6 +22,7 @@ __all__ = [
     "DeviceSelectionBlock",
     "IdentityCardBlock",
     "MapBlock",
+    "MilestoneTargetBlock",
     "OperatorReadinessBlock",
     "StartRecentBlock",
     "TopBar",

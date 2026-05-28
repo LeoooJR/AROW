@@ -12,7 +12,7 @@ from gui.blocks.start import (
     StartRecentBlock,
     WalkthroughBlock,
 )
-from gui.components import File, WalkthroughButton
+from gui.components import File, StatusBadge, WalkthroughButton
 from gui.signals import view_signals
 
 pytestmark = pytest.mark.usefixtures("qapp")
@@ -102,9 +102,18 @@ def test_operator_readiness_block_builds_expected_rows(qtbot) -> None:
     qtbot.addWidget(block)
 
     assert block.ui.title.text() == block.texts.title
-    assert len(block.ui.rows) == len(block.texts.rows)
-    assert block.ui.rows[0].ui.label.text() == "Host ready"
-    assert block.ui.rows[0].ui.status.text() == "READY"
+    assert len(block.ui.rows) == len(block.texts.default_rows)
+    assert block.ui.rows[0].ui.label.text() == "Host"
+    assert isinstance(block.ui.rows[0].ui.status, StatusBadge)
+    assert block.ui.rows[0].ui.status.text() == "PENDING"
+    assert block.ui.rows[0].ui.status.kind() == "ready"
+    assert block.ui.rows[0].ui.status.property("readiness-status-chip") == "ready"
+
+    block.ui.rows[0].update("Host", "ADB bridge stopped", "ERROR", "error")
+
+    assert block.ui.rows[0].ui.status.text() == "ERROR"
+    assert block.ui.rows[0].ui.status.kind() == "error"
+    assert block.ui.rows[0].ui.status.property("readiness-status-chip") == "error"
 
 
 def test_connection_actions_block_builds_unwired_buttons(qtbot) -> None:

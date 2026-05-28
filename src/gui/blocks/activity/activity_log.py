@@ -1007,7 +1007,7 @@ class ActivityLogBlock(QFrame, Block):
         self.add_activity(
             "ADB server stopped",
             "adb",
-            "stop",
+            "warning",
             metadata={"state": "idle"},
         )
 

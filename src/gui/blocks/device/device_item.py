@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
 from shiboken6 import isValid
 
 from gui.colors import Theme
-from gui.components import ToolButton
+from gui.components import StatusBadge, ToolButton
 from gui.icons import GenericIcons, icon_qt_path, icon_qt_path_for_theme
 from gui.settings import Settings
 from gui.signals import view_signals
@@ -631,8 +631,16 @@ class DeviceItem(QListWidgetItem):
         if self._badge == "none":
             return
         if self._badge == "active":
-            lab = QLabel(self.texts.active_badge)
-            lab.setProperty("device-item-badge", "active")
+            lab = StatusBadge(
+                text=self.texts.active_badge,
+                kind="active",
+                object_name="device-item-badge",
+                property_name="device-item-badge",
+                size_policy=(
+                    QSizePolicy.Policy.Maximum,
+                    QSizePolicy.Policy.Preferred,
+                ),
+            )
             lab.setFont(
                 QFont(
                     Settings.FONT.FAMILY, Settings.FONT.SIZE_HELPER, QFont.Weight.Normal
@@ -649,8 +657,16 @@ class DeviceItem(QListWidgetItem):
                     QSize(self._SUBTITLE_ICON_PX, self._SUBTITLE_ICON_PX)
                 )
             )
-            tx = QLabel(self.texts.trusted_badge)
-            tx.setProperty("device-item-badge", "trusted-text")
+            tx = StatusBadge(
+                text=self.texts.trusted_badge,
+                kind="trusted-text",
+                object_name="device-item-badge",
+                property_name="device-item-badge",
+                size_policy=(
+                    QSizePolicy.Policy.Maximum,
+                    QSizePolicy.Policy.Preferred,
+                ),
+            )
             tx.setFont(
                 QFont(
                     Settings.FONT.FAMILY, Settings.FONT.SIZE_HELPER, QFont.Weight.Normal
@@ -662,8 +678,16 @@ class DeviceItem(QListWidgetItem):
             layout.addWidget(ic)
             layout.addWidget(tx)
         elif self._badge == "new":
-            lab = QLabel(self.texts.new_badge)
-            lab.setProperty("device-item-badge", "new")
+            lab = StatusBadge(
+                text=self.texts.new_badge,
+                kind="new",
+                object_name="device-item-badge",
+                property_name="device-item-badge",
+                size_policy=(
+                    QSizePolicy.Policy.Maximum,
+                    QSizePolicy.Policy.Preferred,
+                ),
+            )
             lab.setFont(
                 QFont(
                     Settings.FONT.FAMILY,

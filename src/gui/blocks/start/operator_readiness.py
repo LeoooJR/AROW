@@ -10,6 +10,7 @@ from PySide6.QtWidgets import QLabel, QSizePolicy, QWidget
 
 from gui.blocks.base import Block
 from gui.colors import Theme
+from gui.components import StatusBadge
 from gui.settings import Settings
 from gui.signals import view_signals
 from gui.wrapper import HorizontalLayoutWrapper, VerticalLayoutWrapper
@@ -28,7 +29,7 @@ class ReadinessRow(HorizontalLayoutWrapper):
     class UI:
         label: QLabel
         detail: QLabel
-        status: QLabel
+        status: StatusBadge
         text_wrapper: VerticalLayoutWrapper
 
     def __init__(
@@ -58,9 +59,13 @@ class ReadinessRow(HorizontalLayoutWrapper):
         )
         text_wrapper.setObjectName("readiness-row-text")
 
-        status_widget = QLabel(status, parent)
-        status_widget.setObjectName("readiness-status-chip")
-        status_widget.setProperty("readiness-status-chip", status_kind)
+        status_widget = StatusBadge(
+            parent,
+            text=status,
+            kind=status_kind,
+            object_name="readiness-status-chip",
+            property_name="readiness-status-chip",
+        )
 
         super().__init__(
             parent,
@@ -97,11 +102,7 @@ class ReadinessRow(HorizontalLayoutWrapper):
 
     def _set_status(self, status: str, status_kind: str = "muted") -> None:
         """Update the status label."""
-        self.ui.status.setText(status)
-        self.ui.status.setProperty("readiness-status-chip", status_kind)
-        self.ui.status.style().unpolish(self.ui.status)
-        self.ui.status.style().polish(self.ui.status)
-        self.ui.status.update()
+        self.ui.status.set_status(status, status_kind)
 
 
 class OperatorReadinessBlock(VerticalLayoutWrapper, Block):
