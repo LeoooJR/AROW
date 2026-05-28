@@ -992,6 +992,7 @@ class ActivityLogBlock(QFrame, Block):
     def _on_ui_constraints_disabled(self) -> None:
         """Record an activity when the UI constraints are disabled."""
         self._seed_placeholder_activities()
+        self._render_activities()
 
     def _on_adb_server_started(self) -> None:
         """Record an activity when the ADB server starts."""
