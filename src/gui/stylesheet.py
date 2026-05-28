@@ -639,6 +639,95 @@ QLabel#readiness-status-chip[readiness-status-chip="muted"] {{
     color: {palette.TEXT_MUTED};
 }}
 
+QLabel#status-badge {{
+    border-radius: {Settings.BORDER_RADIUS.SM}px;
+    font-family: {Settings.FONT.MONO_FAMILY_CSS};
+    font-size: {Settings.FONT.SIZE_HELPER}px;
+    font-weight: {Settings.FONT.WEIGHT_DEMIBOLD};
+    padding: 3px 8px;
+}}
+
+QLabel#status-badge[status-badge="not-set"] {{
+    background-color: {palette.PRIMARY_SOFT};
+    border: 1px solid {palette.PRIMARY_BORDER};
+    color: {palette.PRIMARY};
+}}
+
+QLabel#status-badge[status-badge="ready"] {{
+    background-color: {palette.SUCCESS_SOFT};
+    border: 1px solid {palette.SUCCESS_BORDER};
+    color: {palette.SUCCESS};
+}}
+
+QLabel#status-badge[status-badge="muted"] {{
+    background-color: {palette.SURFACE_ELEVATED};
+    border: 1px solid {palette.BORDER_SUBTLE};
+    color: {palette.TEXT_MUTED};
+}}
+
+QLabel#status-badge[status-badge="error"] {{
+    background-color: rgba(217, 84, 77, 0.12);
+    border: 1px solid rgba(217, 84, 77, 0.28);
+    color: {palette.ERROR};
+}}
+
+QFrame#milestone-target-block {{
+    background-color: {palette.SURFACE_ELEVATED};
+    border: 1px solid {palette.BORDER_SUBTLE};
+    border-radius: {Settings.BORDER_RADIUS.MD}px;
+}}
+
+QFrame#milestone-target-header,
+QFrame#milestone-metadata-grid,
+QFrame#milestone-target-footer,
+QFrame#milestone-metadata-item {{
+    background-color: {palette.TRANSPARENT};
+    border: none;
+}}
+
+QLabel#milestone-target-title,
+QLabel[milestone-target-title="true"] {{
+    background-color: {palette.TRANSPARENT};
+    border: none;
+    color: {palette.TEXT_PRIMARY};
+    font-size: {Settings.FONT.SIZE_DEFAULT}px;
+    font-weight: {Settings.FONT.WEIGHT_DEMIBOLD};
+}}
+
+QFrame#milestone-metadata-item QLabel[milestone-metadata-key="true"] {{
+    color: {palette.TEXT_MUTED};
+    font-size: {Settings.FONT.SIZE_HELPER}px;
+    font-weight: {Settings.FONT.WEIGHT_NORMAL};
+}}
+
+QFrame#milestone-metadata-item QLabel[milestone-metadata-value="true"] {{
+    color: {palette.TEXT_PRIMARY};
+    font-family: {Settings.FONT.MONO_FAMILY_CSS};
+    font-size: {Settings.FONT.SIZE_HELPER}px;
+    font-weight: {Settings.FONT.WEIGHT_DEMIBOLD};
+}}
+
+QPushButton#location-target-button,
+QPushButton[location-target-button="true"] {{
+    background-color: {palette.PRIMARY};
+    border: none;
+    border-radius: {Settings.BORDER_RADIUS.SM}px;
+    color: {palette.BLACK};
+    font-size: {Settings.FONT.SIZE_HELPER}px;
+    font-weight: {Settings.FONT.WEIGHT_DEMIBOLD};
+    padding: 6px 12px;
+}}
+
+QPushButton#location-target-button:hover,
+QPushButton[location-target-button="true"]:hover {{
+    background-color: {palette.PRIMARY_HOVER};
+}}
+
+QPushButton#location-target-button:pressed,
+QPushButton[location-target-button="true"]:pressed {{
+    background-color: {palette.PRIMARY};
+}}
+
 QPushButton#welcome-walkthrough-button,
 QPushButton[welcome-walkthrough-button="true"] {{
     background-color: {palette.SURFACE_ELEVATED};

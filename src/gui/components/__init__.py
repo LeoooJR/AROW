@@ -13,7 +13,13 @@ from gui.components.dialogs import (
 )
 from gui.components.feedback import Toast
 from gui.components.file_display import File
-from gui.components.indicators import ConditionIndicator, IndicatorState, ProgressBar
+from gui.components.indicators import (
+    ConditionIndicator,
+    IndicatorState,
+    ProgressBar,
+    StatusBadge,
+    StatusBadgeKind,
+)
 from gui.components.inputs import (
     OTPInput,
     OTPLineEdit,
@@ -50,6 +56,8 @@ __all__ = [
     "QtABCMeta",
     "SVG",
     "SelectionField",
+    "StatusBadge",
+    "StatusBadgeKind",
     "Toast",
     "ToolButton",
     "WalkthroughButton",
