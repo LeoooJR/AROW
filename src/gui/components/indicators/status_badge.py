@@ -32,6 +32,9 @@ class StatusBadge(QLabel, Component):
         parent: QWidget | None = None,
         text: str = "",
         kind: StatusBadgeKind = "muted",
+        object_name: str = "status-badge",
+        property_name: str = "status-badge",
+        size_policy: tuple[QSizePolicy.Policy, QSizePolicy.Policy] | None = None,
     ) -> None:
         """Create a status badge.
 
@@ -39,17 +42,25 @@ class StatusBadge(QLabel, Component):
             parent: Optional Qt parent widget for lifetime and hierarchy.
             text: Initial badge text.
             kind: Dynamic style kind consumed by the stylesheet.
+            object_name: Object name consumed by the stylesheet.
+            property_name: Dynamic property name consumed by the stylesheet.
+            size_policy: Optional explicit size policy.
         """
         super().__init__(text, parent)
         self.texts = StatusBadge.Text(label=text)
         self.ui = StatusBadge.UI()
-        self.setObjectName("status-badge")
-        self.setProperty("status-badge", kind)
+        self._property_name = property_name
+        self._size_policy = size_policy or (
+            QSizePolicy.Policy.Fixed,
+            QSizePolicy.Policy.Fixed,
+        )
+        self.setObjectName(object_name)
+        self.setProperty(self._property_name, kind)
         self._kind: StatusBadgeKind = kind
         self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
-        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.setSizePolicy(*self._size_policy)
 
     def _set_alignment(self) -> None:
         pass
@@ -65,7 +76,7 @@ class StatusBadge(QLabel, Component):
         self.setText(text)
         self.texts = StatusBadge.Text(label=text)
         self._kind = kind
-        self.setProperty("status-badge", kind)
+        self.setProperty(self._property_name, kind)
         self.style().unpolish(self)
         self.style().polish(self)
         self.update()

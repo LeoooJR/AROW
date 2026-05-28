@@ -9,12 +9,14 @@ from __future__ import annotations
 import datetime as dt
 
 import pytest
+from PySide6.QtWidgets import QLabel
 
 from gui.blocks.device import (
     DeviceItem,
     DeviceSelectionBlock,
     format_last_communication_short,
 )
+from gui.components import StatusBadge
 from gui.settings import Settings
 from gui.signals import view_signals
 
@@ -30,6 +32,50 @@ def test_device_item_badge_stays_stacked_in_compact_and_extended_modes(qtbot) ->
 
     assert item.ui.center.get_layout().indexOf(item.ui.badge_container) == 1
     assert item.ui.title_row.get_layout().indexOf(item.ui.badge_container) == -1
+
+
+@pytest.mark.parametrize(
+    ("badge_kind", "text", "property_value"),
+    [
+        ("active", "Active", "active"),
+        ("new", "New", "new"),
+    ],
+)
+def test_device_item_text_badges_use_status_badge(
+    qtbot, badge_kind: str, text: str, property_value: str
+) -> None:
+    item = DeviceItem(None, text="Zenfone 11", badge=badge_kind)
+    qtbot.addWidget(item.row_widget)
+    qtbot.wait(0)
+
+    badges = item.ui.badge_container.findChildren(StatusBadge)
+
+    assert len(badges) == 1
+    assert badges[0].objectName() == "device-item-badge"
+    assert badges[0].text() == text
+    assert badges[0].property("device-item-badge") == property_value
+    assert badges[0].property("status-badge") is None
+
+
+def test_device_item_trusted_badge_keeps_icon_and_uses_status_badge_text(qtbot) -> None:
+    item = DeviceItem(None, text="Zenfone 11", badge="trusted")
+    qtbot.addWidget(item.row_widget)
+    qtbot.wait(0)
+
+    badges = item.ui.badge_container.findChildren(StatusBadge)
+    plain_labels = [
+        label
+        for label in item.ui.badge_container.findChildren(QLabel)
+        if not isinstance(label, StatusBadge)
+    ]
+
+    assert len(badges) == 1
+    assert badges[0].objectName() == "device-item-badge"
+    assert badges[0].text() == "Trusted"
+    assert badges[0].property("device-item-badge") == "trusted-text"
+    assert badges[0].property("status-badge") is None
+    assert len(plain_labels) == 1
+    assert plain_labels[0].pixmap() is not None
 
     item.extend()
     assert item.ui.center.get_layout().indexOf(item.ui.badge_container) == 1

@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from PySide6.QtCore import QAbstractAnimation
 
-from gui.components.indicators import ConditionIndicator, ProgressBar
+from gui.components.indicators import ConditionIndicator, ProgressBar, StatusBadge
 
 pytestmark = pytest.mark.usefixtures("qapp")
 
@@ -48,3 +48,38 @@ def test_progress_bar_uses_step_labels_and_falls_back_out_of_range(qtbot) -> Non
     progress.setValue(2)
 
     assert progress.format() == "%v"
+
+
+def test_status_badge_keeps_default_stylesheet_property(qtbot) -> None:
+    badge = StatusBadge(text="Not set", kind="not-set")
+    qtbot.addWidget(badge)
+
+    assert badge.objectName() == "status-badge"
+    assert badge.property("status-badge") == "not-set"
+
+    badge.set_status("Ready", "ready")
+
+    assert badge.text() == "Ready"
+    assert badge.kind() == "ready"
+    assert badge.property("status-badge") == "ready"
+
+
+def test_status_badge_accepts_custom_stylesheet_property(qtbot) -> None:
+    badge = StatusBadge(
+        text="PENDING",
+        kind="muted",
+        object_name="readiness-status-chip",
+        property_name="readiness-status-chip",
+    )
+    qtbot.addWidget(badge)
+
+    assert badge.objectName() == "readiness-status-chip"
+    assert badge.property("readiness-status-chip") == "muted"
+    assert badge.property("status-badge") is None
+
+    badge.set_status("READY", "ready")
+
+    assert badge.text() == "READY"
+    assert badge.kind() == "ready"
+    assert badge.property("readiness-status-chip") == "ready"
+    assert badge.property("status-badge") is None
