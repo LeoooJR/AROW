@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from numbers import Real
 from typing import Final
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QFontMetrics
 from PySide6.QtWidgets import QLabel, QSizePolicy, QWidget
 
+from gui import faker as ui_faker
 from gui.blocks.base import Block
 from gui.colors import Theme
 from gui.components import Button, StatusBadge
@@ -44,6 +47,7 @@ class MilestoneMetadataItem(HorizontalLayoutWrapper):
 
         value_label = QLabel(value, parent)
         value_label.setProperty("milestone-metadata-value", True)
+        value_label.setWordWrap(False)
 
         super().__init__(
             parent,
@@ -53,16 +57,69 @@ class MilestoneMetadataItem(HorizontalLayoutWrapper):
         )
         self.setObjectName("milestone-metadata-item")
         self.setProperty("milestone-metadata-item", True)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        self._raw_value = _display_value(value)
+        self._pending_value_elision_refresh = False
         self.texts = item_texts
         self.ui = MilestoneMetadataItem.UI(key=key_label, value=value_label)
-        self.get_layout().setAlignment(key_label, Qt.AlignmentFlag.AlignLeft)
-        self.get_layout().setAlignment(value_label, Qt.AlignmentFlag.AlignLeft)
+        self.ui.key.setSizePolicy(
+            QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred
+        )
+        self.ui.value.setSizePolicy(
+            QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred
+        )
+        self.ui.value.setMinimumWidth(0)
+        self.ui.key.setAlignment(
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+        )
+        self.ui.value.setAlignment(
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+        )
+        self.get_layout().setStretchFactor(key_label, 0)
+        self.get_layout().setStretchFactor(value_label, 1)
 
     def set_value(self, value: object | None) -> None:
         """Update the displayed value, falling back to ``--`` for empty data."""
         display_value = _display_value(value)
-        self.ui.value.setText(display_value)
+        self._raw_value = display_value
         self.texts = MilestoneMetadataItem.Text(key=self.texts.key, value=display_value)
+        self.ui.value.setText(display_value)
+        self._schedule_value_elision_refresh()
+
+    def resizeEvent(self, event) -> None:
+        """Keep long values elided whenever the metadata item width changes."""
+        super().resizeEvent(event)
+        self._schedule_value_elision_refresh()
+
+    @property
+    def raw_value(self) -> str:
+        """Return the unelided displayed value."""
+        return self._raw_value
+
+    def _refresh_value_elision(self) -> None:
+        """Render the raw value with right-side elision inside the available width."""
+        self._pending_value_elision_refresh = False
+        try:
+            available_width = max(0, self.ui.value.width())
+        except RuntimeError:
+            return
+        if available_width <= 0:
+            self.ui.value.setText(self._raw_value)
+            return
+        elided = QFontMetrics(self.ui.value.font()).elidedText(
+            self._raw_value,
+            Qt.TextElideMode.ElideRight,
+            available_width,
+        )
+        self.ui.value.setText(elided)
+        self.ui.value.setToolTip(self._raw_value if elided != self._raw_value else "")
+
+    def _schedule_value_elision_refresh(self) -> None:
+        """Refresh elision after Qt has settled child label geometry."""
+        if self._pending_value_elision_refresh:
+            return
+        self._pending_value_elision_refresh = True
+        QTimer.singleShot(0, self._refresh_value_elision)
 
 
 class MilestoneTargetBlock(VerticalLayoutWrapper, Block):
@@ -80,6 +137,22 @@ class MilestoneTargetBlock(VerticalLayoutWrapper, Block):
         latitude_key: Final[str] = "Latitude"
         type_key: Final[str] = "Type"
         source_key: Final[str] = "Source"
+        placeholder_line: str = field(
+            default_factory=ui_faker.generate_milestone_line_label
+        )
+        placeholder_km: str = field(default_factory=ui_faker.generate_milestone_km_label)
+        placeholder_longitude: float = field(
+            default_factory=ui_faker.generate_milestone_longitude
+        )
+        placeholder_latitude: float = field(
+            default_factory=ui_faker.generate_milestone_latitude
+        )
+        placeholder_type: str = field(
+            default_factory=ui_faker.generate_milestone_type_label
+        )
+        placeholder_source: str = field(
+            default_factory=ui_faker.generate_milestone_source_label
+        )
 
     @dataclass
     class UI:
@@ -128,19 +201,17 @@ class MilestoneTargetBlock(VerticalLayoutWrapper, Block):
 
         metadata_grid = GridLayoutWrapper(
             parent,
-            widgets=[
-                (line_item, 0, 0),
-                (longitude_item, 1, 0),
-                (type_item, 2, 0),
-                (km_item, 0, 1),
-                (latitude_item, 1, 1),
-                (source_item, 2, 1),
-            ],
+            widgets=[],
             spacing=Settings.SPACING.NONE,
             margins=Settings.SPACING.MARGIN_NONE,
-            alignment=Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
         )
         metadata_grid.setObjectName("milestone-metadata-grid")
+        metadata_grid.get_layout().addWidget(line_item, 0, 0)
+        metadata_grid.get_layout().addWidget(longitude_item, 1, 0)
+        metadata_grid.get_layout().addWidget(type_item, 2, 0)
+        metadata_grid.get_layout().addWidget(km_item, 0, 1)
+        metadata_grid.get_layout().addWidget(latitude_item, 1, 1)
+        metadata_grid.get_layout().addWidget(source_item, 2, 1)
         metadata_grid.get_layout().setHorizontalSpacing(
             Settings.LOCATION.METADATA_GRID_HORIZONTAL_SPACING
         )
@@ -225,6 +296,7 @@ class MilestoneTargetBlock(VerticalLayoutWrapper, Block):
 
     def _connect_signals(self) -> None:
         self.ui.target_button.clicked.connect(view_signals.TargetSelectionRequested.emit)
+        view_signals.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
 
     def apply_theme_icons(self, theme: Theme) -> None:
         self.ui.target_button.apply_theme_icons(theme)
@@ -245,8 +317,8 @@ class MilestoneTargetBlock(VerticalLayoutWrapper, Block):
         updates: tuple[tuple[object | None, MilestoneMetadataItem], ...] = (
             (line, self.ui.line_item),
             (km, self.ui.km_item),
-            (longitude, self.ui.longitude_item),
-            (latitude, self.ui.latitude_item),
+            (_coordinate_display_value(longitude), self.ui.longitude_item),
+            (_coordinate_display_value(latitude), self.ui.latitude_item),
             (type_, self.ui.type_item),
             (source, self.ui.source_item),
         )
@@ -260,9 +332,42 @@ class MilestoneTargetBlock(VerticalLayoutWrapper, Block):
                 status_kind or self.ui.status_badge.kind(),
             )
 
+    def _on_ui_constraints_disabled(self) -> None:
+        """Re-apply placeholder values when UI constraints are disabled."""
+        self.set_placeholder_values()
+
+    def set_placeholder_values(self) -> None:
+        """Populate the block with generated placeholder milestone values."""
+        self.set_target_values(
+            line=self.texts.placeholder_line,
+            km=self.texts.placeholder_km,
+            longitude=self.texts.placeholder_longitude,
+            latitude=self.texts.placeholder_latitude,
+            type_=self.texts.placeholder_type,
+            source=self.texts.placeholder_source,
+            status_text="Ready",
+            status_kind="ready",
+        )
+
+
 def _display_value(value: object | None) -> str:
     """Format empty values as the shared placeholder."""
     if value is None:
         return "--"
     text = str(value).strip()
     return text if text else "--"
+
+
+def _coordinate_display_value(value: object | None) -> str | None:
+    """Format coordinate values to a bounded precision for compact display."""
+    if value is None:
+        return None
+    if isinstance(value, Real) and not isinstance(value, bool):
+        return f"{float(value):.6f}"
+    display_value = _display_value(value)
+    if display_value == "--":
+        return display_value
+    try:
+        return f"{float(display_value):.6f}"
+    except ValueError:
+        return display_value
