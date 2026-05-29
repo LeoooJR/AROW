@@ -1,6 +1,6 @@
+from __future__ import annotations
+
 import datetime
-import os
-import random
 import re
 import shlex
 import subprocess
@@ -8,10 +8,17 @@ from collections import OrderedDict
 from dataclasses import dataclass, field
 from enum import Enum, member
 from pathlib import Path
-from typing import Any, Callable, Final, Optional
+from typing import Any, Callable, Final, Literal, Optional
 
-from faker import Faker
-from faker.providers import DynamicProvider
+from tenacity import (
+    Retrying,
+    retry_if_exception,
+    retry_if_result,
+    stop_after_attempt,
+    stop_after_delay,
+    wait_exponential_jitter,
+    wait_fixed,
+)
 
 ParserFn = Callable[[str], Any]
 
@@ -59,18 +66,19 @@ class AdbBinary:
 
 class AdbCommandResultStatus(Enum):
     """
-    Status of the command execution
-    SUCCESS: The command executed successfully
-    ERROR: The command failed to execute
-    TIMEOUT: The command timed out
-    CONNECTION_ERROR: The command failed to connect to the device
-    UNKNOWN_ERROR: The command failed for an unknown reason
+    Status of the command execution.
+
+    SUCCESS: The command executed successfully.
+    ERROR: Non-retryable command failure (auth, permissions, invalid input, etc.).
+    TIMEOUT: The subprocess timed out.
+    TRANSIENT_ERROR: Retryable transport/device/server failure after retries are exhausted.
+    UNKNOWN_ERROR: Unclassified failure (reserved for future use).
     """
 
     SUCCESS = 0
     ERROR = 1
     TIMEOUT = 2
-    CONNECTION_ERROR = 3
+    TRANSIENT_ERROR = 3
     UNKNOWN_ERROR = 4
 
 
@@ -100,6 +108,192 @@ class AdbCommandResult:
     return_code: int = field(
         metadata={"description": "The return code of the command execution"}, default=1
     )
+
+
+# Substrings that indicate a transient ADB failure worth retrying (case-insensitive).
+_RETRYABLE_ADB_MESSAGE_FRAGMENTS: Final[tuple[str, ...]] = (
+    "protocol fault",
+    "connection reset",
+    "error: closed",
+    "broken pipe",
+    "connection refused",
+    "cannot connect",
+    "no connection could be made",
+    "failed to connect",
+    "device offline",
+    "device not found",
+    "daemon not running",
+    "server version mismatch",
+    "timed out",
+    "timeout",
+)
+
+# Substrings that indicate a permanent failure; never retry even if mixed with noise.
+_PERMANENT_ADB_MESSAGE_FRAGMENTS: Final[tuple[str, ...]] = (
+    "wrong pairing code",
+    "wrong",
+    "invalid",
+    "failed to authenticate",
+    "incorrect",
+    "pairing code",
+    "unauthorized",
+    "permission denied",
+    "insufficient permissions",
+    "failed to run adb binary",
+)
+
+
+@dataclass(frozen=True)
+class _AdbRetryProfile:
+    """Per-command Tenacity stop/wait boundaries and subprocess timeout."""
+
+    stop: Any
+    wait: Any
+    timeout_seconds: float
+
+
+_AdbRetryScope = Literal["client", "server"]
+
+
+def _message_is_retryable_adb_failure(message: str) -> bool:
+    """True when ADB stderr/stdout points to a transient transport or daemon issue."""
+    message = message.casefold()
+    for fragment in _PERMANENT_ADB_MESSAGE_FRAGMENTS:
+        if fragment in message:
+            return False
+    for fragment in _RETRYABLE_ADB_MESSAGE_FRAGMENTS:
+        if fragment in message:
+            return True
+    return False
+
+
+def _is_retryable_adb_exception(exc: BaseException) -> bool:
+    """
+    Return True when an ADB subprocess failure is likely transient.
+
+    Missing binaries (``OSError``) and user-action failures (auth, permissions) are excluded.
+    """
+    if isinstance(exc, OSError):
+        return False
+    if not isinstance(exc, (AdbClientException, AdbServerException)):
+        return False
+    return _message_is_retryable_adb_failure(str(exc))
+
+
+def _adb_status_from_process(
+    *, return_code: int, output: str = "", error: str = ""
+) -> AdbCommandResultStatus:
+    """
+    Map a completed adb process to the project status enum.
+
+    ADB often writes daemon and diagnostic notes to stderr on success, so stderr alone is
+    not a failure signal. Non-zero return codes are classified by the message content.
+    """
+    if return_code == 0:
+        return AdbCommandResultStatus.SUCCESS
+    combined = f"{output}\n{error}".strip()
+    if _message_is_retryable_adb_failure(combined):
+        return AdbCommandResultStatus.TRANSIENT_ERROR
+    return AdbCommandResultStatus.ERROR
+
+
+def _adb_status_from_timeout() -> AdbCommandResultStatus:
+    """Name timeout status through a helper so timeout construction stays explicit."""
+    return AdbCommandResultStatus.TIMEOUT
+
+
+def _is_retryable_adb_result(result: AdbCommandResult) -> bool:
+    """Retry finalizable ADB results only for transient status values/messages."""
+    if result.status == AdbCommandResultStatus.TIMEOUT:
+        return True
+    if result.status == AdbCommandResultStatus.TRANSIENT_ERROR:
+        return True
+    if result.status != AdbCommandResultStatus.SUCCESS:
+        return _message_is_retryable_adb_failure(f"{result.output}\n{result.error}")
+    return False
+
+
+def _return_last_adb_retry_outcome(retry_state: Any) -> AdbCommandResult:
+    """
+    Return the final result when result-based retries are exhausted.
+
+    Tenacity otherwise raises ``RetryError`` for exhausted result predicates. Exceptions
+    still re-raise here so ``reraise=True`` preserves the original exception contract.
+    """
+    outcome = retry_state.outcome
+    if outcome is None:
+        raise RuntimeError("ADB retry finished without an outcome")
+    if outcome.failed:
+        raise outcome.exception()
+    return outcome.result()
+
+
+def _adb_failure_message(command: AdbCommand, result: AdbCommandResult) -> str:
+    """Build one consistent exception message from a non-success command result."""
+    detail = (result.error or result.output or result.status.name).strip()
+    return f"Failed to execute command: {command.command} {command.args}: {detail}"
+
+
+def _raise_client_for_result(command: AdbCommand, result: AdbCommandResult) -> None:
+    if result.status != AdbCommandResultStatus.SUCCESS:
+        raise AdbClientException(_adb_failure_message(command, result))
+
+
+def _raise_server_for_result(command: AdbCommand, result: AdbCommandResult) -> None:
+    if result.status != AdbCommandResultStatus.SUCCESS:
+        raise AdbServerException(_adb_failure_message(command, result))
+
+
+def _make_adb_retry_before(
+    *,
+    scope: _AdbRetryScope,
+    command_name: str,
+    phone_id: str | None,
+) -> Callable[[Any], None]:
+    """Build a Tenacity ``before`` callback that logs attempt start and elapsed time."""
+
+    def _before(retry_state: Any) -> None:
+        elapsed = retry_state.seconds_since_start
+        logger.debug(
+            "ADB retry: attempt starting",
+            scope=scope,
+            command=command_name,
+            phone_id=phone_id,
+            attempt=retry_state.attempt_number,
+            elapsed_s=round(elapsed, 3) if elapsed is not None else 0.0,
+        )
+
+    return _before
+
+
+def _make_adb_retry_after(
+    *,
+    scope: _AdbRetryScope,
+    command_name: str,
+    phone_id: str | None,
+) -> Callable[[Any], None]:
+    """Build a Tenacity ``after`` callback that logs attempt outcome and elapsed time."""
+
+    def _after(retry_state: Any) -> None:
+        outcome = retry_state.outcome
+        failed = outcome is not None and outcome.failed
+        error = str(outcome.exception()) if failed else None
+        result = None if outcome is None or failed else outcome.result()
+        result_status = getattr(getattr(result, "status", None), "name", None)
+        elapsed = retry_state.seconds_since_start
+        logger.debug(
+            "ADB retry: attempt finished",
+            scope=scope,
+            command=command_name,
+            phone_id=phone_id,
+            attempt=retry_state.attempt_number,
+            elapsed_s=round(elapsed, 3) if elapsed is not None else 0.0,
+            failed=failed,
+            result_status=result_status,
+            error=error,
+        )
+
+    return _after
 
 
 def _make_strip_parser() -> ParserFn:
@@ -304,6 +498,46 @@ class AdbCommand:
     )
 
 
+def _retry_profile_for(
+    command: AdbCommand, *, scope: _AdbRetryScope
+) -> _AdbRetryProfile:
+    """
+    Select optimized retry boundaries by ADB subcommand shape.
+
+    ``pair`` gets a wider window; shell getters stay short; kill-server is minimal.
+    """
+    cmd = command.command
+    if cmd == "pair":
+        return _AdbRetryProfile(
+            stop=stop_after_attempt(3) | stop_after_delay(8),
+            wait=wait_exponential_jitter(initial=0.3, max=2.0, jitter=0.2),
+            timeout_seconds=15.0,
+        )
+    if cmd == "kill-server":
+        return _AdbRetryProfile(
+            stop=stop_after_attempt(2) | stop_after_delay(3),
+            wait=wait_fixed(0.5),
+            timeout_seconds=5.0,
+        )
+    if cmd in ("start-server", "get-state", "devices"):
+        return _AdbRetryProfile(
+            stop=stop_after_attempt(3) | stop_after_delay(5),
+            wait=wait_exponential_jitter(initial=0.2, max=1.5, jitter=0.1),
+            timeout_seconds=10.0,
+        )
+    if cmd == "shell" or scope == "client":
+        return _AdbRetryProfile(
+            stop=stop_after_attempt(2) | stop_after_delay(3),
+            wait=wait_exponential_jitter(initial=0.15, max=1.0, jitter=0.1),
+            timeout_seconds=8.0,
+        )
+    return _AdbRetryProfile(
+        stop=stop_after_attempt(3) | stop_after_delay(5),
+        wait=wait_exponential_jitter(initial=0.2, max=1.5, jitter=0.1),
+        timeout_seconds=10.0,
+    )
+
+
 class AdbCommands(Enum):
     """
     Commands to execute
@@ -472,6 +706,7 @@ class AdbClient:
             result = self._execute(command, None, [f"{ip}:{port}", association_code])
         except AdbClientException as e:
             raise
+        _raise_client_for_result(command, result)
         combined = f"{result.output or ''}\n{result.error or ''}".strip()
         phone = ADBCommandParser.PAIR.parse(combined)
         if phone is None:
@@ -491,6 +726,7 @@ class AdbClient:
             result = self._execute(command, None)
         except AdbClientException as e:
             raise
+        _raise_client_for_result(command, result)
         return ADBCommandParser.GET_DEVICES.parse(result.output or "")
 
     def send_notification(self, title: str, message: str) -> bool:
@@ -511,6 +747,7 @@ class AdbClient:
             )
         except AdbClientException as e:
             raise
+        _raise_client_for_result(command, result)
         return ADBCommandParser.SEND_NOTIFICATION.parse(result.output or "")
 
     def enable_location_services(self) -> None:
@@ -534,6 +771,7 @@ class AdbClient:
         command = AdbCommands.GET_SERIAL_NO.value
         try:
             result = self._execute(command, phone)
+            _raise_client_for_result(command, result)
         except AdbClientException as exc:
             logger.warning(
                 "AdbClient: failed to read ro.serialno",
@@ -561,6 +799,7 @@ class AdbClient:
         command = AdbCommands.GET_DEVICE_NAME.value
         try:
             result = self._execute(command, phone)
+            _raise_client_for_result(command, result)
         except AdbClientException as exc:
             logger.warning(
                 "AdbClient: failed to read device_name",
@@ -578,6 +817,7 @@ class AdbClient:
         command = AdbCommands.GET_ANDROID_VERSION.value
         try:
             result = self._execute(command, phone)
+            _raise_client_for_result(command, result)
         except AdbClientException as exc:
             logger.warning(
                 "AdbClient: failed to read ro.build.version.release",
@@ -593,6 +833,7 @@ class AdbClient:
         command = AdbCommands.GET_MANUFACTURER.value
         try:
             result = self._execute(command, phone)
+            _raise_client_for_result(command, result)
         except AdbClientException as exc:
             logger.warning(
                 "AdbClient: failed to read ro.product.manufacturer",
@@ -608,6 +849,7 @@ class AdbClient:
         command = AdbCommands.GET_PRODUCT_MODEL.value
         try:
             result = self._execute(command, phone)
+            _raise_client_for_result(command, result)
         except AdbClientException as exc:
             logger.warning(
                 "AdbClient: failed to read ro.product.model",
@@ -623,6 +865,7 @@ class AdbClient:
         command = AdbCommands.GET_SDK_VERSION.value
         try:
             result = self._execute(command, phone)
+            _raise_client_for_result(command, result)
         except AdbClientException as exc:
             logger.warning(
                 "AdbClient: failed to read ro.build.version.sdk",
@@ -639,53 +882,96 @@ class AdbClient:
         positional_arguments: list[str] | None = None,
     ) -> AdbCommandResult:
         """
-        Execute a command
+        Execute a command with Tenacity-backed retries on transient subprocess failures.
         """
         positional_arguments = positional_arguments or []
         argv: list[str] = [str(self.binary.path)]
         if phone is not None:
             argv.extend(["-s", phone.descriptor.id])
         argv.extend([command.command, *command.args, *positional_arguments])
-        try:
+        phone_id = phone.descriptor.id if phone else None
+        profile = _retry_profile_for(command, scope="client")
+
+        def _attempt() -> AdbCommandResult:
             logger.debug(
                 "AdbClient: executing command",
                 adb_path=str(self.binary.path),
                 command=command.command,
-                phone_id=phone.descriptor.id if phone else None,
+                phone_id=phone_id,
                 argv=argv,
                 command_line=" ".join(shlex.quote(arg) for arg in argv),
+                timeout_s=profile.timeout_seconds,
             )
-            result = subprocess.run(argv, capture_output=True, text=True)
+            try:
+                completed = subprocess.run(
+                    argv,
+                    capture_output=True,
+                    text=True,
+                    timeout=profile.timeout_seconds,
+                )
+            except subprocess.TimeoutExpired as exc:
+                error = f"timed out after {profile.timeout_seconds}s"
+                logger.debug(
+                    "AdbClient: command timed out",
+                    adb_path=str(self.binary.path),
+                    command=command.command,
+                    phone_id=phone_id,
+                    error=error,
+                )
+                return AdbCommandResult(
+                    status=_adb_status_from_timeout(),
+                    phone=phone,
+                    time=datetime.datetime.now(),
+                    output=exc.output or "",
+                    error=error,
+                    return_code=1,
+                )
+            except subprocess.CalledProcessError as exc:
+                raise AdbClientException(
+                    f"Failed to execute command: {command.command} {command.args}"
+                ) from exc
+            except OSError as exc:
+                raise AdbClientException(
+                    f"Failed to run ADB binary {self.binary.path}"
+                ) from exc
             logger.debug(
                 "AdbClient: command completed",
                 adb_path=str(self.binary.path),
                 command=command.command,
-                return_code=result.returncode,
-                stdout=result.stdout.strip(),
-                stderr=result.stderr.strip(),
+                return_code=completed.returncode,
+                stdout=completed.stdout.strip(),
+                stderr=completed.stderr.strip(),
             )
-            if result.returncode != 0:
-                raise AdbClientException(
-                    f"Failed to execute command: {command.command} {command.args}: {result.stderr or result.stdout}"
-                )
-        except subprocess.CalledProcessError as e:
-            raise AdbClientException(
-                f"Failed to execute command: {command.command} {command.args}"
-            ) from e
-        except OSError as e:
-            raise AdbClientException(
-                f"Failed to run ADB binary {self.binary.path}"
-            ) from e
-        cmd_result = AdbCommandResult(
-            status=AdbCommandResultStatus.SUCCESS,
-            phone=phone,
-            time=datetime.datetime.now(),
-            output=result.stdout or "",
-            error=result.stderr or "",
-            return_code=result.returncode,
+            return AdbCommandResult(
+                status=_adb_status_from_process(
+                    return_code=completed.returncode,
+                    output=completed.stdout or "",
+                    error=completed.stderr or "",
+                ),
+                phone=phone,
+                time=datetime.datetime.now(),
+                output=completed.stdout or "",
+                error=completed.stderr or "",
+                return_code=completed.returncode,
+            )
+
+        retryer = Retrying(
+            stop=profile.stop,
+            wait=profile.wait,
+            retry=retry_if_exception(_is_retryable_adb_exception)
+            | retry_if_result(_is_retryable_adb_result),
+            reraise=True,
+            before=_make_adb_retry_before(
+                scope="client", command_name=command.command, phone_id=phone_id
+            ),
+            after=_make_adb_retry_after(
+                scope="client", command_name=command.command, phone_id=phone_id
+            ),
+            retry_error_callback=_return_last_adb_retry_outcome,
         )
-        self.add_to_history(command, cmd_result)
-        return cmd_result
+        result = retryer(_attempt)
+        self.add_to_history(command, result)
+        return result
 
 
 class AdbServer:
@@ -832,428 +1118,93 @@ class AdbServer:
         command = AdbCommands.GET_DEVICES.value
         try:
             result = self._execute(command)
+            _raise_server_for_result(command, result)
         except AdbServerException as e:
             raise AdbClientException(f"Failed to get known devices: {e}") from e
         return ADBCommandParser.GET_DEVICES.parse(result.output or "")
 
     def _execute(self, command: AdbCommand) -> AdbCommandResult:
         """
-        Execute a command
+        Execute a command with Tenacity-backed retries on transient subprocess failures.
         """
         argv: list[str] = [str(self.binary.path), command.command, *command.args]
-        try:
+        profile = _retry_profile_for(command, scope="server")
+
+        def _attempt() -> AdbCommandResult:
             logger.debug(
                 "AdbServer: executing command",
                 adb_path=str(self.binary.path),
                 command=command.command,
                 argv=argv,
                 command_line=" ".join(shlex.quote(arg) for arg in argv),
+                timeout_s=profile.timeout_seconds,
             )
-            result = subprocess.run(argv, capture_output=True, text=True)
+            try:
+                completed = subprocess.run(
+                    argv,
+                    capture_output=True,
+                    text=True,
+                    timeout=profile.timeout_seconds,
+                )
+            except subprocess.TimeoutExpired as exc:
+                error = f"timed out after {profile.timeout_seconds}s"
+                logger.debug(
+                    "AdbServer: command timed out",
+                    adb_path=str(self.binary.path),
+                    command=command.command,
+                    error=error,
+                )
+                return AdbCommandResult(
+                    status=_adb_status_from_timeout(),
+                    phone=None,
+                    time=datetime.datetime.now(),
+                    output=exc.output or "",
+                    error=error,
+                    return_code=1,
+                )
+            except subprocess.CalledProcessError as exc:
+                raise AdbServerException(
+                    f"Failed to execute command: {command.command} {command.args}"
+                ) from exc
+            except OSError as exc:
+                raise AdbServerException(
+                    f"Failed to run ADB binary {self.binary.path}"
+                ) from exc
             logger.debug(
                 "AdbServer: command completed",
                 adb_path=str(self.binary.path),
                 command=command.command,
-                return_code=result.returncode,
-                stdout=result.stdout.strip(),
-                stderr=result.stderr.strip(),
+                return_code=completed.returncode,
+                stdout=completed.stdout.strip(),
+                stderr=completed.stderr.strip(),
             )
-            if result.returncode != 0:
-                raise AdbServerException(
-                    f"Failed to execute command: {command.command} {command.args}: {result.stderr or result.stdout}"
-                )
-        except subprocess.CalledProcessError as e:
-            raise AdbServerException(
-                f"Failed to execute command: {command.command} {command.args}"
-            ) from e
-        except OSError as e:
-            raise AdbServerException(
-                f"Failed to run ADB binary {self.binary.path}"
-            ) from e
-        cmd_result = AdbCommandResult(
-            status=AdbCommandResultStatus.SUCCESS,
-            phone=None,
-            time=datetime.datetime.now(),
-            output=result.stdout or "",
-            error=result.stderr or "",
-            return_code=result.returncode,
-        )
-        self.add_to_history(command, cmd_result)
-        return cmd_result
-
-
-DEFAULT_MOCK_ADB_BINARY_PATH: Final[Path] = Path("/mock/adb")
-
-MOCK_ANDROID_DEVICE_MODEL_ELEMENTS: Final[tuple[str, ...]] = (
-    "Pixel 7",
-    "Pixel 8 Pro",
-    "Galaxy S24 Ultra",
-    "Nothing Phone (2)",
-    "OnePlus 12",
-)
-
-MOCK_ANDROID_DEVICE_MANUFACTURER_ELEMENTS: Final[tuple[str, ...]] = (
-    "Google",
-    "Samsung",
-    "Honor",
-    "Nothing",
-    "OnePlus",
-)
-
-ANDROID_RELEASE_SDK_CHOICES: Final[tuple[tuple[str, int], ...]] = (
-    ("13", 33),
-    ("14", 34),
-    ("15", 35),
-)
-
-
-@dataclass
-class MockAdbDeviceProfile:
-    """Synthetic device facts shared between mock ``devices -l`` and ``adb shell`` output."""
-
-    manufacturer: str
-    model: str
-    product: str
-    device_codename: str
-    ro_serialno: str
-    device_name: str
-    android_release: str
-    sdk: int
-    transport_id: int
-
-
-class MockAdbState:
-    """
-    Shared faker-backed catalogue of mock-connected devices.
-
-    Keeps ``adb devices -l`` rows aligned with fake ``adb shell`` getprop/settings/dumpsys
-    output for each connection id (``adb -s <id>``).
-    """
-
-    def __init__(
-        self, *, seed: int | None = None, initial_devices: int | None = None
-    ) -> None:
-        if seed is not None:
-            Faker.seed(seed)
-            random.seed(seed)
-        fake = Faker("en_US", use_weighting=False)
-        fake.add_provider(
-            DynamicProvider(
-                provider_name="mock_android_model",
-                elements=list(MOCK_ANDROID_DEVICE_MODEL_ELEMENTS),
+            return AdbCommandResult(
+                status=_adb_status_from_process(
+                    return_code=completed.returncode,
+                    output=completed.stdout or "",
+                    error=completed.stderr or "",
+                ),
+                phone=None,
+                time=datetime.datetime.now(),
+                output=completed.stdout or "",
+                error=completed.stderr or "",
+                return_code=completed.returncode,
             )
+
+        retryer = Retrying(
+            stop=profile.stop,
+            wait=profile.wait,
+            retry=retry_if_exception(_is_retryable_adb_exception)
+            | retry_if_result(_is_retryable_adb_result),
+            reraise=True,
+            before=_make_adb_retry_before(
+                scope="server", command_name=command.command, phone_id=None
+            ),
+            after=_make_adb_retry_after(
+                scope="server", command_name=command.command, phone_id=None
+            ),
+            retry_error_callback=_return_last_adb_retry_outcome,
         )
-        fake.add_provider(
-            DynamicProvider(
-                provider_name="mock_android_manufacturer",
-                elements=list(MOCK_ANDROID_DEVICE_MANUFACTURER_ELEMENTS),
-            )
-        )
-
-        count = (
-            initial_devices
-            if initial_devices is not None
-            else fake.random_int(min=1, max=2)
-        )
-        self._faker = fake
-        self._ordered_ids: list[str] = []
-        self._profiles: dict[str, MockAdbDeviceProfile] = {}
-        self._next_transport_id: int = 1
-        self._bootstrap_devices(count)
-
-    def _alloc_transport_id(self) -> int:
-        tid = self._next_transport_id
-        self._next_transport_id += 1
-        return tid
-
-    def _bootstrap_devices(self, count: int) -> None:
-        for _ in range(max(0, count)):
-            tls_id = self._new_tls_connection_id(unique=True)
-            tid = self._alloc_transport_id()
-            self._profiles[tls_id] = self._build_profile(tid)
-            self._ordered_ids.append(tls_id)
-
-    def _new_tls_connection_id(self, *, unique: bool) -> str:
-        fake = self._faker
-        for _ in range(64):
-            left = fake.bothify(
-                text="???????????",
-                letters="ABCDEFGHJKLMNPQRSTUVWXYZ23456789",
-            )
-            right = fake.bothify(
-                text="??????",
-                letters="abcdefghijklmnopqrstuvwxyz0123456789",
-            )
-            cid = f"adb-{left}-{right}._adb-tls-connect._tcp"
-            if not unique or cid not in self._profiles:
-                return cid
-        raise RuntimeError("MockAdbState: exhausted unique connection ids")
-
-    def _slug_token(self, text: str, max_len: int) -> str:
-        base = "".join(ch if ch.isalnum() else "_" for ch in text).strip("_")
-        if len(base) > max_len:
-            base = base[:max_len]
-        return base or "device"
-
-    def _build_profile(self, transport_id: int) -> MockAdbDeviceProfile:
-        fake = self._faker
-        manufacturer = fake.mock_android_manufacturer()
-        model_display = fake.mock_android_model()
-        model_slug = self._slug_token(model_display.replace(" ", "_"), 48)
-        product = self._slug_token(fake.slug() or fake.word(), 32)
-        device_codename = self._slug_token(
-            (fake.lexify("??") + "_" + fake.word())[:16], 16
-        )
-        ro_serialno = fake.bothify(
-            text=f"{manufacturer[:3].upper()}-############",
-            letters="ABCDEFGHJKLMNPQRSTUVWXYZ",
-        ).replace("_", "")[:48]
-        if fake.boolean(chance_of_getting_true=40):
-            device_name = ""
-        else:
-            device_name = fake.first_name().replace("\n", " ")[:32]
-        pair_release_sdk = ANDROID_RELEASE_SDK_CHOICES[
-            fake.random_int(min=0, max=len(ANDROID_RELEASE_SDK_CHOICES) - 1)
-        ]
-        android_release, sdk = pair_release_sdk
-        return MockAdbDeviceProfile(
-            manufacturer=manufacturer,
-            model=model_slug,
-            product=product,
-            device_codename=device_codename,
-            ro_serialno=ro_serialno,
-            device_name=device_name,
-            android_release=android_release,
-            sdk=sdk,
-            transport_id=transport_id,
-        )
-
-    def devices_l_blob(self) -> str:
-        """Stderr/stdout-shaped ``adb devices -l`` list for :class:`ADBCommandParser.GET_DEVICES`."""
-        lines = ["List of devices attached"]
-        for did in self._ordered_ids:
-            p = self._profiles[did]
-            lines.append(
-                f"{did} device product:{p.product} model:{p.model} device:{p.device_codename} transport_id:{p.transport_id}"
-            )
-        return "\n".join(lines) + "\n"
-
-    def ensure_profile_for_id(self, device_id: str) -> MockAdbDeviceProfile:
-        if device_id not in self._profiles:
-            tid = self._alloc_transport_id()
-            self._profiles[device_id] = self._build_profile(tid)
-            self._ordered_ids.append(device_id)
-        return self._profiles[device_id]
-
-    def register_new_paired_device(self) -> str:
-        """Append a freshly generated device profile; return connection id embedded in ``[guid=…]``."""
-        new_id = self._new_tls_connection_id(unique=True)
-        tid = self._alloc_transport_id()
-        self._profiles[new_id] = self._build_profile(tid)
-        self._ordered_ids.append(new_id)
-        return new_id
-
-
-def mock_adb_seed_from_env() -> int | None:
-    """Parse ``AROW_MOCK_ADB_SEED`` for deterministic mocks; invalid values yield ``None``."""
-    raw = (os.environ.get("AROW_MOCK_ADB_SEED") or "").strip()
-    if not raw:
-        return None
-    try:
-        return int(raw)
-    except ValueError:
-        return None
-
-
-def _mock_battery_blob(fake: Faker) -> str:
-    level = fake.random_int(min=12, max=98)
-    return (
-        "Current Battery Service state:\n"
-        "  AC powered: false\n"
-        "  USB powered: false\n"
-        "  Wireless powered: false\n"
-        "  Dock powered: false\n"
-        "  Max charging current: 0\n"
-        "  Max charging voltage: 0\n"
-        "  Charge counter: 2848000\n"
-        "  status: 3\n"
-        "  health: 2\n"
-        "  present: true\n"
-        f"  level: {level}\n"
-        "  scale: 100\n"
-        "  voltage: 3906\n"
-        "  temperature: 220\n"
-        "  technology: Li-ion\n"
-        "  Charging state: 0\n"
-        "  Charging policy: 0\n"
-    )
-
-
-def _mock_window_blob(profile: MockAdbDeviceProfile) -> str:
-    awake = random.choice(("true", "false"))
-    screen_on = random.choice(("true", "false"))
-    width = random.choice((1080, 1200))
-    height = random.choice((2400, 2640))
-    return (
-        f"      screenState=SCREEN_STATE_{'OFF' if screen_on != 'true' else 'FULL'}\n"
-        "WINDOW MANAGER ANIMATOR STATE (dumpsys window animator)\n"
-        f"    Display{{#0 state=OFF size={width}x{height} ROTATION_0}}:\n"
-        "  DisplayPolicy\n"
-        f"    mAwake={awake} mScreenOnEarly={screen_on} mScreenOnFully={screen_on}\n"
-        f"mCurrentFocus=Window{{bdf3658 u0 {profile.model}\\MockHome}}\n"
-        "mFocusedApp=ActivityRecord{3e3682b u0 com.example/com.example.Activity t999}\n"
-    )
-
-
-class MockAdbClient(AdbClient):
-    """
-    ADB client that never spawns adb: emits faker-shaped stdout/stderr compatible with parsers.
-    """
-
-    def __init__(
-        self,
-        *,
-        state: MockAdbState,
-        binary: AdbBinary | None = None,
-    ) -> None:
-        super().__init__(binary or AdbBinary(path=DEFAULT_MOCK_ADB_BINARY_PATH))
-        self._state = state
-
-    def _fake_shell_stdout(
-        self,
-        *,
-        phone: Phone | None,
-        args: list[str],
-    ) -> str:
-        if phone is None:
-            if (
-                len(args) >= 3
-                and args[0] == "cmd"
-                and args[1] == "notification"
-                and args[2] == "post"
-            ):
-                return "posting:\n"
-            return ""
-        fake = self._faker
-        profile = self._state.ensure_profile_for_id(phone.descriptor.id)
-        tup = tuple(args)
-        if tup == ("getprop", "ro.serialno"):
-            return f"{profile.ro_serialno}\n"
-        elif tup == ("getprop", "device_name"):
-            return f"{profile.device_name}\n" if profile.device_name else ""
-        elif tup == ("getprop", "ro.build.version.release"):
-            return f"{profile.android_release}\n"
-        elif tup == ("getprop", "ro.product.manufacturer"):
-            return f"{profile.manufacturer}\n"
-        elif tup == ("getprop", "ro.product.model"):
-            return f"{profile.model.replace('_', ' ')}\n"
-        elif tup == ("getprop", "ro.build.version.sdk"):
-            return f"{profile.sdk}\n"
-        elif tup == ("settings", "get", "secure", "location_mode"):
-            return str(fake.random_int(min=0, max=3)) + "\n"
-        elif tup == ("dumpsys", "battery"):
-            return _mock_battery_blob(fake)
-        elif tup == ("dumpsys", "window"):
-            return _mock_window_blob(profile)
-        else:
-            return ""
-
-    @property
-    def _faker(self) -> Faker:
-        return self._state._faker
-
-    def _execute(
-        self,
-        command: AdbCommand,
-        phone: Phone | None = None,
-        positional_arguments: list[str] | None = None,
-    ) -> AdbCommandResult:
-        positional_arguments = positional_arguments or []
-        argv: list[str] = [str(self.binary.path)]
-        if phone is not None:
-            argv.extend(["-s", phone.descriptor.id])
-        argv.extend([command.command, *command.args, *positional_arguments])
-        logger.debug(
-            "MockAdbClient: executing command (no subprocess)",
-            adb_path=str(self.binary.path),
-            command=command.command,
-            phone_id=phone.descriptor.id if phone else None,
-            argv=argv,
-            command_line=" ".join(shlex.quote(arg) for arg in argv),
-        )
-        out = ""
-        if command.command == "pair":
-            hostport = (
-                positional_arguments[0] if positional_arguments else "127.0.0.1:5555"
-            )
-            if ":" not in hostport:
-                raise AdbClientException(f"Malformed pair endpoint: {hostport!r}")
-            new_id = self._state.register_new_paired_device()
-            out = f"Successfully paired to {hostport} [guid={new_id}]\n"
-        elif command.command == "devices" and command.args == ["-l"]:
-            out = self._state.devices_l_blob()
-        elif command.command == "shell":
-            out = self._fake_shell_stdout(phone=phone, args=list(command.args))
-        else:
-            out = ""
-
-        logger.debug(
-            "MockAdbClient: command completed (mock)",
-            command=command.command,
-            stdout_preview=out[:200],
-        )
-        cmd_result = AdbCommandResult(
-            status=AdbCommandResultStatus.SUCCESS,
-            phone=phone,
-            time=datetime.datetime.now(),
-            output=out,
-            error="",
-            return_code=0,
-        )
-        self.add_to_history(command, cmd_result)
-        return cmd_result
-
-
-class MockAdbServer(AdbServer):
-    """ADB server façade that satisfies lifecycle calls without spawning adb."""
-
-    def __init__(
-        self,
-        *,
-        state: MockAdbState,
-        binary: AdbBinary | None = None,
-    ) -> None:
-        self._mock_state = state
-        super().__init__(binary or AdbBinary(path=DEFAULT_MOCK_ADB_BINARY_PATH))
-
-    def start(self) -> None:
-        command = AdbCommands.START_SERVER.value
-        result = self._execute(command)
-        if result.status != AdbCommandResultStatus.SUCCESS:
-            raise AdbServerException(f"Failed to start adb server: {result}")
-        self._paired_devices.clear()
-        for device in self.get_known_devices():
-            self._paired_devices.add(device)
-
-    def _execute(self, command: AdbCommand) -> AdbCommandResult:
-        argv: list[str] = [str(self.binary.path), command.command, *command.args]
-        logger.debug(
-            "MockAdbServer: executing command (no subprocess)",
-            adb_path=str(self.binary.path),
-            command=command.command,
-            argv=argv,
-            command_line=" ".join(shlex.quote(arg) for arg in argv),
-        )
-        out = ""
-        if command.command == "devices" and command.args == ["-l"]:
-            out = self._mock_state.devices_l_blob()
-        cmd_result = AdbCommandResult(
-            status=AdbCommandResultStatus.SUCCESS,
-            phone=None,
-            time=datetime.datetime.now(),
-            output=out,
-            error="",
-            return_code=0,
-        )
-        self.add_to_history(command, cmd_result)
-        return cmd_result
+        result = retryer(_attempt)
+        self.add_to_history(command, result)
+        return result
