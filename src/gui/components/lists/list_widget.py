@@ -74,7 +74,7 @@ class List(QListWidget, Component):
         self.setSelectionBehavior(selection_behavior)
         self.setEditTriggers(edit_triggers)
         self.setItemAlignment(item_alignment)
-        self.setAlternatingRowColors(True)
+        self.setAlternatingRowColors(False)
 
         self.ui = List.UI()
         self._finalize_ui_hooks()
