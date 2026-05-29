@@ -13,11 +13,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from core.adb import (
+from core.adb import AdbBinary, AdbClient, AdbServer
+from core.adb_mock import (
     DEFAULT_MOCK_ADB_BINARY_PATH,
-    AdbBinary,
-    AdbClient,
-    AdbServer,
     MockAdbClient,
     MockAdbServer,
     MockAdbState,

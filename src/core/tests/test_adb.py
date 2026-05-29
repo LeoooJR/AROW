@@ -133,7 +133,7 @@ class TestAdbServerKillSuccess:
         """Execute kill-server returns a result with SUCCESS status."""
 
         def fake_run(
-            argv: list[str], capture_output: bool, text: bool
+            argv: list[str], capture_output: bool, text: bool, timeout: float
         ) -> subprocess.CompletedProcess[str]:
             return _completed_process(argv, returncode=0)
 
@@ -206,7 +206,7 @@ class TestAdbServerExecuteResult:
         """Execute start-server returns AdbCommandResult with expected fields."""
 
         def fake_run(
-            argv: list[str], capture_output: bool, text: bool
+            argv: list[str], capture_output: bool, text: bool, timeout: float
         ) -> subprocess.CompletedProcess[str]:
             return _completed_process(
                 argv,
@@ -229,7 +229,7 @@ class TestAdbServerExecuteResult:
         """Execute kill-server adds an entry to history."""
 
         def fake_run(
-            argv: list[str], capture_output: bool, text: bool
+            argv: list[str], capture_output: bool, text: bool, timeout: float
         ) -> subprocess.CompletedProcess[str]:
             return _completed_process(argv, returncode=0)
 
