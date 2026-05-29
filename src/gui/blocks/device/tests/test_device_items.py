@@ -197,6 +197,83 @@ def test_device_selection_block_shorten_signal_collapses_all_rows(qtbot) -> None
         assert item.trash_button.isHidden() is True
 
 
+def test_device_selection_block_extends_new_authenticated_device(qtbot) -> None:
+    block = DeviceSelectionBlock()
+    qtbot.addWidget(block)
+    block.show()
+
+    view_signals.ExtendDeviceSelectionPanelRequested.emit()
+    qtbot.wait(0)
+    block._on_authentification_succeeded(
+        {
+            "id": "new-phone",
+            "name": "Pixel 9",
+            "os": "15",
+            "last_communication": _NOW,
+        }
+    )
+    qtbot.wait(0)
+
+    item = _device_rows(block)[0]
+    assert item.ui.time_label.isHidden() is False
+    assert item.trash_button.isHidden() is False
+
+
+def test_device_selection_block_extends_refreshed_devices(qtbot) -> None:
+    block = DeviceSelectionBlock()
+    qtbot.addWidget(block)
+    block.show()
+
+    view_signals.ExtendDeviceSelectionPanelRequested.emit()
+    qtbot.wait(0)
+    block._on_devices_updated(
+        [
+            {
+                "id": "first-phone",
+                "name": "Pixel 9",
+                "os": "15",
+                "last_communication": _NOW,
+            },
+            {
+                "id": "second-phone",
+                "name": "Zenfone 11",
+                "os": "14",
+                "last_communication": _NOW - dt.timedelta(minutes=30),
+            },
+        ]
+    )
+    qtbot.wait(0)
+
+    for item in _device_rows(block):
+        assert item.ui.time_label.isHidden() is False
+        assert item.trash_button.isHidden() is False
+
+
+def test_device_selection_block_keeps_new_rows_shortened_after_shorten(qtbot) -> None:
+    block = DeviceSelectionBlock()
+    qtbot.addWidget(block)
+    block.show()
+
+    view_signals.ExtendDeviceSelectionPanelRequested.emit()
+    view_signals.ShortenDeviceSelectionPanelRequested.emit()
+    qtbot.wait(0)
+    block._on_devices_updated(
+        [
+            {
+                "id": "first-phone",
+                "name": "Pixel 9",
+                "os": "15",
+                "last_communication": _NOW,
+            }
+        ]
+    )
+    qtbot.wait(0)
+
+    item = _device_rows(block)[0]
+    assert item.ui.time_label.isHidden() is True
+    assert item.trash_button.isHidden() is True
+
+
 def test_alert_device_item_can_also_be_selected(qtbot) -> None:
     block = DeviceSelectionBlock()
     qtbot.addWidget(block)
@@ -486,6 +563,6 @@ def test_device_selection_block_timer_tick_refreshes_badges(qtbot) -> None:
     )
     qtbot.wait(0)
 
-    block._on_last_communication_refresh_timer_tick(now=_NOW)
+    block._on_refresh_timer_tick(now=_NOW)
 
     assert item.badge == "trusted"

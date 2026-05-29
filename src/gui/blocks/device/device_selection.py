@@ -190,6 +190,7 @@ class DeviceSelectionBlock(QFrame, Block):
 
         self.ui.available_device_list.selectionModel().clear()  # Clear the selection model to avoid any residual selection when the list is empty.
         self._has_active_device = False
+        self._is_extended = False
 
         self._finalize_ui_hooks()
         self._update_available_device_empty_state_visibility()
@@ -305,8 +306,19 @@ class DeviceSelectionBlock(QFrame, Block):
     def _on_available_device_list_model_changed(self, *args) -> None:
         """Refresh placeholder, selection styling, and row sizes after list changes."""
         self._update_available_device_empty_state_visibility()
+        self._sync_available_device_item_presentation_state()
         self._sync_available_device_selection_state()
         self._sync_available_device_item_size_hints()
+
+    def _sync_available_device_item_presentation_state(self) -> None:
+        """Apply the block's current compact/extended mode to every device row."""
+        for item in self.ui.available_device_list.iter_items():
+            if not isinstance(item, self._device_item_type):
+                continue
+            if self._is_extended:
+                item.extend()
+            else:
+                item.shorten()
 
     def _sync_available_device_selection_state(self) -> None:
         """Mirror QListWidget selection state onto each custom device row widget."""
@@ -535,15 +547,13 @@ class DeviceSelectionBlock(QFrame, Block):
 
     def extend(self) -> None:
         """Expand all device rows to show extended metadata and actions."""
-        for item in self.ui.available_device_list.iter_items():
-            if isinstance(item, self._device_item_type):
-                item.extend()
+        self._is_extended = True
+        self._sync_available_device_item_presentation_state()
 
     def shorten(self) -> None:
         """Collapse all device rows back to their compact presentation."""
-        for item in self.ui.available_device_list.iter_items():
-            if isinstance(item, self._device_item_type):
-                item.shorten()
+        self._is_extended = False
+        self._sync_available_device_item_presentation_state()
 
     @property
     def available_device_list(self) -> List:
