@@ -6,7 +6,8 @@ from __future__ import annotations
 
 import pytest
 
-from core.adb import AdbClientException, MockAdbClient, MockAdbServer, MockAdbState
+from core.adb import AdbClientException
+from core.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
 from core.devices import Phone
 from core.models import CoreRuntimeModel
 from core.signals import (
