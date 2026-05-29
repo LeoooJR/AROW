@@ -198,9 +198,6 @@ class OperatorReadinessBlock(VerticalLayoutWrapper, Block):
         view_signals.ADBServerStarted.connect(self._on_adb_server_started)
         view_signals.ADBServerStopped.connect(self._on_adb_server_stopped)
 
-        view_signals.AuthentificationSucceeded.connect(
-            self._on_authentification_succeeded
-        )
         view_signals.DeviceSelectionSucceeded.connect(
             self._on_device_selection_succeeded
         )
@@ -228,15 +225,6 @@ class OperatorReadinessBlock(VerticalLayoutWrapper, Block):
             detail="ADB bridge stopped",
             status="ERROR",
             status_kind="error",
-        )
-
-    def _on_authentification_succeeded(self, device: dict) -> None:
-        """Update the readiness row when the authentification succeeds."""
-        self.ui.rows[self.ROWS_INDEX_MAPPING["device"]].update(
-            label="Device",
-            detail="Device linked",
-            status="READY",
-            status_kind="ready",
         )
 
     def _on_device_selection_succeeded(self, device: dict) -> None:

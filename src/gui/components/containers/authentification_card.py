@@ -18,11 +18,11 @@ from gui.components.buttons.tool_button import ToolButton
 from gui.components.inputs.otp import OTPInput, OTPType
 from gui.components.labels.demi_bold_text import DemiBoldText
 from gui.components.labels.helper_text import HelperText
+from gui.components.media import get_svg_size
 from gui.components.media.svg import SVG
 from gui.icons import GenericIcons, icon_qt_path_for_theme
 from gui.settings import Settings
 from gui.signals import view_signals
-from gui.components.media import get_svg_size
 from gui.wrapper import HorizontalLayoutWrapper, VerticalLayoutWrapper
 
 
@@ -333,21 +333,29 @@ class AuthentificationCard(QFrame, Component):
         raise_signal: bool = True
 
         if self._is_ip_otp_input_valid():
-            logger.info("IP adress for authentification is valid.")
+            logger.info(
+                "Authentification card: IP adress for authentification is valid."
+            )
         else:
-            logger.info("IP adress for authentification is invalid.")
+            logger.info(
+                "Authentification card: IP adress for authentification is invalid."
+            )
             raise_signal = False
 
         if self._is_port_otp_input_valid():
-            logger.info("Port for authentification is valid.")
+            logger.info("Authentification card: Port for authentification is valid.")
         else:
-            logger.info("Port for authentification is invalid.")
+            logger.info("Authentification card: Port for authentification is invalid.")
             raise_signal = False
 
         if self._is_association_code_otp_input_valid():
-            logger.info("Association code for authentification is valid.")
+            logger.info(
+                "Authentification card: Association code for authentification is valid."
+            )
         else:
-            logger.info("Association code for authentification is invalid.")
+            logger.info(
+                "Authentification card: Association code for authentification is invalid."
+            )
             raise_signal = False
 
         if raise_signal:

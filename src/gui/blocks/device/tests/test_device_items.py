@@ -435,3 +435,57 @@ def test_device_selection_block_handles_failed_selection_without_current_item(
     qtbot.wait(0)
 
     assert block.available_device_list.currentItem() is None
+
+
+def test_device_item_refresh_badge_keeps_new_before_five_minutes(qtbot) -> None:
+    at = _NOW - dt.timedelta(minutes=4, seconds=59)
+    item = DeviceItem(None, text="Phone", badge="new", last_communication=at)
+    qtbot.addWidget(item.row_widget)
+    qtbot.wait(0)
+
+    item.refresh_badge(now=_NOW)
+
+    assert item.badge == "new"
+
+
+def test_device_item_refresh_badge_becomes_trusted_at_five_minutes(qtbot) -> None:
+    at = _NOW - dt.timedelta(minutes=5)
+    item = DeviceItem(None, text="Phone", badge="new", last_communication=at)
+    qtbot.addWidget(item.row_widget)
+    qtbot.wait(0)
+
+    item.refresh_badge(now=_NOW)
+
+    assert item.badge == "trusted"
+
+
+def test_device_item_refresh_badge_skips_static_last_communication(qtbot) -> None:
+    item = DeviceItem(
+        None,
+        text="Phone",
+        badge="new",
+        last_communication="Active now",
+    )
+    qtbot.addWidget(item.row_widget)
+    qtbot.wait(0)
+
+    item.refresh_badge(now=_NOW)
+
+    assert item.badge == "new"
+
+
+def test_device_selection_block_timer_tick_refreshes_badges(qtbot) -> None:
+    block = DeviceSelectionBlock()
+    qtbot.addWidget(block)
+    at = _NOW - dt.timedelta(minutes=5)
+    item = DeviceItem.add_to_list(
+        block.available_device_list,
+        text="Phone",
+        badge="new",
+        last_communication=at,
+    )
+    qtbot.wait(0)
+
+    block._on_last_communication_refresh_timer_tick(now=_NOW)
+
+    assert item.badge == "trusted"

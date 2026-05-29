@@ -269,8 +269,10 @@ class ListSettings:
     SCROLLBAR_HANDLE_MIN_WIDTH: int = 30
     SCROLLBAR_MARGIN: int = 4
     SCROLLBAR_HANDLE_MARGIN: int = 2
-    # How often relative “last communication” labels refresh (list + device state).
-    LAST_COMMUNICATION_REFRESH_MS: int = 60_000
+    # How often the device list and device state are refreshed.
+    REFRESH_MS: int = 60_000
+    # Elapsed time since last communication before a "new" device badge becomes "trusted".
+    NEW_DEVICE_BADGE_DURATION_SECONDS: int = 5 * 60
 
 
 @dataclass(frozen=True)

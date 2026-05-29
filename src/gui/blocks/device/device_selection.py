@@ -182,15 +182,11 @@ class DeviceSelectionBlock(QFrame, Block):
         self._highlight_stop_timer.timeout.connect(self._stop_highlight_attention)
         self._highlight_elapsed = QElapsedTimer()
 
-        self._last_communication_refresh_timer = QTimer(self)
-        self._last_communication_refresh_timer.setSingleShot(False)
-        self._last_communication_refresh_timer.timeout.connect(
-            self._on_last_communication_refresh_timer_tick
-        )
-        self._last_communication_refresh_timer.setInterval(
-            Settings.LIST.LAST_COMMUNICATION_REFRESH_MS
-        )
-        self._last_communication_refresh_timer.start()
+        self._refresh_timer = QTimer(self)
+        self._refresh_timer.setSingleShot(False)
+        self._refresh_timer.timeout.connect(self._on_refresh_timer_tick)
+        self._refresh_timer.setInterval(Settings.LIST.REFRESH_MS)
+        self._refresh_timer.start()
 
         self.ui.available_device_list.selectionModel().clear()  # Clear the selection model to avoid any residual selection when the list is empty.
         self._has_active_device = False
@@ -279,14 +275,13 @@ class DeviceSelectionBlock(QFrame, Block):
         """Seed placeholder rows when UI constraints are disabled."""
         self.add_list_items_placeholder()
 
-    def _on_last_communication_refresh_timer_tick(
-        self, *, now: dt.datetime | None = None
-    ) -> None:
+    def _on_refresh_timer_tick(self, *, now: dt.datetime | None = None) -> None:
         """Refresh live last-communication labels on every device row."""
         ref = now if now is not None else dt.datetime.now()
         for list_item in self.ui.available_device_list.iter_items():
             if isinstance(list_item, self._device_item_type):
                 list_item.refresh_last_communication_label(now=ref)
+                list_item.refresh_badge(now=ref)
 
     def _reposition_available_device_empty_state(self) -> None:
         """Resize and center the empty-state placeholder over the list viewport."""
@@ -327,22 +322,19 @@ class DeviceSelectionBlock(QFrame, Block):
 
     def _on_authentification_succeeded(self, device: dict) -> None:
         """Add a newly authenticated device and mark it as the active selection."""
-        self._has_active_device = True
-        for item in self.ui.available_device_list.iter_items():
-            item.badge = "trusted"
+        self._has_active_device = (
+            False  # Authentification does not mean the device is active.
+        )
         item = self._device_item_type.add_to_list(
             self.ui.available_device_list,
             id=device["id"],
             text=device["name"],
             type="available",
-            badge="active",
+            badge="new",
             operating_system=device["os"],
             location="N/A",
             last_communication=device["last_communication"],
             alert_highlight=True,
-        )
-        self.ui.available_device_list.setCurrentItem(
-            item, QItemSelectionModel.SelectionFlag.SelectCurrent
         )
         self.ui.available_device_list.sortItems()
         self._on_available_device_list_model_changed()
@@ -364,9 +356,14 @@ class DeviceSelectionBlock(QFrame, Block):
         selected_item = self.ui.available_device_list.currentItem()
         if selected_item is None:
             return
+        # Ensure that no other device is active.
         for list_item in self.ui.available_device_list.iter_items():
-            list_item.badge = "trusted"
+            if list_item.badge == "active":
+                list_item.badge = "trusted"
+                break
+        # Mark the selected device as active.
         selected_item.badge = "active"
+        # Refresh the device list.
         self._on_available_device_list_model_changed()
 
     def _on_device_selection_failed(self, device: dict) -> None:

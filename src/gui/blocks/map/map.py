@@ -708,8 +708,9 @@ class MapBlock(QWidget):
         """Connect signals for the map view and its UI widgets."""
         view_signals.RunHelperAnimationRequested.connect(self._on_run_helper_animation)
         view_signals.MapTabActivated.connect(self._on_run_helper_animation)
-        view_signals.AuthentificationSucceeded.connect(self._on_connection_succeeded)
-        view_signals.DeviceSelectionSucceeded.connect(self._on_connection_succeeded)
+        view_signals.DeviceSelectionSucceeded.connect(
+            self._on_device_selection_succeeded
+        )
         view_signals.AuthentificationFailed.connect(self._on_authentification_failed)
         view_signals.DeviceSelectionFailed.connect(self._on_device_selection_failed)
 
@@ -750,7 +751,7 @@ class MapBlock(QWidget):
         self.ui.placeholder.apply_theme_icons(theme)
         self.ui.coordinates.apply_theme_icons(theme)
 
-    def _on_connection_succeeded(self, device: dict) -> None:
+    def _on_device_selection_succeeded(self, device: dict) -> None:
         """Update placeholder after auth or device selection succeeds."""
         self.update_placeholder(
             self.texts.loading_placeholder, GenericIcons.MAP_PLACEHOLDER
