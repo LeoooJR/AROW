@@ -15,13 +15,15 @@ from core.adb import (
     AdbBinary,
     AdbClient,
     AdbCommand,
+    AdbCommandResult,
+    AdbCommandResultStatus,
     AdbCommands,
     AdbServer,
     _AdbRetryProfile,
     _is_retryable_adb_exception,
     _retry_profile_for,
 )
-from core.devices import PhoneRepository
+from core.devices import Phone, PhoneRepository
 from core.exceptions import AdbClientException, AdbServerException
 
 
@@ -139,6 +141,7 @@ class TestAdbClientExecuteRetry:
         monkeypatch.setattr(subprocess, "run", fake_run)
         result = adb_client._execute(AdbCommands.GET_DEVICES.value)
         assert calls["count"] == 3
+        assert result.status == AdbCommandResultStatus.SUCCESS
         assert result.return_code == 0
         assert result.output == "ok\n"
 
@@ -157,13 +160,14 @@ class TestAdbClientExecuteRetry:
             return _completed_process(argv, returncode=1, stderr="wrong pairing code")
 
         monkeypatch.setattr(subprocess, "run", fake_run)
-        with pytest.raises(AdbClientException, match="wrong pairing code"):
-            adb_client._execute(
-                AdbCommands.PAIR.value,
-                None,
-                ["127.0.0.1:5555", "000000"],
-            )
+        result = adb_client._execute(
+            AdbCommands.PAIR.value,
+            None,
+            ["127.0.0.1:5555", "000000"],
+        )
         assert calls["count"] == 1
+        assert result.status == AdbCommandResultStatus.ERROR
+        assert result.error == "wrong pairing code"
 
     def test_oserror_is_not_retried(
         self, adb_client: AdbClient, monkeypatch: pytest.MonkeyPatch
@@ -199,9 +203,43 @@ class TestAdbClientExecuteRetry:
             raise subprocess.TimeoutExpired(cmd=argv, timeout=timeout)
 
         monkeypatch.setattr(subprocess, "run", fake_run)
-        with pytest.raises(AdbClientException, match="timed out"):
-            adb_client._execute(AdbCommands.GET_DEVICES.value)
+        result = adb_client._execute(AdbCommands.GET_DEVICES.value)
         assert calls["count"] == 3
+        assert result.status == AdbCommandResultStatus.TIMEOUT
+        assert "timed out" in result.error
+
+    def test_pair_raises_from_non_success_result(
+        self, adb_client: AdbClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def fake_execute(
+            command: AdbCommand,
+            phone: Phone | None = None,
+            positional_arguments: list[str] | None = None,
+        ) -> AdbCommandResult:
+            return AdbCommandResult(
+                status=AdbCommandResultStatus.ERROR,
+                output="",
+                error="wrong pairing code",
+                return_code=1,
+            )
+
+        monkeypatch.setattr(adb_client, "_execute", fake_execute)
+        with pytest.raises(AdbClientException, match="wrong pairing code"):
+            adb_client.pair("127.0.0.1", 5555, "000000")
+
+    def test_shell_getter_returns_empty_from_non_success_result(
+        self, adb_client: AdbClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def fake_execute(command: AdbCommand, phone: Phone) -> AdbCommandResult:
+            return AdbCommandResult(
+                status=AdbCommandResultStatus.TRANSIENT_ERROR,
+                output="",
+                error="device offline",
+                return_code=1,
+            )
+
+        monkeypatch.setattr(adb_client, "_execute", fake_execute)
+        assert adb_client.get_product_model(Phone(id="abc123", state="device")) == ""
 
 
 class TestAdbServerExecuteRetry:
@@ -230,6 +268,7 @@ class TestAdbServerExecuteRetry:
         monkeypatch.setattr(subprocess, "run", fake_run)
         result = adb_server._execute(AdbCommands.START_SERVER.value)
         assert calls["count"] == 2
+        assert result.status == AdbCommandResultStatus.SUCCESS
         assert result.return_code == 0
         assert "daemon started successfully" in result.output
 
@@ -248,9 +287,30 @@ class TestAdbServerExecuteRetry:
             return _completed_process(argv, returncode=1, stderr="unauthorized")
 
         monkeypatch.setattr(subprocess, "run", fake_run)
-        with pytest.raises(AdbServerException, match="unauthorized"):
-            adb_server._execute(AdbCommands.GET_DEVICES.value)
+        result = adb_server._execute(AdbCommands.GET_DEVICES.value)
         assert calls["count"] == 1
+        assert result.status == AdbCommandResultStatus.ERROR
+        assert result.error == "unauthorized"
+
+    def test_retryable_failure_exhaustion_returns_transient_error(
+        self, adb_server: AdbServer, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        calls = {"count": 0}
+
+        def fake_run(
+            argv: list[str],
+            capture_output: bool,
+            text: bool,
+            timeout: float,
+        ) -> subprocess.CompletedProcess[str]:
+            calls["count"] += 1
+            return _completed_process(argv, returncode=1, stderr="device offline")
+
+        monkeypatch.setattr(subprocess, "run", fake_run)
+        result = adb_server._execute(AdbCommands.GET_DEVICES.value)
+        assert calls["count"] == 3
+        assert result.status == AdbCommandResultStatus.TRANSIENT_ERROR
+        assert result.error == "device offline"
 
 
 class TestRetryProfiles:
