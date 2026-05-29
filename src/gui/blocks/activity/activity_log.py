@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
     QWidget,
     QWidgetAction,
 )
+from shiboken6 import isValid
 
 from gui import faker as ui_faker
 from gui.blocks.base import Block
@@ -906,7 +907,13 @@ class ActivityLogBlock(QFrame, Block):
         self._sync_activity_item_size_hints()
         self.ui.file_display_widget.refresh_display()
         if deferred:
-            QTimer.singleShot(0, lambda: self.refresh_layout(deferred=False))
+            QTimer.singleShot(0, self._refresh_layout_deferred)
+
+    def _refresh_layout_deferred(self) -> None:
+        """Skip deferred refreshes once Qt has started tearing the block down."""
+        if not isValid(self):
+            return
+        self.refresh_layout(deferred=False)
 
     def add_activity(
         self,

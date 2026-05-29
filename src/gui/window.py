@@ -304,6 +304,10 @@ class Body(QWidget):
         view_signals.DeviceSelectionSucceeded.connect(self._on_device_connected)
         view_signals.ActiveDeviceRemoved.connect(self._on_active_device_removed)
 
+        view_signals.TargetSelectionRequested.connect(
+            self._on_target_selection_requested
+        )
+
     def _set_alignment(self) -> None:
         pass
 
@@ -355,6 +359,11 @@ class Body(QWidget):
             self.set_device_selection_panel_visibility(
                 True
             )  # Show device panel when location panel is hidden, one panel must be visible at all times in UI
+
+    def _on_target_selection_requested(self) -> None:
+        """Route the location panel CTA to the existing map selection surface."""
+        if self.ui.tabs.currentIndex() != self.TAB_MAP:
+            self.ui.tabs.setCurrentIndex(self.TAB_MAP)
 
     def set_left_panels_visibility(self, visible: bool) -> None:
         """Set the left panels visibility."""
