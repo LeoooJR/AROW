@@ -16,7 +16,8 @@ from gui.blocks.device import (
     DeviceSelectionBlock,
     format_last_communication_short,
 )
-from gui.components import StatusBadge
+from gui.components import DotStatusBadge, StatusBadge
+from gui.icons import GenericIcons
 from gui.settings import Settings
 from gui.signals import view_signals
 
@@ -129,6 +130,31 @@ def test_device_selection_block_syncs_custom_row_selection(qtbot) -> None:
     qtbot.wait(0)
     assert first.row_widget.property("selected") is False
     assert second.row_widget.property("selected") is True
+
+def test_device_selection_block_hides_empty_state_when_devices_exist(qtbot) -> None:
+    block = DeviceSelectionBlock()
+    qtbot.addWidget(block)
+    block.show()
+
+    DeviceItem.add_to_list(block.available_device_list, text="Pixel 9")
+    qtbot.wait(0)
+
+    assert block.ui.available_device_empty_state.isHidden() is True
+    assert block.ui.select_helper_text.isVisible() is True
+    assert block.ui.buttons_wrapper.isVisible() is True
+
+
+def test_device_selection_block_empty_state_buttons_emit_actions(qtbot) -> None:
+    block = DeviceSelectionBlock()
+    qtbot.addWidget(block)
+    block.show()
+    qtbot.wait(0)
+
+    with qtbot.waitSignal(view_signals.AddDeviceRequested):
+        block.ui.available_device_empty_state.ui.add_button.click()
+
+    with qtbot.waitSignal(view_signals.RefreshDeviceListRequested):
+        block.ui.available_device_empty_state.ui.refresh_button.click()
 
 
 def _device_rows(block: DeviceSelectionBlock) -> list[DeviceItem]:

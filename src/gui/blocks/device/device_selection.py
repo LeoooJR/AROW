@@ -20,9 +20,10 @@ from PySide6.QtWidgets import QFrame, QSizePolicy, QVBoxLayout, QWidget
 from gui import faker as ui_faker
 from gui.animation import apply_highlight_level, compute_sine_pulse_level
 from gui.blocks.base import Block
+from gui.blocks.device.device_empty_state import DeviceEmptyState
 from gui.blocks.device.device_item import DeviceItem
 from gui.colors import Theme
-from gui.components import GroupBox, HelperText, List, PlaceHolder, ToolButton
+from gui.components import GroupBox, HelperText, List, ToolButton
 from gui.icons import GenericIcons
 from gui.settings import Settings
 from gui.signals import view_signals
@@ -35,7 +36,6 @@ class DeviceSelectionBlock(QFrame, Block):
 
     @dataclass(frozen=True)
     class Text:
-        empty_state: Final[str] = "No device found"
         add_device_tooltip: Final[str] = "Add a device"
         refresh_button_tooltip: Final[str] = "Refresh device list"
         select_helper_text: Final[str] = "Select a device to work with"
@@ -72,7 +72,7 @@ class DeviceSelectionBlock(QFrame, Block):
     @dataclass
     class UI:
         available_device_list: List
-        available_device_empty_state: PlaceHolder
+        available_device_empty_state: DeviceEmptyState
         available_device_wrapper: HorizontalLayoutWrapper
         available_device_group_box: GroupBox
         add_device_button: ToolButton
@@ -93,25 +93,8 @@ class DeviceSelectionBlock(QFrame, Block):
 
         available_device_list = List(None)
         available_device_list.setObjectName("available-device-list")
-        available_device_empty_state = PlaceHolder(
-            available_device_list.viewport(),
-            text=self.texts.empty_state,
-            minimum_width=0,
-            minimum_height=0,
-            icon=GenericIcons.DEVICE_PLACEHOLDER,
-        )
+        available_device_empty_state = DeviceEmptyState(available_device_list.viewport())
         available_device_empty_state.setObjectName("available-device-empty-state")
-        available_device_empty_state.setProperty("place-holder", False)
-        available_device_empty_state.setAttribute(
-            Qt.WidgetAttribute.WA_StyledBackground, False
-        )
-        available_device_empty_state.setAttribute(
-            Qt.WidgetAttribute.WA_TransparentForMouseEvents, True
-        )
-        available_device_empty_state.ui.text.setWordWrap(True)
-        available_device_empty_state.ui.text.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        available_device_empty_state.style().unpolish(available_device_empty_state)
-        available_device_empty_state.style().polish(available_device_empty_state)
         available_device_empty_state.hide()
 
         add_device_button = ToolButton(
@@ -289,17 +272,29 @@ class DeviceSelectionBlock(QFrame, Block):
         viewport = self.ui.available_device_list.viewport()
         placeholder = self.ui.available_device_empty_state
         inset = Settings.SPACING.XS
-        geometry = viewport.rect().adjusted(inset, inset, -inset, -inset)
-        placeholder.setGeometry(geometry)
-        min_side = max(0, min(geometry.width(), geometry.height()))
-        icon_size = max(24, min(Settings.PLACEHOLDER.ICON_SIZE, int(min_side * 0.38)))
-        placeholder.ui.svg.setFixedSize(icon_size, icon_size)
+        available_geometry = viewport.rect().adjusted(inset, inset, -inset, -inset)
+        card_width = min(
+            Settings.LIST.DEVICE_EMPTY_STATE_WIDTH,
+            available_geometry.width(),
+        )
+        card_x = available_geometry.x() + (
+            (available_geometry.width() - card_width) // 2
+        )
+        placeholder.fit_to_available_width(card_width)
+        placeholder.setGeometry(
+            card_x,
+            available_geometry.y(),
+            card_width,
+            available_geometry.height(),
+        )
         placeholder.raise_()
 
     def _update_available_device_empty_state_visibility(self) -> None:
         """Show the empty-state placeholder only when the device list is empty."""
         is_empty = self.ui.available_device_list.count() == 0
         self.ui.available_device_empty_state.setVisible(is_empty)
+        self.ui.select_helper_text.setVisible(not is_empty)
+        self.ui.buttons_wrapper.setVisible(not is_empty)
         if is_empty:
             self._reposition_available_device_empty_state()
 
