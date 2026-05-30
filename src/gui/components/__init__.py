@@ -15,6 +15,8 @@ from gui.components.feedback import Toast
 from gui.components.file_display import File
 from gui.components.indicators import (
     ConditionIndicator,
+    DotStatusBadge,
+    DotStatusKind,
     IndicatorState,
     ProgressBar,
     StatusBadge,
@@ -37,6 +39,8 @@ __all__ = [
     "Component",
     "ConditionIndicator",
     "DemiBoldText",
+    "DotStatusBadge",
+    "DotStatusKind",
     "File",
     "FileOpenDialog",
     "FileSaveDialog",

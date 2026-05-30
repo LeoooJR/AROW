@@ -16,7 +16,8 @@ from gui.blocks.device import (
     DeviceSelectionBlock,
     format_last_communication_short,
 )
-from gui.components import StatusBadge
+from gui.components import DotStatusBadge, StatusBadge
+from gui.icons import GenericIcons
 from gui.settings import Settings
 from gui.signals import view_signals
 
@@ -130,6 +131,31 @@ def test_device_selection_block_syncs_custom_row_selection(qtbot) -> None:
     assert first.row_widget.property("selected") is False
     assert second.row_widget.property("selected") is True
 
+def test_device_selection_block_hides_empty_state_when_devices_exist(qtbot) -> None:
+    block = DeviceSelectionBlock()
+    qtbot.addWidget(block)
+    block.show()
+
+    DeviceItem.add_to_list(block.available_device_list, text="Pixel 9")
+    qtbot.wait(0)
+
+    assert block.ui.available_device_empty_state.isHidden() is True
+    assert block.ui.select_helper_text.isVisible() is True
+    assert block.ui.buttons_wrapper.isVisible() is True
+
+
+def test_device_selection_block_empty_state_buttons_emit_actions(qtbot) -> None:
+    block = DeviceSelectionBlock()
+    qtbot.addWidget(block)
+    block.show()
+    qtbot.wait(0)
+
+    with qtbot.waitSignal(view_signals.AddDeviceRequested):
+        block.ui.available_device_empty_state.ui.add_button.click()
+
+    with qtbot.waitSignal(view_signals.RefreshDeviceListRequested):
+        block.ui.available_device_empty_state.ui.refresh_button.click()
+
 
 def _device_rows(block: DeviceSelectionBlock) -> list[DeviceItem]:
     """Return custom device rows from the block list."""
@@ -195,6 +221,83 @@ def test_device_selection_block_shorten_signal_collapses_all_rows(qtbot) -> None
     for item in _device_rows(block):
         assert item.ui.time_label.isHidden() is True
         assert item.trash_button.isHidden() is True
+
+
+def test_device_selection_block_extends_new_authenticated_device(qtbot) -> None:
+    block = DeviceSelectionBlock()
+    qtbot.addWidget(block)
+    block.show()
+
+    view_signals.ExtendDeviceSelectionPanelRequested.emit()
+    qtbot.wait(0)
+    block._on_authentification_succeeded(
+        {
+            "id": "new-phone",
+            "name": "Pixel 9",
+            "os": "15",
+            "last_communication": _NOW,
+        }
+    )
+    qtbot.wait(0)
+
+    item = _device_rows(block)[0]
+    assert item.ui.time_label.isHidden() is False
+    assert item.trash_button.isHidden() is False
+
+
+def test_device_selection_block_extends_refreshed_devices(qtbot) -> None:
+    block = DeviceSelectionBlock()
+    qtbot.addWidget(block)
+    block.show()
+
+    view_signals.ExtendDeviceSelectionPanelRequested.emit()
+    qtbot.wait(0)
+    block._on_devices_updated(
+        [
+            {
+                "id": "first-phone",
+                "name": "Pixel 9",
+                "os": "15",
+                "last_communication": _NOW,
+            },
+            {
+                "id": "second-phone",
+                "name": "Zenfone 11",
+                "os": "14",
+                "last_communication": _NOW - dt.timedelta(minutes=30),
+            },
+        ]
+    )
+    qtbot.wait(0)
+
+    for item in _device_rows(block):
+        assert item.ui.time_label.isHidden() is False
+        assert item.trash_button.isHidden() is False
+
+
+def test_device_selection_block_keeps_new_rows_shortened_after_shorten(qtbot) -> None:
+    block = DeviceSelectionBlock()
+    qtbot.addWidget(block)
+    block.show()
+
+    view_signals.ExtendDeviceSelectionPanelRequested.emit()
+    view_signals.ShortenDeviceSelectionPanelRequested.emit()
+    qtbot.wait(0)
+    block._on_devices_updated(
+        [
+            {
+                "id": "first-phone",
+                "name": "Pixel 9",
+                "os": "15",
+                "last_communication": _NOW,
+            }
+        ]
+    )
+    qtbot.wait(0)
+
+    item = _device_rows(block)[0]
+    assert item.ui.time_label.isHidden() is True
+    assert item.trash_button.isHidden() is True
 
 
 def test_alert_device_item_can_also_be_selected(qtbot) -> None:
@@ -435,3 +538,57 @@ def test_device_selection_block_handles_failed_selection_without_current_item(
     qtbot.wait(0)
 
     assert block.available_device_list.currentItem() is None
+
+
+def test_device_item_refresh_badge_keeps_new_before_five_minutes(qtbot) -> None:
+    at = _NOW - dt.timedelta(minutes=4, seconds=59)
+    item = DeviceItem(None, text="Phone", badge="new", last_communication=at)
+    qtbot.addWidget(item.row_widget)
+    qtbot.wait(0)
+
+    item.refresh_badge(now=_NOW)
+
+    assert item.badge == "new"
+
+
+def test_device_item_refresh_badge_becomes_trusted_at_five_minutes(qtbot) -> None:
+    at = _NOW - dt.timedelta(minutes=5)
+    item = DeviceItem(None, text="Phone", badge="new", last_communication=at)
+    qtbot.addWidget(item.row_widget)
+    qtbot.wait(0)
+
+    item.refresh_badge(now=_NOW)
+
+    assert item.badge == "trusted"
+
+
+def test_device_item_refresh_badge_skips_static_last_communication(qtbot) -> None:
+    item = DeviceItem(
+        None,
+        text="Phone",
+        badge="new",
+        last_communication="Active now",
+    )
+    qtbot.addWidget(item.row_widget)
+    qtbot.wait(0)
+
+    item.refresh_badge(now=_NOW)
+
+    assert item.badge == "new"
+
+
+def test_device_selection_block_timer_tick_refreshes_badges(qtbot) -> None:
+    block = DeviceSelectionBlock()
+    qtbot.addWidget(block)
+    at = _NOW - dt.timedelta(minutes=5)
+    item = DeviceItem.add_to_list(
+        block.available_device_list,
+        text="Phone",
+        badge="new",
+        last_communication=at,
+    )
+    qtbot.wait(0)
+
+    block._on_refresh_timer_tick(now=_NOW)
+
+    assert item.badge == "trusted"

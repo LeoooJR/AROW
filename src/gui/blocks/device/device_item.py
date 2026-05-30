@@ -730,6 +730,29 @@ class DeviceItem(QListWidgetItem):
         title_layout.insertWidget(1, self.ui.badge_container)
         self._uses_compact_badge_layout = False
 
+    def refresh_badge(self, *, now: dt.datetime | None = None) -> None:
+        """Promote a ``new`` badge to ``trusted`` after the configured elapsed time.
+
+        Uses the stored live last-communication instant, not the rendered time label.
+        Static rows and rows without a timestamp are left unchanged.
+        """
+        if self._badge != "new":
+            return
+        if self._last_communication_is_static:
+            return
+        at = self._last_communication_live_at
+        if at is None:
+            return
+        current = now if now is not None else dt.datetime.now()
+        if at > current:
+            return
+        elapsed_secs = int((current - at).total_seconds())
+        if elapsed_secs < Settings.LIST.NEW_DEVICE_BADGE_DURATION_SECONDS:
+            return
+        self._badge = "trusted"
+        self._apply_badge()
+        self._sync_size_hint()
+
     @property
     def device_kind(self) -> DeviceKind:
         """Return the logical device kind represented by this row."""

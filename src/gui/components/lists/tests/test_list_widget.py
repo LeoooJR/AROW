@@ -34,3 +34,10 @@ def test_list_reports_empty_and_rejects_unsupported_item_type(qtbot) -> None:
 
     with pytest.raises(TypeError):
         list_widget.add_items([object()])
+
+
+def test_list_disables_alternating_row_backgrounds(qtbot) -> None:
+    list_widget = List(None)
+    qtbot.addWidget(list_widget)
+
+    assert list_widget.alternatingRowColors() is False

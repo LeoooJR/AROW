@@ -20,9 +20,10 @@ from PySide6.QtWidgets import QFrame, QSizePolicy, QVBoxLayout, QWidget
 from gui import faker as ui_faker
 from gui.animation import apply_highlight_level, compute_sine_pulse_level
 from gui.blocks.base import Block
+from gui.blocks.device.device_empty_state import DeviceEmptyState
 from gui.blocks.device.device_item import DeviceItem
 from gui.colors import Theme
-from gui.components import GroupBox, HelperText, List, PlaceHolder, ToolButton
+from gui.components import GroupBox, HelperText, List, ToolButton
 from gui.icons import GenericIcons
 from gui.settings import Settings
 from gui.signals import view_signals
@@ -35,7 +36,6 @@ class DeviceSelectionBlock(QFrame, Block):
 
     @dataclass(frozen=True)
     class Text:
-        empty_state: Final[str] = "No device found"
         add_device_tooltip: Final[str] = "Add a device"
         refresh_button_tooltip: Final[str] = "Refresh device list"
         select_helper_text: Final[str] = "Select a device to work with"
@@ -72,7 +72,7 @@ class DeviceSelectionBlock(QFrame, Block):
     @dataclass
     class UI:
         available_device_list: List
-        available_device_empty_state: PlaceHolder
+        available_device_empty_state: DeviceEmptyState
         available_device_wrapper: HorizontalLayoutWrapper
         available_device_group_box: GroupBox
         add_device_button: ToolButton
@@ -93,25 +93,8 @@ class DeviceSelectionBlock(QFrame, Block):
 
         available_device_list = List(None)
         available_device_list.setObjectName("available-device-list")
-        available_device_empty_state = PlaceHolder(
-            available_device_list.viewport(),
-            text=self.texts.empty_state,
-            minimum_width=0,
-            minimum_height=0,
-            icon=GenericIcons.DEVICE_PLACEHOLDER,
-        )
+        available_device_empty_state = DeviceEmptyState(available_device_list.viewport())
         available_device_empty_state.setObjectName("available-device-empty-state")
-        available_device_empty_state.setProperty("place-holder", False)
-        available_device_empty_state.setAttribute(
-            Qt.WidgetAttribute.WA_StyledBackground, False
-        )
-        available_device_empty_state.setAttribute(
-            Qt.WidgetAttribute.WA_TransparentForMouseEvents, True
-        )
-        available_device_empty_state.ui.text.setWordWrap(True)
-        available_device_empty_state.ui.text.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        available_device_empty_state.style().unpolish(available_device_empty_state)
-        available_device_empty_state.style().polish(available_device_empty_state)
         available_device_empty_state.hide()
 
         add_device_button = ToolButton(
@@ -182,18 +165,15 @@ class DeviceSelectionBlock(QFrame, Block):
         self._highlight_stop_timer.timeout.connect(self._stop_highlight_attention)
         self._highlight_elapsed = QElapsedTimer()
 
-        self._last_communication_refresh_timer = QTimer(self)
-        self._last_communication_refresh_timer.setSingleShot(False)
-        self._last_communication_refresh_timer.timeout.connect(
-            self._on_last_communication_refresh_timer_tick
-        )
-        self._last_communication_refresh_timer.setInterval(
-            Settings.LIST.LAST_COMMUNICATION_REFRESH_MS
-        )
-        self._last_communication_refresh_timer.start()
+        self._refresh_timer = QTimer(self)
+        self._refresh_timer.setSingleShot(False)
+        self._refresh_timer.timeout.connect(self._on_refresh_timer_tick)
+        self._refresh_timer.setInterval(Settings.LIST.REFRESH_MS)
+        self._refresh_timer.start()
 
         self.ui.available_device_list.selectionModel().clear()  # Clear the selection model to avoid any residual selection when the list is empty.
         self._has_active_device = False
+        self._is_extended = False
 
         self._finalize_ui_hooks()
         self._update_available_device_empty_state_visibility()
@@ -279,39 +259,61 @@ class DeviceSelectionBlock(QFrame, Block):
         """Seed placeholder rows when UI constraints are disabled."""
         self.add_list_items_placeholder()
 
-    def _on_last_communication_refresh_timer_tick(
-        self, *, now: dt.datetime | None = None
-    ) -> None:
+    def _on_refresh_timer_tick(self, *, now: dt.datetime | None = None) -> None:
         """Refresh live last-communication labels on every device row."""
         ref = now if now is not None else dt.datetime.now()
         for list_item in self.ui.available_device_list.iter_items():
             if isinstance(list_item, self._device_item_type):
                 list_item.refresh_last_communication_label(now=ref)
+                list_item.refresh_badge(now=ref)
 
     def _reposition_available_device_empty_state(self) -> None:
         """Resize and center the empty-state placeholder over the list viewport."""
         viewport = self.ui.available_device_list.viewport()
         placeholder = self.ui.available_device_empty_state
         inset = Settings.SPACING.XS
-        geometry = viewport.rect().adjusted(inset, inset, -inset, -inset)
-        placeholder.setGeometry(geometry)
-        min_side = max(0, min(geometry.width(), geometry.height()))
-        icon_size = max(24, min(Settings.PLACEHOLDER.ICON_SIZE, int(min_side * 0.38)))
-        placeholder.ui.svg.setFixedSize(icon_size, icon_size)
+        available_geometry = viewport.rect().adjusted(inset, inset, -inset, -inset)
+        card_width = min(
+            Settings.LIST.DEVICE_EMPTY_STATE_WIDTH,
+            available_geometry.width(),
+        )
+        card_x = available_geometry.x() + (
+            (available_geometry.width() - card_width) // 2
+        )
+        placeholder.fit_to_available_width(card_width)
+        placeholder.setGeometry(
+            card_x,
+            available_geometry.y(),
+            card_width,
+            available_geometry.height(),
+        )
         placeholder.raise_()
 
     def _update_available_device_empty_state_visibility(self) -> None:
         """Show the empty-state placeholder only when the device list is empty."""
         is_empty = self.ui.available_device_list.count() == 0
         self.ui.available_device_empty_state.setVisible(is_empty)
+        self.ui.select_helper_text.setVisible(not is_empty)
+        self.ui.buttons_wrapper.setVisible(not is_empty)
         if is_empty:
             self._reposition_available_device_empty_state()
 
     def _on_available_device_list_model_changed(self, *args) -> None:
         """Refresh placeholder, selection styling, and row sizes after list changes."""
         self._update_available_device_empty_state_visibility()
+        self._sync_available_device_item_presentation_state()
         self._sync_available_device_selection_state()
         self._sync_available_device_item_size_hints()
+
+    def _sync_available_device_item_presentation_state(self) -> None:
+        """Apply the block's current compact/extended mode to every device row."""
+        for item in self.ui.available_device_list.iter_items():
+            if not isinstance(item, self._device_item_type):
+                continue
+            if self._is_extended:
+                item.extend()
+            else:
+                item.shorten()
 
     def _sync_available_device_selection_state(self) -> None:
         """Mirror QListWidget selection state onto each custom device row widget."""
@@ -327,22 +329,19 @@ class DeviceSelectionBlock(QFrame, Block):
 
     def _on_authentification_succeeded(self, device: dict) -> None:
         """Add a newly authenticated device and mark it as the active selection."""
-        self._has_active_device = True
-        for item in self.ui.available_device_list.iter_items():
-            item.badge = "trusted"
+        self._has_active_device = (
+            False  # Authentification does not mean the device is active.
+        )
         item = self._device_item_type.add_to_list(
             self.ui.available_device_list,
             id=device["id"],
             text=device["name"],
             type="available",
-            badge="active",
+            badge="new",
             operating_system=device["os"],
             location="N/A",
             last_communication=device["last_communication"],
             alert_highlight=True,
-        )
-        self.ui.available_device_list.setCurrentItem(
-            item, QItemSelectionModel.SelectionFlag.SelectCurrent
         )
         self.ui.available_device_list.sortItems()
         self._on_available_device_list_model_changed()
@@ -364,9 +363,14 @@ class DeviceSelectionBlock(QFrame, Block):
         selected_item = self.ui.available_device_list.currentItem()
         if selected_item is None:
             return
+        # Ensure that no other device is active.
         for list_item in self.ui.available_device_list.iter_items():
-            list_item.badge = "trusted"
+            if list_item.badge == "active":
+                list_item.badge = "trusted"
+                break
+        # Mark the selected device as active.
         selected_item.badge = "active"
+        # Refresh the device list.
         self._on_available_device_list_model_changed()
 
     def _on_device_selection_failed(self, device: dict) -> None:
@@ -538,15 +542,13 @@ class DeviceSelectionBlock(QFrame, Block):
 
     def extend(self) -> None:
         """Expand all device rows to show extended metadata and actions."""
-        for item in self.ui.available_device_list.iter_items():
-            if isinstance(item, self._device_item_type):
-                item.extend()
+        self._is_extended = True
+        self._sync_available_device_item_presentation_state()
 
     def shorten(self) -> None:
         """Collapse all device rows back to their compact presentation."""
-        for item in self.ui.available_device_list.iter_items():
-            if isinstance(item, self._device_item_type):
-                item.shorten()
+        self._is_extended = False
+        self._sync_available_device_item_presentation_state()
 
     @property
     def available_device_list(self) -> List:

@@ -470,7 +470,6 @@ QWidget#authentification-overlay {{
 }}
 
 QFrame[place-holder="true"],
-QWidget#available-device-empty-state,
 QFrame#map-placeholder {{
     background-color: {palette.SURFACE_MUTED};
     border: 1px solid {palette.BORDER_SUBTLE};
@@ -485,7 +484,6 @@ QFrame#map-placeholder {{
 }}
 
 QFrame[place-holder="true"] QLabel,
-QWidget#available-device-empty-state QLabel,
 QFrame#map-placeholder QLabel {{
     color: {palette.TEXT_MUTED};
     font-weight: {Settings.FONT.WEIGHT_NORMAL};
@@ -671,6 +669,50 @@ QLabel#status-badge[status-badge="error"] {{
     color: {palette.ERROR};
 }}
 
+QFrame#dot-status-badge {{
+    background-color: {palette.SURFACE_MUTED};
+    border: 1px solid {palette.BORDER_SUBTLE};
+    border-radius: {Settings.BORDER_RADIUS.SM}px;
+}}
+
+QFrame#dot-status-badge QLabel#dot-status-badge-label {{
+    background-color: {palette.TRANSPARENT};
+    color: {palette.TEXT_PRIMARY};
+    font-size: {Settings.FONT.SIZE_HELPER}px;
+    font-weight: {Settings.FONT.WEIGHT_DEMIBOLD};
+}}
+
+QFrame#dot-status-badge-dot {{
+    background-color: {palette.TEXT_MUTED};
+    border: none;
+    border-radius: 4px;
+}}
+
+QFrame#dot-status-badge-dot[dot-status-badge="ready"],
+QFrame#dot-status-badge-dot[dot-status-badge="success"] {{
+    background-color: {palette.SUCCESS};
+}}
+
+QFrame#dot-status-badge-dot[dot-status-badge="warning"] {{
+    background-color: {palette.WARNING};
+}}
+
+QFrame#dot-status-badge-dot[dot-status-badge="error"] {{
+    background-color: {palette.ERROR};
+}}
+
+QFrame#dot-status-badge[dot-status-badge="error"] QLabel#dot-status-badge-label {{
+    color: {palette.ERROR};
+}}
+
+QFrame#dot-status-badge[dot-status-badge="warning"] QLabel#dot-status-badge-label {{
+    color: {palette.WARNING};
+}}
+
+QFrame#dot-status-badge[dot-status-badge="muted"] QLabel#dot-status-badge-label {{
+    color: {palette.TEXT_MUTED};
+}}
+
 QFrame#milestone-target-block {{
     background-color: {palette.SURFACE_ELEVATED};
     border: 1px solid {palette.BORDER_SUBTLE};
@@ -825,6 +867,50 @@ QGroupBox#available-device-group-box QListWidget#available-device-list::item {{
 
 QGroupBox#available-device-group-box QWidget#available-device-actions {{
     background-color: {palette.TRANSPARENT};
+}}
+
+QFrame#available-device-empty-state {{
+    background-color: {palette.PRIMARY_SOFT};
+    border: 1px solid {palette.PRIMARY_BORDER};
+    border-radius: {Settings.BORDER_RADIUS.MD}px;
+}}
+
+QFrame#available-device-empty-state QLabel#device-empty-state-title {{
+    background-color: {palette.TRANSPARENT};
+    color: {palette.TEXT_PRIMARY};
+    font-size: {Settings.FONT.SIZE_DEFAULT}px;
+    font-weight: {Settings.FONT.WEIGHT_DEMIBOLD};
+}}
+
+QFrame#available-device-empty-state QLabel#device-empty-state-description {{
+    background-color: {palette.TRANSPARENT};
+    color: {palette.TEXT_MUTED};
+    font-size: {Settings.FONT.SIZE_HELPER}px;
+    font-weight: {Settings.FONT.WEIGHT_NORMAL};
+}}
+
+QFrame#available-device-empty-state QWidget#device-empty-state-actions {{
+    background-color: {palette.TRANSPARENT};
+}}
+
+QFrame#available-device-empty-state QPushButton#device-empty-state-add-button {{
+    padding: 8px 10px;
+}}
+
+QFrame#available-device-empty-state QPushButton#device-empty-state-refresh-button {{
+    background-color: {palette.SURFACE_ELEVATED};
+    border: 1px solid {palette.BORDER_SUBTLE};
+    color: {palette.TEXT_PRIMARY};
+    padding: 8px 10px;
+}}
+
+QFrame#available-device-empty-state QPushButton#device-empty-state-refresh-button:hover {{
+    background-color: {palette.PRIMARY_SOFT};
+    border: 1px solid {palette.PRIMARY_BORDER};
+}}
+
+QFrame#available-device-empty-state QPushButton#device-empty-state-refresh-button:pressed {{
+    background-color: {palette.PRIMARY_BORDER};
 }}
 
 QWidget#device-item-row {{

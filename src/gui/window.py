@@ -300,8 +300,9 @@ class Body(QWidget):
         self.ui.tabs.currentChanged.connect(self._on_tab_changed)
 
         #### Signals for handling the step transition from authentification to map display ####
-        view_signals.AuthentificationSucceeded.connect(self._on_device_connected)
-        view_signals.DeviceSelectionSucceeded.connect(self._on_device_connected)
+        view_signals.DeviceSelectionSucceeded.connect(
+            self._on_device_selection_succeeded
+        )
         view_signals.ActiveDeviceRemoved.connect(self._on_active_device_removed)
 
         view_signals.TargetSelectionRequested.connect(
@@ -472,7 +473,7 @@ class Body(QWidget):
         self.ui.host_panel.apply_theme_icons(theme)
         self.ui.log_panel.apply_theme_icons(theme)
 
-    def _on_device_connected(self, device: str) -> None:
+    def _on_device_selection_succeeded(self, device: str) -> None:
         """Handle post-connection UI updates for any successful connection flow."""
         self.ui.progress_bar.setValue(1)
         self.ui.tabs.setCurrentIndex(1)

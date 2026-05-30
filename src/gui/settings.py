@@ -237,8 +237,8 @@ class ComboBoxSettings:
 class ListSettings:
     """List widget settings."""
 
-    MIN_WIDTH: int = 180
-    MIN_HEIGHT: int = 150
+    MIN_WIDTH: int = 200
+    MIN_HEIGHT: int = 200
     BASE_WIDTH: int = 260
     BASE_HEIGHT: int = 200
     ITEM_PADDING_VERTICAL: int = 10
@@ -256,6 +256,9 @@ class ListSettings:
     DEVICE_ITEM_ROW_COMPACT_PREFERRED_WIDTH: int = 250
     DEVICE_ITEM_ROW_EXTENDED_PREFERRED_WIDTH: int = 420
     DEVICE_ITEM_ICON_FRAME: int = 44
+    DEVICE_EMPTY_STATE_WIDTH: int = 250
+    DEVICE_EMPTY_STATE_ACTION_WIDTH: int = 190
+    DEVICE_EMPTY_STATE_GLYPH_TITLE_SPACING: int = 16
     ACTIVITY_ITEM_ROW_PADDING_V: int = 8
     ACTIVITY_ITEM_ROW_PADDING_H: int = 8
     ACTIVITY_ITEM_ROW_ICON_FRAME: int = 30
@@ -269,8 +272,10 @@ class ListSettings:
     SCROLLBAR_HANDLE_MIN_WIDTH: int = 30
     SCROLLBAR_MARGIN: int = 4
     SCROLLBAR_HANDLE_MARGIN: int = 2
-    # How often relative “last communication” labels refresh (list + device state).
-    LAST_COMMUNICATION_REFRESH_MS: int = 60_000
+    # How often the device list and device state are refreshed.
+    REFRESH_MS: int = 60_000
+    # Elapsed time since last communication before a "new" device badge becomes "trusted".
+    NEW_DEVICE_BADGE_DURATION_SECONDS: int = 5 * 60
 
 
 @dataclass(frozen=True)
