@@ -9,11 +9,10 @@ import numpy as np
 import pandas as pd
 import pandera.geopandas as pg
 import pandera.pandas as pa
+from geo.exceptions import SchemaValidationError
 from loguru import logger
 from pandera.typing import INT64, Float, Int, Int32, Object, Series, String
 from pandera.typing.geopandas import GeoSeries
-
-from geo.exceptions import SchemaValidationError
 
 # --- Vectorized checks for object columns that hold nested GeoJSON dicts (lon/lat) ---
 

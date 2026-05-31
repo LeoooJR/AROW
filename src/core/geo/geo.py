@@ -7,10 +7,9 @@ import pandas as pd
 import xyzservices.providers as xyz
 from folium.plugins import Fullscreen, MarkerCluster, MousePosition, Search
 from folium.utilities import JsCode
-from loguru import logger
-
 from geo.datasets import DatasetManager
 from geo.icons import Icons
+from loguru import logger
 
 # Columns embedded in Folium GeoJSON for milestone layers (tooltip/popup only).
 _MILESTONE_GEOJSON_COLUMNS: Final[Tuple[str, ...]] = (
