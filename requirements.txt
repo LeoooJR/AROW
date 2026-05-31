@@ -1,10 +1,14 @@
+bandit==1.9.4
+black==26.5.1
 # GUI
 faker==40.15.0
 
 # Geo and map stack
 folium==0.20.0
 geopandas==1.1.2
+isort==8.0.1
 loguru==0.7.3
+mypy==1.20.1
 pandas==3.0.0
 pandera==0.31.1
 
@@ -16,6 +20,7 @@ PySide6==6.10.1
 pytest==9.0.2
 pytest-qt==4.5.0
 rich==14.2.0
+ruff==0.15.15
 shapely==2.1.2
 
 # Core
