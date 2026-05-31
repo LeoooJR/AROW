@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QLabel, QFrame, QHBoxLayout, QSizePolicy, QWidget
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QSizePolicy, QWidget
 
 from gui.colors import Theme
 from gui.components.base.component import Component

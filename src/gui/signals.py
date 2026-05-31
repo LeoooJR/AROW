@@ -33,8 +33,8 @@ class ViewSignals(QObject):
     DeviceSelectionRequested = Signal(str, str)
     DeviceSelectionCancelled = Signal()
     DeviceSelectionConfirmed = Signal(str, str)
-    DeviceSelectionSucceeded = Signal(dict)
-    DeviceSelectionFailed = Signal(dict)
+    DeviceSelectionSucceeded = Signal(str, str)
+    DeviceSelectionFailed = Signal(str, str)
     RefreshDeviceListRequested = Signal()
     DevicesUpdated = Signal(object)
     RemoveDeviceRequested = Signal(str)
@@ -43,13 +43,15 @@ class ViewSignals(QObject):
     #### Host Signals ####
     HostDeviceInformationUpdated = Signal(str, str, str)
 
+    #### Activity Log Signals ####
+    ActivityLogFileUpdateRequested = Signal(str)
+    ActivityLogFileUpdated = Signal(str)
+
     #### Simulation Signals ####
     StartSimulationRequested = Signal()
     StopSimulationRequested = Signal()
     SimulationContextChanged = Signal(str, int)
     SimulationPositionChanged = Signal(float, float)
-    SimulationLogFileUpdateRequested = Signal(str)
-    SimulationLogFileUpdated = Signal(str, str)
 
 
 view_signals: ViewSignals = ViewSignals()

@@ -131,6 +131,7 @@ def test_device_selection_block_syncs_custom_row_selection(qtbot) -> None:
     assert first.row_widget.property("selected") is False
     assert second.row_widget.property("selected") is True
 
+
 def test_device_selection_block_hides_empty_state_when_devices_exist(qtbot) -> None:
     block = DeviceSelectionBlock()
     qtbot.addWidget(block)
@@ -436,7 +437,7 @@ def test_device_selection_block_map_tab_skips_highlight_when_device_selected(
         last_communication="Active now",
     )
     block.available_device_list.setCurrentItem(item)
-    view_signals.DeviceSelectionSucceeded.emit({"id": "device-1", "name": "Phone"})
+    view_signals.DeviceSelectionSucceeded.emit("device-1", "Phone")
     qtbot.wait(0)
 
     view_signals.MapTabActivated.emit()
@@ -534,7 +535,7 @@ def test_device_selection_block_handles_failed_selection_without_current_item(
     DeviceItem.add_to_list(block.available_device_list, id="known", text="Pixel 9")
     block.available_device_list.setCurrentItem(None)
 
-    view_signals.DeviceSelectionFailed.emit({"id": "missing", "name": "Missing"})
+    view_signals.DeviceSelectionFailed.emit("missing", "Missing")
     qtbot.wait(0)
 
     assert block.available_device_list.currentItem() is None

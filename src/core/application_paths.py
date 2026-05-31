@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import os
 import sys
+from datetime import datetime
 from pathlib import Path
 
 
@@ -58,3 +59,26 @@ def get_or_create_config_dir() -> Path:
     config = _resolved_config_base() / "arow"
     config.mkdir(parents=True, exist_ok=True)
     return config
+
+
+def get_or_create_activity_logs_dir(application_dir: Path) -> Path:
+    """Return the app-wide activity logs directory under ``application_dir``, creating it if needed."""
+    logs_dir = application_dir / "logs"
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    return logs_dir
+
+
+def default_activity_log_file_path(
+    application_dir: Path,
+    *,
+    now: datetime | None = None,
+) -> Path:
+    """
+    Return the default timestamped app-wide activity log file path.
+
+    One file per calendar day under ``<application_dir>/logs/activity_YYYYMMDD.log``.
+    """
+    day_stamp = (now or datetime.now()).strftime("%Y%m%d")
+    return (
+        get_or_create_activity_logs_dir(application_dir) / f"activity_{day_stamp}.log"
+    )

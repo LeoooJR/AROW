@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 
 from gui.colors import Theme
 from gui.components.base.component import Component
+from gui.components.media import get_svg_size
 from gui.components.media.svg import SVG
 from gui.icons import (
     ApplicationIcons,
@@ -25,7 +26,6 @@ from gui.icons import (
     icon_qt_path_for_theme,
 )
 from gui.settings import Settings
-from gui.components.media import get_svg_size
 
 
 class WalkthroughButton(QPushButton, Component):

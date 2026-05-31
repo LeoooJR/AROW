@@ -93,7 +93,9 @@ class DeviceSelectionBlock(QFrame, Block):
 
         available_device_list = List(None)
         available_device_list.setObjectName("available-device-list")
-        available_device_empty_state = DeviceEmptyState(available_device_list.viewport())
+        available_device_empty_state = DeviceEmptyState(
+            available_device_list.viewport()
+        )
         available_device_empty_state.setObjectName("available-device-empty-state")
         available_device_empty_state.hide()
 
@@ -357,7 +359,7 @@ class DeviceSelectionBlock(QFrame, Block):
                 "DeviceSelectionBlock: device item is not a DeviceItem", item=item
             )
 
-    def _on_device_selection_succeeded(self, device: dict) -> None:
+    def _on_device_selection_succeeded(self, device_id: str, device_name: str) -> None:
         """Mark the currently selected row active after selection succeeds."""
         self._has_active_device = True
         selected_item = self.ui.available_device_list.currentItem()
@@ -373,7 +375,7 @@ class DeviceSelectionBlock(QFrame, Block):
         # Refresh the device list.
         self._on_available_device_list_model_changed()
 
-    def _on_device_selection_failed(self, device: dict) -> None:
+    def _on_device_selection_failed(self, device_id: str, device_name: str) -> None:
         """Clear the current row selection after selection failure."""
         self._has_active_device = False
         self.ui.available_device_list.setCurrentItem(

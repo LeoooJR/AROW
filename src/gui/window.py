@@ -1015,21 +1015,23 @@ class MainWindow(QMainWindow):
             level="success",
         )
 
-    def forward_device_selection_succeeded(self, device: dict) -> None:
+    def forward_device_selection_succeeded(
+        self, device_id: str, device_name: str
+    ) -> None:
         """Handle the device selection succeeded without adding a new list entry."""
-        logger.info("MainWindow: device selection succeeded", device=device["name"])
-        view_signals.DeviceSelectionSucceeded.emit(device)
+        logger.info("MainWindow: device selection succeeded", device=device_name)
+        view_signals.DeviceSelectionSucceeded.emit(device_id, device_name)
         self.ui.container.post_toast(
-            self.texts.device_selection_success_toast.format(device=device["name"]),
+            self.texts.device_selection_success_toast.format(device=device_name),
             level="success",
         )
 
-    def forward_device_selection_failed(self, device: dict) -> None:
+    def forward_device_selection_failed(self, device_id: str, device_name: str) -> None:
         """Handle the device selection failed."""
-        logger.warning("MainWindow: device selection failed", device=device["name"])
-        view_signals.DeviceSelectionFailed.emit(device)
+        logger.warning("MainWindow: device selection failed", device=device_name)
+        view_signals.DeviceSelectionFailed.emit(device_id, device_name)
         self.ui.container.post_toast(
-            self.texts.device_selection_failed_toast.format(device=device["name"]),
+            self.texts.device_selection_failed_toast.format(device=device_name),
             level="error",
         )
 
@@ -1078,16 +1080,13 @@ class MainWindow(QMainWindow):
         )
         view_signals.HostDeviceInformationUpdated.emit(name, os, ip)
 
-    def forward_simulation_log_file_updated(
-        self, simulation_id: str, log_file_path: str
-    ) -> None:
-        """Forward default simulation log path to the log panel (via app signals)."""
+    def forward_activity_log_file_updated(self, log_file_path: str) -> None:
+        """Forward the app-wide activity log path to the log panel (via app signals)."""
         logger.info(
-            "MainWindow: simulation log file path updated",
-            simulation_id=simulation_id,
+            "MainWindow: activity log file path updated",
             log_file_path=log_file_path,
         )
-        view_signals.SimulationLogFileUpdated.emit(simulation_id, log_file_path)
+        view_signals.ActivityLogFileUpdated.emit(log_file_path)
 
     def resizeEvent(self, event) -> None:
         """Keep authentication overlay covering the full main container."""

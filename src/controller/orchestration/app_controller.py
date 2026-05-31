@@ -5,6 +5,8 @@ composed of *SubController domain objects.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6.QtCore import QEventLoop, QTimer
 from PySide6.QtWidgets import QApplication
 
@@ -12,8 +14,10 @@ from controller.controller import Controller
 from controller.domains.adb_sub_controller import AdbSubController
 from controller.domains.map_sub_controller import MapSubController
 from controller.domains.simulation_sub_controller import SimulationSubController
-from controller.helper import watchdog
+from controller.helper import validate_view, watchdog
+from core.application_paths import default_activity_log_file_path
 from core.models import CoreRuntimeModel
+from gui.signals import view_signals
 from gui.window import MainWindow
 from logger import logger
 
@@ -39,10 +43,11 @@ class AppController(Controller):
         )  # Create simulation subcontroller before adb subcontroller to avoid race condition, signals are connected in the order of creation
         self._adb: AdbSubController = AdbSubController(self)
         self._map: MapSubController = MapSubController(self)
+        self._activity_log_file: Path | None = None
         self._connect_view_signals()
         self._connect_model_signals()
         self._simulation.send_host_device_information()
-        self._simulation.send_simulation_log_file_to_view()
+        self._send_activity_log_file_to_view()
         self._adb.run_startup()
 
     @property
@@ -61,10 +66,36 @@ class AppController(Controller):
         self._simulation.connect_view_signals()
         self._adb.connect_view_signals()
         self._map.connect_view_signals()
+        view_signals.ActivityLogFileUpdateRequested.connect(
+            self._on_activity_log_file_update_requested
+        )
 
         qt_app = QApplication.instance()
         if qt_app is not None:
             qt_app.aboutToQuit.connect(self._on_application_about_to_quit)
+
+    def _resolve_activity_log_file(self) -> Path:
+        """Return the current app-wide activity log path, creating a default when unset."""
+        if self._activity_log_file is None:
+            self._activity_log_file = default_activity_log_file_path(
+                self.model.application_dir
+            )
+        return self._activity_log_file
+
+    @validate_view
+    def _send_activity_log_file_to_view(self) -> None:
+        log_file = self._resolve_activity_log_file()
+        self.view.forward_activity_log_file_updated(str(log_file))
+
+    @validate_view
+    def _on_activity_log_file_update_requested(self, path: str) -> None:
+        """Update the app-wide activity log file path and refresh the view."""
+        logger.debug(
+            "AppController: activity log file update requested",
+            path=path,
+        )
+        self._activity_log_file = Path(path)
+        self.view.forward_activity_log_file_updated(path)
 
     def _connect_model_signals(self) -> None:
         self._simulation.connect_model_signals()

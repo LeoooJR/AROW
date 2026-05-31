@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from gui.components.media import Image, SVG, get_svg_size
+from gui.components.media import SVG, Image, get_svg_size
 from gui.settings import Settings
 
 pytestmark = pytest.mark.usefixtures("qapp")

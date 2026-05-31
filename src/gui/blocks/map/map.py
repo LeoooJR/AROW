@@ -751,14 +751,14 @@ class MapBlock(QWidget):
         self.ui.placeholder.apply_theme_icons(theme)
         self.ui.coordinates.apply_theme_icons(theme)
 
-    def _on_device_selection_succeeded(self, device: dict) -> None:
+    def _on_device_selection_succeeded(self, device_id: str, device_name: str) -> None:
         """Update placeholder after auth or device selection succeeds."""
         self.update_placeholder(
             self.texts.loading_placeholder, GenericIcons.MAP_PLACEHOLDER
         )
         self._on_run_helper_animation()
 
-    def _on_device_selection_failed(self, device: dict) -> None:
+    def _on_device_selection_failed(self, device_id: str, device_name: str) -> None:
         """Pulse placeholder when device selection fails."""
         self._on_run_helper_animation()
 

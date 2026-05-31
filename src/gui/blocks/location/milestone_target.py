@@ -17,7 +17,11 @@ from gui.components import Button, StatusBadge
 from gui.icons import GenericIcons
 from gui.settings import Settings
 from gui.signals import view_signals
-from gui.wrapper import GridLayoutWrapper, HorizontalLayoutWrapper, VerticalLayoutWrapper
+from gui.wrapper import (
+    GridLayoutWrapper,
+    HorizontalLayoutWrapper,
+    VerticalLayoutWrapper,
+)
 
 
 class MilestoneMetadataItem(HorizontalLayoutWrapper):
@@ -140,7 +144,9 @@ class MilestoneTargetBlock(VerticalLayoutWrapper, Block):
         placeholder_line: str = field(
             default_factory=ui_faker.generate_milestone_line_label
         )
-        placeholder_km: str = field(default_factory=ui_faker.generate_milestone_km_label)
+        placeholder_km: str = field(
+            default_factory=ui_faker.generate_milestone_km_label
+        )
         placeholder_longitude: float = field(
             default_factory=ui_faker.generate_milestone_longitude
         )
@@ -295,7 +301,9 @@ class MilestoneTargetBlock(VerticalLayoutWrapper, Block):
         self.get_layout().setStretchFactor(self.ui.footer, 0)
 
     def _connect_signals(self) -> None:
-        self.ui.target_button.clicked.connect(view_signals.TargetSelectionRequested.emit)
+        self.ui.target_button.clicked.connect(
+            view_signals.TargetSelectionRequested.emit
+        )
         view_signals.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
 
     def apply_theme_icons(self, theme: Theme) -> None:

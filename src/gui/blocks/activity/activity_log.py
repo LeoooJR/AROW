@@ -524,7 +524,6 @@ class ActivityLogBlock(QFrame, Block):
         self.texts = ActivityLogBlock.Text()
 
         self.setObjectName("activity-log-block")
-        self._active_simulation_id: str | None = None
         self._activities: list[ActivityLogEntry] = []
         self._category_filter: set[ActivityCategory] | None = None
         self._level_filter: set[ActivityLevel] | None = None
@@ -689,9 +688,7 @@ class ActivityLogBlock(QFrame, Block):
     def _connect_signals(self) -> None:
         """Connect signals for the activity log block."""
         view_signals.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
-        view_signals.SimulationLogFileUpdated.connect(
-            self._on_simulation_log_file_updated
-        )
+        view_signals.ActivityLogFileUpdated.connect(self._on_activity_log_file_updated)
         view_signals.ADBServerStarted.connect(self._on_adb_server_started)
         view_signals.ADBServerStopped.connect(self._on_adb_server_stopped)
         view_signals.AuthentificationSucceeded.connect(
@@ -1042,32 +1039,28 @@ class ActivityLogBlock(QFrame, Block):
             metadata={"target": f"{ip}:{port}"},
         )
 
-    def _on_device_selection_succeeded(self, device: dict) -> None:
+    def _on_device_selection_succeeded(self, device_id: str, device_name: str) -> None:
         """Record an activity when active-device selection succeeds."""
-        name = str(device.get("name", "Android device"))
         self.add_activity(
             "Active device selected",
             "device",
             "success",
-            detail=f"{name} has been selected for the simulation.",
-            metadata={"target": name},
+            detail=f"{device_name} has been selected for the simulation.",
+            metadata={"target": device_name},
         )
 
-    def _on_device_selection_failed(self, device: dict) -> None:
+    def _on_device_selection_failed(self, device_id: str, device_name: str) -> None:
         """Record an activity when active-device selection fails."""
-        name = str(device.get("name", "Android device"))
         self.add_activity(
             "Device selection failed",
             "device",
             "error",
-            detail=f"{name} could not be selected for the simulation.",
-            metadata={"target": name},
+            detail=f"{device_name} could not be selected for the simulation.",
+            metadata={"target": device_name},
         )
 
-    def _on_simulation_log_file_updated(
-        self, simulation_id: str, log_file_path: str
-    ) -> None:
-        """Set the file row from the active simulation's default log path."""
+    def _on_activity_log_file_updated(self, log_file_path: str) -> None:
+        """Set the file row from the app-wide activity log path."""
         if not log_file_path:
             return
         path = Path(log_file_path)
@@ -1075,9 +1068,8 @@ class ActivityLogBlock(QFrame, Block):
         ext = path.suffix.lstrip(".").lower()
         file_type = ext.upper() if ext else "LOG"
         self.ui.file_display_widget.set_file_display(file_name, file_type)
-        self._active_simulation_id = simulation_id
         self.add_activity(
-            "Simulation log file updated",
+            "Activity log file updated",
             "file",
             "info",
             metadata={"file": file_name},
@@ -1090,7 +1082,7 @@ class ActivityLogBlock(QFrame, Block):
 
     @property
     def file_display_widget(self) -> File:
-        """Return the simulation log file display widget."""
+        """Return the activity log file display widget."""
         return self.ui.file_display_widget
 
     @property

@@ -19,4 +19,6 @@ repos:
 -   repo: https://github.com/PyCQA/bandit
     rev: 1.9.4
     hooks:
-    - id: bandit
+    -   id: bandit
+        args: ["-c", "pyproject.toml"]
+        additional_dependencies: ["bandit[toml]"]

@@ -54,7 +54,7 @@ def test_map_block_connection_succeeded_updates_placeholder_and_animates(
     qtbot.addWidget(block)
     block.show()
 
-    view_signals.DeviceSelectionSucceeded.emit({"id": "d1", "name": "Phone"})
+    view_signals.DeviceSelectionSucceeded.emit("d1", "Phone")
     qtbot.wait(0)
 
     assert block.placeholder.ui.text.text() == block.texts.loading_placeholder
@@ -68,7 +68,7 @@ def test_map_block_device_selection_failed_starts_helper_animation(qtbot) -> Non
     qtbot.addWidget(block)
     block.show()
 
-    view_signals.DeviceSelectionFailed.emit({"id": "d1"})
+    view_signals.DeviceSelectionFailed.emit("d1")
     qtbot.wait(0)
 
     assert block._placeholder_helper_anim is not None

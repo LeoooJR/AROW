@@ -221,3 +221,18 @@ def test_activity_log_block_records_adb_server_stop_as_warning(qtbot) -> None:
     assert len(block._activities) == 1
     assert block._activities[0].message == "ADB server stopped"
     assert block._activities[0].level == "warning"
+
+
+def test_activity_log_block_updates_file_display_from_signal(qtbot) -> None:
+    block = ActivityLogBlock()
+    qtbot.addWidget(block)
+    block.clear_activities()
+
+    block._on_activity_log_file_updated("/tmp/logs/activity_20260531.log")
+    qtbot.wait(0)
+
+    assert block.ui.file_display_widget._file_name == "activity_20260531.log"
+    assert block.ui.file_display_widget._file_type_label.text() == "LOG"
+    assert len(block._activities) == 1
+    assert block._activities[0].message == "Activity log file updated"
+    assert block._activities[0].category == "file"

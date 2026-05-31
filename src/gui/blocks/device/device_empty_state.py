@@ -8,8 +8,8 @@ from typing import Final
 from PySide6.QtCore import QRectF, QSize, Qt
 from PySide6.QtGui import QColor, QIcon, QPainter, QPen
 from PySide6.QtWidgets import (
-    QLabel,
     QFrame,
+    QLabel,
     QSizePolicy,
     QSpacerItem,
     QVBoxLayout,
@@ -66,7 +66,9 @@ class DeviceDiscoveryGlyph(QFrame):
             painter.drawEllipse(QRectF(top_left_x, top_left_y, diameter, diameter))
 
         painter.setPen(Qt.PenStyle.NoPen)
-        pulse_fill = palette.PRIMARY_SOFT if self._theme == "light" else palette.SURFACE_ELEVATED
+        pulse_fill = (
+            palette.PRIMARY_SOFT if self._theme == "light" else palette.SURFACE_ELEVATED
+        )
         painter.setBrush(QColor(pulse_fill))
         painter.drawEllipse(QRectF(center.x() - 25, center.y() - 25, 50, 50))
 
@@ -155,9 +157,7 @@ class DeviceEmptyState(QFrame, Block):
         )
 
         layout = QVBoxLayout()
-        layout.setContentsMargins(
-            *Settings.SPACING.MARGIN_PANEL
-        )
+        layout.setContentsMargins(*Settings.SPACING.MARGIN_PANEL)
         layout.setSpacing(Settings.SPACING.SM)
         layout.addStretch(1)
         layout.addWidget(glyph_host, alignment=Qt.AlignmentFlag.AlignCenter)

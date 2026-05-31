@@ -9,6 +9,7 @@ from PySide6.QtWidgets import QPushButton, QSizePolicy, QWidget
 
 from gui.colors import Theme
 from gui.components.base.component import Component
+from gui.components.media import get_svg_size
 from gui.icons import (
     ApplicationIcons,
     GenericIcons,
@@ -17,7 +18,6 @@ from gui.icons import (
     icon_qt_path_for_theme,
 )
 from gui.settings import Settings
-from gui.components.media import get_svg_size
 
 
 class Button(QPushButton, Component):

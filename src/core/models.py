@@ -1,7 +1,7 @@
 from abc import ABC
 from functools import cached_property
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 
 from core.adb import AdbClient, AdbServer
 from core.application_paths import (
@@ -18,6 +18,7 @@ from core.signals import (
     InMemoryCoreSignalBus,
     SignalHandler,
 )
+from core.simulation import Simulation, SimulationRepository
 from core.work.authentificate_device_work import (
     AuthenticateDeviceWork,
     AuthentificateDeviceOutcome,
@@ -89,6 +90,9 @@ class CoreRuntimeModel(Model):
         self._adb_server: AdbServer | None = None
         self._adb_client: AdbClient | None = None
         self._use_mock_adb: bool = use_mock_adb
+        self._simulations: SimulationRepository = SimulationRepository(
+            self.application_dir / "simulations"
+        )
 
     @property
     def host(self) -> Computer:
@@ -212,6 +216,67 @@ class CoreRuntimeModel(Model):
         if resolved is None:
             return []
         return resolved.get_known_devices()
+
+    def create_simulation(self, device_id: str) -> str:
+        """
+        Create a new simulation.
+        """
+        device: Phone | None = self.get_device(device_id)
+        if device is None:
+            raise AttributeError(f"Device with id {device_id} not found")
+        simulation: Simulation = Simulation(device=device)
+        self._simulations.add(simulation)
+        return simulation.id
+
+    def get_simulation(self, id: str) -> Simulation | None:
+        """
+        Get a simulation by id.
+        """
+        return self._simulations.get(id)
+
+    def is_simulation_active(self, id: str) -> bool:
+        """
+        Check if a simulation is active.
+        """
+        simulation: Simulation | None = self._simulations.get(id)
+        if simulation is None:
+            raise ValueError(f"Simulation with id {id} not found")
+        return simulation.active
+
+    def set_simulation_active(self, id: str, active: bool) -> None:
+        """
+        Set a simulation active or inactive.
+        """
+        simulation: Simulation | None = self._simulations.get(id)
+        if simulation is None:
+            raise ValueError(f"Simulation with id {id} not found")
+        simulation.active = active
+
+    def update_simulation(self, id: str, **kwargs: Any) -> None:
+        """
+        Update a simulation.
+        """
+        simulation: Simulation | None = self._simulations.get(id)
+        if simulation is None:
+            raise ValueError(f"Simulation with id {id} not found")
+        for key, value in kwargs.items():
+            setattr(simulation, key, value)
+
+    def delete_simulation(self, simulation: Simulation) -> None:
+        """
+        Delete a simulation by id.
+        """
+        return self._simulations.remove(simulation)
+
+    def delete_simulation_for_device(self, device_id: str) -> None:
+        """
+        Delete a simulation for a device by id.
+        """
+        for simulation in self._simulations:
+            if simulation.device.id == device_id:
+                self.delete_simulation(simulation)
+                return
+        raise ValueError(f"Simulation for device with id {device_id} not found")
 
     def apply_result(self, result: CoreRuntimeWorkOutcome) -> None:
         """
