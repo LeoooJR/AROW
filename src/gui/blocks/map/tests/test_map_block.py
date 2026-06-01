@@ -68,9 +68,27 @@ def test_map_block_device_selection_failed_starts_helper_animation(qtbot) -> Non
     qtbot.addWidget(block)
     block.show()
 
-    view_signals.DeviceSelectionFailed.emit("d1")
+    view_signals.DeviceSelectionFailed.emit("d1", "Phone")
     qtbot.wait(0)
 
+    assert block._placeholder_helper_anim is not None
+    assert block._placeholder_helper_anim.state() == QAbstractAnimation.State.Running
+
+
+def test_map_block_active_device_removed_resets_placeholder_and_animates(
+    qtbot,
+) -> None:
+    block = MapBlock()
+    qtbot.addWidget(block)
+    block.show()
+
+    block.update_placeholder("Map is being loaded...", GenericIcons.MAP_PLACEHOLDER)
+
+    view_signals.ActiveDeviceRemoved.emit()
+    qtbot.wait(0)
+
+    assert block.placeholder.ui.text.text() == block.texts.placeholder
+    assert block._placeholder_icon == GenericIcons.DEVICE_PLACEHOLDER
     assert block._placeholder_helper_anim is not None
     assert block._placeholder_helper_anim.state() == QAbstractAnimation.State.Running
 

@@ -25,7 +25,6 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from gui.blocks.base import Block
 from gui.colors import Theme
 from gui.components import SVG, LeadingIconLabel, PlaceHolder, ToolButton
 from gui.components.media import get_svg_size
@@ -115,7 +114,6 @@ class Legend(QFrame):
         """
         super().__init__(parent)
 
-        self.ui: Legend.UI
         self.texts = Legend.Text()
 
         self.setObjectName("map-legend")
@@ -174,7 +172,7 @@ class Legend(QFrame):
 
         self.setLayout(layout)
 
-        self.ui: Legend.UI = Legend.UI(
+        self.ui = Legend.UI(
             location_label_icon=location_label_icon,
             simulated_location_label_icon=simulated_location_label_icon,
             legend_first_row=legend_first_row,
@@ -225,7 +223,7 @@ class Location(QWidget):
         longitude_label: QLabel
         crosshair_button: ToolButton
 
-    def __init__(self, parent: QWidget = None, icon_path: str = None):
+    def __init__(self, parent: QWidget | None = None, icon_path: str | None = None):
         """Build a coordinate readout row with optional leading icon.
 
         Args:
@@ -234,7 +232,6 @@ class Location(QWidget):
         """
         super().__init__(parent)
 
-        self.ui: Location.UI
         self.texts = Location.Text()
 
         layout = QHBoxLayout()
@@ -260,7 +257,6 @@ class Location(QWidget):
         latitude_label.setFont(
             QFont(Settings.FONT.FAMILY, Settings.FONT.SIZE_SMALL, QFont.Weight.Normal)
         )
-        latitude_label_font_size = latitude_label.font().pointSize()
 
         self._coordinate_lead_svg: SVG | None = None
         if icon_path is not None:
@@ -304,7 +300,7 @@ class Location(QWidget):
 
         self.setLayout(layout)
 
-        self.ui: Location.UI = Location.UI(
+        self.ui = Location.UI(
             latitude_widget=latitude_widget,
             latitude_label=latitude_label,
             longitude_widget=longitude_widget,
@@ -417,7 +413,6 @@ class Coordinates(QFrame):
         """
         super().__init__(parent)
 
-        self.ui: Coordinates.UI
         self.texts = Coordinates.Text()
 
         self.setObjectName("map-coordinates")
@@ -484,7 +479,7 @@ class Coordinates(QFrame):
         self.setLayout(layout)
 
         self._state_animation_group: QParallelAnimationGroup | None = None
-        self.ui: Coordinates.UI = Coordinates.UI(
+        self.ui = Coordinates.UI(
             simulation_state_container=simulation_state_container,
             simulation_state_off=simulation_state_off,
             simulation_state_on=simulation_state_on,
@@ -637,7 +632,6 @@ class MapBlock(QWidget):
         """
         super().__init__(parent)
 
-        self.ui: MapBlock.UI
         self.texts = MapBlock.Text()
 
         layout = QVBoxLayout()
@@ -672,7 +666,7 @@ class MapBlock(QWidget):
 
         self.setLayout(layout)
 
-        self.ui: MapBlock.UI = MapBlock.UI(
+        self.ui = MapBlock.UI(
             legend=legend,
             canvas=canvas,
             coordinates=coordinates,
@@ -713,6 +707,7 @@ class MapBlock(QWidget):
         )
         view_signals.AuthentificationFailed.connect(self._on_authentification_failed)
         view_signals.DeviceSelectionFailed.connect(self._on_device_selection_failed)
+        view_signals.ActiveDeviceRemoved.connect(self._on_active_device_removed)
 
     def is_canvas_visible(self) -> bool:
         """Return whether the concrete map canvas is currently visible."""
@@ -764,6 +759,11 @@ class MapBlock(QWidget):
 
     def _on_authentification_failed(self, *_args) -> None:
         """Pulse placeholder when authentification fails."""
+        self._on_run_helper_animation()
+
+    def _on_active_device_removed(self) -> None:
+        """Reset placeholder when the active device is removed."""
+        self.update_placeholder(self.texts.placeholder, GenericIcons.DEVICE_PLACEHOLDER)
         self._on_run_helper_animation()
 
     def _on_run_helper_animation(self) -> None:
