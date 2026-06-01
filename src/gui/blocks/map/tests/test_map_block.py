@@ -6,20 +6,43 @@ import pytest
 from PySide6.QtCore import QAbstractAnimation
 
 from gui.blocks.map import MapBlock
-from gui.icons import GenericIcons
 from gui.signals import view_signals
 
 pytestmark = pytest.mark.usefixtures("qapp")
 
 
-def test_map_block_updates_placeholder_text_and_icon(qtbot) -> None:
+def test_map_block_shows_loading_placeholder(qtbot) -> None:
     block = MapBlock()
     qtbot.addWidget(block)
 
-    block.update_placeholder("Map is being loaded...", GenericIcons.MAP_PLACEHOLDER)
+    block.show_map_loading_placeholder()
 
-    assert block.placeholder.ui.text.text() == "Map is being loaded..."
-    assert block._placeholder_icon == GenericIcons.MAP_PLACEHOLDER
+    assert block.placeholder.currentWidget() is block.ui.map_loading_placeholder
+
+
+def test_map_block_initial_state_shows_device_required_placeholder(qtbot) -> None:
+    block = MapBlock()
+    qtbot.addWidget(block)
+
+    placeholder = block.ui.device_required_placeholder
+
+    assert block.placeholder.currentWidget() is placeholder
+    assert placeholder.ui.title_label.text() == "Choose a device to open the map"
+    assert (
+        placeholder.ui.description_label.text()
+        == "The map becomes available after an Android device is linked and selected."
+    )
+    assert placeholder.ui.open_device_list_button.text().strip() == "Open device list"
+
+
+def test_map_block_open_device_list_cta_shows_left_panels(qtbot) -> None:
+    block = MapBlock()
+    qtbot.addWidget(block)
+
+    with qtbot.waitSignal(view_signals.LeftPanelsVisibilityRequested) as signal:
+        block.ui.device_required_placeholder.ui.open_device_list_button.click()
+
+    assert signal.args == [True]
 
 
 def test_map_block_placeholder_helper_animation_starts(qtbot) -> None:
@@ -34,17 +57,25 @@ def test_map_block_placeholder_helper_animation_starts(qtbot) -> None:
     assert block._placeholder_helper_anim.state() == QAbstractAnimation.State.Running
 
 
-def test_map_block_placeholder_helper_animation_noops_without_svg(
-    monkeypatch, qtbot
-) -> None:
+def test_map_block_placeholder_helper_animation_is_delegated(monkeypatch, qtbot) -> None:
     block = MapBlock()
     qtbot.addWidget(block)
     block.show()
-    monkeypatch.setattr(block.placeholder, "findChild", lambda *args: None)
+    calls = []
+
+    def fake_play_helper_animation(previous_animation):
+        calls.append(previous_animation)
+        return previous_animation
+
+    monkeypatch.setattr(
+        block.ui.device_required_placeholder,
+        "play_helper_animation",
+        fake_play_helper_animation,
+    )
 
     view_signals.MapTabActivated.emit()
 
-    assert block._placeholder_helper_anim is None
+    assert calls == [None]
 
 
 def test_map_block_connection_succeeded_updates_placeholder_and_animates(
@@ -57,8 +88,7 @@ def test_map_block_connection_succeeded_updates_placeholder_and_animates(
     view_signals.DeviceSelectionSucceeded.emit("d1", "Phone")
     qtbot.wait(0)
 
-    assert block.placeholder.ui.text.text() == block.texts.loading_placeholder
-    assert block._placeholder_icon == GenericIcons.MAP_PLACEHOLDER
+    assert block.placeholder.currentWidget() is block.ui.map_loading_placeholder
     assert block._placeholder_helper_anim is not None
     assert block._placeholder_helper_anim.state() == QAbstractAnimation.State.Running
 
@@ -82,13 +112,12 @@ def test_map_block_active_device_removed_resets_placeholder_and_animates(
     qtbot.addWidget(block)
     block.show()
 
-    block.update_placeholder("Map is being loaded...", GenericIcons.MAP_PLACEHOLDER)
+    block.show_map_loading_placeholder()
 
     view_signals.ActiveDeviceRemoved.emit()
     qtbot.wait(0)
 
-    assert block.placeholder.ui.text.text() == block.texts.placeholder
-    assert block._placeholder_icon == GenericIcons.DEVICE_PLACEHOLDER
+    assert block.placeholder.currentWidget() is block.ui.device_required_placeholder
     assert block._placeholder_helper_anim is not None
     assert block._placeholder_helper_anim.state() == QAbstractAnimation.State.Running
 
