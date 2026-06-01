@@ -933,8 +933,6 @@ QFrame[map-placeholder-state="true"] QLabel#map-placeholder-description {{
     font-weight: {Settings.FONT.WEIGHT_NORMAL};
 }}
 
-QFrame#map-device-required-body,
-QFrame#map-device-required-content,
 QFrame#map-loading-descriptor {{
     background-color: {palette.TRANSPARENT};
     border: none;

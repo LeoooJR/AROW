@@ -27,12 +27,41 @@ def test_map_block_initial_state_shows_device_required_placeholder(qtbot) -> Non
     placeholder = block.ui.device_required_placeholder
 
     assert block.placeholder.currentWidget() is placeholder
+    assert placeholder.layout().itemAt(1).widget() is placeholder.ui.glyph
+    assert placeholder.layout().itemAt(2).widget() is placeholder.ui.title_label
+    assert placeholder.layout().itemAt(3).widget() is placeholder.ui.description_label
+    assert (
+        placeholder.layout().itemAt(4).widget()
+        is placeholder.ui.open_device_list_button
+    )
     assert placeholder.ui.title_label.text() == "Choose a device to open the map"
     assert (
         placeholder.ui.description_label.text()
         == "The map becomes available after an Android device is linked and selected."
     )
     assert placeholder.ui.open_device_list_button.text().strip() == "Open device list"
+
+
+def test_map_block_device_required_placeholder_resizes_without_overlap(qtbot) -> None:
+    block = MapBlock()
+    qtbot.addWidget(block)
+    block.show()
+
+    placeholder = block.ui.device_required_placeholder
+
+    for width in (900, 680, 560, 460):
+        block.resize(width, 560)
+        qtbot.wait(0)
+
+        assert not placeholder.ui.glyph.geometry().intersects(
+            placeholder.ui.title_label.geometry()
+        )
+        assert not placeholder.ui.glyph.geometry().intersects(
+            placeholder.ui.description_label.geometry()
+        )
+        assert not placeholder.ui.glyph.geometry().intersects(
+            placeholder.ui.open_device_list_button.geometry()
+        )
 
 
 def test_map_block_open_device_list_cta_shows_left_panels(qtbot) -> None:

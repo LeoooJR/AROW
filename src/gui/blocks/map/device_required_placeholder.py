@@ -7,6 +7,7 @@ from typing import Final
 
 from PySide6.QtCore import (
     QAbstractAnimation,
+    QPointF,
     QEasingCurve,
     QPropertyAnimation,
     QRectF,
@@ -14,7 +15,7 @@ from PySide6.QtCore import (
     QSequentialAnimationGroup,
     Qt,
 )
-from PySide6.QtGui import QColor, QIcon, QPainter, QPainterPath, QPen
+from PySide6.QtGui import QColor, QIcon, QPainter, QPen
 from PySide6.QtWidgets import (
     QFrame,
     QGraphicsOpacityEffect,
@@ -31,14 +32,14 @@ from gui.components.media import get_svg_size
 from gui.icons import GenericIcons, icon_qt_path_for_theme
 from gui.settings import Settings
 from gui.signals import view_signals
-from gui.wrapper import HorizontalLayoutWrapper, VerticalLayoutWrapper
 
 
 class DeviceRequiredMapGlyph(QFrame):
-    """Device glyph with a dotted selection frame and direction cue."""
+    """Device glyph with a dotted target frame and click cue."""
 
-    _SIZE = QSize(180, 126)
+    _SIZE = QSize(154, 126)
     _PHONE_ICON_PX = 42
+    _HAND_ICON_PX = 46
 
     def __init__(self, parent: QWidget | None = None) -> None:
         """Create the painted glyph."""
@@ -65,7 +66,7 @@ class DeviceRequiredMapGlyph(QFrame):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        frame_rect = QRectF(18, 22, 76, 82)
+        frame_rect = QRectF(34, 18, 86, 88)
         frame_pen = QPen(QColor(palette.PRIMARY_BORDER), 1.4)
         frame_pen.setStyle(Qt.PenStyle.DotLine)
         painter.setPen(frame_pen)
@@ -87,22 +88,22 @@ class DeviceRequiredMapGlyph(QFrame):
             pixmap,
         )
 
-        path = QPainterPath()
-        path.moveTo(102, 70)
-        path.cubicTo(122, 72, 116, 45, 140, 46)
-        path.lineTo(154, 46)
+        hand_icon = QIcon(icon_qt_path_for_theme(self._theme, GenericIcons.HAND_INDEX))
+        hand_pixmap = hand_icon.pixmap(QSize(self._HAND_ICON_PX, self._HAND_ICON_PX))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(palette.PRIMARY_SOFT))
+        painter.drawEllipse(QRectF(90, 68, self._HAND_ICON_PX, self._HAND_ICON_PX))
+        painter.drawPixmap(90, 68, hand_pixmap)
 
-        arrow_pen = QPen(QColor(palette.PRIMARY), 2)
-        arrow_pen.setStyle(Qt.PenStyle.DashLine)
-        arrow_pen.setDashPattern([4, 4])
-        arrow_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-        painter.setPen(arrow_pen)
-        painter.drawPath(path)
-
-        painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.setPen(QPen(QColor(palette.PRIMARY), 2))
-        painter.drawLine(154, 46, 143, 35)
-        painter.drawLine(154, 46, 143, 57)
+        click_ray_pen = QPen(QColor(palette.PRIMARY_BORDER), 1.4)
+        click_ray_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        painter.setPen(click_ray_pen)
+        for start, end in (
+            (QPointF(116, 76), QPointF(124, 68)),
+            (QPointF(121, 88), QPointF(132, 86)),
+            (QPointF(110, 68), QPointF(112, 58)),
+        ):
+            painter.drawLine(start, end)
         painter.end()
 
 
@@ -126,8 +127,6 @@ class DeviceRequiredMapPlaceholder(QFrame, Block):
         title_label: QLabel
         description_label: QLabel
         open_device_list_button: QPushButton
-        content: VerticalLayoutWrapper
-        body: HorizontalLayoutWrapper
 
     def __init__(self, parent: QWidget | None = None) -> None:
         """Build the no-device map placeholder."""
@@ -153,29 +152,17 @@ class DeviceRequiredMapPlaceholder(QFrame, Block):
         )
         open_device_list_button.setIconSize(get_svg_size(Settings.FONT.SIZE_DEFAULT))
 
-        content = VerticalLayoutWrapper(
-            self,
-            widgets=[title_label, description_label, open_device_list_button],
-            spacing=Settings.SPACING.SM,
-            margins=Settings.SPACING.MARGIN_NONE,
-        )
-        content.setObjectName("map-device-required-content")
-
-        body = HorizontalLayoutWrapper(
-            self,
-            widgets=[glyph, content],
-            spacing=Settings.SPACING.LG,
-            margins=Settings.SPACING.MARGIN_NONE,
-            stretch_at_beginning=True,
-            stretch_at_end=True,
-        )
-        body.setObjectName("map-device-required-body")
-
         layout = QVBoxLayout()
         layout.setContentsMargins(*Settings.SPACING.MARGIN_PANEL)
-        layout.setSpacing(Settings.SPACING.NONE)
+        layout.setSpacing(Settings.SPACING.SM)
         layout.addStretch(1)
-        layout.addWidget(body)
+        layout.addWidget(glyph, alignment=Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(title_label)
+        layout.addWidget(description_label)
+        layout.addWidget(
+            open_device_list_button,
+            alignment=Qt.AlignmentFlag.AlignCenter,
+        )
         layout.addStretch(1)
         self.setLayout(layout)
 
@@ -184,8 +171,6 @@ class DeviceRequiredMapPlaceholder(QFrame, Block):
             title_label=title_label,
             description_label=description_label,
             open_device_list_button=open_device_list_button,
-            content=content,
-            body=body,
         )
         self._finalize_ui_hooks()
 
@@ -193,24 +178,33 @@ class DeviceRequiredMapPlaceholder(QFrame, Block):
         """Preserve the expanding map placeholder behavior."""
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.ui.glyph.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        self.ui.content.setSizePolicy(
-            QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Preferred
+        self.ui.title_label.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
         )
-        self.ui.content.setMinimumWidth(self._CONTENT_MIN_WIDTH)
-        self.ui.content.setMaximumWidth(self._CONTENT_MAX_WIDTH)
+        self.ui.description_label.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+        )
+        self.ui.title_label.setMinimumWidth(self._CONTENT_MIN_WIDTH)
+        self.ui.description_label.setMinimumWidth(self._CONTENT_MIN_WIDTH)
+        self.ui.title_label.setMaximumWidth(self._CONTENT_MAX_WIDTH)
+        self.ui.description_label.setMaximumWidth(self._CONTENT_MAX_WIDTH)
         self.ui.open_device_list_button.setSizePolicy(
             QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed
         )
 
     def _set_alignment(self) -> None:
         """Align no-device placeholder content."""
-        self.layout().setAlignment(self.ui.body, Qt.AlignmentFlag.AlignCenter)
-        self.ui.body.get_layout().setAlignment(self.ui.glyph, Qt.AlignmentFlag.AlignCenter)
-        self.ui.body.get_layout().setAlignment(
-            self.ui.content, Qt.AlignmentFlag.AlignVCenter
+        self.layout().setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.ui.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.ui.description_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.layout().setAlignment(self.ui.glyph, Qt.AlignmentFlag.AlignCenter)
+        self.layout().setAlignment(self.ui.title_label, Qt.AlignmentFlag.AlignCenter)
+        self.layout().setAlignment(
+            self.ui.description_label,
+            Qt.AlignmentFlag.AlignCenter,
         )
-        self.ui.content.get_layout().setAlignment(
-            self.ui.open_device_list_button, Qt.AlignmentFlag.AlignLeft
+        self.layout().setAlignment(
+            self.ui.open_device_list_button, Qt.AlignmentFlag.AlignCenter
         )
 
     def _connect_signals(self) -> None:
