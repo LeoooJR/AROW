@@ -86,7 +86,9 @@ def test_map_block_placeholder_helper_animation_starts(qtbot) -> None:
     assert block._placeholder_helper_anim.state() == QAbstractAnimation.State.Running
 
 
-def test_map_block_placeholder_helper_animation_is_delegated(monkeypatch, qtbot) -> None:
+def test_map_block_placeholder_helper_animation_is_delegated(
+    monkeypatch, qtbot
+) -> None:
     block = MapBlock()
     qtbot.addWidget(block)
     block.show()
@@ -143,7 +145,7 @@ def test_map_block_active_device_removed_resets_placeholder_and_animates(
 
     block.show_map_loading_placeholder()
 
-    view_signals.ActiveDeviceRemoved.emit()
+    view_signals.ActiveDeviceRemoved.emit("d1")
     qtbot.wait(0)
 
     assert block.placeholder.currentWidget() is block.ui.device_required_placeholder

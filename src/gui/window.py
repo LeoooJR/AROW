@@ -9,10 +9,9 @@ from time import monotonic
 from typing import Deque, Final, Optional
 
 from PySide6.QtCore import QSize, Qt, QTimer
-from PySide6.QtGui import QColor, QFont, QIcon, QPalette, QPixmap, QScreen
+from PySide6.QtGui import QColor, QFont, QIcon, QPalette, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
-    QFrame,
     QHBoxLayout,
     QMainWindow,
     QMessageBox,
@@ -24,10 +23,9 @@ from PySide6.QtWidgets import (
 from shiboken6 import isValid
 
 import gui.faker as ui_faker
-import gui.ressources_rc
+import gui.ressources_rc  # noqa: F401
 from gui.__init__ import __application__
 from gui.animation import animate_widget_visibility
-from gui.blocks.device import DeviceItem
 from gui.blocks.top_bar import TopBar
 from gui.colors import Theme, get_current_palette, set_current_theme
 from gui.components import (
@@ -479,9 +477,9 @@ class Body(QWidget):
         self.ui.tabs.setCurrentIndex(1)
         self.ui.tabs.setTabVisible(2, True)
 
-    def _on_active_device_removed(self) -> None:
+    def _on_active_device_removed(self, device_id: str) -> None:
         """Handle the active device removed."""
-        logger.info("Body: active device removed")
+        logger.info("Body: active device removed", device_id=device_id)
         self.ui.progress_bar.setValue(0)
         self.ui.tabs.setCurrentIndex(0)
         self.ui.tabs.setTabVisible(2, False)
@@ -789,6 +787,12 @@ class MainWindow(QMainWindow):
         )
         device_selection_failed_toast: str = "Failed to select device: {device}."
         device_selection_success_toast: str = "Successfully selected device: {device}."
+        active_device_removed_success_toast: str = (
+            "Successfully removed active device: {device}. Shutting down simulation..."
+        )
+        active_device_removed_error_toast: str = (
+            "Failed to remove active device: {device}. Please try again."
+        )
 
     @dataclass
     class UI:
@@ -962,15 +966,7 @@ class MainWindow(QMainWindow):
                     logger.warning(
                         "MainWindow: device selection request skipped (UI constraints disabled)",
                     )
-                    self.forward_device_selection_succeeded(
-                        {
-                            "id": device_id,
-                            "name": device_name,
-                            "os": self.texts.demo_device_os,
-                            "location": self.texts.demo_device_location,
-                            "last_communication": self.texts.demo_device_last_communication,
-                        }
-                    )
+                    self.forward_device_selection_succeeded(device_id, device_name)
                 else:
                     view_signals.DeviceSelectionConfirmed.emit(device_id, device_name)
             else:
@@ -1063,10 +1059,14 @@ class MainWindow(QMainWindow):
         )
         view_signals.DevicesUpdated.emit(devices)
 
-    def forward_active_device_removed(self) -> None:
+    def forward_active_device_removed(self, device_id: str) -> None:
         """Handle the active device removed."""
         logger.info("MainWindow: active device removed")
-        view_signals.ActiveDeviceRemoved.emit()
+        view_signals.ActiveDeviceRemoved.emit(device_id)
+        self.ui.container.post_toast(
+            self.texts.active_device_removed_success_toast.format(device=device_id),
+            level="success",
+        )
 
     def forward_host_device_information_updated(
         self, name: str, os: str, ip: str

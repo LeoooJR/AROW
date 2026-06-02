@@ -236,7 +236,7 @@ class OperatorReadinessBlock(VerticalLayoutWrapper, Block):
             status_kind="ready",
         )
 
-    def _on_active_device_removed(self) -> None:
+    def _on_active_device_removed(self, device_id: str) -> None:
         """Update the readiness row when the active device is removed."""
         self.ui.rows[self.ROWS_INDEX_MAPPING["device"]].update(
             *self.texts.default_rows[self.ROWS_INDEX_MAPPING["device"]]

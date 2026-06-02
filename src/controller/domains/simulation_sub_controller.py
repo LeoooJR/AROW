@@ -140,5 +140,22 @@ class SimulationSubController(AppSubController):
 
     def _on_remove_device_requested(self, device_id: str) -> None:
         """Handle the remove device requested event."""
-        self.model.delete_simulation_for_device(device_id)
-        self.view.forward_active_device_removed()
+        try:
+            self.model.delete_simulation_for_device(device_id)
+            self.view.forward_active_device_removed(device_id)
+        except (
+            ValueError
+        ) as e:  # Simulation for device not found, the device was not active
+            logger.debug(
+                "SimulationSubController: no simulation found for device, safely ignoring",
+                error=str(e),
+                device_id=device_id,
+            )
+            return
+        except Exception as e:
+            logger.error(
+                "SimulationSubController: failed to delete simulation for device",
+                error=str(e),
+                device_id=device_id,
+            )
+            return

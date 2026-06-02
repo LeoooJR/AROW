@@ -26,11 +26,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from gui.colors import Theme
-from gui.components import LeadingIconLabel, SVG, ToolButton
-from gui.components.media import get_svg_size
 from gui.blocks.map.device_required_placeholder import DeviceRequiredMapPlaceholder
 from gui.blocks.map.map_loading_placeholder import MapLoadingPlaceholder
+from gui.colors import Theme
+from gui.components import SVG, LeadingIconLabel, ToolButton
+from gui.components.media import get_svg_size
 from gui.icons import GenericIcons, icon_qt_path, icon_qt_path_for_theme
 from gui.settings import Settings
 from gui.signals import view_signals
@@ -768,7 +768,7 @@ class MapBlock(QWidget):
         """Pulse placeholder when authentification fails."""
         self._on_run_helper_animation()
 
-    def _on_active_device_removed(self) -> None:
+    def _on_active_device_removed(self, device_id: str) -> None:
         """Reset placeholder when the active device is removed."""
         self.show_device_required_placeholder()
         self._on_run_helper_animation()
