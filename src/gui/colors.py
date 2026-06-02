@@ -3,9 +3,19 @@ This file contains the colors used in the application.
 Light and dark mode values follow the AROW design system in DESIGN.md.
 """
 
+from __future__ import annotations
+
+import re
 from dataclasses import dataclass
 from enum import Enum
 from typing import Literal
+
+from PySide6.QtGui import QColor
+
+_CSS_RGB_PATTERN = re.compile(
+    r"^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?\s*\)$",
+    re.IGNORECASE,
+)
 
 Theme = Literal["light", "dark"]
 
@@ -128,3 +138,29 @@ def get_palette(theme: Theme) -> Palette:
 def get_current_palette() -> Palette:
     """Return the color palette for the active theme."""
     return get_palette(get_current_theme())
+
+
+def qcolor_from_css(value: str) -> QColor:
+    """Build a QColor from a palette/CSS color string.
+
+    Qt stylesheets accept CSS ``rgb(...)`` / ``rgba(...)`` syntax, but
+    ``QColor(str)`` does not. This helper keeps palette tokens unchanged while
+    letting painter code render semi-transparent fills and strokes correctly.
+    """
+    normalized = value.strip()
+    if not normalized:
+        raise ValueError("Palette color value must not be empty.")
+
+    match = _CSS_RGB_PATTERN.match(normalized)
+    if match is not None:
+        red, green, blue, alpha = match.groups()
+        qt_alpha = 255 if alpha is None else round(float(alpha) * 255)
+        color = QColor(int(red), int(green), int(blue), qt_alpha)
+        if not color.isValid():
+            raise ValueError(f"Invalid CSS color components in {value!r}.")
+        return color
+
+    color = QColor(normalized)
+    if not color.isValid():
+        raise ValueError(f"Unsupported palette color value for QPainter: {value!r}.")
+    return color

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Final
 
 from PySide6.QtCore import QRectF, QSize, Qt
-from PySide6.QtGui import QColor, QIcon, QPainter, QPen
+from PySide6.QtGui import QIcon, QPainter, QPen
 from PySide6.QtWidgets import (
     QFrame,
     QLabel,
@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from gui.blocks.base import Block
-from gui.colors import Theme, get_current_palette
+from gui.colors import Theme, get_current_palette, qcolor_from_css
 from gui.components import Button, DotStatusBadge
 from gui.icons import GenericIcons, icon_qt_path_for_theme
 from gui.settings import Settings
@@ -56,8 +56,7 @@ class DeviceDiscoveryGlyph(QFrame):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         center = self.rect().center()
-        ring_color = palette.PRIMARY_BORDER
-        ring_pen = QPen(QColor(ring_color), 1.8)
+        ring_pen = QPen(qcolor_from_css(palette.PRIMARY_BORDER), 1.8)
         painter.setPen(ring_pen)
         painter.setBrush(Qt.BrushStyle.NoBrush)
         for diameter in (58, 82):
@@ -66,10 +65,7 @@ class DeviceDiscoveryGlyph(QFrame):
             painter.drawEllipse(QRectF(top_left_x, top_left_y, diameter, diameter))
 
         painter.setPen(Qt.PenStyle.NoPen)
-        pulse_fill = (
-            palette.PRIMARY_SOFT if self._theme == "light" else palette.SURFACE_ELEVATED
-        )
-        painter.setBrush(QColor(pulse_fill))
+        painter.setBrush(qcolor_from_css(palette.PRIMARY_SOFT))
         painter.drawEllipse(QRectF(center.x() - 25, center.y() - 25, 50, 50))
 
         icon = QIcon(icon_qt_path_for_theme(self._theme, GenericIcons.DEVICE))

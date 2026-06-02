@@ -7,15 +7,15 @@ from typing import Final
 
 from PySide6.QtCore import (
     QAbstractAnimation,
-    QPointF,
     QEasingCurve,
+    QPointF,
     QPropertyAnimation,
     QRectF,
-    QSize,
     QSequentialAnimationGroup,
+    QSize,
     Qt,
 )
-from PySide6.QtGui import QColor, QIcon, QPainter, QPen
+from PySide6.QtGui import QIcon, QPainter, QPen
 from PySide6.QtWidgets import (
     QFrame,
     QGraphicsOpacityEffect,
@@ -27,7 +27,7 @@ from PySide6.QtWidgets import (
 )
 
 from gui.blocks.base import Block
-from gui.colors import Theme, get_current_palette
+from gui.colors import Theme, get_current_palette, qcolor_from_css
 from gui.components.media import get_svg_size
 from gui.icons import GenericIcons, icon_qt_path_for_theme
 from gui.settings import Settings
@@ -67,7 +67,7 @@ class DeviceRequiredMapGlyph(QFrame):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         frame_rect = QRectF(34, 18, 86, 88)
-        frame_pen = QPen(QColor(palette.PRIMARY_BORDER), 1.4)
+        frame_pen = QPen(qcolor_from_css(palette.PRIMARY_BORDER), 1.4)
         frame_pen.setStyle(Qt.PenStyle.DotLine)
         painter.setPen(frame_pen)
         painter.setBrush(Qt.BrushStyle.NoBrush)
@@ -75,7 +75,7 @@ class DeviceRequiredMapGlyph(QFrame):
 
         icon_center = frame_rect.center()
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QColor(palette.PRIMARY_SOFT))
+        painter.setBrush(qcolor_from_css(palette.PRIMARY_SOFT))
         painter.drawRoundedRect(
             QRectF(icon_center.x() - 26, icon_center.y() - 32, 52, 64), 10, 10
         )
@@ -91,11 +91,11 @@ class DeviceRequiredMapGlyph(QFrame):
         hand_icon = QIcon(icon_qt_path_for_theme(self._theme, GenericIcons.HAND_INDEX))
         hand_pixmap = hand_icon.pixmap(QSize(self._HAND_ICON_PX, self._HAND_ICON_PX))
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QColor(palette.PRIMARY_SOFT))
+        painter.setBrush(qcolor_from_css(palette.PRIMARY_SOFT))
         painter.drawEllipse(QRectF(90, 68, self._HAND_ICON_PX, self._HAND_ICON_PX))
         painter.drawPixmap(90, 68, hand_pixmap)
 
-        click_ray_pen = QPen(QColor(palette.PRIMARY_BORDER), 1.4)
+        click_ray_pen = QPen(qcolor_from_css(palette.PRIMARY_BORDER), 1.4)
         click_ray_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(click_ray_pen)
         for start, end in (

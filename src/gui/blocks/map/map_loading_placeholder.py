@@ -11,11 +11,11 @@ from PySide6.QtCore import (
     QEasingCurve,
     QPropertyAnimation,
     QRectF,
-    QSize,
     QSequentialAnimationGroup,
+    QSize,
     Qt,
 )
-from PySide6.QtGui import QColor, QIcon, QPainter, QPen
+from PySide6.QtGui import QIcon, QPainter, QPen
 from PySide6.QtWidgets import (
     QFrame,
     QGraphicsOpacityEffect,
@@ -26,7 +26,7 @@ from PySide6.QtWidgets import (
 )
 
 from gui.blocks.base import Block
-from gui.colors import Theme, get_current_palette
+from gui.colors import Theme, get_current_palette, qcolor_from_css
 from gui.icons import GenericIcons, icon_qt_path_for_theme
 from gui.settings import Settings
 from gui.wrapper import HorizontalLayoutWrapper
@@ -70,7 +70,7 @@ class MapLoadingGlyph(QFrame):
         painter.translate(center)
         painter.rotate(-14)
 
-        orbit_pen = QPen(QColor(palette.PRIMARY), 1.8)
+        orbit_pen = QPen(qcolor_from_css(palette.PRIMARY), 1.8)
         orbit_pen.setStyle(Qt.PenStyle.DashLine)
         orbit_pen.setDashPattern([4, 5])
         orbit_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
@@ -82,12 +82,12 @@ class MapLoadingGlyph(QFrame):
         dot_x = (orbit_rect.width() / 2) * math.cos(angle)
         dot_y = (orbit_rect.height() / 2) * math.sin(angle)
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QColor(palette.PRIMARY))
+        painter.setBrush(qcolor_from_css(palette.PRIMARY))
         painter.drawEllipse(QRectF(dot_x - 5, dot_y - 5, 10, 10))
         painter.restore()
 
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QColor(palette.PRIMARY_SOFT))
+        painter.setBrush(qcolor_from_css(palette.PRIMARY_SOFT))
         painter.drawEllipse(QRectF(center.x() - 34, center.y() - 34, 68, 68))
 
         icon = QIcon(icon_qt_path_for_theme(self._theme, GenericIcons.MAP))
