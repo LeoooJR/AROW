@@ -26,7 +26,7 @@ from PySide6.QtWidgets import (
 )
 
 from gui.blocks.base import Block
-from gui.colors import Theme, get_current_palette, qcolor_from_css
+from gui.colors import Theme, get_current_palette, get_current_theme, qcolor_from_css
 from gui.icons import GenericIcons, icon_qt_path_for_theme
 from gui.settings import Settings
 from gui.wrapper import HorizontalLayoutWrapper
@@ -44,7 +44,7 @@ class MapLoadingGlyph(QFrame):
         self.setObjectName("map-loading-glyph")
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setFixedSize(self._SIZE)
-        self._theme: Theme = "light"
+        self._theme: Theme = get_current_theme()
 
     def sizeHint(self) -> QSize:
         """Return the preferred visual size."""

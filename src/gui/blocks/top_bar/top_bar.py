@@ -24,7 +24,7 @@ from PySide6.QtWidgets import (
 from shiboken6 import isValid
 
 from gui.blocks.base import Block
-from gui.colors import Theme
+from gui.colors import Theme, get_current_theme
 from gui.components import SVG, ToolButton
 from gui.icons import (
     ApplicationIcons,
@@ -326,10 +326,14 @@ class TopBar(QWidget, Block):
     #### Private methods ####
 
     def _update_palette_thumb_geometry(self) -> None:
-        """Position the palette thumb over the light button (initial or after layout)."""
+        """Position the palette thumb over the active theme button (initial or after layout)."""
         if not isValid(self):
             return
-        btn = self.ui.light_palette_button
+        btn = (
+            self.ui.dark_palette_button
+            if get_current_theme() == "dark"
+            else self.ui.light_palette_button
+        )
         thumb = self.ui.palette_thumb
         if not isValid(btn) or not isValid(thumb):
             return
@@ -371,5 +375,4 @@ class TopBar(QWidget, Block):
         self._palette_thumb_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
         self._palette_thumb_anim.setParent(self)
         self._palette_thumb_anim.start()
-        icon_size = thumb.width() - 8
         button.raise_()

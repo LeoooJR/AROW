@@ -5,9 +5,38 @@ from __future__ import annotations
 import pytest
 
 from gui.blocks.top_bar import TopBar
+from gui.colors import get_current_theme, set_current_theme
 from gui.signals import view_signals
 
 pytestmark = pytest.mark.usefixtures("qapp")
+
+
+def _thumb_center(thumb) -> tuple[int, int]:
+    rect = thumb.geometry()
+    return rect.x() + rect.width() // 2, rect.y() + rect.height() // 2
+
+
+def _button_center(button) -> tuple[int, int]:
+    rect = button.geometry()
+    return rect.x() + rect.width() // 2, rect.y() + rect.height() // 2
+
+
+def test_top_bar_palette_thumb_aligns_with_dark_theme_at_startup(qtbot) -> None:
+    previous_theme = get_current_theme()
+    try:
+        set_current_theme("dark")
+        top_bar = TopBar()
+        qtbot.addWidget(top_bar)
+        top_bar.show()
+        qtbot.wait(0)
+        top_bar._update_palette_thumb_geometry()
+        qtbot.wait(0)
+
+        assert _thumb_center(top_bar.ui.palette_thumb) == _button_center(
+            top_bar.ui.dark_palette_button
+        )
+    finally:
+        set_current_theme(previous_theme)
 
 
 def test_top_bar_palette_buttons_emit_theme_requests(qtbot) -> None:

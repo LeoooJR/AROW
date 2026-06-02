@@ -3,7 +3,7 @@ Stylesheet of the application.
 Light and dark stylesheets are built once from the color palette for each theme.
 """
 
-from gui.colors import get_palette
+from gui.colors import get_current_theme, get_palette
 from gui.settings import Settings
 
 
@@ -1498,4 +1498,4 @@ QTabBar::tab:last {{
 
 stylesheet_light = _build_stylesheet(get_palette("light"))
 stylesheet_dark = _build_stylesheet(get_palette("dark"))
-stylesheet = stylesheet_light
+stylesheet = stylesheet_dark if get_current_theme() == "dark" else stylesheet_light

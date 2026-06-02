@@ -5,10 +5,15 @@ Light and dark mode values follow the AROW design system in DESIGN.md.
 
 from __future__ import annotations
 
+import importlib
+import platform
 import re
+import shutil
+import subprocess  # nosec B404
+import sys
 from dataclasses import dataclass
 from enum import Enum
-from typing import Literal
+from typing import Final, Literal
 
 from PySide6.QtGui import QColor
 
@@ -16,10 +21,127 @@ _CSS_RGB_PATTERN = re.compile(
     r"^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?\s*\)$",
     re.IGNORECASE,
 )
+_THEME_LOOKUP_TIMEOUT_SECONDS: Final[float] = 0.5
+_MACOS_INTERFACE_STYLE_ARGS: Final[tuple[str, ...]] = (
+    "read",
+    "-g",
+    "AppleInterfaceStyle",
+)
+_LINUX_GNOME_COLOR_SCHEME_ARGS: Final[tuple[str, ...]] = (
+    "get",
+    "org.gnome.desktop.interface",
+    "color-scheme",
+)
+_WINDOWS_APPS_USE_LIGHT_THEME_VALUE: Final[str] = "AppsUseLightTheme"
+_WINDOWS_PERSONALIZE_REGISTRY_PATH: Final[str] = (
+    r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"
+)
 
 Theme = Literal["light", "dark"]
 
 _APP_THEME: Theme = "light"
+
+
+def _run_fixed_theme_subprocess(
+    executable_name: str,
+    args: tuple[str, ...],
+) -> str | None:
+    """Run a fixed-argument OS theme probe when the executable is on PATH.
+
+    Uses the resolved executable path (never a shell) and returns stdout on
+    success, or ``None`` when the tool is missing or the subprocess fails.
+    """
+    executable_path = shutil.which(executable_name)
+    if executable_path is None:
+        return None
+    try:
+        completed = subprocess.run(  # nosec B603
+            [executable_path, *args],
+            capture_output=True,
+            check=False,
+            text=True,
+            timeout=_THEME_LOOKUP_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.SubprocessError, TimeoutError):
+        return None
+    if completed.returncode != 0:
+        return None
+    return completed.stdout.strip()
+
+
+def _theme_from_macos() -> Theme:
+    """Return the macOS appearance, defaulting to light when unset."""
+    output = _run_fixed_theme_subprocess("defaults", _MACOS_INTERFACE_STYLE_ARGS)
+    if output is None:
+        return "light"
+    return "dark" if output.lower() == "dark" else "light"
+
+
+def _theme_from_windows() -> Theme:
+    """Return the Windows app appearance from the user personalization registry."""
+    if sys.platform != "win32":
+        return "light"
+
+    winreg = importlib.import_module("winreg")
+    try:
+        with winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            _WINDOWS_PERSONALIZE_REGISTRY_PATH,
+        ) as key:
+            value, _ = winreg.QueryValueEx(key, _WINDOWS_APPS_USE_LIGHT_THEME_VALUE)
+    except OSError:
+        return "light"
+
+    try:
+        apps_use_light_theme = int(value)
+    except (TypeError, ValueError):
+        return "light"
+    if apps_use_light_theme not in (0, 1):
+        return "light"
+    return "light" if apps_use_light_theme == 1 else "dark"
+
+
+def _theme_from_linux() -> Theme:
+    """Return the Linux desktop color scheme when exposed through GNOME settings."""
+    output = _run_fixed_theme_subprocess("gsettings", _LINUX_GNOME_COLOR_SCHEME_ARGS)
+    if output is None:
+        return "light"
+    normalized = output.strip("'\"").lower()
+    if "dark" in normalized:
+        return "dark"
+    return "light"
+
+
+def get_system_theme() -> Theme:
+    """Return the current operating system theme for known desktop platforms."""
+    system_name = platform.system().lower()
+    try:
+        if system_name == "darwin":
+            return _theme_from_macos()
+        if system_name == "windows":
+            return _theme_from_windows()
+        if system_name == "linux":
+            return _theme_from_linux()
+    except (
+        FileNotFoundError,
+        OSError,
+        subprocess.SubprocessError,
+        TimeoutError,
+        ImportError,
+        ValueError,
+    ):
+        return "light"
+    return "light"
+
+
+def initialize_app_theme_from_system() -> Theme:
+    """Set and return the active UI theme from the operating system preference."""
+    global _APP_THEME
+    _APP_THEME = get_system_theme()
+    return _APP_THEME
+
+
+initialize_app_theme_from_system()
 
 
 def get_current_theme() -> Theme:
