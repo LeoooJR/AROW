@@ -78,6 +78,7 @@ class GenericIcons(Enum):
     START = _create_icon("start.svg")
     OFF = _create_icon("off.svg")
     ON = _create_icon("on.svg")
+    LIST_UL = _create_icon("light/list-ul.svg", has_both_themes=False)
     PLAY = _create_icon("play-circle.svg")
     PAUSE = _create_icon("pause-circle.svg")
     LAYOUT_SIDEBAR = _create_icon("layout-sidebar.svg")

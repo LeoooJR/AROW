@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Final
+from typing import Final, cast
 
 from PySide6.QtCore import (
     QAbstractAnimation,
@@ -21,13 +21,16 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QSizePolicy,
+    QStackedWidget,
     QVBoxLayout,
     QWidget,
 )
 
 from gui.colors import Theme
-from gui.components import SVG, LeadingIconLabel, PlaceHolder, ToolButton
+from gui.components import LeadingIconLabel, SVG, ToolButton
 from gui.components.media import get_svg_size
+from gui.blocks.map.device_required_placeholder import DeviceRequiredMapPlaceholder
+from gui.blocks.map.map_loading_placeholder import MapLoadingPlaceholder
 from gui.icons import GenericIcons, icon_qt_path, icon_qt_path_for_theme
 from gui.settings import Settings
 from gui.signals import view_signals
@@ -610,10 +613,9 @@ class MapBlock(QWidget):
 
     @dataclass(frozen=True)
     class Text:
-        """Placeholder copy when the map cannot load yet."""
+        """Reserved for future user-visible strings on the map block."""
 
-        placeholder: Final[str] = "Select a device to get started..."
-        loading_placeholder: Final[str] = "Map is being loaded..."
+        pass
 
     @dataclass
     class UI:
@@ -622,7 +624,9 @@ class MapBlock(QWidget):
         legend: Legend
         canvas: Canvas
         coordinates: Coordinates
-        placeholder: PlaceHolder
+        placeholder: QStackedWidget
+        device_required_placeholder: DeviceRequiredMapPlaceholder
+        map_loading_placeholder: MapLoadingPlaceholder
 
     def __init__(self, parent=None):
         """Lay out placeholder, hidden canvas, and coordinates bar.
@@ -650,15 +654,17 @@ class MapBlock(QWidget):
         layout.addWidget(canvas, 1)
         canvas.setVisible(False)
 
-        placeholder = PlaceHolder(
-            self,
-            text=self.texts.placeholder,
-            minimum_width=Settings.DIMENSION.MIN_WIDTH_LARGE,
-            minimum_height=Settings.DIMENSION.MIN_HEIGHT_SMALL,
-            stretch_widgets=False,
-            icon=GenericIcons.DEVICE_PLACEHOLDER,
-        )
+        placeholder = QStackedWidget(self)
         placeholder.setObjectName("map-placeholder")
+        placeholder.setMinimumSize(
+            Settings.DIMENSION.MIN_WIDTH_LARGE,
+            Settings.DIMENSION.MIN_HEIGHT_SMALL,
+        )
+
+        device_required_placeholder = DeviceRequiredMapPlaceholder(placeholder)
+        map_loading_placeholder = MapLoadingPlaceholder(placeholder)
+        placeholder.addWidget(device_required_placeholder)
+        placeholder.addWidget(map_loading_placeholder)
         layout.addWidget(placeholder, 1)
 
         coordinates = Coordinates(self)
@@ -671,9 +677,10 @@ class MapBlock(QWidget):
             canvas=canvas,
             coordinates=coordinates,
             placeholder=placeholder,
+            device_required_placeholder=device_required_placeholder,
+            map_loading_placeholder=map_loading_placeholder,
         )
         self._placeholder_helper_anim: QSequentialAnimationGroup | None = None
-        self._placeholder_icon: GenericIcons = GenericIcons.DEVICE_PLACEHOLDER
 
         self._finalize_ui_hooks()
 
@@ -729,28 +736,28 @@ class MapBlock(QWidget):
         return self.ui.coordinates
 
     @property
-    def placeholder(self) -> PlaceHolder:
+    def placeholder(self) -> QStackedWidget:
         """Return the map placeholder widget."""
         return self.ui.placeholder
 
-    def update_placeholder(self, text: str, icon_member: GenericIcons) -> None:
-        """Update the placeholder text and symbology for the given logical icon."""
+    def show_device_required_placeholder(self) -> None:
+        """Show the placeholder that asks the user to open the device list."""
+        self.ui.placeholder.setCurrentWidget(self.ui.device_required_placeholder)
 
-        self._placeholder_icon = icon_member
-        self.ui.placeholder.set_text(text)
-        self.ui.placeholder.set_icon(icon_member)
+    def show_map_loading_placeholder(self) -> None:
+        """Show the placeholder used while the map is being generated."""
+        self.ui.placeholder.setCurrentWidget(self.ui.map_loading_placeholder)
 
     def apply_theme_icons(self, theme: Theme) -> None:
         """Refresh theme-dependent icons for all map block children."""
         self.ui.legend.apply_theme_icons(theme)
-        self.ui.placeholder.apply_theme_icons(theme)
+        self.ui.device_required_placeholder.apply_theme_icons(theme)
+        self.ui.map_loading_placeholder.apply_theme_icons(theme)
         self.ui.coordinates.apply_theme_icons(theme)
 
     def _on_device_selection_succeeded(self, device_id: str, device_name: str) -> None:
         """Update placeholder after auth or device selection succeeds."""
-        self.update_placeholder(
-            self.texts.loading_placeholder, GenericIcons.MAP_PLACEHOLDER
-        )
+        self.show_map_loading_placeholder()
         self._on_run_helper_animation()
 
     def _on_device_selection_failed(self, device_id: str, device_name: str) -> None:
@@ -763,7 +770,7 @@ class MapBlock(QWidget):
 
     def _on_active_device_removed(self) -> None:
         """Reset placeholder when the active device is removed."""
-        self.update_placeholder(self.texts.placeholder, GenericIcons.DEVICE_PLACEHOLDER)
+        self.show_device_required_placeholder()
         self._on_run_helper_animation()
 
     def _on_run_helper_animation(self) -> None:
@@ -776,38 +783,13 @@ class MapBlock(QWidget):
         """
         Run a one-shot opacity pulse on the canvas placeholder. Help to draw attention of the user to the placeholder.
         """
-        svg = self.ui.placeholder.findChild(SVG)
-        if svg is None:
-            return
-        effect = svg.graphicsEffect()
-        if effect is None:
-            effect = QGraphicsOpacityEffect(svg)
-            svg.setGraphicsEffect(effect)
-        if (
-            self._placeholder_helper_anim is not None
-            and self._placeholder_helper_anim.state()
-            == QAbstractAnimation.State.Running
-        ):
-            self._placeholder_helper_anim.stop()
-        half = Settings.ANIMATION.PLACEHOLDER_HELPER_DURATION // 2
-        easing = QEasingCurve.Type.OutCubic
-        anim_fade_out = QPropertyAnimation(effect, b"opacity")
-        anim_fade_out.setDuration(half)
-        anim_fade_out.setStartValue(1.0)
-        anim_fade_out.setEndValue(0.55)
-        anim_fade_out.setEasingCurve(easing)
-        anim_fade_in = QPropertyAnimation(effect, b"opacity")
-        anim_fade_in.setDuration(half)
-        anim_fade_in.setStartValue(0.55)
-        anim_fade_in.setEndValue(1.0)
-        anim_fade_in.setEasingCurve(easing)
-        self._placeholder_helper_anim = QSequentialAnimationGroup(self)
-        self._placeholder_helper_anim.addAnimation(anim_fade_out)
-        self._placeholder_helper_anim.addAnimation(anim_fade_in)
-        self._placeholder_helper_anim.setLoopCount(
-            Settings.ANIMATION.PLACEHOLDER_HELPER_ITERATION
+        current = cast(
+            DeviceRequiredMapPlaceholder | MapLoadingPlaceholder,
+            self.ui.placeholder.currentWidget(),
         )
-        self._placeholder_helper_anim.start()
+        self._placeholder_helper_anim = current.play_helper_animation(
+            self._placeholder_helper_anim
+        )
 
 
 Map = MapBlock

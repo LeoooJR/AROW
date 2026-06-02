@@ -469,8 +469,7 @@ QWidget#authentification-overlay {{
     background-color: rgba(0, 0, 0, 0.16);
 }}
 
-QFrame[place-holder="true"],
-QFrame#map-placeholder {{
+QFrame[place-holder="true"] {{
     background-color: {palette.SURFACE_MUTED};
     border: 1px solid {palette.BORDER_SUBTLE};
     border-radius: {Settings.BORDER_RADIUS.MD}px;
@@ -483,14 +482,9 @@ QFrame#map-placeholder {{
     text-align: center;
 }}
 
-QFrame[place-holder="true"] QLabel,
-QFrame#map-placeholder QLabel {{
+QFrame[place-holder="true"] QLabel {{
     color: {palette.TEXT_MUTED};
     font-weight: {Settings.FONT.WEIGHT_NORMAL};
-}}
-
-QFrame#map-placeholder QLabel {{
-    color: {palette.PLACEHOLDER_TEXT};
 }}
 
 QWidget#file-display {{
@@ -913,6 +907,65 @@ QFrame#available-device-empty-state QPushButton#device-empty-state-refresh-butto
     background-color: {palette.PRIMARY_BORDER};
 }}
 
+QStackedWidget#map-placeholder {{
+    background-color: {palette.TRANSPARENT};
+    border: none;
+}}
+
+QFrame[map-placeholder-state="true"] {{
+    background-color: {palette.PRIMARY_SOFT};
+    border: 1px solid {palette.PRIMARY_BORDER};
+    border-radius: {Settings.BORDER_RADIUS.MD}px;
+    margin: {Settings.PLACEHOLDER.MARGIN}px;
+}}
+
+QFrame[map-placeholder-state="true"] QLabel#map-placeholder-title {{
+    background-color: {palette.TRANSPARENT};
+    color: {palette.TEXT_PRIMARY};
+    font-size: {Settings.FONT.SIZE_DEFAULT}px;
+    font-weight: {Settings.FONT.WEIGHT_DEMIBOLD};
+}}
+
+QFrame[map-placeholder-state="true"] QLabel#map-placeholder-description {{
+    background-color: {palette.TRANSPARENT};
+    color: {palette.TEXT_MUTED};
+    font-size: {Settings.FONT.SIZE_HELPER}px;
+    font-weight: {Settings.FONT.WEIGHT_NORMAL};
+}}
+
+QFrame#map-loading-descriptor {{
+    background-color: {palette.TRANSPARENT};
+    border: none;
+}}
+
+QPushButton#map-placeholder-open-device-list {{
+    background-color: {palette.PRIMARY};
+    color: #0A0A0A;
+    padding: 8px 14px;
+}}
+
+QPushButton#map-placeholder-open-device-list:hover {{
+    background-color: {palette.PRIMARY_HOVER};
+}}
+
+QPushButton#map-placeholder-open-device-list:pressed {{
+    background-color: {palette.PRIMARY};
+}}
+
+QFrame#map-loading-descriptor[passive-cta="true"] {{
+    background-color: {palette.PRIMARY_SOFT};
+    border: 1px solid {palette.PRIMARY_BORDER};
+    border-radius: {Settings.BORDER_RADIUS.MD}px;
+    padding: 8px 18px;
+}}
+
+QFrame#map-loading-descriptor[passive-cta="true"] QLabel#map-loading-descriptor-label {{
+    background-color: {palette.TRANSPARENT};
+    color: {palette.PRIMARY};
+    font-size: {Settings.FONT.SIZE_HELPER}px;
+    font-weight: {Settings.FONT.WEIGHT_DEMIBOLD};
+}}
+
 QWidget#device-item-row {{
     background-color: {palette.SURFACE_ELEVATED};
     border: 1px solid {palette.BORDER_SUBTLE};
@@ -1331,8 +1384,7 @@ QFrame#map-panel {{
     background-color: {palette.SURFACE};
 }}
 
-QWidget#map-canvas,
-QFrame#map-placeholder {{
+QWidget#map-canvas {{
     background-color: {palette.SURFACE_MUTED};
     border: 1px solid {palette.BORDER_SUBTLE};
 }}
