@@ -5,7 +5,9 @@ Success and error cases, with pytest markers.
 
 from __future__ import annotations
 
+import datetime
 import subprocess
+import time
 from collections import OrderedDict
 from pathlib import Path
 
@@ -13,11 +15,15 @@ import pytest
 
 from core.adb import (
     AdbBinary,
+    AdbClient,
     AdbCommand,
     AdbCommandResult,
     AdbCommandResultStatus,
     AdbCommands,
     AdbServer,
+    _log_safe_argv,
+    _log_safe_command_line,
+    _log_safe_output_preview,
 )
 from core.devices import Phone, PhoneRepository
 from core.exceptions import AdbServerException
@@ -62,16 +68,16 @@ def _completed_process(
 class TestAdbServerStartSuccess:
     """ADB start-server success cases."""
 
-    def test_server_init_calls_restart(
+    def test_server_init_calls_start(
         self, adb_binary: AdbBinary, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """AdbServer.__init__ delegates startup to restart()."""
+        """AdbServer.__init__ gently delegates startup to start()."""
         called: list[AdbBinary] = []
 
-        def fake_restart(self: AdbServer) -> None:
+        def fake_start(self: AdbServer) -> None:
             called.append(self.binary)
 
-        monkeypatch.setattr(AdbServer, "restart", fake_restart)
+        monkeypatch.setattr(AdbServer, "start", fake_start)
         server = AdbServer(adb_binary)
         assert server.binary == adb_binary
         assert called == [adb_binary]
@@ -263,3 +269,149 @@ class TestAdbServerExecuteResult:
         monkeypatch.setattr(server, "_execute", fake_execute)
         devices = server.get_known_devices()
         assert [device.descriptor.id for device in devices] == ["abc123"]
+
+    def test_remove_from_history_removes_matching_commands(
+        self, server: AdbServer
+    ) -> None:
+        """remove_from_history removes all entries matching the given command."""
+        start_result = AdbCommandResult(status=AdbCommandResultStatus.SUCCESS)
+        kill_result = AdbCommandResult(status=AdbCommandResultStatus.SUCCESS)
+        server.history = OrderedDict(
+            [
+                (
+                    datetime.datetime(2026, 1, 1, 10, 0, 0),
+                    (AdbCommands.START_SERVER.value, start_result),
+                ),
+                (
+                    datetime.datetime(2026, 1, 1, 10, 0, 1),
+                    (AdbCommands.KILL_SERVER.value, kill_result),
+                ),
+                (
+                    datetime.datetime(2026, 1, 1, 10, 0, 2),
+                    (AdbCommands.START_SERVER.value, start_result),
+                ),
+            ]
+        )
+
+        server.remove_from_history(AdbCommands.START_SERVER.value)
+
+        assert list(server.history.values()) == [
+            (AdbCommands.KILL_SERVER.value, kill_result)
+        ]
+
+    def test_remove_from_history_noops_when_absent(self, server: AdbServer) -> None:
+        """remove_from_history does not raise when no entry matches the command."""
+        result = AdbCommandResult(status=AdbCommandResultStatus.SUCCESS)
+        server.history = OrderedDict(
+            [
+                (
+                    datetime.datetime(2026, 1, 1, 10, 0, 0),
+                    (AdbCommands.KILL_SERVER.value, result),
+                )
+            ]
+        )
+
+        server.remove_from_history(AdbCommands.START_SERVER.value)
+
+        assert list(server.history.values()) == [
+            (AdbCommands.KILL_SERVER.value, result)
+        ]
+
+
+class TestAdbCommandResultDefaults:
+    """Default result values."""
+
+    def test_time_uses_default_factory(self) -> None:
+        """Separate default result instances get independent timestamps."""
+        first = AdbCommandResult()
+        time.sleep(0.001)
+        second = AdbCommandResult()
+        assert first.time < second.time
+
+
+class TestAdbClientSendNotification:
+    """ADB notification command construction."""
+
+    def test_send_notification_targets_phone_and_keeps_raw_argv(
+        self, adb_binary: AdbBinary, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Notification title/message are passed as argv values, not shell-quoted."""
+        client = AdbClient(adb_binary)
+        phone = Phone(id="abc123", name="Pixel", state="device")
+        calls: list[tuple[AdbCommand, Phone | None, list[str] | None]] = []
+
+        def fake_execute(
+            command: AdbCommand,
+            phone_arg: Phone | None = None,
+            positional_arguments: list[str] | None = None,
+        ) -> AdbCommandResult:
+            calls.append((command, phone_arg, positional_arguments))
+            return AdbCommandResult(
+                status=AdbCommandResultStatus.SUCCESS,
+                output="posting:\n",
+                error="",
+                return_code=0,
+            )
+
+        monkeypatch.setattr(client, "_execute", fake_execute)
+
+        assert client.send_notification(phone, "Hello there", "it's ready") is True
+        assert calls == [
+            (
+                AdbCommands.SEND_NOTIFICATION.value,
+                phone,
+                ["-t", "Hello there", "-m", "it's ready"],
+            )
+        ]
+
+
+class TestAdbLogRedaction:
+    """Log-only ADB command redaction helpers."""
+
+    def test_pairing_code_is_redacted_from_log_safe_argv(self) -> None:
+        argv = ["/adb", "pair", "10.0.0.2:41000", "123456"]
+        safe = _log_safe_argv(AdbCommands.PAIR.value, argv)
+        assert "123456" not in safe
+        assert safe == ["/adb", "pair", "10.0.0.2:41000", "<redacted>"]
+
+    def test_device_id_is_redacted_from_log_safe_command_line(self) -> None:
+        argv = [
+            "/adb",
+            "-s",
+            "adb-secret-device._adb-tls-connect._tcp",
+            "shell",
+            "getprop",
+            "ro.serialno",
+        ]
+        safe_line = _log_safe_command_line(AdbCommands.GET_SERIAL_NO.value, argv)
+        assert "adb-secret-device" not in safe_line
+        assert "<redacted>" in safe_line
+
+    def test_notification_payload_is_redacted_from_log_safe_argv(self) -> None:
+        argv = [
+            "/adb",
+            "-s",
+            "device-1",
+            "shell",
+            "cmd",
+            "notification",
+            "post",
+            "-n",
+            "ARROW",
+            "-t",
+            "Private title",
+            "-m",
+            "Private message",
+        ]
+        safe = _log_safe_argv(AdbCommands.SEND_NOTIFICATION.value, argv)
+        assert "device-1" not in safe
+        assert "Private title" not in safe
+        assert "Private message" not in safe
+        assert safe[safe.index("-t") + 1] == "<redacted>"
+        assert safe[safe.index("-m") + 1] == "<redacted>"
+
+    def test_sensitive_output_preview_is_redacted(self) -> None:
+        output = "adb-secret-device device product:x model:y device:z transport_id:1"
+        assert _log_safe_output_preview(output, AdbCommands.GET_DEVICES.value) == (
+            "<redacted>"
+        )

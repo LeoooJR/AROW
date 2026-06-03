@@ -3,7 +3,6 @@ from __future__ import annotations
 import datetime
 import os
 import random
-import shlex
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Final
@@ -19,6 +18,10 @@ from core.adb import (
     AdbCommandResultStatus,
     AdbCommands,
     AdbServer,
+    _log_safe_argv,
+    _log_safe_command_line,
+    _log_safe_output_preview,
+    _redacted_log_value,
 )
 from core.devices import Phone
 from core.exceptions import AdbClientException, AdbServerException
@@ -232,10 +235,11 @@ def _mock_battery_blob(fake: Faker) -> str:
 
 
 def _mock_window_blob(profile: MockAdbDeviceProfile) -> str:
-    awake = random.choice(("true", "false"))
-    screen_on = random.choice(("true", "false"))
-    width = random.choice((1080, 1200))
-    height = random.choice((2400, 2640))
+    # Mock display state only; no security or cryptographic use.
+    awake = random.choice(("true", "false"))  # nosec B311
+    screen_on = random.choice(("true", "false"))  # nosec B311
+    width = random.choice((1080, 1200))  # nosec B311
+    height = random.choice((2400, 2640))  # nosec B311
     return (
         f"      screenState=SCREEN_STATE_{'OFF' if screen_on != 'true' else 'FULL'}\n"
         "WINDOW MANAGER ANIMATOR STATE (dumpsys window animator)\n"
@@ -319,9 +323,9 @@ class MockAdbClient(AdbClient):
             "MockAdbClient: executing command (no subprocess)",
             adb_path=str(self.binary.path),
             command=command.command,
-            phone_id=phone.descriptor.id if phone else None,
-            argv=argv,
-            command_line=" ".join(shlex.quote(arg) for arg in argv),
+            phone_id=_redacted_log_value(phone.descriptor.id if phone else None),
+            argv=_log_safe_argv(command, argv),
+            command_line=_log_safe_command_line(command, argv),
         )
         out = ""
         if command.command == "pair":
@@ -342,7 +346,7 @@ class MockAdbClient(AdbClient):
         logger.debug(
             "MockAdbClient: command completed (mock)",
             command=command.command,
-            stdout_preview=out[:200],
+            stdout_preview=_log_safe_output_preview(out.strip(), command),
         )
         cmd_result = AdbCommandResult(
             status=AdbCommandResultStatus.SUCCESS,
@@ -383,8 +387,8 @@ class MockAdbServer(AdbServer):
             "MockAdbServer: executing command (no subprocess)",
             adb_path=str(self.binary.path),
             command=command.command,
-            argv=argv,
-            command_line=" ".join(shlex.quote(arg) for arg in argv),
+            argv=_log_safe_argv(command, argv),
+            command_line=_log_safe_command_line(command, argv),
         )
         out = ""
         if command.command == "devices" and command.args == ["-l"]:

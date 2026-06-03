@@ -3,7 +3,9 @@ from __future__ import annotations
 import datetime
 import re
 import shlex
-import subprocess
+
+# ADB is an external binary; execution is centralized below with list argv and no shell.
+import subprocess  # nosec B404
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from enum import Enum, member
@@ -20,12 +22,12 @@ from tenacity import (
     wait_fixed,
 )
 
-ParserFn = Callable[[str], Any]
-
 from core.devices import Phone, PhoneRepository
 from core.exceptions import AdbClientException, AdbServerException
 from core.location import Location
 from logger import logger
+
+ParserFn = Callable[[str], Any]
 
 # `adb pair` success line: Successfully paired to <host>:<port> [guid=<device_id>]
 _PAIR_SUCCESS_LINE = re.compile(
@@ -97,7 +99,7 @@ class AdbCommandResult:
     )
     time: datetime.datetime = field(
         metadata={"description": "The time the command was executed"},
-        default=datetime.datetime.now(),
+        default_factory=datetime.datetime.now,
     )
     output: str = field(
         metadata={"description": "The output of the command execution"}, default=""
@@ -141,6 +143,9 @@ _PERMANENT_ADB_MESSAGE_FRAGMENTS: Final[tuple[str, ...]] = (
     "insufficient permissions",
     "failed to run adb binary",
 )
+
+_REDACTED_LOG_VALUE: Final[str] = "<redacted>"
+_LOG_PREVIEW_LIMIT: Final[int] = 200
 
 
 @dataclass(frozen=True)
@@ -244,6 +249,92 @@ def _raise_server_for_result(command: AdbCommand, result: AdbCommandResult) -> N
         raise AdbServerException(_adb_failure_message(command, result))
 
 
+def _redacted_log_value(value: str | None) -> str | None:
+    """Return a fixed redaction token for sensitive log-only fields."""
+    if value is None:
+        return None
+    return _REDACTED_LOG_VALUE
+
+
+def _command_is_notification_post(command: AdbCommand) -> bool:
+    args = tuple(command.args)
+    return command.command == "shell" and args[:3] == ("cmd", "notification", "post")
+
+
+def _command_has_location_payload(command: AdbCommand) -> bool:
+    """
+    True for future commands that are expected to carry coordinates or location payloads.
+
+    Current read-only location commands, such as ``settings get secure location_mode``,
+    are intentionally excluded.
+    """
+    name = command.name.casefold()
+    return "send location" in name or "set mock location" in name
+
+
+def _command_output_is_sensitive(command: AdbCommand) -> bool:
+    """True when stdout/stderr may contain pairing codes, device ids, or payloads."""
+    if command.command in ("pair", "devices"):
+        return True
+    if tuple(command.args) == ("getprop", "ro.serialno"):
+        return True
+    return _command_has_location_payload(command)
+
+
+def _log_safe_argv(command: AdbCommand, argv: list[str]) -> list[str]:
+    """Build a log-only argv copy with credentials, device ids, and payloads redacted."""
+    safe: list[str] = []
+    pair_value_index = -1
+    if command.command == "pair":
+        try:
+            pair_value_index = argv.index("pair") + 2
+        except ValueError:
+            pair_value_index = -1
+    command_index = -1
+    if _command_has_location_payload(command) and command.command:
+        try:
+            command_index = argv.index(command.command)
+        except ValueError:
+            command_index = -1
+
+    redact_next_option_value = False
+    for index, value in enumerate(argv):
+        if redact_next_option_value:
+            safe.append(_REDACTED_LOG_VALUE)
+            redact_next_option_value = False
+            continue
+        if value == "-s":
+            safe.append(value)
+            redact_next_option_value = True
+            continue
+        if _command_is_notification_post(command) and value in ("-t", "-m"):
+            safe.append(value)
+            redact_next_option_value = True
+            continue
+        if pair_value_index == index:
+            safe.append(_REDACTED_LOG_VALUE)
+            continue
+        if command_index >= 0 and index > command_index:
+            safe.append(_REDACTED_LOG_VALUE)
+            continue
+        safe.append(value)
+    return safe
+
+
+def _log_safe_command_line(command: AdbCommand, argv: list[str]) -> str:
+    """Return a shell-like command preview from the redacted argv copy."""
+    return " ".join(shlex.quote(arg) for arg in _log_safe_argv(command, argv))
+
+
+def _log_safe_output_preview(output: str, command: AdbCommand | None = None) -> str:
+    """Keep stdout/stderr logs bounded without changing stored command results."""
+    if command is not None and output and _command_output_is_sensitive(command):
+        return _REDACTED_LOG_VALUE
+    if len(output) <= _LOG_PREVIEW_LIMIT:
+        return output
+    return output[:_LOG_PREVIEW_LIMIT] + "..."
+
+
 def _make_adb_retry_before(
     *,
     scope: _AdbRetryScope,
@@ -258,7 +349,7 @@ def _make_adb_retry_before(
             "ADB retry: attempt starting",
             scope=scope,
             command=command_name,
-            phone_id=phone_id,
+            phone_id=_redacted_log_value(phone_id),
             attempt=retry_state.attempt_number,
             elapsed_s=round(elapsed, 3) if elapsed is not None else 0.0,
         )
@@ -285,7 +376,7 @@ def _make_adb_retry_after(
             "ADB retry: attempt finished",
             scope=scope,
             command=command_name,
-            phone_id=phone_id,
+            phone_id=_redacted_log_value(phone_id),
             attempt=retry_state.attempt_number,
             elapsed_s=round(elapsed, 3) if elapsed is not None else 0.0,
             failed=failed,
@@ -704,7 +795,7 @@ class AdbClient:
         command = AdbCommands.PAIR.value
         try:
             result = self._execute(command, None, [f"{ip}:{port}", association_code])
-        except AdbClientException as e:
+        except AdbClientException:
             raise
         _raise_client_for_result(command, result)
         combined = f"{result.output or ''}\n{result.error or ''}".strip()
@@ -724,16 +815,17 @@ class AdbClient:
         command = AdbCommands.GET_DEVICES.value
         try:
             result = self._execute(command, None)
-        except AdbClientException as e:
+        except AdbClientException:
             raise
         _raise_client_for_result(command, result)
         return ADBCommandParser.GET_DEVICES.parse(result.output or "")
 
-    def send_notification(self, title: str, message: str) -> bool:
+    def send_notification(self, phone: Phone, title: str, message: str) -> bool:
         """
         Send a notification to the device
 
         Args:
+            phone: The phone to target.
             title: The title of the notification
             message: The message of the notification
 
@@ -742,10 +834,8 @@ class AdbClient:
         """
         command = AdbCommands.SEND_NOTIFICATION.value
         try:
-            result = self._execute(
-                command, None, ["-t", shlex.quote(title), "-m", shlex.quote(message)]
-            )
-        except AdbClientException as e:
+            result = self._execute(command, phone, ["-t", title, "-m", message])
+        except AdbClientException:
             raise
         _raise_client_for_result(command, result)
         return ADBCommandParser.SEND_NOTIFICATION.parse(result.output or "")
@@ -897,13 +987,14 @@ class AdbClient:
                 "AdbClient: executing command",
                 adb_path=str(self.binary.path),
                 command=command.command,
-                phone_id=phone_id,
-                argv=argv,
-                command_line=" ".join(shlex.quote(arg) for arg in argv),
+                phone_id=_redacted_log_value(phone_id),
+                argv=_log_safe_argv(command, argv),
+                command_line=_log_safe_command_line(command, argv),
                 timeout_s=profile.timeout_seconds,
             )
             try:
-                completed = subprocess.run(
+                # ADB execution uses list argv, no shell, and bounded timeouts.
+                completed = subprocess.run(  # nosec B603
                     argv,
                     capture_output=True,
                     text=True,
@@ -915,7 +1006,7 @@ class AdbClient:
                     "AdbClient: command timed out",
                     adb_path=str(self.binary.path),
                     command=command.command,
-                    phone_id=phone_id,
+                    phone_id=_redacted_log_value(phone_id),
                     error=error,
                 )
                 return AdbCommandResult(
@@ -939,8 +1030,8 @@ class AdbClient:
                 adb_path=str(self.binary.path),
                 command=command.command,
                 return_code=completed.returncode,
-                stdout=completed.stdout.strip(),
-                stderr=completed.stderr.strip(),
+                stdout=_log_safe_output_preview(completed.stdout.strip(), command),
+                stderr=_log_safe_output_preview(completed.stderr.strip(), command),
             )
             return AdbCommandResult(
                 status=_adb_status_from_process(
@@ -986,7 +1077,7 @@ class AdbServer:
             datetime.datetime, tuple[AdbCommand, AdbCommandResult]
         ] = OrderedDict()
         self._paired_devices: PhoneRepository = PhoneRepository()
-        self.restart()
+        self.start()
 
     @property
     def history(
@@ -1024,7 +1115,11 @@ class AdbServer:
         """
         Remove from the history of the adb server
         """
-        self._history.pop(datetime.datetime.now())
+        self._history = OrderedDict(
+            (time, entry)
+            for time, entry in self._history.items()
+            if entry[0] != command
+        )
 
     def get_last_command_time(self) -> datetime.datetime:
         """
@@ -1099,7 +1194,7 @@ class AdbServer:
         try:
             self.stop()
             self.start()
-        except AdbServerException as e:
+        except AdbServerException:
             raise
 
     def status(self) -> None:
@@ -1135,12 +1230,13 @@ class AdbServer:
                 "AdbServer: executing command",
                 adb_path=str(self.binary.path),
                 command=command.command,
-                argv=argv,
-                command_line=" ".join(shlex.quote(arg) for arg in argv),
+                argv=_log_safe_argv(command, argv),
+                command_line=_log_safe_command_line(command, argv),
                 timeout_s=profile.timeout_seconds,
             )
             try:
-                completed = subprocess.run(
+                # ADB execution uses list argv, no shell, and bounded timeouts.
+                completed = subprocess.run(  # nosec B603
                     argv,
                     capture_output=True,
                     text=True,
@@ -1175,8 +1271,8 @@ class AdbServer:
                 adb_path=str(self.binary.path),
                 command=command.command,
                 return_code=completed.returncode,
-                stdout=completed.stdout.strip(),
-                stderr=completed.stderr.strip(),
+                stdout=_log_safe_output_preview(completed.stdout.strip(), command),
+                stderr=_log_safe_output_preview(completed.stderr.strip(), command),
             )
             return AdbCommandResult(
                 status=_adb_status_from_process(

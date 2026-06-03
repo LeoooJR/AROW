@@ -35,16 +35,6 @@ class AuthentificateDeviceOutcome(CoreRuntimeWorkOutcome):
     failure: DeviceAuthentificationFailedPayload | None = None
 
 
-def _ro_serial_after_pair(adb_client: AdbClient, phone: Phone | None) -> str:
-    """Read ``ro.serialno`` on the worker when the handset is usable for shell I/O."""
-    if phone is None:
-        return ""
-    state = (phone.descriptor.state or "").strip().casefold()
-    if state != "device":
-        return ""
-    return adb_client.get_ro_serialno(phone)
-
-
 class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
     """
     Pair over ADB on a worker; emit success/failure from the main thread only.
