@@ -146,7 +146,7 @@ class StartupCoreRuntimeWork(CoreRuntimeWork[StartupOutcome]):
         else:
             adb_server = _start_adb_server()
             adb_client = _create_adb_client()
-        devices = adb_server.get_known_devices()
+        devices = list(adb_server.paired_devices)
         enrich_phones_with_adb_shell_properties(adb_client, devices)
         return StartupOutcome(
             adb_server=adb_server,

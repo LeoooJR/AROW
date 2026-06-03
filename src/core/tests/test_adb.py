@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 
 from core.adb import (
+    _ADB_HISTORY_MAX_ENTRIES,
     AdbBinary,
     AdbClient,
     AdbCommand,
@@ -104,6 +105,17 @@ class TestAdbServerStartSuccess:
         assert server.paired_devices.get("abc123") is phone
         last_result = server.get_last_command_result()
         assert last_result.status == AdbCommandResultStatus.SUCCESS
+
+
+class TestAdbBinaryDefaults:
+    """Bundled ADB binary metadata defaults."""
+
+    def test_adb_binary_defaults_use_frozen_project_metadata(self) -> None:
+        binary = AdbBinary()
+        assert binary.version == "Android Debug Bridge version 1.0.41"
+        assert binary.build_version == "36.0.0-13206524"
+        assert binary.build_number == 13206524
+        assert binary.build_date is None
 
 
 # --- Kill server: success ---
@@ -316,6 +328,80 @@ class TestAdbServerExecuteResult:
         assert list(server.history.values()) == [
             (AdbCommands.KILL_SERVER.value, result)
         ]
+
+    def test_server_history_is_capped_to_recent_entries(
+        self, server: AdbServer
+    ) -> None:
+        """Server history keeps newest entries only."""
+        for _ in range(_ADB_HISTORY_MAX_ENTRIES + 3):
+            server.add_to_history(
+                AdbCommands.START_SERVER.value,
+                AdbCommandResult(status=AdbCommandResultStatus.SUCCESS),
+            )
+
+        assert len(server.history) == _ADB_HISTORY_MAX_ENTRIES
+
+
+class TestAdbClientHistory:
+    """ADB client history behavior mirrors server history behavior."""
+
+    def test_client_history_is_capped_to_recent_entries(
+        self, adb_binary: AdbBinary
+    ) -> None:
+        client = AdbClient(adb_binary)
+
+        for _ in range(_ADB_HISTORY_MAX_ENTRIES + 3):
+            client.add_to_history(
+                AdbCommands.GET_DEVICES.value,
+                AdbCommandResult(status=AdbCommandResultStatus.SUCCESS),
+            )
+
+        assert len(client.history) == _ADB_HISTORY_MAX_ENTRIES
+
+    def test_client_remove_from_history_removes_matching_commands(
+        self, adb_binary: AdbBinary
+    ) -> None:
+        client = AdbClient(adb_binary)
+        devices_result = AdbCommandResult(status=AdbCommandResultStatus.SUCCESS)
+        pair_result = AdbCommandResult(status=AdbCommandResultStatus.SUCCESS)
+        client.history = OrderedDict(
+            [
+                (
+                    datetime.datetime(2026, 1, 1, 10, 0, 0),
+                    (AdbCommands.GET_DEVICES.value, devices_result),
+                ),
+                (
+                    datetime.datetime(2026, 1, 1, 10, 0, 1),
+                    (AdbCommands.PAIR.value, pair_result),
+                ),
+                (
+                    datetime.datetime(2026, 1, 1, 10, 0, 2),
+                    (AdbCommands.GET_DEVICES.value, devices_result),
+                ),
+            ]
+        )
+
+        client.remove_from_history(AdbCommands.GET_DEVICES.value)
+
+        assert list(client.history.values()) == [(AdbCommands.PAIR.value, pair_result)]
+
+    def test_client_remove_from_history_noops_when_absent(
+        self, adb_binary: AdbBinary
+    ) -> None:
+        client = AdbClient(adb_binary)
+        result = AdbCommandResult(status=AdbCommandResultStatus.SUCCESS)
+        client.history = OrderedDict(
+            [
+                (
+                    datetime.datetime(2026, 1, 1, 10, 0, 0),
+                    (AdbCommands.PAIR.value, result),
+                )
+            ]
+        )
+
+        client.remove_from_history(AdbCommands.GET_DEVICES.value)
+
+        assert list(client.history.values()) == [(AdbCommands.PAIR.value, result)]
 
 
 class TestAdbCommandResultDefaults:

@@ -251,6 +251,17 @@ def _mock_window_blob(profile: MockAdbDeviceProfile) -> str:
     )
 
 
+def _mock_shell_enrichment_blob(profile: MockAdbDeviceProfile) -> str:
+    return (
+        f"manufacturer={profile.manufacturer}\n"
+        f"model={profile.model.replace('_', ' ')}\n"
+        f"device_name={profile.device_name}\n"
+        f"android_release={profile.android_release}\n"
+        f"sdk={profile.sdk}\n"
+        f"ro_serialno={profile.ro_serialno}\n"
+    )
+
+
 class MockAdbClient(AdbClient):
     """
     ADB client that never spawns adb: emits faker-shaped stdout/stderr compatible with parsers.
@@ -301,6 +312,11 @@ class MockAdbClient(AdbClient):
             return _mock_battery_blob(fake)
         elif tup == ("dumpsys", "window"):
             return _mock_window_blob(profile)
+        elif len(args) >= 3 and args[0] == "sh" and args[1] == "-c":
+            script = args[2]
+            if "manufacturer=" in script and "ro_serialno=" in script:
+                return _mock_shell_enrichment_blob(profile)
+            return ""
         else:
             return ""
 

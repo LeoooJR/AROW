@@ -148,6 +148,30 @@ def test_optional_int_empty() -> None:
     assert ADBCommandParser.GET_SDK_VERSION.parse("   \n") is None
 
 
+def test_shell_enrichment_properties_parser() -> None:
+    parsed = ADBCommandParser.GET_SHELL_ENRICHMENT_PROPERTIES.parse(
+        "\n".join(
+            [
+                "manufacturer=Google",
+                "model=Pixel 8",
+                "device_name=Operator phone",
+                "android_release=15",
+                "sdk=35",
+                "ro_serialno=ABC123",
+                "ignored=value",
+            ]
+        )
+    )
+    assert parsed == {
+        "manufacturer": "Google",
+        "model": "Pixel 8",
+        "device_name": "Operator phone",
+        "android_release": "15",
+        "sdk": 35,
+        "ro_serialno": "ABC123",
+    }
+
+
 def test_send_notification_post_confirmation() -> None:
     assert (
         ADBCommandParser.SEND_NOTIFICATION.parse(
@@ -271,6 +295,7 @@ def test_adb_command_parsers_registry() -> None:
         AdbCommands.GET_SDK_VERSION,
         AdbCommands.GET_LOCATION_MODE,
         AdbCommands.GET_SERIAL_NO,
+        AdbCommands.GET_SHELL_ENRICHMENT_PROPERTIES,
         AdbCommands.GET_BATTERY_INFOS,
         AdbCommands.DUMPSYS_WINDOW,
         AdbCommands.SEND_NOTIFICATION,

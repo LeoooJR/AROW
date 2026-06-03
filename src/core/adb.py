@@ -22,6 +22,7 @@ from tenacity import (
     wait_fixed,
 )
 
+from core import ADB_BINARY_BUILD_NUMBER, ADB_BINARY_BUILD_VERSION, ADB_BINARY_VERSION
 from core.devices import Phone, PhoneRepository
 from core.exceptions import AdbClientException, AdbServerException
 from core.location import Location
@@ -29,11 +30,63 @@ from logger import logger
 
 ParserFn = Callable[[str], Any]
 
-# `adb pair` success line: Successfully paired to <host>:<port> [guid=<device_id>]
+# Parser regex for `adb pair` success lines. Update if platform-tools changes output.
 _PAIR_SUCCESS_LINE = re.compile(
     r"Successfully\s+paired\s+to\s+(\S+)\s+\[guid=([^\]]+)\]",
     re.IGNORECASE,
 )
+
+# Retryable ADB message fragments. Update when new transient transport failures are observed.
+_RETRYABLE_ADB_MESSAGE_FRAGMENTS: Final[tuple[str, ...]] = (
+    "protocol fault",
+    "connection reset",
+    "error: closed",
+    "broken pipe",
+    "connection refused",
+    "cannot connect",
+    "no connection could be made",
+    "failed to connect",
+    "device offline",
+    "device not found",
+    "daemon not running",
+    "server version mismatch",
+    "timed out",
+    "timeout",
+)
+
+# Permanent ADB message fragments. Keep user/action failures here so retries stop quickly.
+_PERMANENT_ADB_MESSAGE_FRAGMENTS: Final[tuple[str, ...]] = (
+    "wrong pairing code",
+    "wrong",
+    "invalid",
+    "failed to authenticate",
+    "incorrect",
+    "pairing code",
+    "unauthorized",
+    "permission denied",
+    "insufficient permissions",
+    "failed to run adb binary",
+)
+
+# Log redaction token. Keep stable so tests and log filters can match it.
+_REDACTED_LOG_VALUE: Final[str] = "<redacted>"
+
+# Maximum stdout/stderr preview length for non-sensitive command logs.
+_LOG_PREVIEW_LIMIT: Final[int] = 200
+
+# Maximum per-client/server command history entries retained for debugging.
+_ADB_HISTORY_MAX_ENTRIES: Final[int] = 100
+
+# Batch shell enrichment keys. Update together with GET_SHELL_ENRICHMENT_PROPERTIES.
+_SHELL_ENRICHMENT_KEY_MANUFACTURER: Final[str] = "manufacturer"
+_SHELL_ENRICHMENT_KEY_MODEL: Final[str] = "model"
+_SHELL_ENRICHMENT_KEY_DEVICE_NAME: Final[str] = "device_name"
+_SHELL_ENRICHMENT_KEY_ANDROID_RELEASE: Final[str] = "android_release"
+_SHELL_ENRICHMENT_KEY_SDK: Final[str] = "sdk"
+_SHELL_ENRICHMENT_KEY_RO_SERIALNO: Final[str] = "ro_serialno"
+
+# Parsed shape returned by the batch shell enrichment parser.
+ShellEnrichmentProperties = dict[str, str | int | None]
 
 
 @dataclass(frozen=True)
@@ -47,16 +100,19 @@ class AdbBinary:
         default=Path(__file__).parent / "assets" / "linux" / "plateform-tools" / "adb",
     )
     version: str = field(
-        metadata={"description": "The version of the adb binary"}, default=""
+        metadata={"description": "The version of the adb binary"},
+        default=ADB_BINARY_VERSION,
     )
     build_date: Optional[datetime.datetime] = field(
         metadata={"description": "The build date of the adb binary"}, default=None
     )
     build_number: Optional[int] = field(
-        metadata={"description": "The build number of the adb binary"}, default=None
+        metadata={"description": "The build number of the adb binary"},
+        default=ADB_BINARY_BUILD_NUMBER,
     )
     build_version: Optional[str] = field(
-        metadata={"description": "The build version of the adb binary"}, default=None
+        metadata={"description": "The build version of the adb binary"},
+        default=ADB_BINARY_BUILD_VERSION,
     )
 
     def __str__(self) -> str:
@@ -110,42 +166,6 @@ class AdbCommandResult:
     return_code: int = field(
         metadata={"description": "The return code of the command execution"}, default=1
     )
-
-
-# Substrings that indicate a transient ADB failure worth retrying (case-insensitive).
-_RETRYABLE_ADB_MESSAGE_FRAGMENTS: Final[tuple[str, ...]] = (
-    "protocol fault",
-    "connection reset",
-    "error: closed",
-    "broken pipe",
-    "connection refused",
-    "cannot connect",
-    "no connection could be made",
-    "failed to connect",
-    "device offline",
-    "device not found",
-    "daemon not running",
-    "server version mismatch",
-    "timed out",
-    "timeout",
-)
-
-# Substrings that indicate a permanent failure; never retry even if mixed with noise.
-_PERMANENT_ADB_MESSAGE_FRAGMENTS: Final[tuple[str, ...]] = (
-    "wrong pairing code",
-    "wrong",
-    "invalid",
-    "failed to authenticate",
-    "incorrect",
-    "pairing code",
-    "unauthorized",
-    "permission denied",
-    "insufficient permissions",
-    "failed to run adb binary",
-)
-
-_REDACTED_LOG_VALUE: Final[str] = "<redacted>"
-_LOG_PREVIEW_LIMIT: Final[int] = 200
 
 
 @dataclass(frozen=True)
@@ -277,6 +297,8 @@ def _command_output_is_sensitive(command: AdbCommand) -> bool:
     if command.command in ("pair", "devices"):
         return True
     if tuple(command.args) == ("getprop", "ro.serialno"):
+        return True
+    if command.name == "Get shell enrichment properties":
         return True
     return _command_has_location_payload(command)
 
@@ -471,6 +493,36 @@ def _parse_optional_int_line(output: str) -> int | None:
         return None
 
 
+def _parse_shell_enrichment_properties(output: str) -> ShellEnrichmentProperties:
+    """
+    Parse batch enrichment output as one ``key=value`` per line.
+
+    Unknown keys are ignored so device-side command changes remain backward-compatible.
+    """
+    parsed: ShellEnrichmentProperties = {
+        _SHELL_ENRICHMENT_KEY_MANUFACTURER: "",
+        _SHELL_ENRICHMENT_KEY_MODEL: "",
+        _SHELL_ENRICHMENT_KEY_DEVICE_NAME: "",
+        _SHELL_ENRICHMENT_KEY_ANDROID_RELEASE: "",
+        _SHELL_ENRICHMENT_KEY_SDK: None,
+        _SHELL_ENRICHMENT_KEY_RO_SERIALNO: "",
+    }
+    valid_keys = set(parsed)
+    for raw in output.splitlines():
+        line = raw.strip()
+        if not line or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        if key not in valid_keys:
+            continue
+        if key == _SHELL_ENRICHMENT_KEY_SDK:
+            parsed[key] = _parse_optional_int_line(value)
+            continue
+        parsed[key] = value.strip()
+    return parsed
+
+
 def _normalize_kv_key(key: str) -> str:
     return key.strip().lower().replace(" ", "_").replace("/", "_")
 
@@ -555,6 +607,7 @@ class ADBCommandParser(Enum):
     GET_SDK_VERSION = member(_parse_optional_int_line)
     GET_LOCATION_MODE = member(_parse_optional_int_line)
     GET_SERIAL_NO = member(_make_strip_parser())
+    GET_SHELL_ENRICHMENT_PROPERTIES = member(_parse_shell_enrichment_properties)
     GET_BATTERY_INFOS = member(_parse_battery)
     DUMPSYS_WINDOW = member(_parse_window_summary)
     SEND_NOTIFICATION = member(_parse_notification_post)
@@ -696,6 +749,23 @@ class AdbCommands(Enum):
         command="shell",
         args=["getprop", "ro.build.version.sdk"],
     )
+    GET_SHELL_ENRICHMENT_PROPERTIES = AdbCommand(
+        name="Get shell enrichment properties",
+        description="Batch getprops used to enrich device metadata",
+        command="shell",
+        args=[
+            "sh",
+            "-c",
+            (
+                "printf 'manufacturer=%s\\n' \"$(getprop ro.product.manufacturer)\"; "
+                "printf 'model=%s\\n' \"$(getprop ro.product.model)\"; "
+                "printf 'device_name=%s\\n' \"$(getprop device_name)\"; "
+                "printf 'android_release=%s\\n' \"$(getprop ro.build.version.release)\"; "
+                "printf 'sdk=%s\\n' \"$(getprop ro.build.version.sdk)\"; "
+                "printf 'ro_serialno=%s\\n' \"$(getprop ro.serialno)\""
+            ),
+        ],
+    )  # A all in one command to get all the properties at once, reducing the number of adb trips
     GET_LOCATION_MODE = AdbCommand(
         name="Get location mode",
         description="Secure settings location_mode (0 off, 3 high accuracy, etc.)",
@@ -732,6 +802,9 @@ ADB_COMMAND_PARSERS: dict[AdbCommands, ADBCommandParser] = {
     AdbCommands.GET_SDK_VERSION: ADBCommandParser.GET_SDK_VERSION,
     AdbCommands.GET_LOCATION_MODE: ADBCommandParser.GET_LOCATION_MODE,
     AdbCommands.GET_SERIAL_NO: ADBCommandParser.GET_SERIAL_NO,
+    AdbCommands.GET_SHELL_ENRICHMENT_PROPERTIES: (
+        ADBCommandParser.GET_SHELL_ENRICHMENT_PROPERTIES
+    ),
     AdbCommands.GET_BATTERY_INFOS: ADBCommandParser.GET_BATTERY_INFOS,
     AdbCommands.DUMPSYS_WINDOW: ADBCommandParser.DUMPSYS_WINDOW,
     AdbCommands.SEND_NOTIFICATION: ADBCommandParser.SEND_NOTIFICATION,
@@ -781,12 +854,22 @@ class AdbClient:
         Add to the history of the adb client
         """
         self._history[datetime.datetime.now()] = (command, result)
+        self._prune_history()
+
+    def _prune_history(self) -> None:
+        """Keep newest client history entries by dropping oldest entries first."""
+        while len(self._history) > _ADB_HISTORY_MAX_ENTRIES:
+            self._history.popitem(last=False)
 
     def remove_from_history(self, command: AdbCommand) -> None:
         """
         Remove from the history of the adb client
         """
-        self._history.pop(datetime.datetime.now())
+        self._history = OrderedDict(
+            (time, entry)
+            for time, entry in self._history.items()
+            if entry[0] != command
+        )
 
     def pair(self, ip: str, port: int, association_code: str) -> Phone:
         """
@@ -965,6 +1048,30 @@ class AdbClient:
             return None
         return ADBCommandParser.GET_SDK_VERSION.parse(result.output or "")
 
+    def get_shell_enrichment_properties(
+        self, phone: Phone
+    ) -> ShellEnrichmentProperties:
+        """
+        Fetch shell-backed device enrichment properties in one ADB round trip.
+
+        Returns empty-string/``None`` values when the command fails so refresh paths can
+        preserve the existing best-effort enrichment behavior.
+        """
+        command = AdbCommands.GET_SHELL_ENRICHMENT_PROPERTIES.value
+        try:
+            result = self._execute(command, phone)
+            _raise_client_for_result(command, result)
+        except AdbClientException as exc:
+            logger.warning(
+                "AdbClient: failed to read shell enrichment properties",
+                device_id=phone.descriptor.id,
+                error=str(exc),
+            )
+            return ADBCommandParser.GET_SHELL_ENRICHMENT_PROPERTIES.parse("")
+        return ADBCommandParser.GET_SHELL_ENRICHMENT_PROPERTIES.parse(
+            result.output or ""
+        )
+
     def _execute(
         self,
         command: AdbCommand,
@@ -1110,6 +1217,12 @@ class AdbServer:
         Add to the history of the adb server
         """
         self._history[datetime.datetime.now()] = (command, result)
+        self._prune_history()
+
+    def _prune_history(self) -> None:
+        """Keep newest server history entries by dropping oldest entries first."""
+        while len(self._history) > _ADB_HISTORY_MAX_ENTRIES:
+            self._history.popitem(last=False)
 
     def remove_from_history(self, command: AdbCommand) -> None:
         """
