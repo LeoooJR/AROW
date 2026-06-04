@@ -411,6 +411,13 @@ class MockAdbServer(AdbServer):
             out = self._mock_state.devices_l_blob()
         elif command.command == "mdns" and command.args == ["check"]:
             out = "mdns daemon version [Openscreen discovery 0.0.0]\n"
+        elif command.command == "--version":
+            out = (
+                "Android Debug Bridge version 1.0.41\n"
+                "Version 36.0.0-13206524\n"
+                "Installed as /mock/adb\n"
+                "Running on MockOS 0.0.0 (mock)\n"
+            )
         cmd_result = AdbCommandResult(
             status=AdbCommandResultStatus.SUCCESS,
             phone=None,

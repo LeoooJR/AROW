@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import pytest
 
+from core import ADB_BINARY_BUILD_NUMBER, ADB_BINARY_BUILD_VERSION, ADB_BINARY_VERSION
 from core.adb import AdbClientException, ADBCommandParser, AdbCommands
 from core.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
 from core.devices import Phone
@@ -98,6 +99,17 @@ def test_mock_server_mdns_check_output_matches_parser() -> None:
     result = server._execute(AdbCommands.MDNS_CHECK.value)
 
     assert ADBCommandParser.MDNS_CHECK.parse(result.output) is True
+
+
+def test_mock_server_binary_version_output_matches_parser() -> None:
+    server = MockAdbServer(state=MockAdbState(seed=810, initial_devices=1))
+    result = server._execute(AdbCommands.GET_BINARY_VERSION.value)
+    parsed = ADBCommandParser.GET_BINARY_VERSION.parse(result.output)
+
+    assert parsed.version == ADB_BINARY_VERSION
+    assert parsed.build_version == ADB_BINARY_BUILD_VERSION
+    assert parsed.build_number == ADB_BINARY_BUILD_NUMBER
+    assert str(parsed.path) == "/mock/adb"
 
 
 def test_startup_reuses_server_paired_devices_after_start(

@@ -89,7 +89,7 @@ _SHELL_ENRICHMENT_KEY_RO_SERIALNO: Final[str] = "ro_serialno"
 ShellEnrichmentProperties = dict[str, str | int | None]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, match_args=True)
 class AdbBinary:
     """
     Adb binary
@@ -98,13 +98,16 @@ class AdbBinary:
     path: Path = field(
         metadata={"description": "The path to the adb binary"},
         default=Path(__file__).parent / "assets" / "linux" / "plateform-tools" / "adb",
+        compare=False,
     )
     version: str = field(
         metadata={"description": "The version of the adb binary"},
         default=ADB_BINARY_VERSION,
     )
     build_date: Optional[datetime.datetime] = field(
-        metadata={"description": "The build date of the adb binary"}, default=None
+        metadata={"description": "The build date of the adb binary"},
+        default=None,
+        compare=False,
     )
     build_number: Optional[int] = field(
         metadata={"description": "The build number of the adb binary"},
@@ -459,6 +462,38 @@ def _parse_mdns_check(output: str) -> bool:
     return "mdns daemon version" in output.casefold()
 
 
+def _parse_binary_version(output: str) -> AdbBinary:
+    """Parse `adb --version` output into bundled binary metadata."""
+    version = ""
+    build_version: str | None = None
+    build_number: int | None = None
+    installed_path: Path | None = None
+    for raw in output.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        if not version:
+            version = line
+            continue
+        if line.startswith("Version "):
+            build_version = line.removeprefix("Version ").strip() or None
+            if build_version is not None:
+                suffix = build_version.rsplit("-", 1)[-1]
+                try:
+                    build_number = int(suffix)
+                except ValueError:
+                    build_number = None
+            continue
+        if line.startswith("Installed as "):
+            installed_path = Path(line.removeprefix("Installed as ").strip())
+    return AdbBinary(
+        path=installed_path or AdbBinary().path,
+        version=version,
+        build_number=build_number,
+        build_version=build_version,
+    )
+
+
 def _parse_devices(output: str) -> list[Phone]:
     """Parse `adb devices -l` stdout into `Phone` rows; skip header and malformed lines."""
     phones: list[Phone] = []
@@ -605,6 +640,7 @@ class ADBCommandParser(Enum):
     # Callables must be wrapped with enum.member() or Enum treats them as methods.
     PAIR = member(_parse_pair)
     MDNS_CHECK = member(_parse_mdns_check)
+    GET_BINARY_VERSION = member(_parse_binary_version)
     GET_DEVICES = member(_parse_devices)
     GET_ANDROID_VERSION = member(_make_strip_parser())
     GET_MANUFACTURER = member(_make_strip_parser())
@@ -719,6 +755,11 @@ class AdbCommands(Enum):
         command="mdns",
         args=["check"],
     )
+    GET_BINARY_VERSION = AdbCommand(
+        name="Get ADB binary version",
+        description="Read bundled ADB binary version metadata",
+        command="--version",
+    )
     GET_DEVICE_NAME = AdbCommand(
         name="Get device name",
         description="Get the name of the device",
@@ -807,6 +848,7 @@ class AdbCommands(Enum):
 
 ADB_COMMAND_PARSERS: dict[AdbCommands, ADBCommandParser] = {
     AdbCommands.MDNS_CHECK: ADBCommandParser.MDNS_CHECK,
+    AdbCommands.GET_BINARY_VERSION: ADBCommandParser.GET_BINARY_VERSION,
     AdbCommands.GET_DEVICES: ADBCommandParser.GET_DEVICES,
     AdbCommands.GET_ANDROID_VERSION: ADBCommandParser.GET_ANDROID_VERSION,
     AdbCommands.GET_MANUFACTURER: ADBCommandParser.GET_MANUFACTURER,
@@ -1331,6 +1373,56 @@ class AdbServer:
             self.start()
         except AdbServerException:
             raise
+
+    @classmethod
+    def get_binary_version(cls, binary: AdbBinary) -> AdbBinary:
+        """
+        Read ADB binary metadata without constructing or starting the ADB server.
+        """
+        command = AdbCommands.GET_BINARY_VERSION.value
+        argv = [str(binary.path), command.command, *command.args]
+        profile = _retry_profile_for(command, scope="server")
+        logger.debug(
+            "AdbServer: reading ADB binary version",
+            adb_path=str(binary.path),
+            argv=_log_safe_argv(command, argv),
+            command_line=_log_safe_command_line(command, argv),
+            timeout_s=profile.timeout_seconds,
+        )
+        try:
+            # Version preflight uses list argv, no shell, and a bounded timeout.
+            completed = subprocess.run(  # nosec B603
+                argv,
+                capture_output=True,
+                text=True,
+                timeout=profile.timeout_seconds,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise AdbServerException(
+                f"Failed to read ADB binary version: timed out after {profile.timeout_seconds}s"
+            ) from exc
+        except OSError as exc:
+            raise AdbServerException(f"Failed to run ADB binary {binary.path}") from exc
+        result = AdbCommandResult(
+            status=_adb_status_from_process(
+                return_code=completed.returncode,
+                output=completed.stdout or "",
+                error=completed.stderr or "",
+            ),
+            output=completed.stdout or "",
+            error=completed.stderr or "",
+            return_code=completed.returncode,
+        )
+        if result.status != AdbCommandResultStatus.SUCCESS:
+            raise AdbServerException(
+                f"Failed to read ADB binary version: {result.status.name}"
+            )
+        parsed = ADBCommandParser.GET_BINARY_VERSION.parse(result.output or "")
+        if not parsed.version or not parsed.build_version:
+            raise AdbServerException(
+                "Failed to parse ADB binary version from --version output"
+            )
+        return parsed
 
     def refresh_mdns_availability(self) -> bool:
         """

@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 
+from core import ADB_BINARY_BUILD_NUMBER, ADB_BINARY_BUILD_VERSION, ADB_BINARY_VERSION
 from core.adb import (
     _ADB_HISTORY_MAX_ENTRIES,
     AdbBinary,
@@ -179,6 +180,73 @@ class TestAdbBinaryDefaults:
         assert binary.build_version == "36.0.0-13206524"
         assert binary.build_number == 13206524
         assert binary.build_date is None
+
+    def test_adb_binary_equality_uses_frozen_metadata_identity(self) -> None:
+        first = AdbBinary(path=Path("/mock/adb"))
+        second = AdbBinary(path=Path("/different/adb"))
+        assert first == second
+
+    def test_adb_binary_equality_detects_metadata_mismatch(self) -> None:
+        expected = AdbBinary(path=Path("/mock/adb"))
+        actual = AdbBinary(
+            path=Path("/mock/adb"),
+            version="Android Debug Bridge version 9.9.9",
+        )
+        assert actual != expected
+
+
+class TestAdbServerBinaryVersion:
+    """ADB binary version preflight behavior."""
+
+    def test_get_binary_version_executes_without_constructing_server(
+        self, adb_binary: AdbBinary, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        calls: list[list[str]] = []
+
+        def fake_run(
+            argv: list[str], capture_output: bool, text: bool, timeout: float
+        ) -> subprocess.CompletedProcess[str]:
+            calls.append(argv)
+            return _completed_process(
+                argv,
+                returncode=0,
+                stdout=(
+                    f"{ADB_BINARY_VERSION}\n"
+                    f"Version {ADB_BINARY_BUILD_VERSION}\n"
+                    f"Installed as {adb_binary.path}\n"
+                    "Running on Darwin 25.5.0 (arm64)\n"
+                ),
+            )
+
+        monkeypatch.setattr(subprocess, "run", fake_run)
+
+        parsed = AdbServer.get_binary_version(adb_binary)
+
+        assert calls == [[str(adb_binary.path), "--version"]]
+        assert parsed.version == ADB_BINARY_VERSION
+        assert parsed.build_version == ADB_BINARY_BUILD_VERSION
+        assert parsed.build_number == ADB_BINARY_BUILD_NUMBER
+        assert parsed.path == adb_binary.path
+
+    def test_get_binary_version_raises_on_non_success(
+        self, adb_binary: AdbBinary, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def fake_run(
+            argv: list[str], capture_output: bool, text: bool, timeout: float
+        ) -> subprocess.CompletedProcess[str]:
+            return _completed_process(
+                argv,
+                returncode=1,
+                stdout="",
+                stderr="cannot read version",
+            )
+
+        monkeypatch.setattr(subprocess, "run", fake_run)
+
+        with pytest.raises(
+            AdbServerException, match="Failed to read ADB binary version"
+        ):
+            AdbServer.get_binary_version(adb_binary)
 
 
 # --- Kill server: success ---

@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import pytest
 
+from core import ADB_BINARY_BUILD_NUMBER, ADB_BINARY_BUILD_VERSION, ADB_BINARY_VERSION
 from core.adb import ADB_COMMAND_PARSERS, ADBCommandParser, AdbCommands
 from core.devices import DEFAULT_PHONE_DISPLAY_NAME, Phone
 
@@ -45,6 +46,12 @@ WINDOW MANAGER ANIMATOR STATE (dumpsys window animator)
     mAwake=false mScreenOnEarly=false mScreenOnFully=false
   mCurrentFocus=Window{bdf3658 u0 NotificationShade}
   mFocusedApp=ActivityRecord{3e3682b u0 com.android.settings/com.hihonor.settingslib.SubSettings t1019}
+"""
+
+OUTPUT_ADB_VERSION = """Android Debug Bridge version 1.0.41
+Version 36.0.0-13206524
+Installed as /mock/adb
+Running on Darwin 25.5.0 (arm64)
 """
 
 
@@ -196,6 +203,25 @@ def test_mdns_check_unknown_or_failure_output(output: str) -> None:
     assert ADBCommandParser.MDNS_CHECK.parse(output) is False
 
 
+def test_binary_version_parser_extracts_adb_metadata() -> None:
+    parsed = ADBCommandParser.GET_BINARY_VERSION.parse(OUTPUT_ADB_VERSION)
+    assert parsed.version == ADB_BINARY_VERSION
+    assert parsed.build_version == ADB_BINARY_BUILD_VERSION
+    assert parsed.build_number == ADB_BINARY_BUILD_NUMBER
+    assert str(parsed.path) == "/mock/adb"
+
+
+def test_binary_version_parser_keeps_malformed_build_number_empty() -> None:
+    parsed = ADBCommandParser.GET_BINARY_VERSION.parse(
+        "Android Debug Bridge version 1.0.41\n"
+        "Version 36.0.0-not-a-number\n"
+        "Installed as /mock/adb\n"
+    )
+    assert parsed.version == ADB_BINARY_VERSION
+    assert parsed.build_version == "36.0.0-not-a-number"
+    assert parsed.build_number is None
+
+
 # --- `adb pair` (PAIR parser): shape matches tool output; literals are test fixtures only. ---
 
 
@@ -314,6 +340,7 @@ def test_adb_command_parsers_registry() -> None:
         AdbCommands.DUMPSYS_WINDOW,
         AdbCommands.SEND_NOTIFICATION,
         AdbCommands.MDNS_CHECK,
+        AdbCommands.GET_BINARY_VERSION,
     }
     assert set(ADB_COMMAND_PARSERS.keys()) == expected
     for cmd, parser in ADB_COMMAND_PARSERS.items():
