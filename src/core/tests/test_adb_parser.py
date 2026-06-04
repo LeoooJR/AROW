@@ -182,6 +182,20 @@ def test_send_notification_post_confirmation() -> None:
     assert ADBCommandParser.SEND_NOTIFICATION.parse("") is False
 
 
+def test_mdns_check_success_marker() -> None:
+    assert (
+        ADBCommandParser.MDNS_CHECK.parse(
+            "mdns daemon version [Openscreen discovery 0.0.0]\n"
+        )
+        is True
+    )
+
+
+@pytest.mark.parametrize("output", ["", "mdns unavailable\n", "daemon not running\n"])
+def test_mdns_check_unknown_or_failure_output(output: str) -> None:
+    assert ADBCommandParser.MDNS_CHECK.parse(output) is False
+
+
 # --- `adb pair` (PAIR parser): shape matches tool output; literals are test fixtures only. ---
 
 
@@ -299,6 +313,7 @@ def test_adb_command_parsers_registry() -> None:
         AdbCommands.GET_BATTERY_INFOS,
         AdbCommands.DUMPSYS_WINDOW,
         AdbCommands.SEND_NOTIFICATION,
+        AdbCommands.MDNS_CHECK,
     }
     assert set(ADB_COMMAND_PARSERS.keys()) == expected
     for cmd, parser in ADB_COMMAND_PARSERS.items():

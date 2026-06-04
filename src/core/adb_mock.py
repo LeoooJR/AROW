@@ -409,6 +409,8 @@ class MockAdbServer(AdbServer):
         out = ""
         if command.command == "devices" and command.args == ["-l"]:
             out = self._mock_state.devices_l_blob()
+        elif command.command == "mdns" and command.args == ["check"]:
+            out = "mdns daemon version [Openscreen discovery 0.0.0]\n"
         cmd_result = AdbCommandResult(
             status=AdbCommandResultStatus.SUCCESS,
             phone=None,

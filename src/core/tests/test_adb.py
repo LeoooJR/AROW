@@ -54,6 +54,7 @@ def server(adb_binary: AdbBinary) -> AdbServer:
     server.binary = adb_binary
     server._history = OrderedDict()
     server.paired_devices = PhoneRepository()
+    server._mdns_available = False
     return server
 
 
@@ -69,19 +70,30 @@ def _completed_process(
 class TestAdbServerStartSuccess:
     """ADB start-server success cases."""
 
-    def test_server_init_calls_start(
+    def test_server_init_calls_start_then_refreshes_mdns(
         self, adb_binary: AdbBinary, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """AdbServer.__init__ gently delegates startup to start()."""
-        called: list[AdbBinary] = []
+        """AdbServer.__init__ starts gently before refreshing advisory mDNS state."""
+        calls: list[str] = []
 
         def fake_start(self: AdbServer) -> None:
-            called.append(self.binary)
+            calls.append("start")
+
+        def fake_refresh_mdns_availability(self: AdbServer) -> bool:
+            calls.append("refresh_mdns_availability")
+            self._mdns_available = True
+            return self._mdns_available
 
         monkeypatch.setattr(AdbServer, "start", fake_start)
+        monkeypatch.setattr(
+            AdbServer,
+            "refresh_mdns_availability",
+            fake_refresh_mdns_availability,
+        )
         server = AdbServer(adb_binary)
         assert server.binary == adb_binary
-        assert called == [adb_binary]
+        assert calls == ["start", "refresh_mdns_availability"]
+        assert server.mdns_available is True
 
     def test_server_start_adds_known_devices(
         self, server: AdbServer, monkeypatch: pytest.MonkeyPatch
@@ -105,6 +117,57 @@ class TestAdbServerStartSuccess:
         assert server.paired_devices.get("abc123") is phone
         last_result = server.get_last_command_result()
         assert last_result.status == AdbCommandResultStatus.SUCCESS
+
+    def test_refresh_mdns_availability_sets_property_on_success(
+        self, server: AdbServer, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """refresh_mdns_availability stores and returns a parsed success signal."""
+
+        def fake_execute(_command: AdbCommand) -> AdbCommandResult:
+            return AdbCommandResult(
+                status=AdbCommandResultStatus.SUCCESS,
+                output="mdns daemon version [Openscreen discovery 0.0.0]\n",
+                error="",
+                return_code=0,
+            )
+
+        monkeypatch.setattr(server, "_execute", fake_execute)
+
+        assert server.refresh_mdns_availability() is True
+        assert server.mdns_available is True
+
+    def test_refresh_mdns_availability_noops_startup_on_failure(
+        self, server: AdbServer, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """mDNS preflight failures are advisory and leave availability false."""
+
+        def fake_execute(_command: AdbCommand) -> AdbCommandResult:
+            return AdbCommandResult(
+                status=AdbCommandResultStatus.ERROR,
+                output="",
+                error="mdns unavailable",
+                return_code=1,
+            )
+
+        server._mdns_available = True
+        monkeypatch.setattr(server, "_execute", fake_execute)
+
+        assert server.refresh_mdns_availability() is False
+        assert server.mdns_available is False
+
+    def test_refresh_mdns_availability_handles_execute_exception(
+        self, server: AdbServer, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """mDNS preflight exceptions are advisory and leave availability false."""
+
+        def fake_execute(_command: AdbCommand) -> AdbCommandResult:
+            raise AdbServerException("mdns check failed")
+
+        server._mdns_available = True
+        monkeypatch.setattr(server, "_execute", fake_execute)
+
+        assert server.refresh_mdns_availability() is False
+        assert server.mdns_available is False
 
 
 class TestAdbBinaryDefaults:

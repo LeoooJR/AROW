@@ -454,6 +454,11 @@ def _parse_pair(output: str) -> Phone | None:
     return None
 
 
+def _parse_mdns_check(output: str) -> bool:
+    """Return True when `adb mdns check` reports a running mDNS daemon."""
+    return "mdns daemon version" in output.casefold()
+
+
 def _parse_devices(output: str) -> list[Phone]:
     """Parse `adb devices -l` stdout into `Phone` rows; skip header and malformed lines."""
     phones: list[Phone] = []
@@ -599,6 +604,7 @@ class ADBCommandParser(Enum):
 
     # Callables must be wrapped with enum.member() or Enum treats them as methods.
     PAIR = member(_parse_pair)
+    MDNS_CHECK = member(_parse_mdns_check)
     GET_DEVICES = member(_parse_devices)
     GET_ANDROID_VERSION = member(_make_strip_parser())
     GET_MANUFACTURER = member(_make_strip_parser())
@@ -707,6 +713,12 @@ class AdbCommands(Enum):
     PAIR = AdbCommand(
         name="Pair with a device", description="Pair with a device", command="pair"
     )
+    MDNS_CHECK = AdbCommand(
+        name="Check mDNS availability",
+        description="Check whether ADB mDNS discovery is available",
+        command="mdns",
+        args=["check"],
+    )
     GET_DEVICE_NAME = AdbCommand(
         name="Get device name",
         description="Get the name of the device",
@@ -794,6 +806,7 @@ class AdbCommands(Enum):
 
 
 ADB_COMMAND_PARSERS: dict[AdbCommands, ADBCommandParser] = {
+    AdbCommands.MDNS_CHECK: ADBCommandParser.MDNS_CHECK,
     AdbCommands.GET_DEVICES: ADBCommandParser.GET_DEVICES,
     AdbCommands.GET_ANDROID_VERSION: ADBCommandParser.GET_ANDROID_VERSION,
     AdbCommands.GET_MANUFACTURER: ADBCommandParser.GET_MANUFACTURER,
@@ -1184,7 +1197,9 @@ class AdbServer:
             datetime.datetime, tuple[AdbCommand, AdbCommandResult]
         ] = OrderedDict()
         self._paired_devices: PhoneRepository = PhoneRepository()
+        self._mdns_available: bool = False
         self.start()
+        self.refresh_mdns_availability()
 
     @property
     def history(
@@ -1279,6 +1294,13 @@ class AdbServer:
         """
         self._paired_devices.clear()
 
+    @property
+    def mdns_available(self) -> bool:
+        """
+        Get whether ADB reports mDNS discovery as available.
+        """
+        return self._mdns_available
+
     def start(self) -> None:
         """
         Start the adb server
@@ -1309,6 +1331,39 @@ class AdbServer:
             self.start()
         except AdbServerException:
             raise
+
+    def refresh_mdns_availability(self) -> bool:
+        """
+        Refresh and return whether ADB mDNS discovery is available.
+
+        This preflight is advisory: startup should continue even when the check is
+        unsupported, returns an unknown output shape, or fails on the host.
+        """
+        command = AdbCommands.MDNS_CHECK.value
+        try:
+            result = self._execute(command)
+        except AdbServerException as exc:
+            logger.warning(
+                "AdbServer: failed to check mDNS availability",
+                error=str(exc),
+            )
+            self._mdns_available = False
+            return self._mdns_available
+        if result.status != AdbCommandResultStatus.SUCCESS:
+            logger.warning(
+                "AdbServer: mDNS availability check returned non-success",
+                status=result.status.name,
+                return_code=result.return_code,
+                stdout=_log_safe_output_preview(result.output, command),
+                stderr=_log_safe_output_preview(result.error, command),
+            )
+            self._mdns_available = False
+            return self._mdns_available
+        self._mdns_available = ADBCommandParser.MDNS_CHECK.parse(result.output or "")
+        logger.debug(
+            "AdbServer: mDNS availability refreshed", available=self._mdns_available
+        )
+        return self._mdns_available
 
     def status(self) -> None:
         """

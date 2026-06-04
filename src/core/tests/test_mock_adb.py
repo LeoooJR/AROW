@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import pytest
 
-from core.adb import AdbClientException
+from core.adb import AdbClientException, ADBCommandParser, AdbCommands
 from core.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
 from core.devices import Phone
 from core.models import CoreRuntimeModel
@@ -86,6 +86,18 @@ def test_startup_mock_enriches_devices() -> None:
     assert phone.descriptor.manufacturer.strip()
     assert phone.descriptor.os.strip()
     assert phone.descriptor.android_api_level is not None
+
+
+def test_mock_server_reports_mdns_available() -> None:
+    server = MockAdbServer(state=MockAdbState(seed=808, initial_devices=1))
+    assert server.mdns_available is True
+
+
+def test_mock_server_mdns_check_output_matches_parser() -> None:
+    server = MockAdbServer(state=MockAdbState(seed=809, initial_devices=1))
+    result = server._execute(AdbCommands.MDNS_CHECK.value)
+
+    assert ADBCommandParser.MDNS_CHECK.parse(result.output) is True
 
 
 def test_startup_reuses_server_paired_devices_after_start(
