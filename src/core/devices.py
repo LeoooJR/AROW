@@ -9,6 +9,7 @@ from typing import Any, Optional
 from loguru import logger
 
 from collection import Repository
+from core.network import is_non_loopback_ipv4
 
 # Prefixes so stored keys remain version-migratable and distinguish Tier 1 vs Tier 2.
 _STABLE_HW_PREFIX = "hw:v1:"
@@ -228,18 +229,26 @@ class ComputerDescriptor(DeviceDescriptor):
         default="",
         hash=True,
     )
+    network_available: bool = field(
+        metadata={
+            "description": "Whether the host has a non-loopback IPv4 address usable for wireless ADB pairing"
+        },
+        default=False,
+    )
 
     def __str__(self):
         return (
             f"{self.id} - {self.name} - {self.os} - {self.ip}:{self.port} - "
-            f"{self.state} - {self.stable_key} - {self.last_communication}"
+            f"{self.state} - {self.stable_key} - {self.network_available} - "
+            f"{self.last_communication}"
         )
 
     def __repr__(self):
         return (
             f"{self.__class__.__name__}(id={self.id}, name={self.name}, os={self.os}, "
             f"ip={self.ip}, port={self.port}, state={self.state}, "
-            f"stable_key={self.stable_key!r}, last_communication={self.last_communication})"
+            f"stable_key={self.stable_key!r}, network_available={self.network_available!r}, "
+            f"last_communication={self.last_communication})"
         )
 
 
@@ -558,7 +567,11 @@ class Computer(Device):
     ) -> None:
         resolved_name = name or platform.node()
         resolved_os = os or platform.system()
-        resolved_ip = ip if ip is not None else self._resolve_ip()
+        if ip is not None:
+            resolved_ip = ip
+            network_available = is_non_loopback_ipv4(ip)
+        else:
+            resolved_ip, network_available = self._resolve_network_identity()
         super().__init__(
             id=id,
             name=resolved_name,
@@ -575,6 +588,7 @@ class Computer(Device):
             state=state,
             last_communication=last_communication,
             stable_key="",
+            network_available=network_available,
         )
 
     @property
@@ -600,6 +614,9 @@ class Computer(Device):
     def get_ip(self) -> str:
         return self._descriptor.ip
 
+    def is_network_available(self) -> bool:
+        return self._descriptor.network_available
+
     def get_port(self) -> int:
         return self._descriptor.port
 
@@ -609,22 +626,30 @@ class Computer(Device):
     def get_last_communication(self) -> datetime.datetime | None:
         return self._descriptor.last_communication
 
-    def _resolve_ip(self) -> str:
+    def refresh_network_identity(self) -> None:
+        ip, network_available = self._resolve_network_identity()
+        self._descriptor.ip = ip
+        self._descriptor.network_available = network_available
+
+    def _resolve_network_identity(self) -> tuple[str, bool]:
         try:
             ip = socket.gethostbyname(socket.gethostname())
-            if not ip.startswith("127."):  # 127.0.0.1 is the loopback address
-                return ip
+            if is_non_loopback_ipv4(ip):
+                return ip, True
         except OSError:
             pass
 
         try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.connect(("8.8.8.8", 80))  # 8.8.8.8 is a public DNS server
-            ip = s.getsockname()[0]
-            s.close()
-            return ip
+            # UDP route probing asks the OS which local address would be used; no packet
+            # needs to be exchanged with the target.
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                s.connect(("8.8.8.8", 80))
+                ip = s.getsockname()[0]
+            if is_non_loopback_ipv4(ip):
+                return ip, True
         except OSError:
-            return "127.0.0.1"  # fallback to loopback address
+            pass
+        return "127.0.0.1", False
 
 
 def connect_to_device(ip: str, port: int, association_code: str) -> Phone:

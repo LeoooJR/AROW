@@ -8,12 +8,11 @@ import datetime
 
 import pytest
 
-from core.adb import ADBCommandParser
+import core.devices as devices
 from core.devices import (
     DEFAULT_PHONE_DISPLAY_NAME,
     Computer,
     ComputerDescriptor,
-    Device,
     DeviceDescriptor,
     Phone,
     PhoneDescriptor,
@@ -357,6 +356,100 @@ class TestComputer:
         assert computer.descriptor.last_communication is now
         assert computer.descriptor.stable_key == ""
         assert computer.stable_key == ""
+        assert computer.is_network_available() is True
+
+    def test_computer_creation_with_loopback_ip_marks_network_unavailable(self) -> None:
+        computer = Computer(id="host-1", ip="127.0.0.1")
+        assert computer.descriptor.ip == "127.0.0.1"
+        assert computer.is_network_available() is False
+
+    def test_computer_hostname_lookup_sets_network_available(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(devices.socket, "gethostname", lambda: "workstation")
+        monkeypatch.setattr(
+            devices.socket, "gethostbyname", lambda _hostname: "192.168.1.10"
+        )
+
+        computer = Computer(id="host-1")
+
+        assert computer.descriptor.ip == "192.168.1.10"
+        assert computer.is_network_available() is True
+
+    def test_computer_udp_route_probe_used_after_loopback_hostname(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        class FakeSocket:
+            def __enter__(self) -> "FakeSocket":
+                return self
+
+            def __exit__(self, *args: object) -> None:
+                return None
+
+            def connect(self, _address: tuple[str, int]) -> None:
+                return None
+
+            def getsockname(self) -> tuple[str, int]:
+                return ("10.0.0.42", 54321)
+
+        monkeypatch.setattr(devices.socket, "gethostname", lambda: "workstation")
+        monkeypatch.setattr(
+            devices.socket, "gethostbyname", lambda _hostname: "127.0.0.1"
+        )
+        monkeypatch.setattr(
+            devices.socket,
+            "socket",
+            lambda _family, _type: FakeSocket(),
+        )
+
+        computer = Computer(id="host-1")
+
+        assert computer.descriptor.ip == "10.0.0.42"
+        assert computer.is_network_available() is True
+
+    def test_computer_network_resolution_fallback_marks_unavailable(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        class FailingSocket:
+            def __enter__(self) -> "FailingSocket":
+                return self
+
+            def __exit__(self, *args: object) -> None:
+                return None
+
+            def connect(self, _address: tuple[str, int]) -> None:
+                raise OSError("no route")
+
+        monkeypatch.setattr(devices.socket, "gethostname", lambda: "workstation")
+        monkeypatch.setattr(
+            devices.socket,
+            "gethostbyname",
+            lambda _hostname: (_ for _ in ()).throw(OSError("lookup failed")),
+        )
+        monkeypatch.setattr(
+            devices.socket,
+            "socket",
+            lambda _family, _type: FailingSocket(),
+        )
+
+        computer = Computer(id="host-1")
+
+        assert computer.descriptor.ip == "127.0.0.1"
+        assert computer.is_network_available() is False
+
+    def test_refresh_network_identity_updates_previous_unavailable_state(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        computer = Computer(id="host-1", ip="127.0.0.1")
+        assert computer.is_network_available() is False
+
+        monkeypatch.setattr(
+            computer, "_resolve_network_identity", lambda: ("192.168.1.10", True)
+        )
+        computer.refresh_network_identity()
+
+        assert computer.descriptor.ip == "192.168.1.10"
+        assert computer.is_network_available() is True
 
 
 class TestComputeComputerStableKey:

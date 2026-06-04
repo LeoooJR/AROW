@@ -12,6 +12,11 @@ from core.work.authentificate_device_work import AuthentificateDeviceOutcome
 pytestmark = [pytest.mark.async_jobs]
 
 
+def _mark_host_network_available(model: CoreRuntimeModel) -> None:
+    model.host.descriptor.network_available = True
+    model.host.refresh_network_identity = lambda: None  # type: ignore[method-assign]
+
+
 class TestCoreRuntimeModel:
     def test_authentificate_device_requires_initialized_adb(self) -> None:
         """Pairing is rejected until startup has bound server and client on the model."""
@@ -41,6 +46,7 @@ class TestCoreRuntimeModel:
         model = CoreRuntimeModel()
         model._adb_server = server
         model._adb_client = client
+        _mark_host_network_available(model)
 
         outcome = model.authentificate_device(duplicate_ip, port, code)
 
@@ -73,6 +79,7 @@ class TestCoreRuntimeModel:
         model = CoreRuntimeModel()
         model._adb_server = server
         model._adb_client = client
+        _mark_host_network_available(model)
 
         outcome = model.authentificate_device(requested_ip, port, code)
 
@@ -84,3 +91,71 @@ class TestCoreRuntimeModel:
             association_code=code,
         )
         assert outcome is expected_outcome
+
+    @patch("core.models.AuthenticateDeviceWork")
+    def test_authentificate_device_fails_when_host_network_unavailable(
+        self, mock_work_cls: MagicMock
+    ) -> None:
+        state = MockAdbState(seed=13, initial_devices=0)
+        model = CoreRuntimeModel()
+        model._adb_server = MockAdbServer(state=state)
+        model._adb_client = MockAdbClient(state=state)
+        model.host.descriptor.network_available = False
+        model.host.refresh_network_identity = lambda: None  # type: ignore[method-assign]
+
+        outcome = model.authentificate_device("192.168.1.42", 37777, "123456")
+
+        mock_work_cls.assert_not_called()
+        assert outcome.success_phone is None
+        assert outcome.failure is not None
+        assert outcome.failure.reason == "Host network is unavailable"
+        assert outcome.failure.ip == "192.168.1.42"
+
+    @patch("core.models.AuthenticateDeviceWork")
+    def test_authentificate_device_refreshes_host_network_before_gating(
+        self, mock_work_cls: MagicMock
+    ) -> None:
+        state = MockAdbState(seed=14, initial_devices=0)
+        model = CoreRuntimeModel()
+        model._adb_server = MockAdbServer(state=state)
+        model._adb_client = MockAdbClient(state=state)
+        model.host.descriptor.network_available = False
+        refresh_calls: list[None] = []
+
+        def refresh_network_identity() -> None:
+            refresh_calls.append(None)
+            model.host.descriptor.network_available = True
+
+        model.host.refresh_network_identity = refresh_network_identity  # type: ignore[method-assign]
+        expected_outcome = AuthentificateDeviceOutcome(success_phone=None, failure=None)
+        mock_work_cls.return_value.run.return_value = expected_outcome
+
+        outcome = model.authentificate_device("192.168.1.42", 37777, "123456")
+
+        assert len(refresh_calls) == 1
+        mock_work_cls.assert_called_once()
+        assert outcome is expected_outcome
+
+    @patch("core.models.AuthenticateDeviceWork")
+    def test_authentificate_device_network_guard_runs_before_duplicate_ip_check(
+        self, mock_work_cls: MagicMock
+    ) -> None:
+        state = MockAdbState(seed=15, initial_devices=0)
+        duplicate_ip = "192.168.77.1"
+        port = 5555
+        code = "123456"
+        server = MockAdbServer(state=state)
+        server.paired_devices.add(
+            Phone(id="existing-handset", ip=duplicate_ip, port=port)
+        )
+        model = CoreRuntimeModel()
+        model._adb_server = server
+        model._adb_client = MockAdbClient(state=state)
+        model.host.descriptor.network_available = False
+        model.host.refresh_network_identity = lambda: None  # type: ignore[method-assign]
+
+        outcome = model.authentificate_device(duplicate_ip, port, code)
+
+        mock_work_cls.assert_not_called()
+        assert outcome.failure is not None
+        assert outcome.failure.reason == "Host network is unavailable"
