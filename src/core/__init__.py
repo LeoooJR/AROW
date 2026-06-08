@@ -1,0 +1,5 @@
+"""Core package metadata."""
+
+ADB_BINARY_VERSION = "Android Debug Bridge version 1.0.41"
+ADB_BINARY_BUILD_VERSION = "36.0.0-13206524"
+ADB_BINARY_BUILD_NUMBER = 13206524

@@ -4,8 +4,10 @@ Worker / main-thread split for device pairing: ADB I/O on a worker, bus emit on 
 
 from __future__ import annotations
 
+import ipaddress
+import re
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 from core.adb import AdbClient, AdbClientException, AdbServer, AdbServerException
 from core.devices import Phone
@@ -35,14 +37,27 @@ class AuthentificateDeviceOutcome(CoreRuntimeWorkOutcome):
     failure: DeviceAuthentificationFailedPayload | None = None
 
 
-def _ro_serial_after_pair(adb_client: AdbClient, phone: Phone | None) -> str:
-    """Read ``ro.serialno`` on the worker when the handset is usable for shell I/O."""
-    if phone is None:
-        return ""
-    state = (phone.descriptor.state or "").strip().casefold()
-    if state != "device":
-        return ""
-    return adb_client.get_ro_serialno(phone)
+class PairingInputValidator:
+    """Core-side validation rules for ADB wireless pairing inputs."""
+
+    ASSOCIATION_CODE_PATTERN: ClassVar[re.Pattern[str]] = re.compile(r"^[0-9]{6}$")
+    PORT_MIN: ClassVar[int] = 1
+    PORT_MAX: ClassVar[int] = 65535
+
+    @classmethod
+    def validate(cls, ip: str, port: int, association_code: str) -> str | None:
+        """Return a failure reason for invalid pairing input, otherwise ``None``."""
+        try:
+            ipaddress.IPv4Address(ip)
+        except (ipaddress.AddressValueError, ValueError):
+            return "Invalid IPv4 address"
+        if isinstance(port, bool) or not isinstance(port, int):
+            return "Invalid port number"
+        if not cls.PORT_MIN <= port <= cls.PORT_MAX:
+            return "Invalid port range"
+        if cls.ASSOCIATION_CODE_PATTERN.fullmatch(association_code) is None:
+            return "Invalid association code"
+        return None
 
 
 class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
@@ -72,6 +87,23 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
         adb_server = self.adb_server
         adb_client = self.adb_client
         ip, port, association_code = self.ip, self.port, self.association_code
+        validation_failure = PairingInputValidator.validate(ip, port, association_code)
+        if validation_failure is not None:
+            logger.warning(
+                "CoreRuntimeModel: device pairing input validation failed",
+                ip=ip,
+                port=port,
+                reason=validation_failure,
+            )
+            return AuthentificateDeviceOutcome(
+                success_phone=None,
+                failure=DeviceAuthentificationFailedPayload(
+                    ip=ip,
+                    port=port,
+                    association_code=association_code,
+                    reason=validation_failure,
+                ),
+            )
         try:
             phone = adb_client.pair(ip, port, association_code)
             enrich_phones_with_adb_shell_properties(adb_client, [phone])

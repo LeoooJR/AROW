@@ -121,6 +121,17 @@ class CoreRuntimeModel(Model):
             raise AttributeError(
                 "ADB server and client must be initialized before authentification"
             )
+        self._host.refresh_network_identity()
+        if not self._host.is_network_available():
+            return AuthentificateDeviceOutcome(
+                success_phone=None,
+                failure=DeviceAuthentificationFailedPayload(
+                    ip=ip,
+                    port=port,
+                    association_code=association_code,
+                    reason="Host network is unavailable",
+                ),
+            )
         # Check if a device with this IP address on the current ADB server is already paired
         for device in self._adb_server.paired_devices:
             if device.ip == ip:

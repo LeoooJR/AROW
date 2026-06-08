@@ -3,7 +3,9 @@ from __future__ import annotations
 import datetime
 import re
 import shlex
-import subprocess
+
+# ADB is an external binary; execution is centralized below with list argv and no shell.
+import subprocess  # nosec B404
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from enum import Enum, member
@@ -20,21 +22,74 @@ from tenacity import (
     wait_fixed,
 )
 
-ParserFn = Callable[[str], Any]
-
+from core import ADB_BINARY_BUILD_NUMBER, ADB_BINARY_BUILD_VERSION, ADB_BINARY_VERSION
 from core.devices import Phone, PhoneRepository
 from core.exceptions import AdbClientException, AdbServerException
 from core.location import Location
 from logger import logger
 
-# `adb pair` success line: Successfully paired to <host>:<port> [guid=<device_id>]
+ParserFn = Callable[[str], Any]
+
+# Parser regex for `adb pair` success lines. Update if platform-tools changes output.
 _PAIR_SUCCESS_LINE = re.compile(
     r"Successfully\s+paired\s+to\s+(\S+)\s+\[guid=([^\]]+)\]",
     re.IGNORECASE,
 )
 
+# Retryable ADB message fragments. Update when new transient transport failures are observed.
+_RETRYABLE_ADB_MESSAGE_FRAGMENTS: Final[tuple[str, ...]] = (
+    "protocol fault",
+    "connection reset",
+    "error: closed",
+    "broken pipe",
+    "connection refused",
+    "cannot connect",
+    "no connection could be made",
+    "failed to connect",
+    "device offline",
+    "device not found",
+    "daemon not running",
+    "server version mismatch",
+    "timed out",
+    "timeout",
+)
 
-@dataclass(frozen=True)
+# Permanent ADB message fragments. Keep user/action failures here so retries stop quickly.
+_PERMANENT_ADB_MESSAGE_FRAGMENTS: Final[tuple[str, ...]] = (
+    "wrong pairing code",
+    "wrong",
+    "invalid",
+    "failed to authenticate",
+    "incorrect",
+    "pairing code",
+    "unauthorized",
+    "permission denied",
+    "insufficient permissions",
+    "failed to run adb binary",
+)
+
+# Log redaction token. Keep stable so tests and log filters can match it.
+_REDACTED_LOG_VALUE: Final[str] = "<redacted>"
+
+# Maximum stdout/stderr preview length for non-sensitive command logs.
+_LOG_PREVIEW_LIMIT: Final[int] = 200
+
+# Maximum per-client/server command history entries retained for debugging.
+_ADB_HISTORY_MAX_ENTRIES: Final[int] = 100
+
+# Batch shell enrichment keys. Update together with GET_SHELL_ENRICHMENT_PROPERTIES.
+_SHELL_ENRICHMENT_KEY_MANUFACTURER: Final[str] = "manufacturer"
+_SHELL_ENRICHMENT_KEY_MODEL: Final[str] = "model"
+_SHELL_ENRICHMENT_KEY_DEVICE_NAME: Final[str] = "device_name"
+_SHELL_ENRICHMENT_KEY_ANDROID_RELEASE: Final[str] = "android_release"
+_SHELL_ENRICHMENT_KEY_SDK: Final[str] = "sdk"
+_SHELL_ENRICHMENT_KEY_RO_SERIALNO: Final[str] = "ro_serialno"
+
+# Parsed shape returned by the batch shell enrichment parser.
+ShellEnrichmentProperties = dict[str, str | int | None]
+
+
+@dataclass(frozen=True, match_args=True)
 class AdbBinary:
     """
     Adb binary
@@ -43,18 +98,24 @@ class AdbBinary:
     path: Path = field(
         metadata={"description": "The path to the adb binary"},
         default=Path(__file__).parent / "assets" / "linux" / "plateform-tools" / "adb",
+        compare=False,
     )
     version: str = field(
-        metadata={"description": "The version of the adb binary"}, default=""
+        metadata={"description": "The version of the adb binary"},
+        default=ADB_BINARY_VERSION,
     )
     build_date: Optional[datetime.datetime] = field(
-        metadata={"description": "The build date of the adb binary"}, default=None
+        metadata={"description": "The build date of the adb binary"},
+        default=None,
+        compare=False,
     )
     build_number: Optional[int] = field(
-        metadata={"description": "The build number of the adb binary"}, default=None
+        metadata={"description": "The build number of the adb binary"},
+        default=ADB_BINARY_BUILD_NUMBER,
     )
     build_version: Optional[str] = field(
-        metadata={"description": "The build version of the adb binary"}, default=None
+        metadata={"description": "The build version of the adb binary"},
+        default=ADB_BINARY_BUILD_VERSION,
     )
 
     def __str__(self) -> str:
@@ -97,7 +158,7 @@ class AdbCommandResult:
     )
     time: datetime.datetime = field(
         metadata={"description": "The time the command was executed"},
-        default=datetime.datetime.now(),
+        default_factory=datetime.datetime.now,
     )
     output: str = field(
         metadata={"description": "The output of the command execution"}, default=""
@@ -108,39 +169,6 @@ class AdbCommandResult:
     return_code: int = field(
         metadata={"description": "The return code of the command execution"}, default=1
     )
-
-
-# Substrings that indicate a transient ADB failure worth retrying (case-insensitive).
-_RETRYABLE_ADB_MESSAGE_FRAGMENTS: Final[tuple[str, ...]] = (
-    "protocol fault",
-    "connection reset",
-    "error: closed",
-    "broken pipe",
-    "connection refused",
-    "cannot connect",
-    "no connection could be made",
-    "failed to connect",
-    "device offline",
-    "device not found",
-    "daemon not running",
-    "server version mismatch",
-    "timed out",
-    "timeout",
-)
-
-# Substrings that indicate a permanent failure; never retry even if mixed with noise.
-_PERMANENT_ADB_MESSAGE_FRAGMENTS: Final[tuple[str, ...]] = (
-    "wrong pairing code",
-    "wrong",
-    "invalid",
-    "failed to authenticate",
-    "incorrect",
-    "pairing code",
-    "unauthorized",
-    "permission denied",
-    "insufficient permissions",
-    "failed to run adb binary",
-)
 
 
 @dataclass(frozen=True)
@@ -244,6 +272,94 @@ def _raise_server_for_result(command: AdbCommand, result: AdbCommandResult) -> N
         raise AdbServerException(_adb_failure_message(command, result))
 
 
+def _redacted_log_value(value: str | None) -> str | None:
+    """Return a fixed redaction token for sensitive log-only fields."""
+    if value is None:
+        return None
+    return _REDACTED_LOG_VALUE
+
+
+def _command_is_notification_post(command: AdbCommand) -> bool:
+    args = tuple(command.args)
+    return command.command == "shell" and args[:3] == ("cmd", "notification", "post")
+
+
+def _command_has_location_payload(command: AdbCommand) -> bool:
+    """
+    True for future commands that are expected to carry coordinates or location payloads.
+
+    Current read-only location commands, such as ``settings get secure location_mode``,
+    are intentionally excluded.
+    """
+    name = command.name.casefold()
+    return "send location" in name or "set mock location" in name
+
+
+def _command_output_is_sensitive(command: AdbCommand) -> bool:
+    """True when stdout/stderr may contain pairing codes, device ids, or payloads."""
+    if command.command in ("pair", "devices"):
+        return True
+    if tuple(command.args) == ("getprop", "ro.serialno"):
+        return True
+    if command.name == "Get shell enrichment properties":
+        return True
+    return _command_has_location_payload(command)
+
+
+def _log_safe_argv(command: AdbCommand, argv: list[str]) -> list[str]:
+    """Build a log-only argv copy with credentials, device ids, and payloads redacted."""
+    safe: list[str] = []
+    pair_value_index = -1
+    if command.command == "pair":
+        try:
+            pair_value_index = argv.index("pair") + 2
+        except ValueError:
+            pair_value_index = -1
+    command_index = -1
+    if _command_has_location_payload(command) and command.command:
+        try:
+            command_index = argv.index(command.command)
+        except ValueError:
+            command_index = -1
+
+    redact_next_option_value = False
+    for index, value in enumerate(argv):
+        if redact_next_option_value:
+            safe.append(_REDACTED_LOG_VALUE)
+            redact_next_option_value = False
+            continue
+        if value == "-s":
+            safe.append(value)
+            redact_next_option_value = True
+            continue
+        if _command_is_notification_post(command) and value in ("-t", "-m"):
+            safe.append(value)
+            redact_next_option_value = True
+            continue
+        if pair_value_index == index:
+            safe.append(_REDACTED_LOG_VALUE)
+            continue
+        if command_index >= 0 and index > command_index:
+            safe.append(_REDACTED_LOG_VALUE)
+            continue
+        safe.append(value)
+    return safe
+
+
+def _log_safe_command_line(command: AdbCommand, argv: list[str]) -> str:
+    """Return a shell-like command preview from the redacted argv copy."""
+    return " ".join(shlex.quote(arg) for arg in _log_safe_argv(command, argv))
+
+
+def _log_safe_output_preview(output: str, command: AdbCommand | None = None) -> str:
+    """Keep stdout/stderr logs bounded without changing stored command results."""
+    if command is not None and output and _command_output_is_sensitive(command):
+        return _REDACTED_LOG_VALUE
+    if len(output) <= _LOG_PREVIEW_LIMIT:
+        return output
+    return output[:_LOG_PREVIEW_LIMIT] + "..."
+
+
 def _make_adb_retry_before(
     *,
     scope: _AdbRetryScope,
@@ -258,7 +374,7 @@ def _make_adb_retry_before(
             "ADB retry: attempt starting",
             scope=scope,
             command=command_name,
-            phone_id=phone_id,
+            phone_id=_redacted_log_value(phone_id),
             attempt=retry_state.attempt_number,
             elapsed_s=round(elapsed, 3) if elapsed is not None else 0.0,
         )
@@ -285,7 +401,7 @@ def _make_adb_retry_after(
             "ADB retry: attempt finished",
             scope=scope,
             command=command_name,
-            phone_id=phone_id,
+            phone_id=_redacted_log_value(phone_id),
             attempt=retry_state.attempt_number,
             elapsed_s=round(elapsed, 3) if elapsed is not None else 0.0,
             failed=failed,
@@ -341,6 +457,43 @@ def _parse_pair(output: str) -> Phone | None:
     return None
 
 
+def _parse_mdns_check(output: str) -> bool:
+    """Return True when `adb mdns check` reports a running mDNS daemon."""
+    return "mdns daemon version" in output.casefold()
+
+
+def _parse_binary_version(output: str) -> AdbBinary:
+    """Parse `adb --version` output into bundled binary metadata."""
+    version = ""
+    build_version: str | None = None
+    build_number: int | None = None
+    installed_path: Path | None = None
+    for raw in output.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        if not version:
+            version = line
+            continue
+        if line.startswith("Version "):
+            build_version = line.removeprefix("Version ").strip() or None
+            if build_version is not None:
+                suffix = build_version.rsplit("-", 1)[-1]
+                try:
+                    build_number = int(suffix)
+                except ValueError:
+                    build_number = None
+            continue
+        if line.startswith("Installed as "):
+            installed_path = Path(line.removeprefix("Installed as ").strip())
+    return AdbBinary(
+        path=installed_path or AdbBinary().path,
+        version=version,
+        build_number=build_number,
+        build_version=build_version,
+    )
+
+
 def _parse_devices(output: str) -> list[Phone]:
     """Parse `adb devices -l` stdout into `Phone` rows; skip header and malformed lines."""
     phones: list[Phone] = []
@@ -378,6 +531,36 @@ def _parse_optional_int_line(output: str) -> int | None:
         return int(text)
     except ValueError:
         return None
+
+
+def _parse_shell_enrichment_properties(output: str) -> ShellEnrichmentProperties:
+    """
+    Parse batch enrichment output as one ``key=value`` per line.
+
+    Unknown keys are ignored so device-side command changes remain backward-compatible.
+    """
+    parsed: ShellEnrichmentProperties = {
+        _SHELL_ENRICHMENT_KEY_MANUFACTURER: "",
+        _SHELL_ENRICHMENT_KEY_MODEL: "",
+        _SHELL_ENRICHMENT_KEY_DEVICE_NAME: "",
+        _SHELL_ENRICHMENT_KEY_ANDROID_RELEASE: "",
+        _SHELL_ENRICHMENT_KEY_SDK: None,
+        _SHELL_ENRICHMENT_KEY_RO_SERIALNO: "",
+    }
+    valid_keys = set(parsed)
+    for raw in output.splitlines():
+        line = raw.strip()
+        if not line or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        if key not in valid_keys:
+            continue
+        if key == _SHELL_ENRICHMENT_KEY_SDK:
+            parsed[key] = _parse_optional_int_line(value)
+            continue
+        parsed[key] = value.strip()
+    return parsed
 
 
 def _normalize_kv_key(key: str) -> str:
@@ -456,6 +639,8 @@ class ADBCommandParser(Enum):
 
     # Callables must be wrapped with enum.member() or Enum treats them as methods.
     PAIR = member(_parse_pair)
+    MDNS_CHECK = member(_parse_mdns_check)
+    GET_BINARY_VERSION = member(_parse_binary_version)
     GET_DEVICES = member(_parse_devices)
     GET_ANDROID_VERSION = member(_make_strip_parser())
     GET_MANUFACTURER = member(_make_strip_parser())
@@ -464,6 +649,7 @@ class ADBCommandParser(Enum):
     GET_SDK_VERSION = member(_parse_optional_int_line)
     GET_LOCATION_MODE = member(_parse_optional_int_line)
     GET_SERIAL_NO = member(_make_strip_parser())
+    GET_SHELL_ENRICHMENT_PROPERTIES = member(_parse_shell_enrichment_properties)
     GET_BATTERY_INFOS = member(_parse_battery)
     DUMPSYS_WINDOW = member(_parse_window_summary)
     SEND_NOTIFICATION = member(_parse_notification_post)
@@ -563,6 +749,17 @@ class AdbCommands(Enum):
     PAIR = AdbCommand(
         name="Pair with a device", description="Pair with a device", command="pair"
     )
+    MDNS_CHECK = AdbCommand(
+        name="Check mDNS availability",
+        description="Check whether ADB mDNS discovery is available",
+        command="mdns",
+        args=["check"],
+    )
+    GET_BINARY_VERSION = AdbCommand(
+        name="Get ADB binary version",
+        description="Read bundled ADB binary version metadata",
+        command="--version",
+    )
     GET_DEVICE_NAME = AdbCommand(
         name="Get device name",
         description="Get the name of the device",
@@ -605,6 +802,23 @@ class AdbCommands(Enum):
         command="shell",
         args=["getprop", "ro.build.version.sdk"],
     )
+    GET_SHELL_ENRICHMENT_PROPERTIES = AdbCommand(
+        name="Get shell enrichment properties",
+        description="Batch getprops used to enrich device metadata",
+        command="shell",
+        args=[
+            "sh",
+            "-c",
+            (
+                "printf 'manufacturer=%s\\n' \"$(getprop ro.product.manufacturer)\"; "
+                "printf 'model=%s\\n' \"$(getprop ro.product.model)\"; "
+                "printf 'device_name=%s\\n' \"$(getprop device_name)\"; "
+                "printf 'android_release=%s\\n' \"$(getprop ro.build.version.release)\"; "
+                "printf 'sdk=%s\\n' \"$(getprop ro.build.version.sdk)\"; "
+                "printf 'ro_serialno=%s\\n' \"$(getprop ro.serialno)\""
+            ),
+        ],
+    )  # A all in one command to get all the properties at once, reducing the number of adb trips
     GET_LOCATION_MODE = AdbCommand(
         name="Get location mode",
         description="Secure settings location_mode (0 off, 3 high accuracy, etc.)",
@@ -633,6 +847,8 @@ class AdbCommands(Enum):
 
 
 ADB_COMMAND_PARSERS: dict[AdbCommands, ADBCommandParser] = {
+    AdbCommands.MDNS_CHECK: ADBCommandParser.MDNS_CHECK,
+    AdbCommands.GET_BINARY_VERSION: ADBCommandParser.GET_BINARY_VERSION,
     AdbCommands.GET_DEVICES: ADBCommandParser.GET_DEVICES,
     AdbCommands.GET_ANDROID_VERSION: ADBCommandParser.GET_ANDROID_VERSION,
     AdbCommands.GET_MANUFACTURER: ADBCommandParser.GET_MANUFACTURER,
@@ -641,6 +857,9 @@ ADB_COMMAND_PARSERS: dict[AdbCommands, ADBCommandParser] = {
     AdbCommands.GET_SDK_VERSION: ADBCommandParser.GET_SDK_VERSION,
     AdbCommands.GET_LOCATION_MODE: ADBCommandParser.GET_LOCATION_MODE,
     AdbCommands.GET_SERIAL_NO: ADBCommandParser.GET_SERIAL_NO,
+    AdbCommands.GET_SHELL_ENRICHMENT_PROPERTIES: (
+        ADBCommandParser.GET_SHELL_ENRICHMENT_PROPERTIES
+    ),
     AdbCommands.GET_BATTERY_INFOS: ADBCommandParser.GET_BATTERY_INFOS,
     AdbCommands.DUMPSYS_WINDOW: ADBCommandParser.DUMPSYS_WINDOW,
     AdbCommands.SEND_NOTIFICATION: ADBCommandParser.SEND_NOTIFICATION,
@@ -690,12 +909,22 @@ class AdbClient:
         Add to the history of the adb client
         """
         self._history[datetime.datetime.now()] = (command, result)
+        self._prune_history()
+
+    def _prune_history(self) -> None:
+        """Keep newest client history entries by dropping oldest entries first."""
+        while len(self._history) > _ADB_HISTORY_MAX_ENTRIES:
+            self._history.popitem(last=False)
 
     def remove_from_history(self, command: AdbCommand) -> None:
         """
         Remove from the history of the adb client
         """
-        self._history.pop(datetime.datetime.now())
+        self._history = OrderedDict(
+            (time, entry)
+            for time, entry in self._history.items()
+            if entry[0] != command
+        )
 
     def pair(self, ip: str, port: int, association_code: str) -> Phone:
         """
@@ -704,7 +933,7 @@ class AdbClient:
         command = AdbCommands.PAIR.value
         try:
             result = self._execute(command, None, [f"{ip}:{port}", association_code])
-        except AdbClientException as e:
+        except AdbClientException:
             raise
         _raise_client_for_result(command, result)
         combined = f"{result.output or ''}\n{result.error or ''}".strip()
@@ -724,16 +953,17 @@ class AdbClient:
         command = AdbCommands.GET_DEVICES.value
         try:
             result = self._execute(command, None)
-        except AdbClientException as e:
+        except AdbClientException:
             raise
         _raise_client_for_result(command, result)
         return ADBCommandParser.GET_DEVICES.parse(result.output or "")
 
-    def send_notification(self, title: str, message: str) -> bool:
+    def send_notification(self, phone: Phone, title: str, message: str) -> bool:
         """
         Send a notification to the device
 
         Args:
+            phone: The phone to target.
             title: The title of the notification
             message: The message of the notification
 
@@ -742,10 +972,8 @@ class AdbClient:
         """
         command = AdbCommands.SEND_NOTIFICATION.value
         try:
-            result = self._execute(
-                command, None, ["-t", shlex.quote(title), "-m", shlex.quote(message)]
-            )
-        except AdbClientException as e:
+            result = self._execute(command, phone, ["-t", title, "-m", message])
+        except AdbClientException:
             raise
         _raise_client_for_result(command, result)
         return ADBCommandParser.SEND_NOTIFICATION.parse(result.output or "")
@@ -875,6 +1103,30 @@ class AdbClient:
             return None
         return ADBCommandParser.GET_SDK_VERSION.parse(result.output or "")
 
+    def get_shell_enrichment_properties(
+        self, phone: Phone
+    ) -> ShellEnrichmentProperties:
+        """
+        Fetch shell-backed device enrichment properties in one ADB round trip.
+
+        Returns empty-string/``None`` values when the command fails so refresh paths can
+        preserve the existing best-effort enrichment behavior.
+        """
+        command = AdbCommands.GET_SHELL_ENRICHMENT_PROPERTIES.value
+        try:
+            result = self._execute(command, phone)
+            _raise_client_for_result(command, result)
+        except AdbClientException as exc:
+            logger.warning(
+                "AdbClient: failed to read shell enrichment properties",
+                device_id=phone.descriptor.id,
+                error=str(exc),
+            )
+            return ADBCommandParser.GET_SHELL_ENRICHMENT_PROPERTIES.parse("")
+        return ADBCommandParser.GET_SHELL_ENRICHMENT_PROPERTIES.parse(
+            result.output or ""
+        )
+
     def _execute(
         self,
         command: AdbCommand,
@@ -897,13 +1149,14 @@ class AdbClient:
                 "AdbClient: executing command",
                 adb_path=str(self.binary.path),
                 command=command.command,
-                phone_id=phone_id,
-                argv=argv,
-                command_line=" ".join(shlex.quote(arg) for arg in argv),
+                phone_id=_redacted_log_value(phone_id),
+                argv=_log_safe_argv(command, argv),
+                command_line=_log_safe_command_line(command, argv),
                 timeout_s=profile.timeout_seconds,
             )
             try:
-                completed = subprocess.run(
+                # ADB execution uses list argv, no shell, and bounded timeouts.
+                completed = subprocess.run(  # nosec B603
                     argv,
                     capture_output=True,
                     text=True,
@@ -915,7 +1168,7 @@ class AdbClient:
                     "AdbClient: command timed out",
                     adb_path=str(self.binary.path),
                     command=command.command,
-                    phone_id=phone_id,
+                    phone_id=_redacted_log_value(phone_id),
                     error=error,
                 )
                 return AdbCommandResult(
@@ -939,8 +1192,8 @@ class AdbClient:
                 adb_path=str(self.binary.path),
                 command=command.command,
                 return_code=completed.returncode,
-                stdout=completed.stdout.strip(),
-                stderr=completed.stderr.strip(),
+                stdout=_log_safe_output_preview(completed.stdout.strip(), command),
+                stderr=_log_safe_output_preview(completed.stderr.strip(), command),
             )
             return AdbCommandResult(
                 status=_adb_status_from_process(
@@ -986,7 +1239,9 @@ class AdbServer:
             datetime.datetime, tuple[AdbCommand, AdbCommandResult]
         ] = OrderedDict()
         self._paired_devices: PhoneRepository = PhoneRepository()
-        self.restart()
+        self._mdns_available: bool = False
+        self.start()
+        self.refresh_mdns_availability()
 
     @property
     def history(
@@ -1019,12 +1274,22 @@ class AdbServer:
         Add to the history of the adb server
         """
         self._history[datetime.datetime.now()] = (command, result)
+        self._prune_history()
+
+    def _prune_history(self) -> None:
+        """Keep newest server history entries by dropping oldest entries first."""
+        while len(self._history) > _ADB_HISTORY_MAX_ENTRIES:
+            self._history.popitem(last=False)
 
     def remove_from_history(self, command: AdbCommand) -> None:
         """
         Remove from the history of the adb server
         """
-        self._history.pop(datetime.datetime.now())
+        self._history = OrderedDict(
+            (time, entry)
+            for time, entry in self._history.items()
+            if entry[0] != command
+        )
 
     def get_last_command_time(self) -> datetime.datetime:
         """
@@ -1071,6 +1336,13 @@ class AdbServer:
         """
         self._paired_devices.clear()
 
+    @property
+    def mdns_available(self) -> bool:
+        """
+        Get whether ADB reports mDNS discovery as available.
+        """
+        return self._mdns_available
+
     def start(self) -> None:
         """
         Start the adb server
@@ -1099,8 +1371,91 @@ class AdbServer:
         try:
             self.stop()
             self.start()
-        except AdbServerException as e:
+        except AdbServerException:
             raise
+
+    @classmethod
+    def get_binary_version(cls, binary: AdbBinary) -> AdbBinary:
+        """
+        Read ADB binary metadata without constructing or starting the ADB server.
+        """
+        command = AdbCommands.GET_BINARY_VERSION.value
+        argv = [str(binary.path), command.command, *command.args]
+        profile = _retry_profile_for(command, scope="server")
+        logger.debug(
+            "AdbServer: reading ADB binary version",
+            adb_path=str(binary.path),
+            argv=_log_safe_argv(command, argv),
+            command_line=_log_safe_command_line(command, argv),
+            timeout_s=profile.timeout_seconds,
+        )
+        try:
+            # Version preflight uses list argv, no shell, and a bounded timeout.
+            completed = subprocess.run(  # nosec B603
+                argv,
+                capture_output=True,
+                text=True,
+                timeout=profile.timeout_seconds,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise AdbServerException(
+                f"Failed to read ADB binary version: timed out after {profile.timeout_seconds}s"
+            ) from exc
+        except OSError as exc:
+            raise AdbServerException(f"Failed to run ADB binary {binary.path}") from exc
+        result = AdbCommandResult(
+            status=_adb_status_from_process(
+                return_code=completed.returncode,
+                output=completed.stdout or "",
+                error=completed.stderr or "",
+            ),
+            output=completed.stdout or "",
+            error=completed.stderr or "",
+            return_code=completed.returncode,
+        )
+        if result.status != AdbCommandResultStatus.SUCCESS:
+            raise AdbServerException(
+                f"Failed to read ADB binary version: {result.status.name}"
+            )
+        parsed = ADBCommandParser.GET_BINARY_VERSION.parse(result.output or "")
+        if not parsed.version or not parsed.build_version:
+            raise AdbServerException(
+                "Failed to parse ADB binary version from --version output"
+            )
+        return parsed
+
+    def refresh_mdns_availability(self) -> bool:
+        """
+        Refresh and return whether ADB mDNS discovery is available.
+
+        This preflight is advisory: startup should continue even when the check is
+        unsupported, returns an unknown output shape, or fails on the host.
+        """
+        command = AdbCommands.MDNS_CHECK.value
+        try:
+            result = self._execute(command)
+        except AdbServerException as exc:
+            logger.warning(
+                "AdbServer: failed to check mDNS availability",
+                error=str(exc),
+            )
+            self._mdns_available = False
+            return self._mdns_available
+        if result.status != AdbCommandResultStatus.SUCCESS:
+            logger.warning(
+                "AdbServer: mDNS availability check returned non-success",
+                status=result.status.name,
+                return_code=result.return_code,
+                stdout=_log_safe_output_preview(result.output, command),
+                stderr=_log_safe_output_preview(result.error, command),
+            )
+            self._mdns_available = False
+            return self._mdns_available
+        self._mdns_available = ADBCommandParser.MDNS_CHECK.parse(result.output or "")
+        logger.debug(
+            "AdbServer: mDNS availability refreshed", available=self._mdns_available
+        )
+        return self._mdns_available
 
     def status(self) -> None:
         """
@@ -1135,12 +1490,13 @@ class AdbServer:
                 "AdbServer: executing command",
                 adb_path=str(self.binary.path),
                 command=command.command,
-                argv=argv,
-                command_line=" ".join(shlex.quote(arg) for arg in argv),
+                argv=_log_safe_argv(command, argv),
+                command_line=_log_safe_command_line(command, argv),
                 timeout_s=profile.timeout_seconds,
             )
             try:
-                completed = subprocess.run(
+                # ADB execution uses list argv, no shell, and bounded timeouts.
+                completed = subprocess.run(  # nosec B603
                     argv,
                     capture_output=True,
                     text=True,
@@ -1175,8 +1531,8 @@ class AdbServer:
                 adb_path=str(self.binary.path),
                 command=command.command,
                 return_code=completed.returncode,
-                stdout=completed.stdout.strip(),
-                stderr=completed.stderr.strip(),
+                stdout=_log_safe_output_preview(completed.stdout.strip(), command),
+                stderr=_log_safe_output_preview(completed.stderr.strip(), command),
             )
             return AdbCommandResult(
                 status=_adb_status_from_process(

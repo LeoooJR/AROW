@@ -74,6 +74,44 @@ def _resolve_adb_binary_path() -> Path:
     return adb_path
 
 
+def _ensure_adb_binary_executable(adb_path: Path) -> None:
+    """
+    Verify that the packaged ADB binary is a runnable file.
+
+    Executable permissions are treated as part of package integrity. The app
+    intentionally does not chmod or repair the shipped binary at runtime: a
+    missing execute bit may indicate packaging drift, corruption, or an
+    unexpected file replacement, so startup fails before launching anything.
+    """
+    if not adb_path.is_file():
+        raise FileNotFoundError(f"ADB binary is not a file: {adb_path}")
+    if not os.access(adb_path, os.X_OK):
+        raise PermissionError(f"ADB binary is not executable: {adb_path}")
+
+
+def _validate_frozen_adb_binary_version(
+    *, expected: AdbBinary, actual: AdbBinary
+) -> None:
+    """
+    Ensure the packaged ADB binary still matches frozen project metadata.
+    """
+    if actual == expected:
+        return
+    # The packaged app expects one known ADB binary. A mismatch here may signal
+    # replacement, corruption, packaging drift, or execution of an unexpected binary.
+    logger.error(
+        "startup_work: bundled ADB metadata mismatch",
+        expected_version=expected.version,
+        expected_build_version=expected.build_version,
+        expected_build_number=expected.build_number,
+        actual_version=actual.version,
+        actual_build_version=actual.build_version,
+        actual_build_number=actual.build_number,
+        actual_path=str(actual.path),
+    )
+    raise RuntimeError("Bundled ADB binary version does not match frozen metadata")
+
+
 def _start_adb_server() -> AdbServer:
     """
     Instantiate an ADB server bound to the shipped binary (blocking I/O on process start).
@@ -82,11 +120,19 @@ def _start_adb_server() -> AdbServer:
     ``apply_main_thread`` path assigns ``_adb_server`` on the Qt main thread.
     """
     try:
-        adb_binary: AdbBinary = AdbBinary(path=_resolve_adb_binary_path())
+        adb_path = _resolve_adb_binary_path()
+        _ensure_adb_binary_executable(adb_path)
+        adb_binary: AdbBinary = AdbBinary(path=adb_path)
+        actual_binary: AdbBinary = AdbServer.get_binary_version(adb_binary)
+        _validate_frozen_adb_binary_version(
+            expected=AdbBinary(path=adb_path), actual=actual_binary
+        )
         adb_server: AdbServer = AdbServer(binary=adb_binary)
         logger.info(
             "startup_work: ADB server started",
             adb_path=str(adb_binary.path),
+            adb_version=actual_binary.version,
+            adb_build_version=actual_binary.build_version,
         )
         return adb_server
     except Exception as error:
@@ -146,7 +192,7 @@ class StartupCoreRuntimeWork(CoreRuntimeWork[StartupOutcome]):
         else:
             adb_server = _start_adb_server()
             adb_client = _create_adb_client()
-        devices = adb_server.get_known_devices()
+        devices = list(adb_server.paired_devices)
         enrich_phones_with_adb_shell_properties(adb_client, devices)
         return StartupOutcome(
             adb_server=adb_server,

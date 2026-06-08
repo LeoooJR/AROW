@@ -5,19 +5,27 @@ Success and error cases, with pytest markers.
 
 from __future__ import annotations
 
+import datetime
 import subprocess
+import time
 from collections import OrderedDict
 from pathlib import Path
 
 import pytest
 
+from core import ADB_BINARY_BUILD_NUMBER, ADB_BINARY_BUILD_VERSION, ADB_BINARY_VERSION
 from core.adb import (
+    _ADB_HISTORY_MAX_ENTRIES,
     AdbBinary,
+    AdbClient,
     AdbCommand,
     AdbCommandResult,
     AdbCommandResultStatus,
     AdbCommands,
     AdbServer,
+    _log_safe_argv,
+    _log_safe_command_line,
+    _log_safe_output_preview,
 )
 from core.devices import Phone, PhoneRepository
 from core.exceptions import AdbServerException
@@ -47,6 +55,7 @@ def server(adb_binary: AdbBinary) -> AdbServer:
     server.binary = adb_binary
     server._history = OrderedDict()
     server.paired_devices = PhoneRepository()
+    server._mdns_available = False
     return server
 
 
@@ -62,19 +71,30 @@ def _completed_process(
 class TestAdbServerStartSuccess:
     """ADB start-server success cases."""
 
-    def test_server_init_calls_restart(
+    def test_server_init_calls_start_then_refreshes_mdns(
         self, adb_binary: AdbBinary, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """AdbServer.__init__ delegates startup to restart()."""
-        called: list[AdbBinary] = []
+        """AdbServer.__init__ starts gently before refreshing advisory mDNS state."""
+        calls: list[str] = []
 
-        def fake_restart(self: AdbServer) -> None:
-            called.append(self.binary)
+        def fake_start(self: AdbServer) -> None:
+            calls.append("start")
 
-        monkeypatch.setattr(AdbServer, "restart", fake_restart)
+        def fake_refresh_mdns_availability(self: AdbServer) -> bool:
+            calls.append("refresh_mdns_availability")
+            self._mdns_available = True
+            return self._mdns_available
+
+        monkeypatch.setattr(AdbServer, "start", fake_start)
+        monkeypatch.setattr(
+            AdbServer,
+            "refresh_mdns_availability",
+            fake_refresh_mdns_availability,
+        )
         server = AdbServer(adb_binary)
         assert server.binary == adb_binary
-        assert called == [adb_binary]
+        assert calls == ["start", "refresh_mdns_availability"]
+        assert server.mdns_available is True
 
     def test_server_start_adds_known_devices(
         self, server: AdbServer, monkeypatch: pytest.MonkeyPatch
@@ -98,6 +118,135 @@ class TestAdbServerStartSuccess:
         assert server.paired_devices.get("abc123") is phone
         last_result = server.get_last_command_result()
         assert last_result.status == AdbCommandResultStatus.SUCCESS
+
+    def test_refresh_mdns_availability_sets_property_on_success(
+        self, server: AdbServer, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """refresh_mdns_availability stores and returns a parsed success signal."""
+
+        def fake_execute(_command: AdbCommand) -> AdbCommandResult:
+            return AdbCommandResult(
+                status=AdbCommandResultStatus.SUCCESS,
+                output="mdns daemon version [Openscreen discovery 0.0.0]\n",
+                error="",
+                return_code=0,
+            )
+
+        monkeypatch.setattr(server, "_execute", fake_execute)
+
+        assert server.refresh_mdns_availability() is True
+        assert server.mdns_available is True
+
+    def test_refresh_mdns_availability_noops_startup_on_failure(
+        self, server: AdbServer, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """mDNS preflight failures are advisory and leave availability false."""
+
+        def fake_execute(_command: AdbCommand) -> AdbCommandResult:
+            return AdbCommandResult(
+                status=AdbCommandResultStatus.ERROR,
+                output="",
+                error="mdns unavailable",
+                return_code=1,
+            )
+
+        server._mdns_available = True
+        monkeypatch.setattr(server, "_execute", fake_execute)
+
+        assert server.refresh_mdns_availability() is False
+        assert server.mdns_available is False
+
+    def test_refresh_mdns_availability_handles_execute_exception(
+        self, server: AdbServer, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """mDNS preflight exceptions are advisory and leave availability false."""
+
+        def fake_execute(_command: AdbCommand) -> AdbCommandResult:
+            raise AdbServerException("mdns check failed")
+
+        server._mdns_available = True
+        monkeypatch.setattr(server, "_execute", fake_execute)
+
+        assert server.refresh_mdns_availability() is False
+        assert server.mdns_available is False
+
+
+class TestAdbBinaryDefaults:
+    """Bundled ADB binary metadata defaults."""
+
+    def test_adb_binary_defaults_use_frozen_project_metadata(self) -> None:
+        binary = AdbBinary()
+        assert binary.version == "Android Debug Bridge version 1.0.41"
+        assert binary.build_version == "36.0.0-13206524"
+        assert binary.build_number == 13206524
+        assert binary.build_date is None
+
+    def test_adb_binary_equality_uses_frozen_metadata_identity(self) -> None:
+        first = AdbBinary(path=Path("/mock/adb"))
+        second = AdbBinary(path=Path("/different/adb"))
+        assert first == second
+
+    def test_adb_binary_equality_detects_metadata_mismatch(self) -> None:
+        expected = AdbBinary(path=Path("/mock/adb"))
+        actual = AdbBinary(
+            path=Path("/mock/adb"),
+            version="Android Debug Bridge version 9.9.9",
+        )
+        assert actual != expected
+
+
+class TestAdbServerBinaryVersion:
+    """ADB binary version preflight behavior."""
+
+    def test_get_binary_version_executes_without_constructing_server(
+        self, adb_binary: AdbBinary, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        calls: list[list[str]] = []
+
+        def fake_run(
+            argv: list[str], capture_output: bool, text: bool, timeout: float
+        ) -> subprocess.CompletedProcess[str]:
+            calls.append(argv)
+            return _completed_process(
+                argv,
+                returncode=0,
+                stdout=(
+                    f"{ADB_BINARY_VERSION}\n"
+                    f"Version {ADB_BINARY_BUILD_VERSION}\n"
+                    f"Installed as {adb_binary.path}\n"
+                    "Running on Darwin 25.5.0 (arm64)\n"
+                ),
+            )
+
+        monkeypatch.setattr(subprocess, "run", fake_run)
+
+        parsed = AdbServer.get_binary_version(adb_binary)
+
+        assert calls == [[str(adb_binary.path), "--version"]]
+        assert parsed.version == ADB_BINARY_VERSION
+        assert parsed.build_version == ADB_BINARY_BUILD_VERSION
+        assert parsed.build_number == ADB_BINARY_BUILD_NUMBER
+        assert parsed.path == adb_binary.path
+
+    def test_get_binary_version_raises_on_non_success(
+        self, adb_binary: AdbBinary, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def fake_run(
+            argv: list[str], capture_output: bool, text: bool, timeout: float
+        ) -> subprocess.CompletedProcess[str]:
+            return _completed_process(
+                argv,
+                returncode=1,
+                stdout="",
+                stderr="cannot read version",
+            )
+
+        monkeypatch.setattr(subprocess, "run", fake_run)
+
+        with pytest.raises(
+            AdbServerException, match="Failed to read ADB binary version"
+        ):
+            AdbServer.get_binary_version(adb_binary)
 
 
 # --- Kill server: success ---
@@ -263,3 +412,223 @@ class TestAdbServerExecuteResult:
         monkeypatch.setattr(server, "_execute", fake_execute)
         devices = server.get_known_devices()
         assert [device.descriptor.id for device in devices] == ["abc123"]
+
+    def test_remove_from_history_removes_matching_commands(
+        self, server: AdbServer
+    ) -> None:
+        """remove_from_history removes all entries matching the given command."""
+        start_result = AdbCommandResult(status=AdbCommandResultStatus.SUCCESS)
+        kill_result = AdbCommandResult(status=AdbCommandResultStatus.SUCCESS)
+        server.history = OrderedDict(
+            [
+                (
+                    datetime.datetime(2026, 1, 1, 10, 0, 0),
+                    (AdbCommands.START_SERVER.value, start_result),
+                ),
+                (
+                    datetime.datetime(2026, 1, 1, 10, 0, 1),
+                    (AdbCommands.KILL_SERVER.value, kill_result),
+                ),
+                (
+                    datetime.datetime(2026, 1, 1, 10, 0, 2),
+                    (AdbCommands.START_SERVER.value, start_result),
+                ),
+            ]
+        )
+
+        server.remove_from_history(AdbCommands.START_SERVER.value)
+
+        assert list(server.history.values()) == [
+            (AdbCommands.KILL_SERVER.value, kill_result)
+        ]
+
+    def test_remove_from_history_noops_when_absent(self, server: AdbServer) -> None:
+        """remove_from_history does not raise when no entry matches the command."""
+        result = AdbCommandResult(status=AdbCommandResultStatus.SUCCESS)
+        server.history = OrderedDict(
+            [
+                (
+                    datetime.datetime(2026, 1, 1, 10, 0, 0),
+                    (AdbCommands.KILL_SERVER.value, result),
+                )
+            ]
+        )
+
+        server.remove_from_history(AdbCommands.START_SERVER.value)
+
+        assert list(server.history.values()) == [
+            (AdbCommands.KILL_SERVER.value, result)
+        ]
+
+    def test_server_history_is_capped_to_recent_entries(
+        self, server: AdbServer
+    ) -> None:
+        """Server history keeps newest entries only."""
+        for _ in range(_ADB_HISTORY_MAX_ENTRIES + 3):
+            server.add_to_history(
+                AdbCommands.START_SERVER.value,
+                AdbCommandResult(status=AdbCommandResultStatus.SUCCESS),
+            )
+
+        assert len(server.history) == _ADB_HISTORY_MAX_ENTRIES
+
+
+class TestAdbClientHistory:
+    """ADB client history behavior mirrors server history behavior."""
+
+    def test_client_history_is_capped_to_recent_entries(
+        self, adb_binary: AdbBinary
+    ) -> None:
+        client = AdbClient(adb_binary)
+
+        for _ in range(_ADB_HISTORY_MAX_ENTRIES + 3):
+            client.add_to_history(
+                AdbCommands.GET_DEVICES.value,
+                AdbCommandResult(status=AdbCommandResultStatus.SUCCESS),
+            )
+
+        assert len(client.history) == _ADB_HISTORY_MAX_ENTRIES
+
+    def test_client_remove_from_history_removes_matching_commands(
+        self, adb_binary: AdbBinary
+    ) -> None:
+        client = AdbClient(adb_binary)
+        devices_result = AdbCommandResult(status=AdbCommandResultStatus.SUCCESS)
+        pair_result = AdbCommandResult(status=AdbCommandResultStatus.SUCCESS)
+        client.history = OrderedDict(
+            [
+                (
+                    datetime.datetime(2026, 1, 1, 10, 0, 0),
+                    (AdbCommands.GET_DEVICES.value, devices_result),
+                ),
+                (
+                    datetime.datetime(2026, 1, 1, 10, 0, 1),
+                    (AdbCommands.PAIR.value, pair_result),
+                ),
+                (
+                    datetime.datetime(2026, 1, 1, 10, 0, 2),
+                    (AdbCommands.GET_DEVICES.value, devices_result),
+                ),
+            ]
+        )
+
+        client.remove_from_history(AdbCommands.GET_DEVICES.value)
+
+        assert list(client.history.values()) == [(AdbCommands.PAIR.value, pair_result)]
+
+    def test_client_remove_from_history_noops_when_absent(
+        self, adb_binary: AdbBinary
+    ) -> None:
+        client = AdbClient(adb_binary)
+        result = AdbCommandResult(status=AdbCommandResultStatus.SUCCESS)
+        client.history = OrderedDict(
+            [
+                (
+                    datetime.datetime(2026, 1, 1, 10, 0, 0),
+                    (AdbCommands.PAIR.value, result),
+                )
+            ]
+        )
+
+        client.remove_from_history(AdbCommands.GET_DEVICES.value)
+
+        assert list(client.history.values()) == [(AdbCommands.PAIR.value, result)]
+
+
+class TestAdbCommandResultDefaults:
+    """Default result values."""
+
+    def test_time_uses_default_factory(self) -> None:
+        """Separate default result instances get independent timestamps."""
+        first = AdbCommandResult()
+        time.sleep(0.001)
+        second = AdbCommandResult()
+        assert first.time < second.time
+
+
+class TestAdbClientSendNotification:
+    """ADB notification command construction."""
+
+    def test_send_notification_targets_phone_and_keeps_raw_argv(
+        self, adb_binary: AdbBinary, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Notification title/message are passed as argv values, not shell-quoted."""
+        client = AdbClient(adb_binary)
+        phone = Phone(id="abc123", name="Pixel", state="device")
+        calls: list[tuple[AdbCommand, Phone | None, list[str] | None]] = []
+
+        def fake_execute(
+            command: AdbCommand,
+            phone_arg: Phone | None = None,
+            positional_arguments: list[str] | None = None,
+        ) -> AdbCommandResult:
+            calls.append((command, phone_arg, positional_arguments))
+            return AdbCommandResult(
+                status=AdbCommandResultStatus.SUCCESS,
+                output="posting:\n",
+                error="",
+                return_code=0,
+            )
+
+        monkeypatch.setattr(client, "_execute", fake_execute)
+
+        assert client.send_notification(phone, "Hello there", "it's ready") is True
+        assert calls == [
+            (
+                AdbCommands.SEND_NOTIFICATION.value,
+                phone,
+                ["-t", "Hello there", "-m", "it's ready"],
+            )
+        ]
+
+
+class TestAdbLogRedaction:
+    """Log-only ADB command redaction helpers."""
+
+    def test_pairing_code_is_redacted_from_log_safe_argv(self) -> None:
+        argv = ["/adb", "pair", "10.0.0.2:41000", "123456"]
+        safe = _log_safe_argv(AdbCommands.PAIR.value, argv)
+        assert "123456" not in safe
+        assert safe == ["/adb", "pair", "10.0.0.2:41000", "<redacted>"]
+
+    def test_device_id_is_redacted_from_log_safe_command_line(self) -> None:
+        argv = [
+            "/adb",
+            "-s",
+            "adb-secret-device._adb-tls-connect._tcp",
+            "shell",
+            "getprop",
+            "ro.serialno",
+        ]
+        safe_line = _log_safe_command_line(AdbCommands.GET_SERIAL_NO.value, argv)
+        assert "adb-secret-device" not in safe_line
+        assert "<redacted>" in safe_line
+
+    def test_notification_payload_is_redacted_from_log_safe_argv(self) -> None:
+        argv = [
+            "/adb",
+            "-s",
+            "device-1",
+            "shell",
+            "cmd",
+            "notification",
+            "post",
+            "-n",
+            "ARROW",
+            "-t",
+            "Private title",
+            "-m",
+            "Private message",
+        ]
+        safe = _log_safe_argv(AdbCommands.SEND_NOTIFICATION.value, argv)
+        assert "device-1" not in safe
+        assert "Private title" not in safe
+        assert "Private message" not in safe
+        assert safe[safe.index("-t") + 1] == "<redacted>"
+        assert safe[safe.index("-m") + 1] == "<redacted>"
+
+    def test_sensitive_output_preview_is_redacted(self) -> None:
+        output = "adb-secret-device device product:x model:y device:z transport_id:1"
+        assert _log_safe_output_preview(output, AdbCommands.GET_DEVICES.value) == (
+            "<redacted>"
+        )

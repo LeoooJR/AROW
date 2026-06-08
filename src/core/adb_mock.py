@@ -3,7 +3,6 @@ from __future__ import annotations
 import datetime
 import os
 import random
-import shlex
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Final
@@ -19,6 +18,10 @@ from core.adb import (
     AdbCommandResultStatus,
     AdbCommands,
     AdbServer,
+    _log_safe_argv,
+    _log_safe_command_line,
+    _log_safe_output_preview,
+    _redacted_log_value,
 )
 from core.devices import Phone
 from core.exceptions import AdbClientException, AdbServerException
@@ -232,10 +235,11 @@ def _mock_battery_blob(fake: Faker) -> str:
 
 
 def _mock_window_blob(profile: MockAdbDeviceProfile) -> str:
-    awake = random.choice(("true", "false"))
-    screen_on = random.choice(("true", "false"))
-    width = random.choice((1080, 1200))
-    height = random.choice((2400, 2640))
+    # Mock display state only; no security or cryptographic use.
+    awake = random.choice(("true", "false"))  # nosec B311
+    screen_on = random.choice(("true", "false"))  # nosec B311
+    width = random.choice((1080, 1200))  # nosec B311
+    height = random.choice((2400, 2640))  # nosec B311
     return (
         f"      screenState=SCREEN_STATE_{'OFF' if screen_on != 'true' else 'FULL'}\n"
         "WINDOW MANAGER ANIMATOR STATE (dumpsys window animator)\n"
@@ -244,6 +248,17 @@ def _mock_window_blob(profile: MockAdbDeviceProfile) -> str:
         f"    mAwake={awake} mScreenOnEarly={screen_on} mScreenOnFully={screen_on}\n"
         f"mCurrentFocus=Window{{bdf3658 u0 {profile.model}\\MockHome}}\n"
         "mFocusedApp=ActivityRecord{3e3682b u0 com.example/com.example.Activity t999}\n"
+    )
+
+
+def _mock_shell_enrichment_blob(profile: MockAdbDeviceProfile) -> str:
+    return (
+        f"manufacturer={profile.manufacturer}\n"
+        f"model={profile.model.replace('_', ' ')}\n"
+        f"device_name={profile.device_name}\n"
+        f"android_release={profile.android_release}\n"
+        f"sdk={profile.sdk}\n"
+        f"ro_serialno={profile.ro_serialno}\n"
     )
 
 
@@ -297,6 +312,11 @@ class MockAdbClient(AdbClient):
             return _mock_battery_blob(fake)
         elif tup == ("dumpsys", "window"):
             return _mock_window_blob(profile)
+        elif len(args) >= 3 and args[0] == "sh" and args[1] == "-c":
+            script = args[2]
+            if "manufacturer=" in script and "ro_serialno=" in script:
+                return _mock_shell_enrichment_blob(profile)
+            return ""
         else:
             return ""
 
@@ -319,9 +339,9 @@ class MockAdbClient(AdbClient):
             "MockAdbClient: executing command (no subprocess)",
             adb_path=str(self.binary.path),
             command=command.command,
-            phone_id=phone.descriptor.id if phone else None,
-            argv=argv,
-            command_line=" ".join(shlex.quote(arg) for arg in argv),
+            phone_id=_redacted_log_value(phone.descriptor.id if phone else None),
+            argv=_log_safe_argv(command, argv),
+            command_line=_log_safe_command_line(command, argv),
         )
         out = ""
         if command.command == "pair":
@@ -342,7 +362,7 @@ class MockAdbClient(AdbClient):
         logger.debug(
             "MockAdbClient: command completed (mock)",
             command=command.command,
-            stdout_preview=out[:200],
+            stdout_preview=_log_safe_output_preview(out.strip(), command),
         )
         cmd_result = AdbCommandResult(
             status=AdbCommandResultStatus.SUCCESS,
@@ -383,12 +403,21 @@ class MockAdbServer(AdbServer):
             "MockAdbServer: executing command (no subprocess)",
             adb_path=str(self.binary.path),
             command=command.command,
-            argv=argv,
-            command_line=" ".join(shlex.quote(arg) for arg in argv),
+            argv=_log_safe_argv(command, argv),
+            command_line=_log_safe_command_line(command, argv),
         )
         out = ""
         if command.command == "devices" and command.args == ["-l"]:
             out = self._mock_state.devices_l_blob()
+        elif command.command == "mdns" and command.args == ["check"]:
+            out = "mdns daemon version [Openscreen discovery 0.0.0]\n"
+        elif command.command == "--version":
+            out = (
+                "Android Debug Bridge version 1.0.41\n"
+                "Version 36.0.0-13206524\n"
+                "Installed as /mock/adb\n"
+                "Running on MockOS 0.0.0 (mock)\n"
+            )
         cmd_result = AdbCommandResult(
             status=AdbCommandResultStatus.SUCCESS,
             phone=None,
