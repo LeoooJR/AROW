@@ -1,10 +1,18 @@
 from abc import ABC
 from pprint import pformat
-from typing import Generic, Iterator, TypeVar
+from typing import Generic, Iterator, Protocol, TypeVar
 
 from loguru import logger
 
-RepositoryObject = TypeVar("RepositoryObject")
+
+class Identifiable(Protocol):
+    """Objects stored in a repository must expose a stable string id."""
+
+    @property
+    def id(self) -> str: ...
+
+
+RepositoryObject = TypeVar("RepositoryObject", bound=Identifiable)
 
 
 class Repository(ABC, Generic[RepositoryObject]):

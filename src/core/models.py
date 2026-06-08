@@ -285,7 +285,8 @@ class CoreRuntimeModel(Model):
         Delete a simulation for a device by id.
         """
         for simulation in self._simulations:
-            if simulation.device.id == device_id:
+            device = simulation.device
+            if device is not None and device.id == device_id:
                 self.delete_simulation(simulation)
                 return
         raise ValueError(f"Simulation for device with id {device_id} not found")

@@ -4,11 +4,11 @@ import platform
 import socket
 from abc import ABC
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any, Generic, Optional, TypeVar
 
 from loguru import logger
 
-from collection import Repository
+from core.collection import Repository
 from core.network import is_non_loopback_ipv4
 
 # Prefixes so stored keys remain version-migratable and distinguish Tier 1 vs Tier 2.
@@ -252,10 +252,15 @@ class ComputerDescriptor(DeviceDescriptor):
         )
 
 
-class Device(ABC):
+D = TypeVar("D", bound=DeviceDescriptor)
+
+
+class Device(ABC, Generic[D]):
     """
     Device
     """
+
+    _descriptor: D
 
     def __init__(
         self,
@@ -264,15 +269,17 @@ class Device(ABC):
         os: str,
         ip: str,
         port: Optional[int],
+        *,
+        descriptor: D,
     ) -> None:
-        self._descriptor = DeviceDescriptor(id, name, os, ip, port)
+        self._descriptor = descriptor
 
     @property
-    def descriptor(self) -> DeviceDescriptor:
+    def descriptor(self) -> D:
         return self._descriptor
 
     @descriptor.setter
-    def descriptor(self, value: DeviceDescriptor) -> None:
+    def descriptor(self, value: D) -> None:
         if not isinstance(value, DeviceDescriptor):
             raise TypeError("descriptor must be an instance of DeviceDescriptor")
         self._descriptor = value
@@ -314,7 +321,7 @@ class Device(ABC):
         return isinstance(other, Device) and self._descriptor == other._descriptor
 
 
-class Phone(Device):
+class Phone(Device[PhoneDescriptor]):
     """
     Phone device
     """
@@ -335,13 +342,6 @@ class Phone(Device):
         transport_id: str | None = None,
         android_api_level: int | None = None,
     ) -> None:
-        super().__init__(
-            id=id,
-            name="",
-            os=os or "",
-            ip=ip or "",
-            port=port,
-        )
         prod = product or ""
         mod = model or ""
         man_u = manufacturer or ""
@@ -357,7 +357,7 @@ class Phone(Device):
             manufacturer=man_u if man_u.strip() else None,
             fingerprint_when_no_serial=False,
         )
-        self._descriptor: PhoneDescriptor = PhoneDescriptor(
+        phone_descriptor = PhoneDescriptor(
             id=id,
             name="",
             os=os or "",
@@ -375,21 +375,19 @@ class Phone(Device):
             android_api_level=android_api_level,
             shell_device_name="",
         )
+        super().__init__(
+            id=id,
+            name="",
+            os=os or "",
+            ip=ip or "",
+            port=port,
+            descriptor=phone_descriptor,
+        )
         sync_phone_display_name(self)
 
     @property
     def product(self) -> str:
         return self._descriptor.product
-
-    @property
-    def descriptor(self) -> PhoneDescriptor:
-        return self._descriptor
-
-    @descriptor.setter
-    def descriptor(self, value: PhoneDescriptor) -> None:
-        if not isinstance(value, PhoneDescriptor):
-            raise TypeError("descriptor must be an instance of PhoneDescriptor")
-        self._descriptor = value
 
     @property
     def state(self) -> str:
@@ -550,7 +548,7 @@ def apply_phone_android_api_level_enrichment(phone: Phone, value: int | None) ->
     _recompute_phone_stable_key_descriptor(phone)
 
 
-class Computer(Device):
+class Computer(Device[ComputerDescriptor]):
     """
     Computer device
     """
@@ -572,14 +570,7 @@ class Computer(Device):
             network_available = is_non_loopback_ipv4(ip)
         else:
             resolved_ip, network_available = self._resolve_network_identity()
-        super().__init__(
-            id=id,
-            name=resolved_name,
-            os=resolved_os.lower(),
-            ip=resolved_ip,
-            port=port,
-        )
-        self.descriptor = ComputerDescriptor(
+        computer_descriptor = ComputerDescriptor(
             id=id,
             name=resolved_name,
             os=resolved_os.lower(),
@@ -590,16 +581,14 @@ class Computer(Device):
             stable_key="",
             network_available=network_available,
         )
-
-    @property
-    def descriptor(self) -> ComputerDescriptor:
-        return self._descriptor  # type: ignore[return-value]
-
-    @descriptor.setter
-    def descriptor(self, value: ComputerDescriptor) -> None:
-        if not isinstance(value, ComputerDescriptor):
-            raise TypeError("descriptor must be an instance of ComputerDescriptor")
-        self._descriptor = value
+        super().__init__(
+            id=id,
+            name=resolved_name,
+            os=resolved_os.lower(),
+            ip=resolved_ip,
+            port=port,
+            descriptor=computer_descriptor,
+        )
 
     @property
     def stable_key(self) -> str:
@@ -617,10 +606,10 @@ class Computer(Device):
     def is_network_available(self) -> bool:
         return self._descriptor.network_available
 
-    def get_port(self) -> int:
+    def get_port(self) -> int | None:
         return self._descriptor.port
 
-    def get_state(self) -> str:
+    def get_state(self) -> str | None:
         return self._descriptor.state
 
     def get_last_communication(self) -> datetime.datetime | None:
