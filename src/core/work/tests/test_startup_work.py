@@ -6,8 +6,8 @@ from pathlib import Path
 import pytest
 
 from core import ADB_BINARY_BUILD_NUMBER, ADB_BINARY_BUILD_VERSION, ADB_BINARY_VERSION
-from core.adb import AdbBinary
-from core.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
+from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
+from core.adb.binary import AdbBinary
 from core.devices import Phone
 from core.models import CoreRuntimeModel
 from core.signals import AdbServerStartedPayload, CoreSignal, DevicesUpdatedPayload
@@ -62,7 +62,7 @@ def test_start_adb_server_checks_binary_before_constructing_server(
         def __init__(self, binary: AdbBinary) -> None:
             calls.append("construct")
             self.binary = binary
-            self.paired_devices = []
+            self.paired_devices: list[Phone] = []
 
         @classmethod
         def get_binary_version(cls, binary: AdbBinary) -> AdbBinary:

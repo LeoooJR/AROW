@@ -714,7 +714,9 @@ class MapBlock(QWidget):
         )
         view_signals.AuthentificationFailed.connect(self._on_authentification_failed)
         view_signals.DeviceSelectionFailed.connect(self._on_device_selection_failed)
-        view_signals.ActiveDeviceRemoved.connect(self._on_active_device_removed)
+        view_signals.RemoveActiveDeviceSucceeded.connect(
+            self._on_remove_active_device_succeeded
+        )
 
     def is_canvas_visible(self) -> bool:
         """Return whether the concrete map canvas is currently visible."""
@@ -768,7 +770,7 @@ class MapBlock(QWidget):
         """Pulse placeholder when authentification fails."""
         self._on_run_helper_animation()
 
-    def _on_active_device_removed(self, device_id: str) -> None:
+    def _on_remove_active_device_succeeded(self, device_id: str) -> None:
         """Reset placeholder when the active device is removed."""
         self.show_device_required_placeholder()
         self._on_run_helper_animation()

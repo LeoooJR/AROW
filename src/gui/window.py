@@ -301,7 +301,9 @@ class Body(QWidget):
         view_signals.DeviceSelectionSucceeded.connect(
             self._on_device_selection_succeeded
         )
-        view_signals.ActiveDeviceRemoved.connect(self._on_active_device_removed)
+        view_signals.RemoveActiveDeviceSucceeded.connect(
+            self._on_remove_active_device_succeeded
+        )
 
         view_signals.TargetSelectionRequested.connect(
             self._on_target_selection_requested
@@ -477,7 +479,7 @@ class Body(QWidget):
         self.ui.tabs.setCurrentIndex(1)
         self.ui.tabs.setTabVisible(2, True)
 
-    def _on_active_device_removed(self, device_id: str) -> None:
+    def _on_remove_active_device_succeeded(self, device_id: str) -> None:
         """Handle the active device removed."""
         logger.info("Body: active device removed", device_id=device_id)
         self.ui.progress_bar.setValue(0)
@@ -1059,7 +1061,7 @@ class MainWindow(QMainWindow):
         )
         view_signals.DevicesUpdated.emit(devices)
 
-    def forward_active_device_removed(self, device_id: str) -> None:
+    def forward_remove_active_device_succeeded(self, device_id: str) -> None:
         """Handle the active device removed."""
         logger.info("MainWindow: active device removed")
         view_signals.ActiveDeviceRemoved.emit(device_id)

@@ -5,7 +5,9 @@ composed of *SubController domain objects.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any, cast
 
 from PySide6.QtCore import QEventLoop, QTimer
 from PySide6.QtWidgets import QApplication
@@ -84,8 +86,9 @@ class AppController(Controller):
 
     @validate_view
     def _send_activity_log_file_to_view(self) -> None:
+        view = cast(MainWindow, self.view)
         log_file = self._resolve_activity_log_file()
-        self.view.forward_activity_log_file_updated(str(log_file))
+        view.forward_activity_log_file_updated(str(log_file))
 
     @validate_view
     def _on_activity_log_file_update_requested(self, path: str) -> None:
@@ -95,7 +98,8 @@ class AppController(Controller):
             path=path,
         )
         self._activity_log_file = Path(path)
-        self.view.forward_activity_log_file_updated(path)
+        view = cast(MainWindow, self.view)
+        view.forward_activity_log_file_updated(path)
 
     def _connect_model_signals(self) -> None:
         self._simulation.connect_model_signals()
@@ -124,7 +128,7 @@ class AppController(Controller):
         bootstrap_loop = QEventLoop()
 
         # Pairs of (per-job signals object, slot) for teardown.
-        handle_bindings: list[tuple[object, object]] = []
+        handle_bindings: list[tuple[Any, Callable[..., None]]] = []
         connected_job_ids: set[str] = set()
 
         def _on_bootstrap_job_finished(*_args: object) -> None:
@@ -186,7 +190,7 @@ class AppController(Controller):
 
         self.view = None  # Ensure the view is not accessible anymore, no data will be forwarded to it
 
-        self._wait_for_adb_bootstrap_jobs()  # Waiting for ADB running jobs to finish before shutting down
+        self._wait_for_adb_bootstrap_jobs()  # Waiting for ADB running jobs (pre aboutToQuit signal) to finish before shutting down
 
         shutdown_loop = QEventLoop()
 

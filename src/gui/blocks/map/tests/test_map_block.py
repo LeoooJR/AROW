@@ -145,7 +145,7 @@ def test_map_block_active_device_removed_resets_placeholder_and_animates(
 
     block.show_map_loading_placeholder()
 
-    view_signals.ActiveDeviceRemoved.emit("d1")
+    view_signals.RemoveActiveDeviceSucceeded.emit("d1")
     qtbot.wait(0)
 
     assert block.placeholder.currentWidget() is block.ui.device_required_placeholder

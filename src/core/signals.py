@@ -3,10 +3,9 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import StrEnum
-from pathlib import Path
 from typing import Protocol, TypeVar
 
-from core.adb import AdbBinary
+from core.adb.binary import AdbBinary
 from core.devices import Phone
 from core.location import Location
 from logger import logger
@@ -119,7 +118,7 @@ class LogMessagePayload:
     message: str
 
 
-PayloadT = TypeVar("PayloadT")
+PayloadT = TypeVar("PayloadT", contravariant=True)
 
 
 class SignalHandler(Protocol[PayloadT]):

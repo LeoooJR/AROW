@@ -13,7 +13,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from core.adb import AdbClient, AdbServer
+from core.adb.client import AdbClient
+from core.adb.server import AdbServer
 from core.devices import (
     Phone,
     apply_phone_android_api_level_enrichment,

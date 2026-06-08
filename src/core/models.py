@@ -3,7 +3,8 @@ from functools import cached_property
 from pathlib import Path
 from typing import Any, Callable
 
-from core.adb import AdbClient, AdbServer
+from core.adb.client import AdbClient
+from core.adb.server import AdbServer
 from core.application_paths import (
     get_or_create_application_dir,
     get_or_create_config_dir,

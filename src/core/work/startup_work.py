@@ -13,14 +13,16 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from core.adb import AdbBinary, AdbClient, AdbServer
-from core.adb_mock import (
+from core.adb.adb_mock import (
     DEFAULT_MOCK_ADB_BINARY_PATH,
     MockAdbClient,
     MockAdbServer,
     MockAdbState,
     mock_adb_seed_from_env,
 )
+from core.adb.binary import AdbBinary
+from core.adb.client import AdbClient
+from core.adb.server import AdbServer
 from core.devices import Phone
 from core.signals import (
     AdbServerStartedPayload,
@@ -144,7 +146,7 @@ def _start_adb_server() -> AdbServer:
 
 
 def _create_adb_client() -> AdbClient:
-    """Build an :class:`~core.adb.AdbClient` using the project's ADB binary path."""
+    """Build an :class:`~core.adb.client.AdbClient` using the project's ADB binary path."""
     logger.debug("startup_work: creating ADB client")
     adb_binary: AdbBinary = AdbBinary(path=_resolve_adb_binary_path())
     return AdbClient(binary=adb_binary)

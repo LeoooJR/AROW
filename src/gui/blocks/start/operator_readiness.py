@@ -201,7 +201,9 @@ class OperatorReadinessBlock(VerticalLayoutWrapper, Block):
         view_signals.DeviceSelectionSucceeded.connect(
             self._on_device_selection_succeeded
         )
-        view_signals.ActiveDeviceRemoved.connect(self._on_active_device_removed)
+        view_signals.RemoveActiveDeviceSucceeded.connect(
+            self._on_remove_active_device_succeeded
+        )
 
     def apply_theme_icons(self, theme: Theme) -> None:
         pass
@@ -236,7 +238,7 @@ class OperatorReadinessBlock(VerticalLayoutWrapper, Block):
             status_kind="ready",
         )
 
-    def _on_active_device_removed(self, device_id: str) -> None:
+    def _on_remove_active_device_succeeded(self, device_id: str) -> None:
         """Update the readiness row when the active device is removed."""
         self.ui.rows[self.ROWS_INDEX_MAPPING["device"]].update(
             *self.texts.default_rows[self.ROWS_INDEX_MAPPING["device"]]
