@@ -5,12 +5,5 @@ namespace_packages = true
 explicit_package_bases = true
 exclude = ["^src/__init__\\.py$"]
 
-[[tool.mypy.overrides]]
-module = [
-    "core.work.refresh_known_devices_work",
-    "core.work.startup_work",
-]
-disable_error_code = ["union-attr", "assignment"]
-
 [tool.bandit]
 exclude_dirs = ["tests"]

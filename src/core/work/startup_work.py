@@ -180,6 +180,8 @@ class StartupCoreRuntimeWork(CoreRuntimeWork[StartupOutcome]):
     def run(self) -> StartupOutcome:
         """Execute startup steps that may block (AsyncRunner worker thread)."""
         use_mock = _use_mock_adb_effective(self._use_mock_adb)
+        adb_server: AdbServer
+        adb_client: AdbClient
         if use_mock:
             seed = mock_adb_seed_from_env()
             adb_state = MockAdbState(seed=seed)
