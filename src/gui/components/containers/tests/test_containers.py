@@ -7,7 +7,7 @@ from PySide6.QtWidgets import QLabel, QVBoxLayout
 
 from gui.components.containers import AuthentificationCard, GroupBox, PlaceHolder
 from gui.icons import GenericIcons, icon_qt_path
-from gui.signals import view_signals
+from gui.signals import signals
 
 pytestmark = pytest.mark.usefixtures("qapp")
 
@@ -54,7 +54,7 @@ def test_authentification_card_emits_confirm_for_valid_inputs(qtbot) -> None:
         for line_edit, value in zip(input_widget._otp_inputs, values, strict=True):
             line_edit.setText(value)
 
-    with qtbot.waitSignal(view_signals.AuthentificationConfirmed) as signal:
+    with qtbot.waitSignal(signals.DEVICE.AuthentificationConfirmed) as signal:
         card.ui.confirm_button.click()
 
     assert signal.args == ["192.168.1.1", "55555", "123456"]

@@ -39,7 +39,7 @@ from gui.components import (
 )
 from gui.icons import GenericIcons, icon_qt_path, icon_qt_path_for_theme
 from gui.settings import Settings
-from gui.signals import view_signals
+from gui.signals import signals
 from gui.wrapper import HorizontalLayoutWrapper, VerticalLayoutWrapper
 
 ActivityCategory = Literal["simulation", "device", "location", "adb", "file", "system"]
@@ -687,18 +687,20 @@ class ActivityLogBlock(QFrame, Block):
 
     def _connect_signals(self) -> None:
         """Connect signals for the activity log block."""
-        view_signals.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
-        view_signals.ActivityLogFileUpdated.connect(self._on_activity_log_file_updated)
-        view_signals.ADBServerStarted.connect(self._on_adb_server_started)
-        view_signals.ADBServerStopped.connect(self._on_adb_server_stopped)
-        view_signals.AuthentificationSucceeded.connect(
+        signals.UI.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
+        signals.ACTIVITY_LOG.ActivityLogFileUpdated.connect(
+            self._on_activity_log_file_updated
+        )
+        signals.ADB_SERVER.ADBServerStarted.connect(self._on_adb_server_started)
+        signals.ADB_SERVER.ADBServerStopped.connect(self._on_adb_server_stopped)
+        signals.DEVICE.AuthentificationSucceeded.connect(
             self._on_authentification_succeeded
         )
-        view_signals.AuthentificationFailed.connect(self._on_authentification_failed)
-        view_signals.DeviceSelectionSucceeded.connect(
+        signals.DEVICE.AuthentificationFailed.connect(self._on_authentification_failed)
+        signals.DEVICE.DeviceSelectionSucceeded.connect(
             self._on_device_selection_succeeded
         )
-        view_signals.DeviceSelectionFailed.connect(self._on_device_selection_failed)
+        signals.DEVICE.DeviceSelectionFailed.connect(self._on_device_selection_failed)
 
         self.ui.logs_list.itemSelectionChanged.connect(
             self._sync_activity_selection_state

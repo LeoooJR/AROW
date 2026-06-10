@@ -13,7 +13,7 @@ from gui.components import LeadingIconLabel, ToolButton
 from gui.icons import GenericIcons
 from gui.panel import CollapsiblePanel, CollapsiblePanelConfig
 from gui.settings import Settings
-from gui.signals import view_signals
+from gui.signals import signals
 from gui.wrapper import VerticalLayoutWrapper
 
 
@@ -53,7 +53,7 @@ class LocationPanel(CollapsiblePanel):
                 title_icon=GenericIcons.GEO,
                 expanded_icon=GenericIcons.LAYOUT_BOTTOMBAR_INSET,
                 collapsed_icon=GenericIcons.LAYOUT_BOTTOMBAR,
-                visibility_signal=view_signals.LocationPanelVisibilityRequested,
+                visibility_signal=signals.UI.LocationPanelVisibilityRequested,
                 expand_button_tooltip=self.texts.expand_button_tooltip,
             ),
             parent,

@@ -21,7 +21,7 @@ from gui.colors import Theme, get_current_palette, get_current_theme, qcolor_fro
 from gui.components import Button, DotStatusBadge
 from gui.icons import GenericIcons, icon_qt_path_for_theme
 from gui.settings import Settings
-from gui.signals import view_signals
+from gui.signals import signals
 from gui.wrapper import VerticalLayoutWrapper
 
 
@@ -226,9 +226,9 @@ class DeviceEmptyState(QFrame, Block):
 
     def _connect_signals(self) -> None:
         """Emit the same view-level actions as the device-list toolbar."""
-        self.ui.add_button.clicked.connect(view_signals.AddDeviceRequested.emit)
+        self.ui.add_button.clicked.connect(signals.DEVICE.AddDeviceRequested.emit)
         self.ui.refresh_button.clicked.connect(
-            view_signals.RefreshDeviceListRequested.emit
+            signals.DEVICE.RefreshDeviceListRequested.emit
         )
 
     def apply_theme_icons(self, theme: Theme) -> None:

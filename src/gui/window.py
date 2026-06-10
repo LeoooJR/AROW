@@ -48,7 +48,7 @@ from gui.location_panel import LocationPanel
 from gui.log_panel import LogPanel
 from gui.map import MapPanel
 from gui.settings import Settings
-from gui.signals import view_signals
+from gui.signals import signals
 from gui.stylesheet import stylesheet, stylesheet_dark, stylesheet_light
 from gui.welcome import WelcomePanel
 from gui.wrapper import (
@@ -285,12 +285,12 @@ class Body(QWidget):
         """Connect body signals. Right sidebar: when one panel is reduced, expand the other. Left sidebar: same."""
 
         #### Signals for handling the panel visibility requests ####
-        view_signals.LogPanelVisibilityRequested.connect(self._on_log_panel_toggled)
-        view_signals.HostPanelVisibilityRequested.connect(self._on_host_panel_toggled)
-        view_signals.DeviceSelectionPanelVisibilityRequested.connect(
+        signals.UI.LogPanelVisibilityRequested.connect(self._on_log_panel_toggled)
+        signals.UI.HostPanelVisibilityRequested.connect(self._on_host_panel_toggled)
+        signals.UI.DeviceSelectionPanelVisibilityRequested.connect(
             self._on_device_selection_panel_toggled
         )
-        view_signals.LocationPanelVisibilityRequested.connect(
+        signals.UI.LocationPanelVisibilityRequested.connect(
             self._on_location_panel_toggled
         )
 
@@ -298,16 +298,14 @@ class Body(QWidget):
         self.ui.tabs.currentChanged.connect(self._on_tab_changed)
 
         #### Signals for handling the step transition from authentification to map display ####
-        view_signals.DeviceSelectionSucceeded.connect(
+        signals.DEVICE.DeviceSelectionSucceeded.connect(
             self._on_device_selection_succeeded
         )
-        view_signals.RemoveActiveDeviceSucceeded.connect(
+        signals.DEVICE.RemoveActiveDeviceSucceeded.connect(
             self._on_remove_active_device_succeeded
         )
 
-        view_signals.TargetSelectionRequested.connect(
-            self._on_target_selection_requested
-        )
+        signals.UI.TargetSelectionRequested.connect(self._on_target_selection_requested)
 
     def _set_alignment(self) -> None:
         pass
@@ -326,7 +324,7 @@ class Body(QWidget):
     def _on_tab_changed(self, index: int) -> None:
         if index != self.TAB_MAP:
             return
-        view_signals.MapTabActivated.emit()
+        signals.UI.MapTabActivated.emit()
 
     def _on_log_panel_toggled(self, visible: bool) -> None:
         """Handle the log panel visibility request."""
@@ -391,9 +389,9 @@ class Body(QWidget):
             hide_widget_when_collapsed=True,
         )
         if not visible:
-            view_signals.ExtendDeviceSelectionPanelRequested.emit()
+            signals.UI.ExtendDeviceSelectionPanelRequested.emit()
         else:
-            view_signals.ShortenDeviceSelectionPanelRequested.emit()
+            signals.UI.ShortenDeviceSelectionPanelRequested.emit()
         self._sync_welcome_workspace_mode_later(
             left_visible=self._left_panels_visible,
             right_visible=visible,
@@ -578,14 +576,14 @@ class MainContainer(QWidget):
 
     def _connect_signals(self) -> None:
         """Connect main container to app signals."""
-        view_signals.LeftPanelsVisibilityRequested.connect(
+        signals.UI.LeftPanelsVisibilityRequested.connect(
             self._on_left_panels_visibility_requested
         )
-        view_signals.RightPanelsVisibilityRequested.connect(
+        signals.UI.RightPanelsVisibilityRequested.connect(
             self._on_right_panels_visibility_requested
         )
-        view_signals.AddDeviceRequested.connect(self._on_add_device_requested)
-        view_signals.AuthentificationConfirmed.connect(
+        signals.DEVICE.AddDeviceRequested.connect(self._on_add_device_requested)
+        signals.DEVICE.AuthentificationConfirmed.connect(
             self._on_authentification_confirmed
         )
 
@@ -611,10 +609,10 @@ class MainContainer(QWidget):
         button = dialog.exec()
 
         if button == QMessageBox.StandardButton.Yes:
-            view_signals.AuthentificationRequested.emit()
+            signals.DEVICE.AuthentificationRequested.emit()
 
         else:
-            view_signals.AuthentificationCancelled.emit()
+            signals.DEVICE.AuthentificationCancelled.emit()
 
     def _on_authentification_confirmed(self) -> None:
         """Handle the authentification confirmation."""
@@ -878,27 +876,27 @@ class MainWindow(QMainWindow):
 
         #### Debugging signals ####
         if self._ui_constraints_disabled:
-            view_signals.UiConstraintsDisabled.emit()
+            signals.UI.UiConstraintsDisabled.emit()
 
         #### Signals for handling the palette update ####
-        view_signals.UpdatePaletteSignal.connect(self._on_palette_update)
+        signals.UI.UpdatePaletteSignal.connect(self._on_palette_update)
 
         #### Signals for handling the idle state ####
         self._activity_tracker.became_idle.connect(self._on_idle)
 
         #### Signals for handling the authentification workflow ####
-        view_signals.AuthentificationRequested.connect(
+        signals.DEVICE.AuthentificationRequested.connect(
             self._on_authentification_requested
         )
-        view_signals.AuthentificationConfirmed.connect(
+        signals.DEVICE.AuthentificationConfirmed.connect(
             self._on_authentification_confirmed
         )
-        view_signals.AuthentificationCancelled.connect(
+        signals.DEVICE.AuthentificationCancelled.connect(
             self._on_authentification_cancelled
         )
 
         #### Signals for handling the device selection workflow ####
-        view_signals.DeviceSelectionRequested.connect(
+        signals.DEVICE.DeviceSelectionRequested.connect(
             self._on_device_selection_requested
         )
 
@@ -928,15 +926,15 @@ class MainWindow(QMainWindow):
         """Handle the idle state: run helper and highlight device lists to draw attention."""
         logger.info("MainWindow: idle state detected")
         # self.ui.container.wake_up()
-        view_signals.RunHelperAnimationRequested.emit()
+        signals.UI.RunHelperAnimationRequested.emit()
 
     def forward_adb_server_started(self) -> None:
         """Forward the ADB server started signal."""
-        view_signals.ADBServerStarted.emit()
+        signals.ADB_SERVER.ADBServerStarted.emit()
 
     def forward_adb_server_stopped(self) -> None:
         """Forward the ADB server stopped signal."""
-        view_signals.ADBServerStopped.emit()
+        signals.ADB_SERVER.ADBServerStopped.emit()
 
     def _on_device_selection_requested(self, device_id: str, device_name: str) -> None:
         """Handle the device selection request."""
@@ -970,9 +968,9 @@ class MainWindow(QMainWindow):
                     )
                     self.forward_device_selection_succeeded(device_id, device_name)
                 else:
-                    view_signals.DeviceSelectionConfirmed.emit(device_id, device_name)
+                    signals.DEVICE.DeviceSelectionConfirmed.emit(device_id, device_name)
             else:
-                view_signals.DeviceSelectionCancelled.emit()
+                signals.DEVICE.DeviceSelectionCancelled.emit()
         finally:
             self._device_selection_dialog_open = False
 
@@ -1007,7 +1005,7 @@ class MainWindow(QMainWindow):
         logger.info(
             "MainWindow: device authentification succeeded", device=device["name"]
         )
-        view_signals.AuthentificationSucceeded.emit(device)
+        signals.DEVICE.AuthentificationSucceeded.emit(device)
         self.ui.container.post_toast(
             self.texts.authentification_success_toast.format(device=device["name"]),
             level="success",
@@ -1018,7 +1016,7 @@ class MainWindow(QMainWindow):
     ) -> None:
         """Handle the device selection succeeded without adding a new list entry."""
         logger.info("MainWindow: device selection succeeded", device=device_name)
-        view_signals.DeviceSelectionSucceeded.emit(device_id, device_name)
+        signals.DEVICE.DeviceSelectionSucceeded.emit(device_id, device_name)
         self.ui.container.post_toast(
             self.texts.device_selection_success_toast.format(device=device_name),
             level="success",
@@ -1027,7 +1025,7 @@ class MainWindow(QMainWindow):
     def forward_device_selection_failed(self, device_id: str, device_name: str) -> None:
         """Handle the device selection failed."""
         logger.warning("MainWindow: device selection failed", device=device_name)
-        view_signals.DeviceSelectionFailed.emit(device_id, device_name)
+        signals.DEVICE.DeviceSelectionFailed.emit(device_id, device_name)
         self.ui.container.post_toast(
             self.texts.device_selection_failed_toast.format(device=device_name),
             level="error",
@@ -1044,7 +1042,7 @@ class MainWindow(QMainWindow):
             association_code=association_code,
             reason=reason,
         )
-        view_signals.AuthentificationFailed.emit(ip, port, association_code)
+        signals.DEVICE.AuthentificationFailed.emit(ip, port, association_code)
         self.ui.container.post_toast(
             self.texts.authentification_failed_toast.format(
                 ip=ip, port=port, association_code=association_code, reason=reason
@@ -1059,12 +1057,12 @@ class MainWindow(QMainWindow):
             device_count=len(devices),
             device_descriptors=devices,
         )
-        view_signals.DevicesUpdated.emit(devices)
+        signals.DEVICE.DevicesUpdated.emit(devices)
 
     def forward_remove_active_device_succeeded(self, device_id: str) -> None:
         """Handle the active device removed."""
         logger.info("MainWindow: active device removed")
-        view_signals.RemoveActiveDeviceSucceeded.emit(device_id)
+        signals.DEVICE.RemoveActiveDeviceSucceeded.emit(device_id)
         self.ui.container.post_toast(
             self.texts.active_device_removed_success_toast.format(device=device_id),
             level="success",
@@ -1080,7 +1078,7 @@ class MainWindow(QMainWindow):
             host_os=os,
             ip=ip,
         )
-        view_signals.HostDeviceInformationUpdated.emit(name, os, ip)
+        signals.HOST.HostDeviceInformationUpdated.emit(name, os, ip)
 
     def forward_activity_log_file_updated(self, log_file_path: str) -> None:
         """Forward the app-wide activity log path to the log panel (via app signals)."""
@@ -1088,7 +1086,7 @@ class MainWindow(QMainWindow):
             "MainWindow: activity log file path updated",
             log_file_path=log_file_path,
         )
-        view_signals.ActivityLogFileUpdated.emit(log_file_path)
+        signals.ACTIVITY_LOG.ActivityLogFileUpdated.emit(log_file_path)
 
     def resizeEvent(self, event) -> None:
         """Keep authentication overlay covering the full main container."""

@@ -23,7 +23,7 @@ from gui.colors import Theme
 from gui.components import StatusBadge, ToolButton
 from gui.icons import GenericIcons, icon_qt_path, icon_qt_path_for_theme
 from gui.settings import Settings
-from gui.signals import view_signals
+from gui.signals import signals
 from gui.wrapper import HorizontalLayoutWrapper, VerticalLayoutWrapper
 
 DeviceKind = Literal["mobile"]
@@ -978,4 +978,4 @@ class DeviceItem(QListWidgetItem):
 
     def _on_trash_button_clicked(self) -> None:
         """Handle the trash button click event."""
-        view_signals.RemoveDeviceRequested.emit(self._id)
+        signals.DEVICE.RemoveDeviceRequested.emit(self._id)

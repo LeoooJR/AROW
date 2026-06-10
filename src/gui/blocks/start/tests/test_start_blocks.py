@@ -13,7 +13,7 @@ from gui.blocks.start import (
     WalkthroughBlock,
 )
 from gui.components import File, StatusBadge, WalkthroughButton
-from gui.signals import view_signals
+from gui.signals import signals
 
 pytestmark = pytest.mark.usefixtures("qapp")
 
@@ -119,7 +119,7 @@ def test_operator_readiness_block_builds_expected_rows(qtbot) -> None:
 def test_connection_actions_block_builds_unwired_buttons(qtbot) -> None:
     block = ConnectionActionsBlock()
     qtbot.addWidget(block)
-    add_device_spy = QSignalSpy(view_signals.AddDeviceRequested)
+    add_device_spy = QSignalSpy(signals.DEVICE.AddDeviceRequested)
 
     qtbot.mouseClick(block.wifi_button, Qt.MouseButton.LeftButton)
     qtbot.mouseClick(block.usb_button, Qt.MouseButton.LeftButton)

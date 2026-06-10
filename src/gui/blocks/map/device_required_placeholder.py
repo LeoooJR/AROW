@@ -31,7 +31,7 @@ from gui.colors import Theme, get_current_palette, get_current_theme, qcolor_fro
 from gui.components.media import get_svg_size
 from gui.icons import GenericIcons, icon_qt_path_for_theme
 from gui.settings import Settings
-from gui.signals import view_signals
+from gui.signals import signals
 
 
 class DeviceRequiredMapGlyph(QFrame):
@@ -210,7 +210,7 @@ class DeviceRequiredMapPlaceholder(QFrame, Block):
     def _connect_signals(self) -> None:
         """Connect the CTA to the left-panel visibility request."""
         self.ui.open_device_list_button.clicked.connect(
-            lambda: view_signals.LeftPanelsVisibilityRequested.emit(True)
+            lambda: signals.UI.LeftPanelsVisibilityRequested.emit(True)
         )
 
     def play_helper_animation(

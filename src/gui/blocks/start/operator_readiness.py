@@ -12,7 +12,7 @@ from gui.blocks.base import Block
 from gui.colors import Theme
 from gui.components import StatusBadge
 from gui.settings import Settings
-from gui.signals import view_signals
+from gui.signals import signals
 from gui.wrapper import HorizontalLayoutWrapper, VerticalLayoutWrapper
 
 
@@ -199,15 +199,15 @@ class OperatorReadinessBlock(VerticalLayoutWrapper, Block):
         )
 
     def _connect_signals(self) -> None:
-        view_signals.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
+        signals.UI.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
 
-        view_signals.ADBServerStarted.connect(self._on_adb_server_started)
-        view_signals.ADBServerStopped.connect(self._on_adb_server_stopped)
+        signals.ADB_SERVER.ADBServerStarted.connect(self._on_adb_server_started)
+        signals.ADB_SERVER.ADBServerStopped.connect(self._on_adb_server_stopped)
 
-        view_signals.DeviceSelectionSucceeded.connect(
+        signals.DEVICE.DeviceSelectionSucceeded.connect(
             self._on_device_selection_succeeded
         )
-        view_signals.RemoveActiveDeviceSucceeded.connect(
+        signals.DEVICE.RemoveActiveDeviceSucceeded.connect(
             self._on_remove_active_device_succeeded
         )
 

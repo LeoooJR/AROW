@@ -16,7 +16,7 @@ from gui.colors import Theme
 from gui.components import Button, StatusBadge
 from gui.icons import GenericIcons
 from gui.settings import Settings
-from gui.signals import view_signals
+from gui.signals import signals
 from gui.wrapper import (
     GridLayoutWrapper,
     HorizontalLayoutWrapper,
@@ -308,10 +308,8 @@ class MilestoneTargetBlock(VerticalLayoutWrapper, Block):
         self.get_layout().setStretchFactor(self.ui.footer, 0)
 
     def _connect_signals(self) -> None:
-        self.ui.target_button.clicked.connect(
-            view_signals.TargetSelectionRequested.emit
-        )
-        view_signals.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
+        self.ui.target_button.clicked.connect(signals.UI.TargetSelectionRequested.emit)
+        signals.UI.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
 
     def apply_theme_icons(self, theme: Theme) -> None:
         self.ui.target_button.apply_theme_icons(theme)

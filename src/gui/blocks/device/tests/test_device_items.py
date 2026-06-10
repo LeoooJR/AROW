@@ -19,7 +19,7 @@ from gui.blocks.device import (
 from gui.components import DotStatusBadge, StatusBadge
 from gui.icons import GenericIcons
 from gui.settings import Settings
-from gui.signals import view_signals
+from gui.signals import signals
 
 pytestmark = pytest.mark.usefixtures("qapp")
 
@@ -45,7 +45,7 @@ def test_device_item_badge_stays_stacked_in_compact_and_extended_modes(qtbot) ->
 def test_device_item_text_badges_use_status_badge(
     qtbot, badge_kind: str, text: str, property_value: str
 ) -> None:
-    item = DeviceItem(None, text="Zenfone 11", badge=badge_kind)
+    item = DeviceItem(None, text="Zenfone 11", badge=badge_kind)  # type: ignore[arg-type]
     qtbot.addWidget(item.row_widget)
     qtbot.wait(0)
 
@@ -151,10 +151,10 @@ def test_device_selection_block_empty_state_buttons_emit_actions(qtbot) -> None:
     block.show()
     qtbot.wait(0)
 
-    with qtbot.waitSignal(view_signals.AddDeviceRequested):
+    with qtbot.waitSignal(signals.DEVICE.AddDeviceRequested):
         block.ui.available_device_empty_state.ui.add_button.click()
 
-    with qtbot.waitSignal(view_signals.RefreshDeviceListRequested):
+    with qtbot.waitSignal(signals.DEVICE.RefreshDeviceListRequested):
         block.ui.available_device_empty_state.ui.refresh_button.click()
 
 
@@ -187,7 +187,7 @@ def test_device_selection_block_extend_signal_expands_all_rows(qtbot) -> None:
         assert item.ui.time_label.isHidden() is True
         assert item.trash_button.isHidden() is True
 
-    view_signals.ExtendDeviceSelectionPanelRequested.emit()
+    signals.UI.ExtendDeviceSelectionPanelRequested.emit()
     qtbot.wait(0)
 
     for item in _device_rows(block):
@@ -211,12 +211,12 @@ def test_device_selection_block_shorten_signal_collapses_all_rows(qtbot) -> None
     )
     qtbot.wait(0)
 
-    view_signals.ExtendDeviceSelectionPanelRequested.emit()
+    signals.UI.ExtendDeviceSelectionPanelRequested.emit()
     qtbot.wait(0)
     for item in _device_rows(block):
         assert item.ui.time_label.isHidden() is False
 
-    view_signals.ShortenDeviceSelectionPanelRequested.emit()
+    signals.UI.ShortenDeviceSelectionPanelRequested.emit()
     qtbot.wait(0)
 
     for item in _device_rows(block):
@@ -229,7 +229,7 @@ def test_device_selection_block_extends_new_authenticated_device(qtbot) -> None:
     qtbot.addWidget(block)
     block.show()
 
-    view_signals.ExtendDeviceSelectionPanelRequested.emit()
+    signals.UI.ExtendDeviceSelectionPanelRequested.emit()
     qtbot.wait(0)
     block._on_authentification_succeeded(
         {
@@ -251,7 +251,7 @@ def test_device_selection_block_extends_refreshed_devices(qtbot) -> None:
     qtbot.addWidget(block)
     block.show()
 
-    view_signals.ExtendDeviceSelectionPanelRequested.emit()
+    signals.UI.ExtendDeviceSelectionPanelRequested.emit()
     qtbot.wait(0)
     block._on_devices_updated(
         [
@@ -281,8 +281,8 @@ def test_device_selection_block_keeps_new_rows_shortened_after_shorten(qtbot) ->
     qtbot.addWidget(block)
     block.show()
 
-    view_signals.ExtendDeviceSelectionPanelRequested.emit()
-    view_signals.ShortenDeviceSelectionPanelRequested.emit()
+    signals.UI.ExtendDeviceSelectionPanelRequested.emit()
+    signals.UI.ShortenDeviceSelectionPanelRequested.emit()
     qtbot.wait(0)
     block._on_devices_updated(
         [
@@ -408,7 +408,7 @@ def test_device_selection_block_highlight_attention_pulses_list(qtbot) -> None:
 
     assert block.available_device_list.objectName() == "available-device-list"
 
-    view_signals.MapTabActivated.emit()
+    signals.UI.MapTabActivated.emit()
     qtbot.wait(80)
 
     level = block.available_device_list.property("device-list-highlight-level")
@@ -437,10 +437,10 @@ def test_device_selection_block_map_tab_skips_highlight_when_device_selected(
         last_communication="Active now",
     )
     block.available_device_list.setCurrentItem(item)
-    view_signals.DeviceSelectionSucceeded.emit("device-1", "Phone")
+    signals.DEVICE.DeviceSelectionSucceeded.emit("device-1", "Phone")
     qtbot.wait(0)
 
-    view_signals.MapTabActivated.emit()
+    signals.UI.MapTabActivated.emit()
     qtbot.wait(80)
 
     assert block.available_device_list.property("device-list-highlight-level") in (
@@ -509,7 +509,7 @@ def test_device_selection_block_seeds_placeholders_from_debug_signal(qtbot) -> N
 
     assert block.available_device_list.count() == 0
 
-    view_signals.UiConstraintsDisabled.emit()
+    signals.UI.UiConstraintsDisabled.emit()
     qtbot.wait(0)
 
     assert block.available_device_list.count() == 3
@@ -521,7 +521,7 @@ def test_device_selection_block_ignores_missing_remove_request(qtbot) -> None:
     DeviceItem.add_to_list(block.available_device_list, id="known", text="Pixel 9")
     qtbot.wait(0)
 
-    view_signals.RemoveDeviceRequested.emit("missing")
+    signals.DEVICE.RemoveDeviceRequested.emit("missing")
     qtbot.wait(0)
 
     assert block.available_device_list.count() == 1
@@ -535,7 +535,7 @@ def test_device_selection_block_handles_failed_selection_without_current_item(
     DeviceItem.add_to_list(block.available_device_list, id="known", text="Pixel 9")
     block.available_device_list.setCurrentItem(None)
 
-    view_signals.DeviceSelectionFailed.emit("missing", "Missing")
+    signals.DEVICE.DeviceSelectionFailed.emit("missing", "Missing")
     qtbot.wait(0)
 
     assert block.available_device_list.currentItem() is None

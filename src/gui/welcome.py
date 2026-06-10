@@ -12,7 +12,7 @@ from gui.blocks.start import (
 )
 from gui.colors import Theme
 from gui.settings import Settings
-from gui.signals import view_signals
+from gui.signals import signals
 from gui.wrapper import HorizontalLayoutWrapper, VerticalLayoutWrapper
 
 
@@ -150,10 +150,10 @@ class WelcomePanel(QFrame):
 
     def _connect_signals(self) -> None:
         """Connect signals for the welcome panel and its UI widgets."""
-        view_signals.DeviceSelectionSucceeded.connect(
+        signals.DEVICE.DeviceSelectionSucceeded.connect(
             self._on_device_selection_succeeded
         )
-        view_signals.RemoveActiveDeviceSucceeded.connect(
+        signals.DEVICE.RemoveActiveDeviceSucceeded.connect(
             self._on_remove_active_device_succeeded
         )
 

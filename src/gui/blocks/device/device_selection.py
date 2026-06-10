@@ -26,7 +26,7 @@ from gui.colors import Theme
 from gui.components import GroupBox, HelperText, List, ToolButton
 from gui.icons import GenericIcons
 from gui.settings import Settings
-from gui.signals import view_signals
+from gui.signals import signals
 from gui.wrapper import GridLayoutWrapper, HorizontalLayoutWrapper
 from logger import logger
 
@@ -220,32 +220,34 @@ class DeviceSelectionBlock(QFrame, Block):
         """Wire device list actions, selection events, and model-change refresh hooks."""
 
         #### Signals for handling the device list actions ####
-        self.ui.add_device_button.clicked.connect(view_signals.AddDeviceRequested.emit)
+        self.ui.add_device_button.clicked.connect(
+            signals.DEVICE.AddDeviceRequested.emit
+        )
         self.ui.refresh_button.clicked.connect(self._on_refresh_button_clicked)
         self.ui.available_device_list.itemClicked.connect(self._on_device_selected)
         self.ui.available_device_list.itemSelectionChanged.connect(
             self._sync_available_device_selection_state
         )
-        view_signals.RemoveDeviceRequested.connect(self._on_remove_device_requested)
+        signals.DEVICE.RemoveDeviceRequested.connect(self._on_remove_device_requested)
 
         #### Signals for handling the device selection panel visibility requests ####
-        view_signals.ExtendDeviceSelectionPanelRequested.connect(self.extend)
-        view_signals.ShortenDeviceSelectionPanelRequested.connect(self.shorten)
+        signals.UI.ExtendDeviceSelectionPanelRequested.connect(self.extend)
+        signals.UI.ShortenDeviceSelectionPanelRequested.connect(self.shorten)
 
         #### Signals for handling the authentification / selection workflow ####
-        view_signals.AuthentificationSucceeded.connect(
+        signals.DEVICE.AuthentificationSucceeded.connect(
             self._on_authentification_succeeded
         )
-        view_signals.DeviceSelectionSucceeded.connect(
+        signals.DEVICE.DeviceSelectionSucceeded.connect(
             self._on_device_selection_succeeded
         )
-        view_signals.DeviceSelectionFailed.connect(self._on_device_selection_failed)
-        view_signals.DevicesUpdated.connect(self._on_devices_updated)
+        signals.DEVICE.DeviceSelectionFailed.connect(self._on_device_selection_failed)
+        signals.DEVICE.DevicesUpdated.connect(self._on_devices_updated)
 
         #### Signals for handling the UI constraints disabled ####
-        view_signals.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
+        signals.UI.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
 
-        view_signals.LeftPanelsVisibilityRequested.connect(
+        signals.UI.LeftPanelsVisibilityRequested.connect(
             self._on_left_panels_visibility_requested
         )
 
@@ -258,8 +260,8 @@ class DeviceSelectionBlock(QFrame, Block):
         model.dataChanged.connect(self._on_available_device_list_model_changed)
 
         #### Signals for handling the helper animation requests ####
-        view_signals.RunHelperAnimationRequested.connect(self._on_run_helper_animation)
-        view_signals.MapTabActivated.connect(self._on_map_tab_activated)
+        signals.UI.RunHelperAnimationRequested.connect(self._on_run_helper_animation)
+        signals.UI.MapTabActivated.connect(self._on_map_tab_activated)
 
     def _on_ui_constraints_disabled(self) -> None:
         """Seed placeholder rows when UI constraints are disabled."""
@@ -362,7 +364,7 @@ class DeviceSelectionBlock(QFrame, Block):
         if item is None:
             return
         if isinstance(item, self._device_item_type):
-            view_signals.DeviceSelectionRequested.emit(item.id, item.name)
+            signals.DEVICE.DeviceSelectionRequested.emit(item.id, item.name)
         else:
             logger.warning(
                 "DeviceSelectionBlock: device item is not a DeviceItem", item=item
@@ -415,7 +417,7 @@ class DeviceSelectionBlock(QFrame, Block):
     def _on_refresh_button_clicked(self) -> None:
         """Emit a device-list refresh request from the refresh action button."""
         logger.info("Available device list refresh requested.")
-        view_signals.RefreshDeviceListRequested.emit()
+        signals.DEVICE.RefreshDeviceListRequested.emit()
 
     def _on_remove_device_requested(self, id: str) -> None:
         """Remove the matching device row when a row-level delete action is requested.

@@ -33,7 +33,7 @@ from gui.components import SVG, LeadingIconLabel, ToolButton
 from gui.components.media import get_svg_size
 from gui.icons import GenericIcons, icon_qt_path, icon_qt_path_for_theme
 from gui.settings import Settings
-from gui.signals import view_signals
+from gui.signals import signals
 from gui.wrapper import GridLayoutWrapper, HorizontalLayoutWrapper
 from logger import logger
 
@@ -707,14 +707,14 @@ class MapBlock(QWidget):
 
     def _connect_signals(self) -> None:
         """Connect signals for the map view and its UI widgets."""
-        view_signals.RunHelperAnimationRequested.connect(self._on_run_helper_animation)
-        view_signals.MapTabActivated.connect(self._on_run_helper_animation)
-        view_signals.DeviceSelectionSucceeded.connect(
+        signals.UI.RunHelperAnimationRequested.connect(self._on_run_helper_animation)
+        signals.UI.MapTabActivated.connect(self._on_run_helper_animation)
+        signals.DEVICE.DeviceSelectionSucceeded.connect(
             self._on_device_selection_succeeded
         )
-        view_signals.AuthentificationFailed.connect(self._on_authentification_failed)
-        view_signals.DeviceSelectionFailed.connect(self._on_device_selection_failed)
-        view_signals.RemoveActiveDeviceSucceeded.connect(
+        signals.DEVICE.AuthentificationFailed.connect(self._on_authentification_failed)
+        signals.DEVICE.DeviceSelectionFailed.connect(self._on_device_selection_failed)
+        signals.DEVICE.RemoveActiveDeviceSucceeded.connect(
             self._on_remove_active_device_succeeded
         )
 

@@ -24,7 +24,7 @@ from gui.components import File, LeadingIconLabel, List, ToolButton
 from gui.icons import GenericIcons
 from gui.panel import CollapsiblePanel, CollapsiblePanelConfig
 from gui.settings import Settings
-from gui.signals import view_signals
+from gui.signals import signals
 from gui.wrapper import VerticalLayoutWrapper
 
 
@@ -55,7 +55,7 @@ class LogPanel(CollapsiblePanel):
                 title_icon=GenericIcons.LOGS,
                 expanded_icon=GenericIcons.LAYOUT_BOTTOMBAR_INSET,
                 collapsed_icon=GenericIcons.LAYOUT_BOTTOMBAR,
-                visibility_signal=view_signals.LogPanelVisibilityRequested,
+                visibility_signal=signals.UI.LogPanelVisibilityRequested,
                 expand_button_tooltip=self.texts.expand_button_tooltip,
             ),
             parent,

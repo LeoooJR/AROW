@@ -1,10 +1,16 @@
+"""
+Central hub for GUI-originating signals (cross-component wiring).
+
+Signals are grouped into logical categories for easy access and maintenance,
+mirroring the organization of ``gui.settings``.
+"""
+
 from PySide6.QtCore import QObject, Signal
 
 
-class ViewSignals(QObject):
-    """Central hub for GUI-originating signals (cross-component wiring)."""
+class UISignals(QObject):
+    """UI chrome, panels, palette, and map-tab activation signals."""
 
-    #### UI Signals ####
     UiConstraintsDisabled = Signal()
     UpdatePaletteSignal = Signal(str)
     LeftPanelsVisibilityRequested = Signal(bool)
@@ -19,11 +25,17 @@ class ViewSignals(QObject):
     RunHelperAnimationRequested = Signal()
     MapTabActivated = Signal()
 
-    #### ADB Server Signals ####
+
+class ADBServerSignals(QObject):
+    """ADB server lifecycle signals."""
+
     ADBServerStarted = Signal()
     ADBServerStopped = Signal()
 
-    #### Device Signals ####
+
+class DeviceSignals(QObject):
+    """Device pairing, selection, refresh, and removal signals."""
+
     AddDeviceRequested = Signal()
     AuthentificationRequested = Signal()
     AuthentificationCancelled = Signal()
@@ -42,18 +54,43 @@ class ViewSignals(QObject):
     RemoveDeviceFailed = Signal(str)
     RemoveActiveDeviceSucceeded = Signal(str)
 
-    #### Host Signals ####
+
+class HostSignals(QObject):
+    """Host identity and metadata signals."""
+
     HostDeviceInformationUpdated = Signal(str, str, str)
 
-    #### Activity Log Signals ####
+
+class ActivityLogSignals(QObject):
+    """Activity log file update signals."""
+
     ActivityLogFileUpdateRequested = Signal(str)
     ActivityLogFileUpdated = Signal(str)
 
-    #### Simulation Signals ####
+
+class SimulationSignals(QObject):
+    """Simulation start/stop and position/context signals."""
+
     StartSimulationRequested = Signal()
     StopSimulationRequested = Signal()
     SimulationContextChanged = Signal(str, int)
     SimulationPositionChanged = Signal(float, float)
 
 
-view_signals: ViewSignals = ViewSignals()
+class Signals(QObject):
+    """
+    Centralized signal container for all GUI-originating cross-component wiring.
+    Access signals through category attributes for consistency.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.UI = UISignals(self)
+        self.ADB_SERVER = ADBServerSignals(self)
+        self.DEVICE = DeviceSignals(self)
+        self.HOST = HostSignals(self)
+        self.ACTIVITY_LOG = ActivityLogSignals(self)
+        self.SIMULATION = SimulationSignals(self)
+
+
+signals: Signals = Signals()

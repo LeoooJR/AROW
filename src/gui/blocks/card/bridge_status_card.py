@@ -22,7 +22,7 @@ from gui.components import SVG, ConditionIndicator, GroupBox
 from gui.components.media import get_svg_size
 from gui.icons import OperatingSystemIcons, icon_qt_path, icon_qt_path_for_theme
 from gui.settings import Settings
-from gui.signals import view_signals
+from gui.signals import signals
 from gui.wrapper import GridLayoutWrapper
 
 ADB_SERVER_STATE = Literal["running", "stopped", "starting", "error", "unknown"]
@@ -393,9 +393,9 @@ class BridgeStatusCardBlock(QFrame, Block):
 
     def _connect_signals(self) -> None:
         """Connect card signals; placeholder/debug values are block-owned."""
-        view_signals.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
-        view_signals.ADBServerStarted.connect(self._on_adb_server_started)
-        view_signals.ADBServerStopped.connect(self._on_adb_server_stopped)
+        signals.UI.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
+        signals.ADB_SERVER.ADBServerStarted.connect(self._on_adb_server_started)
+        signals.ADB_SERVER.ADBServerStopped.connect(self._on_adb_server_stopped)
 
     def _on_adb_server_started(self) -> None:
         """Update bridge card when the ADB server starts."""

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from controller.domains.app_sub_controller import AppSubController
 from controller.helper import validate_model, validate_view
-from gui.signals import view_signals
+from gui.signals import signals
 from logger import logger
 
 if TYPE_CHECKING:
@@ -22,10 +22,10 @@ class SimulationSubController(AppSubController):
         super().__init__(app)
 
     def connect_view_signals(self) -> None:
-        view_signals.DeviceSelectionConfirmed.connect(
+        signals.DEVICE.DeviceSelectionConfirmed.connect(
             self._on_device_selection_confirmed
         )  # Ensuring the device is selected when the user confirms the selection
-        view_signals.RemoveDeviceRequested.connect(
+        signals.DEVICE.RemoveDeviceRequested.connect(
             self._on_remove_device_requested
         )  # Ensuring no simulation is running before device is removed by adb subcontroller
 

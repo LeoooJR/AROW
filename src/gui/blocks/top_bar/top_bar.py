@@ -33,7 +33,7 @@ from gui.icons import (
     icon_qt_path_for_theme,
 )
 from gui.settings import Settings
-from gui.signals import view_signals
+from gui.signals import signals
 from gui.wrapper import GridLayoutWrapper, HorizontalLayoutWrapper
 
 
@@ -195,12 +195,12 @@ class TopBar(QWidget, Block):
         left_btn = self.ui.left_panel_visibility_request_button
         right_btn = self.ui.right_panel_visibility_request_button
         left_btn.clicked.connect(
-            lambda: view_signals.LeftPanelsVisibilityRequested.emit(
+            lambda: signals.UI.LeftPanelsVisibilityRequested.emit(
                 not bool(left_btn.property("visibility"))
             )
         )
         right_btn.clicked.connect(
-            lambda: view_signals.RightPanelsVisibilityRequested.emit(
+            lambda: signals.UI.RightPanelsVisibilityRequested.emit(
                 not bool(right_btn.property("visibility"))
             )
         )
@@ -349,9 +349,9 @@ class TopBar(QWidget, Block):
 
         ### Palette button signal emission ###
         if button == self.ui.light_palette_button:
-            view_signals.UpdatePaletteSignal.emit("light")
+            signals.UI.UpdatePaletteSignal.emit("light")
         elif button == self.ui.dark_palette_button:
-            view_signals.UpdatePaletteSignal.emit("dark")
+            signals.UI.UpdatePaletteSignal.emit("dark")
 
         ### Palette thumb animation (move the thumb over the clicked button) ###
         thumb = self.ui.palette_thumb

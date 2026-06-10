@@ -19,7 +19,7 @@ from controller.domains.simulation_sub_controller import SimulationSubController
 from controller.helper import validate_view, watchdog
 from core.application_paths import default_activity_log_file_path
 from core.models import CoreRuntimeModel
-from gui.signals import view_signals
+from gui.signals import signals
 from gui.window import MainWindow
 from logger import logger
 
@@ -68,7 +68,7 @@ class AppController(Controller):
         self._simulation.connect_view_signals()
         self._adb.connect_view_signals()
         self._map.connect_view_signals()
-        view_signals.ActivityLogFileUpdateRequested.connect(
+        signals.ACTIVITY_LOG.ActivityLogFileUpdateRequested.connect(
             self._on_activity_log_file_update_requested
         )
 

@@ -21,7 +21,7 @@ from gui.colors import Theme
 from gui.components import ConditionIndicator, GroupBox, LeadingIconLabel
 from gui.icons import ApplicationIcons, GenericIcons, OperatingSystemIcons
 from gui.settings import Settings
-from gui.signals import view_signals
+from gui.signals import signals
 from gui.wrapper import GridLayoutWrapper
 
 
@@ -344,8 +344,8 @@ class IdentityCardBlock(QFrame, Block):
 
     def _connect_signals(self) -> None:
         """Connect card signals; placeholder/debug values are block-owned."""
-        view_signals.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
-        view_signals.HostDeviceInformationUpdated.connect(
+        signals.UI.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
+        signals.HOST.HostDeviceInformationUpdated.connect(
             self._on_host_device_information_updated
         )
 
