@@ -1,6 +1,6 @@
 # How to create and submit async jobs
 
-This guide describes how background work is queued in AROW, how results return to the Qt **main thread**, and how to plug in **custom callbacks**. It matches the implementation in `controller/async.py`, `controller/controller.py`, and domain wiring under `controller/orchestration/` and `controller/domains/`.
+This guide describes how background work is queued in AROW, how results return to the Qt **main thread**, and how to plug in **custom callbacks**. It matches the implementation in `controller/runner.py`, `controller/controller.py`, and domain wiring under `controller/orchestration/` and `controller/domains/`.
 
 ## Mental model
 
@@ -79,7 +79,7 @@ so every domain module shares **one** `AsyncRunner` from `AppController`.
 You can submit directly on the runner when you do not need the controller helper:
 
 ```python
-from controller.async import JobSpecification, AsyncRunner
+from controller.runner import JobSpecification, AsyncRunner
 
 runner: AsyncRunner = ...
 job = JobSpecification(
@@ -138,8 +138,8 @@ This keeps async submission sites readable (only **`fn`** and callback reference
 
 | Symbol | Module |
 |--------|--------|
-| `AsyncRunner`, `JobSpecification`, `JobHandler`, `JobHandlerSignals` | `controller.async` |
-| `JobError`, `ProgressEvent`, `CancelledError` | `controller.async` |
+| `AsyncRunner`, `JobSpecification`, `JobHandler`, `JobHandlerSignals` | `controller.runner` |
+| `JobError`, `ProgressEvent`, `CancelledError` | `controller.runner` |
 | `_submit_model_async_call` | `Controller` subclasses (`controller.orchestration.AppController`, …) |
 
 Tests with a fake runner live under **`src/core/tests/test_async_runner.py`** for behavioral examples.

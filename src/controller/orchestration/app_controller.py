@@ -118,7 +118,7 @@ class AppController(Controller):
         Block quit until in-flight startup / host_install_identity jobs leave ``history``,
         so ``runner.shutdown()`` cannot strand worker completions that re-apply model state.
 
-        Uses each job's :class:`~controller.async.JobHandlerSignals` (not runner-level
+        Uses each job's :class:`~controller.runner.JobHandlerSignals` (not runner-level
         signals) so lifecycle ordering matches the intended job graph; ``host_install_identity``
         may appear while draining startup, so connections are attached incrementally.
         """

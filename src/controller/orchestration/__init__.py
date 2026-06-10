@@ -1,6 +1,6 @@
 """
 Application-level orchestration: top-level controllers that own the shared
-:class:`~controller.async.AsyncRunner` and compose domain sub-controllers.
+:class:`~controller.runner.AsyncRunner` and compose domain sub-controllers.
 """
 
 from controller.orchestration.app_controller import AppController

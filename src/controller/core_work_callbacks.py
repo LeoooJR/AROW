@@ -7,11 +7,11 @@ Keep AsyncRunner callbacks out of the subcontroller so each job is easy to read.
 
 from __future__ import annotations
 
-import importlib
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from controller.helper import validate_model
+from controller.runner import JobError
 from core.work.authentificate_device_work import AuthentificateDeviceOutcome
 from core.work.close_work import CloseOutcome
 from core.work.host_install_identity_work import HostInstallIdentityOutcome
@@ -21,9 +21,6 @@ from logger import logger
 
 if TYPE_CHECKING:
     from controller.domains.adb_sub_controller import AdbSubController
-
-_async = importlib.import_module("controller.async")
-JobError = _async.JobError
 
 
 def log_startup_job_failure(error: JobError) -> None:

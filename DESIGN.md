@@ -291,7 +291,7 @@ Icons should remain simple, mostly monochrome, and functional.
 - Keep global styling in `src/gui/stylesheet.py`.
 - Keep reusable GUI pieces in `src/gui/elements.py`.
 - Keep Qt resource updates in sync with `src/gui/ressources.qrc` and recompile `src/gui/ressources_rc.py` when assets change.
-- Preserve the MVC boundaries: GUI styling belongs in `src/gui`, device metadata in `src/gui/device.py`, ADB behavior in `src/core/adb.py`, and async work through `src/controller/async.py`.
+- Preserve the MVC boundaries: GUI styling belongs in `src/gui`, device metadata in `src/gui/device.py`, ADB behavior in `src/core/adb.py`, and async work through `src/controller/runner.py`.
 
 ## Design Checklist
 

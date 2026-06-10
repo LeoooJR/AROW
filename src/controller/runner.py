@@ -94,7 +94,7 @@ class JobSpecification:
     description: str = field(
         metadata={"description": "The description of the job"}, default=""
     )
-    fn: Callable[..., Any] = field(
+    fn: Callable[..., Any] | None = field(
         metadata={"description": "The function to execute"}, default=None
     )
     args: tuple[Any, ...] = field(
@@ -153,7 +153,7 @@ class ProcessPool:
 
     def __init__(self, max_workers: Optional[int] = None) -> None:
         try:
-            self._max_workers: int = max_workers
+            self._max_workers: int | None = max_workers
             self._executor: ProcessPoolExecutor = ProcessPoolExecutor(
                 max_workers=max_workers
             )
@@ -163,7 +163,7 @@ class ProcessPool:
                 error=e,
             )
             raise RuntimeError(
-                f"Failed to initialize process pool on this system"
+                "Failed to initialize process pool on this system"
             ) from e
         logger.debug(
             "Process pool: initialized",
@@ -184,14 +184,17 @@ class ProcessPool:
         Submit a job to the process pool. Callbacks run in the executor's thread;
         callers must marshal to the main thread if needed (e.g. for Qt signals).
         """
+        if job.fn is None:
+            raise ValueError("JobSpecification.fn must be set (callable)")
+        fn = job.fn
         logger.debug(
             "Process pool: job queued",
             job_id=job_id,
             name=job.name,
             timeout_s=job.timeout,
-            fn=getattr(job.fn, "__qualname__", repr(job.fn)),
+            fn=getattr(fn, "__qualname__", repr(fn)),
         )
-        fut: Future[Any] = self._executor.submit(job.fn, *job.args, **job.kwargs)
+        fut: Future[Any] = self._executor.submit(fn, *job.args, **job.kwargs)
 
         def _on_done(f: Future[Any]) -> None:
             if cancel_token.is_cancelled():
@@ -269,7 +272,7 @@ class ThreadPool:
 
     def __init__(self, max_workers: Optional[int] = None) -> None:
         try:
-            self._max_workers: int = max_workers
+            self._max_workers: int | None = max_workers
             self._executor: ThreadPoolExecutor = ThreadPoolExecutor(
                 max_workers=max_workers
             )
@@ -278,9 +281,7 @@ class ThreadPool:
                 "Thread pool: failed to initialize",
                 error=e,
             )
-            raise RuntimeError(
-                f"Failed to initialize thread pool on this system"
-            ) from e
+            raise RuntimeError("Failed to initialize thread pool on this system") from e
         logger.debug(
             "Thread pool: initialized",
             max_workers=max_workers,
@@ -299,14 +300,17 @@ class ThreadPool:
         """
         Submit a job to the thread pool.
         """
+        if job.fn is None:
+            raise ValueError("JobSpecification.fn must be set (callable)")
+        fn = job.fn
         logger.debug(
             "Thread pool: job queued",
             job_id=job_id,
             name=job.name,
             timeout_s=job.timeout,
-            fn=getattr(job.fn, "__qualname__", repr(job.fn)),
+            fn=getattr(fn, "__qualname__", repr(fn)),
         )
-        fut: Future[Any] = self._executor.submit(job.fn, *job.args, **job.kwargs)
+        fut: Future[Any] = self._executor.submit(fn, *job.args, **job.kwargs)
 
         def _on_done(f: Future[Any]) -> None:
             if cancel_token.is_cancelled():
@@ -406,18 +410,17 @@ class AsyncRunner(QObject):
                 error=e,
             )
             raise RuntimeError(
-                f"Failed to initialize async runner on this system"
+                "Failed to initialize async runner on this system"
             ) from e
         try:
-            self._process_pool: ProcessPool = ProcessPool()
+            self._process_pool: ProcessPool | ThreadPool = ProcessPool()
         except RuntimeError as e:
             logger.error(
                 "Async runner: process pool unavailable, falling back to thread pool",
                 error=e,
             )
-            self._process_pool = (
-                ThreadPool()
-            )  # Process pool unavailable, falling back to thread pool, post thread pool (in try/catch block) is successfully initialized, so this initialization should succeed
+            # Process pool unavailable; thread pool was initialized above.
+            self._process_pool = ThreadPool()
         logger.debug(
             "Async runner: initialized",
             process_pool=self._process_pool,
