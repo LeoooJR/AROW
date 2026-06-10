@@ -111,8 +111,30 @@ Apply these rules whenever you touch `src/gui`.
 
 ### Settings and dimensions
 
-- Use values from `src/gui/settings.py` for margins, spacing, dimensions, and fonts.
-- If a needed value is missing, add or adjust it in `src/gui/settings.py` instead of hardcoding it elsewhere.
+GUI settings are split between **app-wide tokens** and **owner-local modules**, mirroring the signals layout.
+
+#### App-wide settings (`src/gui/settings.py`)
+
+- Import the shared container: `from gui.settings import Settings`.
+- Use `Settings` for cross-cutting layout tokens only:
+  - `Settings.FONT`, `Settings.SPACING`, `Settings.DIMENSION`
+  - `Settings.BORDER_RADIUS`, `Settings.ANIMATION`, `Settings.PANEL`
+- If a value is shared across multiple components, blocks, panels, or stylesheets, add or adjust it here instead of hardcoding elsewhere.
+
+#### Owner-local settings (`*_settings.py`)
+
+- Component-, block-, and panel-specific dimensions live next to their owner as frozen dataclass modules with a module-level singleton (e.g. `button_settings`, `device_settings`, `welcome_settings`).
+- Import the owner singleton directly, for example:
+  - `from gui.components.buttons.button_settings import button_settings`
+  - `from gui.blocks.device.device_settings import device_settings`
+  - `from gui.welcome_settings import welcome_settings`
+- Current owner-local modules:
+  - Components: `button_settings`, `input_settings`, `list_settings`, `container_settings`, `feedback_settings`, `indicator_settings`, `svg_settings`
+  - Blocks: `activity_log_settings`, `card_settings`, `device_settings`, `location_settings`, `map_settings`, `start_settings`, `top_bar_settings`
+  - GUI-level panels/tabs: `welcome_settings`, `host_panel_settings`
+- When adding a new reusable component or block, create `<owner>_settings.py` beside the owner module if it needs dedicated sizing or timing constants.
+- Do not add owner-specific constants back into `src/gui/settings.py`; keep `settings.py` for shared shell tokens only.
+- `src/gui/stylesheet.py` may import both `Settings` and owner-local settings modules as needed.
 
 ### Colors
 
@@ -173,8 +195,19 @@ Apply these rules whenever you touch `src/gui`.
 
 ### Signals
 
-- Use view-originating signals from `src/gui/signals.py` (`ViewSignals` / `view_signals`) for cross-component communication.
-- Do not define new global GUI signals elsewhere unless there is a compelling architectural reason.
+- Use view-originating signals from `src/gui/signals.py` for cross-component communication.
+- Import the shared singleton: `from gui.signals import signals`.
+- Access signals through categorized attributes on `signals`, mirroring `Settings`:
+  - `signals.UI` — palette, panel visibility, sidebar display/hide, map-tab activation
+  - `signals.ADB_SERVER` — ADB server lifecycle
+  - `signals.DEVICE` — pairing, selection, refresh, removal
+  - `signals.HOST` — host identity and metadata
+  - `signals.ACTIVITY_LOG` — activity log file updates
+  - `signals.SIMULATION` — simulation start/stop and position/context changes
+- Example: `signals.UI.DisplayLeftPanelsRequested.connect(...)`, `signals.DEVICE.DeviceSelectionSucceeded.emit(...)`.
+- Sidebar visibility uses explicit `Display*` / `Hide*` signals; do not reintroduce boolean left/right toggle signals.
+- Add new GUI-originating signals to the appropriate category class in `src/gui/signals.py`; do not define new global GUI signals elsewhere unless there is a compelling architectural reason.
+- Do not use the legacy `view_signals` / flat `ViewSignals` API in new or updated code.
 
 ### Stylesheets
 
