@@ -14,7 +14,7 @@ Heavy or blocking operations should run **outside** the GUI thread. The app rout
 
 ## End-to-end pathway
 
-1. **Something triggers the controller** — for example a global `view_signals` handler, a menu action, or a model event wired in `_connect_model_signals`.
+1. **Something triggers the controller** — for example a categorized `signals` handler (e.g. `signals.DEVICE.RefreshDeviceListRequested` from `gui.signals`), a menu action, or a model event wired in `_connect_model_signals`.
 2. **The controller submits a job** — usually via `Controller._submit_model_async_call(...)`, which wraps `AsyncRunner.submit(JobSpecification(...))` and binds per-job signals.
 3. **The runner picks a pool** — thread vs process from `job_type` or `"auto"` (see below).
 4. **The worker runs `JobSpecification.fn`** — with `args` / `kwargs`. This runs in a **worker thread or process**, not on the Qt main thread.
