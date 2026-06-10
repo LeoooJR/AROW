@@ -12,6 +12,7 @@ from PySide6.QtWidgets import QLabel, QSizePolicy, QWidget
 
 from gui import faker as ui_faker
 from gui.blocks.base import Block
+from gui.blocks.location.location_settings import location_settings
 from gui.colors import Theme
 from gui.components import Button, StatusBadge
 from gui.icons import GenericIcons
@@ -59,7 +60,7 @@ class MilestoneMetadataItem(HorizontalLayoutWrapper):
         super().__init__(
             parent,
             widgets=[key_label, value_label],
-            spacing=Settings.LOCATION.METADATA_KEY_VALUE_SPACING,
+            spacing=location_settings.METADATA_KEY_VALUE_SPACING,
             margins=Settings.SPACING.MARGIN_NONE,
         )
         self.setObjectName("milestone-metadata-item")
@@ -225,10 +226,10 @@ class MilestoneTargetBlock(VerticalLayoutWrapper, Block):
         metadata_grid.get_layout().addWidget(latitude_item, 1, 1)
         metadata_grid.get_layout().addWidget(source_item, 2, 1)
         metadata_grid.get_layout().setHorizontalSpacing(
-            Settings.LOCATION.METADATA_GRID_HORIZONTAL_SPACING
+            location_settings.METADATA_GRID_HORIZONTAL_SPACING
         )
         metadata_grid.get_layout().setVerticalSpacing(
-            Settings.LOCATION.METADATA_GRID_VERTICAL_SPACING
+            location_settings.METADATA_GRID_VERTICAL_SPACING
         )
         metadata_grid.get_layout().setColumnStretch(0, 1)
         metadata_grid.get_layout().setColumnStretch(1, 1)
@@ -257,12 +258,12 @@ class MilestoneTargetBlock(VerticalLayoutWrapper, Block):
         super().__init__(
             parent,
             widgets=[header, metadata_grid, footer],
-            spacing=Settings.LOCATION.TARGET_BLOCK_SPACING,
+            spacing=location_settings.TARGET_BLOCK_SPACING,
             margins=(
-                Settings.LOCATION.TARGET_PADDING_LEFT,
-                Settings.LOCATION.TARGET_PADDING_TOP,
-                Settings.LOCATION.TARGET_PADDING_RIGHT,
-                Settings.LOCATION.TARGET_PADDING_BOTTOM,
+                location_settings.TARGET_PADDING_LEFT,
+                location_settings.TARGET_PADDING_TOP,
+                location_settings.TARGET_PADDING_RIGHT,
+                location_settings.TARGET_PADDING_BOTTOM,
             ),
         )
         self.setObjectName("milestone-target-block")

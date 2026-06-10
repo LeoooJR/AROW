@@ -11,15 +11,16 @@ from PySide6.QtWidgets import QLabel, QWidget
 
 from gui.colors import Theme
 from gui.components.base.component import Component
+from gui.components.media.svg_settings import svg_settings
 from gui.settings import Settings
 
 
 def get_svg_size(font_size: int) -> QSize:
     """Return a square SVG size scaled from the given font size."""
     if font_size < 20:
-        multiplier = Settings.SVG.MULTIPLIER_SMALL
+        multiplier = svg_settings.MULTIPLIER_SMALL
     else:
-        multiplier = Settings.SVG.MULTIPLIER_LARGE
+        multiplier = svg_settings.MULTIPLIER_LARGE
     size = int(multiplier * font_size)
     return QSize(size, size)
 

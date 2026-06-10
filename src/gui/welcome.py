@@ -13,6 +13,7 @@ from gui.blocks.start import (
 from gui.colors import Theme
 from gui.settings import Settings
 from gui.signals import signals
+from gui.welcome_settings import welcome_settings
 from gui.wrapper import HorizontalLayoutWrapper, VerticalLayoutWrapper
 
 
@@ -131,7 +132,7 @@ class WelcomePanel(QFrame):
     def _apply_expanded_workspace_width(self) -> None:
         """Use available tab width while preventing ultra-wide card stretching."""
         target_width = min(
-            Settings.WELCOME.EXPANDED_CONTENT_MAX_WIDTH,
+            welcome_settings.EXPANDED_CONTENT_MAX_WIDTH,
             max(0, self.contentsRect().width() - (Settings.PANEL.CONTENT_PADDING * 2)),
         )
         self.ui.content_wrapper.setMinimumWidth(target_width)

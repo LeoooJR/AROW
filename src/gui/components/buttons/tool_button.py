@@ -10,6 +10,7 @@ from PySide6.QtWidgets import QToolButton, QWidget
 
 from gui.colors import Theme
 from gui.components.base.component import Component
+from gui.components.buttons.button_settings import button_settings
 from gui.icons import (
     ApplicationIcons,
     GenericIcons,
@@ -60,7 +61,7 @@ class ToolButton(QToolButton, Component):
 
         self.texts = ToolButton.Text(tooltip=tooltip)
 
-        self._icon_size_px = icon_size or Settings.DIMENSION.TOOLBUTTON_ICON_SIZE
+        self._icon_size_px = icon_size or button_settings.TOOLBUTTON_ICON_SIZE
         self._icon = icon
         if self._icon is not None:
             self.setIcon(QIcon(icon_qt_path(self._icon)))
@@ -74,7 +75,7 @@ class ToolButton(QToolButton, Component):
         self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
-        self.setFixedHeight(Settings.DIMENSION.TOOLBUTTON_HEIGHT)
+        self.setFixedHeight(button_settings.TOOLBUTTON_HEIGHT)
         self.setFixedWidth(self.sizeHint().width())
 
     def _set_alignment(self) -> None:

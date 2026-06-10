@@ -14,6 +14,7 @@ from gui.components import (
     LeadingIconLabel,
     ToolButton,
 )
+from gui.host_panel_settings import host_panel_settings
 from gui.icons import GenericIcons
 from gui.panel import CollapsiblePanel, CollapsiblePanelConfig
 from gui.settings import Settings
@@ -82,7 +83,7 @@ class HostPanel(CollapsiblePanel):
         return VerticalLayoutWrapper(
             self,
             widgets=[self._identity_card, self._bridge_card],
-            spacing=Settings.HOST_PANEL.SECTION_SPACING,
+            spacing=host_panel_settings.SECTION_SPACING,
             margins=Settings.SPACING.MARGIN_NONE,
         )
 

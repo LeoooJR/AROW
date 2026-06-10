@@ -28,8 +28,10 @@ from PySide6.QtWidgets import (
 
 from gui.blocks.map.device_required_placeholder import DeviceRequiredMapPlaceholder
 from gui.blocks.map.map_loading_placeholder import MapLoadingPlaceholder
+from gui.blocks.map.map_settings import map_settings
 from gui.colors import Theme
 from gui.components import SVG, LeadingIconLabel, ToolButton
+from gui.components.buttons.button_settings import button_settings
 from gui.components.media import get_svg_size
 from gui.icons import GenericIcons, icon_qt_path, icon_qt_path_for_theme
 from gui.settings import Settings
@@ -64,9 +66,7 @@ class Canvas(QWebEngineView):
         self.ui = Canvas.UI()
 
         self.setObjectName("map-canvas")
-        self.setMinimumSize(
-            Settings.DIMENSION.CANVAS_SIZE, Settings.DIMENSION.CANVAS_SIZE
-        )
+        self.setMinimumSize(map_settings.CANVAS_SIZE, map_settings.CANVAS_SIZE)
 
         self._finalize_ui_hooks()
 
@@ -124,12 +124,12 @@ class Legend(QFrame):
 
         layout = QVBoxLayout()
         layout.setContentsMargins(
-            Settings.MAP.LEGEND_PADDING_LEFT,
-            Settings.MAP.LEGEND_PADDING_TOP,
-            Settings.MAP.LEGEND_PADDING_RIGHT,
-            Settings.MAP.LEGEND_PADDING_BOTTOM,
+            map_settings.LEGEND_PADDING_LEFT,
+            map_settings.LEGEND_PADDING_TOP,
+            map_settings.LEGEND_PADDING_RIGHT,
+            map_settings.LEGEND_PADDING_BOTTOM,
         )
-        layout.setSpacing(Settings.MAP.LEGEND_SPACING)  # Spacing between legend items
+        layout.setSpacing(map_settings.LEGEND_SPACING)  # Spacing between legend items
 
         location_label_icon = LeadingIconLabel(
             None,
@@ -240,21 +240,21 @@ class Location(QWidget):
         layout = QHBoxLayout()
         layout.setContentsMargins(*Settings.SPACING.MARGIN_NONE)
         layout.setSpacing(
-            Settings.LOCATION.COORDINATE_SPACING
+            map_settings.COORDINATE_SPACING
         )  # Spacing between SVG and coordinate widgets
 
         latitude_widget = QWidget(self)
         latitude_widget.setObjectName("location-latitude-widget")
-        latitude_widget.setMinimumWidth(Settings.LOCATION.WIDGET_MIN_WIDTH)
-        latitude_widget.setMaximumHeight(Settings.LOCATION.WIDGET_MAX_HEIGHT)
+        latitude_widget.setMinimumWidth(map_settings.COORDINATE_WIDGET_MIN_WIDTH)
+        latitude_widget.setMaximumHeight(map_settings.COORDINATE_WIDGET_MAX_HEIGHT)
         latitude_widget.setLayout(QVBoxLayout())
         latitude_widget.layout().setContentsMargins(
-            Settings.LOCATION.WIDGET_PADDING_LEFT,
-            Settings.LOCATION.WIDGET_PADDING_TOP,
-            Settings.LOCATION.WIDGET_PADDING_RIGHT,
-            Settings.LOCATION.WIDGET_PADDING_BOTTOM,
+            map_settings.COORDINATE_WIDGET_PADDING_LEFT,
+            map_settings.COORDINATE_WIDGET_PADDING_TOP,
+            map_settings.COORDINATE_WIDGET_PADDING_RIGHT,
+            map_settings.COORDINATE_WIDGET_PADDING_BOTTOM,
         )
-        latitude_widget.layout().setSpacing(Settings.LOCATION.WIDGET_SPACING)
+        latitude_widget.layout().setSpacing(map_settings.COORDINATE_WIDGET_SPACING)
 
         latitude_label = QLabel(self.texts.latitude_label)
         latitude_label.setFont(
@@ -273,16 +273,16 @@ class Location(QWidget):
 
         longitude_widget = QWidget(self)
         longitude_widget.setObjectName("location-longitude-widget")
-        longitude_widget.setMinimumWidth(Settings.LOCATION.WIDGET_MIN_WIDTH)
-        longitude_widget.setMaximumHeight(Settings.LOCATION.WIDGET_MAX_HEIGHT)
+        longitude_widget.setMinimumWidth(map_settings.COORDINATE_WIDGET_MIN_WIDTH)
+        longitude_widget.setMaximumHeight(map_settings.COORDINATE_WIDGET_MAX_HEIGHT)
         longitude_widget.setLayout(QVBoxLayout())
         longitude_widget.layout().setContentsMargins(
-            Settings.LOCATION.WIDGET_PADDING_LEFT,
-            Settings.LOCATION.WIDGET_PADDING_TOP,
-            Settings.LOCATION.WIDGET_PADDING_RIGHT,
-            Settings.LOCATION.WIDGET_PADDING_BOTTOM,
+            map_settings.COORDINATE_WIDGET_PADDING_LEFT,
+            map_settings.COORDINATE_WIDGET_PADDING_TOP,
+            map_settings.COORDINATE_WIDGET_PADDING_RIGHT,
+            map_settings.COORDINATE_WIDGET_PADDING_BOTTOM,
         )
-        longitude_widget.layout().setSpacing(Settings.LOCATION.WIDGET_SPACING)
+        longitude_widget.layout().setSpacing(map_settings.COORDINATE_WIDGET_SPACING)
 
         longitude_label = QLabel(self.texts.longitude_label)
         longitude_label.setFont(
@@ -423,13 +423,13 @@ class Coordinates(QFrame):
 
         layout = QVBoxLayout()
         layout.setContentsMargins(
-            Settings.MAP.LEGEND_PADDING_LEFT,
-            Settings.MAP.LEGEND_PADDING_TOP,
-            Settings.MAP.LEGEND_PADDING_RIGHT,
-            Settings.MAP.LEGEND_PADDING_BOTTOM,
+            map_settings.LEGEND_PADDING_LEFT,
+            map_settings.LEGEND_PADDING_TOP,
+            map_settings.LEGEND_PADDING_RIGHT,
+            map_settings.LEGEND_PADDING_BOTTOM,
         )
         layout.setSpacing(
-            Settings.MAP.COORDINATES_SPACING
+            map_settings.COORDINATES_SPACING
         )  # Spacing between location widgets
 
         simulation_state_off = LeadingIconLabel(
@@ -463,7 +463,7 @@ class Coordinates(QFrame):
             parent=self,
             icon=GenericIcons.PLAY,
             tooltip=self.texts.play_button_tooltip,
-            icon_size=Settings.DIMENSION.TOOLBUTTON_PROMINENT_ICON_SIZE,
+            icon_size=button_settings.TOOLBUTTON_PROMINENT_ICON_SIZE,
         )
         play_button.setEnabled(True)
         play_button.setProperty("toggle", False)
@@ -552,7 +552,7 @@ class Coordinates(QFrame):
         Args:
             state: True when simulation is active (show on-state, pause affordance).
         """
-        duration = Settings.ANIMATION.SIMULATION_STATE_TRANSITION_DURATION
+        duration = map_settings.SIMULATION_STATE_TRANSITION_DURATION
         easing = QEasingCurve.Type.OutCubic
 
         effect_off = self.ui.simulation_state_off.graphicsEffect()
@@ -643,7 +643,7 @@ class MapBlock(QWidget):
             *Settings.SPACING.MARGIN_NONE
         )  # Padding handled by parent
         layout.setSpacing(
-            Settings.MAP.MAP_SPACING
+            map_settings.MAP_SPACING
         )  # Consistent spacing between canvas and coordinates
 
         legend = Legend(self)
@@ -657,8 +657,8 @@ class MapBlock(QWidget):
         placeholder = QStackedWidget(self)
         placeholder.setObjectName("map-placeholder")
         placeholder.setMinimumSize(
-            Settings.DIMENSION.MIN_WIDTH_LARGE,
-            Settings.DIMENSION.MIN_HEIGHT_SMALL,
+            map_settings.MIN_WIDTH_LARGE,
+            map_settings.MIN_HEIGHT_SMALL,
         )
 
         device_required_placeholder = DeviceRequiredMapPlaceholder(placeholder)

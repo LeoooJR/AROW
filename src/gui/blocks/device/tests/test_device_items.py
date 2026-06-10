@@ -16,6 +16,7 @@ from gui.blocks.device import (
     DeviceSelectionBlock,
     format_last_communication_short,
 )
+from gui.blocks.device.device_settings import device_settings
 from gui.components import DotStatusBadge, StatusBadge
 from gui.icons import GenericIcons
 from gui.settings import Settings
@@ -415,7 +416,7 @@ def test_device_selection_block_highlight_attention_pulses_list(qtbot) -> None:
     assert level is not None
     assert level != "0"
 
-    qtbot.wait(Settings.ANIMATION.ATTENTION_HIGHLIGHT_DURATION + 100)
+    qtbot.wait(device_settings.ATTENTION_HIGHLIGHT_DURATION + 100)
 
     assert block.available_device_list.property("device-list-highlight-level") == "0"
 

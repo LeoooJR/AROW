@@ -9,6 +9,7 @@ from PySide6.QtWidgets import QPushButton, QSizePolicy, QWidget
 
 from gui.colors import Theme
 from gui.components.base.component import Component
+from gui.components.buttons.button_settings import button_settings
 from gui.components.media import get_svg_size
 from gui.icons import (
     ApplicationIcons,
@@ -70,7 +71,7 @@ class Button(QPushButton, Component):
         self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
-        self.setFixedHeight(Settings.DIMENSION.BUTTON_HEIGHT)
+        self.setFixedHeight(button_settings.BUTTON_HEIGHT)
         # Set minimum width based on content, but allow horizontal expansion
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.setMinimumWidth(self.sizeHint().width())

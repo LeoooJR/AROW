@@ -13,6 +13,7 @@ from PySide6.QtWidgets import QFrame, QHBoxLayout, QSizePolicy, QVBoxLayout, QWi
 from gui.animation import animate_widget_visibility
 from gui.colors import Theme
 from gui.components import LeadingIconLabel, ToolButton
+from gui.components.buttons.button_settings import button_settings
 from gui.icons import (
     ApplicationIcons,
     GenericIcons,
@@ -214,7 +215,7 @@ class CollapsiblePanel(QFrame, ABC, metaclass=QtABCMeta):
         """Height of the panel when collapsed to its header."""
         height = self._panel_header.sizeHint().height()
         if height <= 0:
-            height = Settings.DIMENSION.TOOLBUTTON_HEIGHT
+            height = button_settings.TOOLBUTTON_HEIGHT
         return 2 * Settings.PANEL.CONTENT_PADDING + height
 
     def _after_panel_visibility_changed(self) -> None:

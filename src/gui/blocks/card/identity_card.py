@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 
 from gui import faker as ui_faker
 from gui.blocks.base import Block
+from gui.blocks.card.card_settings import card_settings
 from gui.colors import Theme
 from gui.components import ConditionIndicator, GroupBox, LeadingIconLabel
 from gui.icons import ApplicationIcons, GenericIcons, OperatingSystemIcons
@@ -48,7 +49,7 @@ class HostIdentityMetadataRow(QWidget):
 
         layout = QHBoxLayout()
         layout.setContentsMargins(*Settings.SPACING.MARGIN_NONE)
-        layout.setSpacing(Settings.HOST_PANEL.KEY_VALUE_SPACING)
+        layout.setSpacing(card_settings.KEY_VALUE_SPACING)
 
         key = QLabel(self.texts.key, self)
         key.setProperty("host-metadata-key", True)
@@ -143,7 +144,7 @@ class IdentityCardContent(QFrame, Block):
 
         layout = QVBoxLayout()
         layout.setContentsMargins(*Settings.SPACING.MARGIN_NONE)
-        layout.setSpacing(Settings.HOST_PANEL.ROW_SPACING)
+        layout.setSpacing(card_settings.ROW_SPACING)
 
         host_name = QLabel(self.texts.host_name, self)
         host_name.setProperty("host-title", True)
@@ -306,7 +307,7 @@ class IdentityCardBlock(QFrame, Block):
         wrapper = GridLayoutWrapper(
             self,
             spacing=Settings.SPACING.NONE,
-            margins=Settings.HOST_PANEL.WRAPPER_MARGIN,
+            margins=card_settings.WRAPPER_MARGIN,
         )
         wrapper.add_widget(group_box, 0, 0)
         wrapper.add_widget(

@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 )
 from shiboken6 import isValid
 
+from gui.blocks.device.device_settings import device_settings
 from gui.colors import Theme
 from gui.components import StatusBadge, ToolButton
 from gui.icons import GenericIcons, icon_qt_path, icon_qt_path_for_theme
@@ -332,7 +333,7 @@ class DeviceItem(QListWidgetItem):
         title_row = HorizontalLayoutWrapper(
             row,
             widgets=[name_label, badge_container],
-            spacing=Settings.LIST.DEVICE_ITEM_ROW_NAME_BADGE_GAP,
+            spacing=device_settings.ITEM_ROW_NAME_BADGE_GAP,
             margins=Settings.SPACING.MARGIN_NONE,
             stretch_at_end=True,
         )
@@ -344,12 +345,12 @@ class DeviceItem(QListWidgetItem):
         center = VerticalLayoutWrapper(
             row,
             widgets=[title_row, subtitle_host],
-            spacing=Settings.LIST.DEVICE_ITEM_ROW_TITLE_SUBTITLE_SPACING,
+            spacing=device_settings.ITEM_ROW_TITLE_SUBTITLE_SPACING,
             margins=(
                 0,
-                Settings.LIST.DEVICE_ITEM_CENTER_PADDING_V,
+                device_settings.ITEM_CENTER_PADDING_V,
                 0,
-                Settings.LIST.DEVICE_ITEM_CENTER_PADDING_V,
+                device_settings.ITEM_CENTER_PADDING_V,
             ),
         )
         center.setObjectName("device-item-center")
@@ -360,7 +361,7 @@ class DeviceItem(QListWidgetItem):
         right_wrap = HorizontalLayoutWrapper(
             row,
             widgets=[time_label, trash_button],
-            spacing=Settings.LIST.DEVICE_ITEM_ROW_RIGHT_GAP,
+            spacing=device_settings.ITEM_ROW_RIGHT_GAP,
             margins=Settings.SPACING.MARGIN_NONE,
         )
         right_wrap.setObjectName("device-item-right-wrap")
@@ -371,12 +372,12 @@ class DeviceItem(QListWidgetItem):
         main_row = HorizontalLayoutWrapper(
             row,
             widgets=[icon_frame, center, right_wrap],
-            spacing=Settings.LIST.DEVICE_ITEM_ROW_ICON_GAP,
+            spacing=device_settings.ITEM_ROW_ICON_GAP,
             margins=(
-                Settings.LIST.DEVICE_ITEM_ROW_PADDING_H,
-                Settings.LIST.DEVICE_ITEM_ROW_PADDING_V,
-                Settings.LIST.DEVICE_ITEM_ROW_PADDING_H,
-                Settings.LIST.DEVICE_ITEM_ROW_PADDING_V,
+                device_settings.ITEM_ROW_PADDING_H,
+                device_settings.ITEM_ROW_PADDING_V,
+                device_settings.ITEM_ROW_PADDING_H,
+                device_settings.ITEM_ROW_PADDING_V,
             ),
         )
         main_row.get_layout().setStretchFactor(center, 1)
@@ -748,7 +749,7 @@ class DeviceItem(QListWidgetItem):
         if at > current:
             return
         elapsed_secs = int((current - at).total_seconds())
-        if elapsed_secs < Settings.LIST.NEW_DEVICE_BADGE_DURATION_SECONDS:
+        if elapsed_secs < device_settings.NEW_DEVICE_BADGE_DURATION_SECONDS:
             return
         self._badge = "trusted"
         self._apply_badge()
@@ -846,9 +847,9 @@ class DeviceItem(QListWidgetItem):
     def _preferred_row_width(self, natural_width: int) -> int:
         """Return the preferred width for compact or expanded row presentation."""
         return (
-            Settings.LIST.DEVICE_ITEM_ROW_EXTENDED_PREFERRED_WIDTH
+            device_settings.ITEM_ROW_EXTENDED_PREFERRED_WIDTH
             if self._is_extended
-            else Settings.LIST.DEVICE_ITEM_ROW_COMPACT_PREFERRED_WIDTH
+            else device_settings.ITEM_ROW_COMPACT_PREFERRED_WIDTH
         )
 
     def _prepare_text_measurement(self) -> None:
@@ -881,7 +882,7 @@ class DeviceItem(QListWidgetItem):
             if self._is_extended and self._can_request_expanded_list_width():
                 preferred_width = max(
                     preferred_width,
-                    Settings.LIST.DEVICE_ITEM_ROW_EXTENDED_PREFERRED_WIDTH,
+                    device_settings.ITEM_ROW_EXTENDED_PREFERRED_WIDTH,
                 )
             if (
                 viewport_width is not None
@@ -907,7 +908,7 @@ class DeviceItem(QListWidgetItem):
                 if lay is not None:
                     lay.activate()
                 row.updateGeometry()
-                h = max(Settings.LIST.DEVICE_ITEM_ROW_MIN_HEIGHT, sh.height())
+                h = max(device_settings.ITEM_ROW_MIN_HEIGHT, sh.height())
                 w = target_width if target_width > 0 else sh.width()
                 self.setSizeHint(QSize(w, h))
             else:
@@ -928,7 +929,7 @@ class DeviceItem(QListWidgetItem):
                 if lay is not None:
                     lay.activate()
                 row.updateGeometry()
-                h = max(Settings.LIST.DEVICE_ITEM_ROW_MIN_HEIGHT, sh.height())
+                h = max(device_settings.ITEM_ROW_MIN_HEIGHT, sh.height())
                 self.setSizeHint(QSize(measure_width, h))
         finally:
             self._sync_size_hint_in_progress = False

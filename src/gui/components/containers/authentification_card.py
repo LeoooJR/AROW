@@ -15,6 +15,7 @@ from gui.colors import Theme
 from gui.components.base.component import Component
 from gui.components.buttons.button import Button
 from gui.components.buttons.tool_button import ToolButton
+from gui.components.containers.container_settings import container_settings
 from gui.components.inputs.otp import OTPInput, OTPType
 from gui.components.labels.demi_bold_text import DemiBoldText
 from gui.components.labels.helper_text import HelperText
@@ -232,8 +233,8 @@ class AuthentificationCard(QFrame, Component):
 
     def _set_size_policy(self) -> None:
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
-        self.setMinimumWidth(Settings.DIMENSION.AUTENTHIFICATION_CARD_MIN_WIDTH)
-        self.setMaximumWidth(Settings.DIMENSION.AUTENTHIFICATION_CARD_MAX_WIDTH)
+        self.setMinimumWidth(container_settings.AUTHENTIFICATION_CARD.MIN_WIDTH)
+        self.setMaximumWidth(container_settings.AUTHENTIFICATION_CARD.MAX_WIDTH)
         self.ui.close_button.setSizePolicy(
             QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed
         )
@@ -391,7 +392,7 @@ class AuthentificationCard(QFrame, Component):
                 )
 
     def _on_invalid_highlight_pulse_tick(self) -> None:
-        cycle_ms = Settings.ANIMATION.ATTENTION_HIGHLIGHT_PULSE_CYCLE_MS
+        cycle_ms = container_settings.ATTENTION_HIGHLIGHT.PULSE_CYCLE_MS
         elapsed = self._invalid_highlight_elapsed.elapsed()
         level = compute_sine_pulse_level(elapsed, cycle_ms)
         self._set_invalid_otp_highlight_level(level)
@@ -408,10 +409,10 @@ class AuthentificationCard(QFrame, Component):
             return
         self._invalid_highlight_elapsed.start()
         self._invalid_highlight_pulse_timer.start(
-            Settings.ANIMATION.ATTENTION_HIGHLIGHT_UPDATE_MS
+            container_settings.ATTENTION_HIGHLIGHT.UPDATE_MS
         )
         self._invalid_highlight_stop_timer.start(
-            Settings.ANIMATION.ATTENTION_HIGHLIGHT_DURATION
+            container_settings.ATTENTION_HIGHLIGHT.DURATION
         )
 
     def stop_invalid_otp_highlight(self) -> None:

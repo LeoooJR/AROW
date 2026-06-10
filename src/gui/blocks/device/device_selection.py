@@ -22,6 +22,7 @@ from gui.animation import apply_highlight_level, compute_sine_pulse_level
 from gui.blocks.base import Block
 from gui.blocks.device.device_empty_state import DeviceEmptyState
 from gui.blocks.device.device_item import DeviceItem
+from gui.blocks.device.device_settings import device_settings
 from gui.colors import Theme
 from gui.components import GroupBox, HelperText, List, ToolButton
 from gui.icons import GenericIcons
@@ -170,7 +171,7 @@ class DeviceSelectionBlock(QFrame, Block):
         self._refresh_timer = QTimer(self)
         self._refresh_timer.setSingleShot(False)
         self._refresh_timer.timeout.connect(self._on_refresh_timer_tick)
-        self._refresh_timer.setInterval(Settings.LIST.REFRESH_MS)
+        self._refresh_timer.setInterval(device_settings.REFRESH_MS)
         self._refresh_timer.start()
 
         self.ui.available_device_list.selectionModel().clear()  # Clear the selection model to avoid any residual selection when the list is empty.
@@ -282,7 +283,7 @@ class DeviceSelectionBlock(QFrame, Block):
         inset = Settings.SPACING.XS
         available_geometry = viewport.rect().adjusted(inset, inset, -inset, -inset)
         card_width = min(
-            Settings.LIST.DEVICE_EMPTY_STATE_WIDTH,
+            device_settings.EMPTY_STATE_WIDTH,
             available_geometry.width(),
         )
         card_x = available_geometry.x() + (
@@ -455,7 +456,7 @@ class DeviceSelectionBlock(QFrame, Block):
 
     def _on_highlight_pulse_tick(self) -> None:
         """Advance the transient attention pulse on the available-device list."""
-        cycle_ms = Settings.ANIMATION.ATTENTION_HIGHLIGHT_PULSE_CYCLE_MS
+        cycle_ms = device_settings.ATTENTION_HIGHLIGHT_PULSE_CYCLE_MS
         elapsed = self._highlight_elapsed.elapsed()
         level = compute_sine_pulse_level(elapsed, cycle_ms)
         apply_highlight_level(
@@ -499,12 +500,8 @@ class DeviceSelectionBlock(QFrame, Block):
         """Start the attention pulse and set the list highlight level."""
         self._stop_highlight_attention()
         self._highlight_elapsed.start()
-        self._highlight_pulse_timer.start(
-            Settings.ANIMATION.ATTENTION_HIGHLIGHT_UPDATE_MS
-        )
-        self._highlight_stop_timer.start(
-            Settings.ANIMATION.ATTENTION_HIGHLIGHT_DURATION
-        )
+        self._highlight_pulse_timer.start(device_settings.ATTENTION_HIGHLIGHT_UPDATE_MS)
+        self._highlight_stop_timer.start(device_settings.ATTENTION_HIGHLIGHT_DURATION)
 
     def _stop_highlight_attention(self) -> None:
         """Stop the attention pulse and reset the list highlight level."""

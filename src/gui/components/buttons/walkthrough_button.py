@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 
 from gui.colors import Theme
 from gui.components.base.component import Component
+from gui.components.buttons.button_settings import button_settings
 from gui.components.media import get_svg_size
 from gui.components.media.svg import SVG
 from gui.icons import (
@@ -92,8 +93,8 @@ class WalkthroughButton(QPushButton, Component):
         self.setDefault(False)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
-        pad_h = Settings.DIMENSION.WELCOME_WALKTHROUGH_CARD_PADDING_H
-        pad_v = Settings.DIMENSION.WELCOME_WALKTHROUGH_CARD_PADDING_V
+        pad_h = button_settings.WELCOME_WALKTHROUGH_CARD_PADDING_H
+        pad_v = button_settings.WELCOME_WALKTHROUGH_CARD_PADDING_V
         row = QHBoxLayout(self)
         row.setContentsMargins(pad_h, pad_v, pad_h, pad_v)
         row.setSpacing(Settings.SPACING.SM)
@@ -137,7 +138,7 @@ class WalkthroughButton(QPushButton, Component):
         self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
-        self.setMinimumHeight(Settings.DIMENSION.WELCOME_WALKTHROUGH_CARD_MIN_HEIGHT)
+        self.setMinimumHeight(button_settings.WELCOME_WALKTHROUGH_CARD_MIN_HEIGHT)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         self.setMinimumWidth(self.sizeHint().width())
 

@@ -16,6 +16,7 @@ from PySide6.QtWidgets import QFrame, QGraphicsOpacityEffect, QWidget
 
 from gui.colors import Theme, get_current_palette
 from gui.components.base.component import Component
+from gui.components.indicators.indicator_settings import indicator_settings
 from gui.settings import Settings
 
 IndicatorState = str  # "default" | "valid" | "warning" | "error"
@@ -56,7 +57,7 @@ class ConditionIndicator(QFrame, Component):
         self.ui = ConditionIndicator.UI()
         self.setObjectName(object_name)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        size = Settings.DIMENSION.CONDITION_INDICATOR_SIZE
+        size = indicator_settings.CONDITION_INDICATOR_SIZE
         self.setFixedSize(size, size)
         self._state: IndicatorState = "default"
         self.set_state(self._state)
@@ -115,7 +116,7 @@ class ConditionIndicator(QFrame, Component):
             self._opacity_effect.setOpacity(1.0)
 
     def _start_pulse(self) -> None:
-        half = Settings.ANIMATION.INDICATOR_PULSE_DURATION // 2
+        half = indicator_settings.PULSE_DURATION // 2
         easing = QEasingCurve.Type.InOutSine
         out = QPropertyAnimation(self._opacity_effect, b"opacity")
         out.setDuration(half)

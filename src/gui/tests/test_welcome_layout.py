@@ -7,6 +7,7 @@ from PySide6.QtCore import Qt
 
 from gui.settings import Settings
 from gui.welcome import WelcomePanel
+from gui.welcome_settings import welcome_settings
 
 pytestmark = pytest.mark.usefixtures("qapp")
 
@@ -19,10 +20,10 @@ def test_welcome_panel_expanded_workspace_mode_caps_and_centers_content(qtbot) -
     panel.set_expanded_workspace_mode(True)
 
     assert panel.ui.content_wrapper.maximumWidth() == (
-        Settings.WELCOME.EXPANDED_CONTENT_MAX_WIDTH
+        welcome_settings.EXPANDED_CONTENT_MAX_WIDTH
     )
     assert panel.ui.content_wrapper.minimumWidth() == (
-        Settings.WELCOME.EXPANDED_CONTENT_MAX_WIDTH
+        welcome_settings.EXPANDED_CONTENT_MAX_WIDTH
     )
     assert panel.layout().itemAt(0).alignment() & Qt.AlignmentFlag.AlignHCenter
 

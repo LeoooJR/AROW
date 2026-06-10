@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 
 from gui import faker as ui_faker
 from gui.blocks.base import Block
+from gui.blocks.card.card_settings import card_settings
 from gui.colors import Theme
 from gui.components import SVG, ConditionIndicator, GroupBox
 from gui.components.media import get_svg_size
@@ -51,7 +52,7 @@ class AdbBridgeMetadataRow(QWidget):
 
         layout = QHBoxLayout()
         layout.setContentsMargins(*Settings.SPACING.MARGIN_NONE)
-        layout.setSpacing(Settings.HOST_PANEL.KEY_VALUE_SPACING)
+        layout.setSpacing(card_settings.KEY_VALUE_SPACING)
 
         key = QLabel(self.texts.key, self)
         key.setProperty("host-metadata-key", True)
@@ -158,7 +159,7 @@ class BridgeStatusContent(QFrame, Block):
 
         layout = QVBoxLayout()
         layout.setContentsMargins(*Settings.SPACING.MARGIN_NONE)
-        layout.setSpacing(Settings.HOST_PANEL.ROW_SPACING)
+        layout.setSpacing(card_settings.ROW_SPACING)
 
         android_svg = SVG(
             svg_path=icon_qt_path(OperatingSystemIcons.ANDROID), parent=self
@@ -358,7 +359,7 @@ class BridgeStatusCardBlock(QFrame, Block):
         wrapper = GridLayoutWrapper(
             self,
             spacing=Settings.SPACING.NONE,
-            margins=Settings.HOST_PANEL.WRAPPER_MARGIN,
+            margins=card_settings.WRAPPER_MARGIN,
         )
         wrapper.add_widget(group_box, 0, 0)
         wrapper.add_widget(

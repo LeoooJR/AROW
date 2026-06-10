@@ -9,6 +9,7 @@ from PySide6.QtWidgets import QComboBox, QWidget
 
 from gui.colors import Theme
 from gui.components.base.component import Component
+from gui.components.inputs.input_settings import input_settings
 from gui.settings import Settings
 
 
@@ -42,8 +43,8 @@ class SelectionField(QComboBox, Component):
         self.setEditable(False)
         self.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
         self.setInsertPolicy(QComboBox.InsertPolicy.InsertAlphabetically)
-        self.setMinimumWidth(Settings.COMBOBOX.MIN_WIDTH)
-        self.setMinimumHeight(Settings.COMBOBOX.MIN_HEIGHT)
+        self.setMinimumWidth(input_settings.COMBOBOX.MIN_WIDTH)
+        self.setMinimumHeight(input_settings.COMBOBOX.MIN_HEIGHT)
         self.setFont(
             QFont(Settings.FONT.FAMILY, Settings.FONT.SIZE_DEFAULT, QFont.Weight.Normal)
         )

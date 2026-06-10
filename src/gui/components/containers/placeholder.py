@@ -9,6 +9,7 @@ from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout, QWidget
 
 from gui.colors import Theme
 from gui.components.base.component import Component
+from gui.components.containers.container_settings import container_settings
 from gui.components.media.svg import SVG
 from gui.icons import (
     ApplicationIcons,
@@ -69,18 +70,22 @@ class PlaceHolder(QFrame, Component):
 
         layout = QVBoxLayout()
         layout.setContentsMargins(
-            Settings.PLACEHOLDER.PADDING,
-            Settings.PLACEHOLDER.PADDING,
-            Settings.PLACEHOLDER.PADDING,
-            Settings.PLACEHOLDER.PADDING,
+            container_settings.PLACEHOLDER.PADDING,
+            container_settings.PLACEHOLDER.PADDING,
+            container_settings.PLACEHOLDER.PADDING,
+            container_settings.PLACEHOLDER.PADDING,
         )
-        layout.setSpacing(Settings.PLACEHOLDER.SPACING)
+        layout.setSpacing(container_settings.PLACEHOLDER.SPACING)
 
         self.setMinimumWidth(
-            minimum_width if minimum_width != 180 else Settings.PLACEHOLDER.MIN_WIDTH
+            minimum_width
+            if minimum_width != 180
+            else container_settings.PLACEHOLDER.MIN_WIDTH
         )
         self.setMinimumHeight(
-            minimum_height if minimum_height != 150 else Settings.PLACEHOLDER.MIN_HEIGHT
+            minimum_height
+            if minimum_height != 150
+            else container_settings.PLACEHOLDER.MIN_HEIGHT
         )
 
         layout.addStretch()
@@ -88,7 +93,7 @@ class PlaceHolder(QFrame, Component):
         svg = SVG("", self)
         svg.hide()
         if icon is not None:
-            icon_size = Settings.PLACEHOLDER.ICON_SIZE
+            icon_size = container_settings.PLACEHOLDER.ICON_SIZE
             svg.set_path(icon_qt_path(icon))
             svg.setFixedSize(icon_size, icon_size)
             svg.setAlignment(Qt.AlignmentFlag.AlignCenter)

@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from gui.blocks.base import Block
+from gui.blocks.device.device_settings import device_settings
 from gui.colors import Theme, get_current_palette, get_current_theme, qcolor_from_css
 from gui.components import Button, DotStatusBadge
 from gui.icons import GenericIcons, icon_qt_path_for_theme
@@ -149,7 +150,7 @@ class DeviceEmptyState(QFrame, Block):
 
         glyph_title_spacer = QSpacerItem(
             1,
-            Settings.LIST.DEVICE_EMPTY_STATE_GLYPH_TITLE_SPACING,
+            device_settings.EMPTY_STATE_GLYPH_TITLE_SPACING,
             QSizePolicy.Policy.Minimum,
             QSizePolicy.Policy.Preferred,
         )
@@ -205,11 +206,9 @@ class DeviceEmptyState(QFrame, Block):
 
     def fit_to_available_width(self, available_width: int) -> None:
         """Clamp preferred CTA widths to the actual list viewport."""
-        card_width = max(
-            0, min(Settings.LIST.DEVICE_EMPTY_STATE_WIDTH, available_width)
-        )
+        card_width = max(0, min(device_settings.EMPTY_STATE_WIDTH, available_width))
         action_width = min(
-            Settings.LIST.DEVICE_EMPTY_STATE_ACTION_WIDTH,
+            device_settings.EMPTY_STATE_ACTION_WIDTH,
             max(0, card_width - (Settings.SPACING.LG * 2)),
         )
         self.setFixedWidth(card_width)

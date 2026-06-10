@@ -5,8 +5,8 @@ from __future__ import annotations
 import pytest
 
 from gui.components.buttons import Button, ToolButton, WalkthroughButton
+from gui.components.buttons.button_settings import button_settings
 from gui.icons import GenericIcons, OperatingSystemIcons
-from gui.settings import Settings
 
 pytestmark = pytest.mark.usefixtures("qapp")
 
@@ -19,7 +19,7 @@ def test_button_and_tool_button_apply_basic_properties(qtbot) -> None:
 
     assert button.text() == "Run"
     assert button.property("button") is True
-    assert button.height() == Settings.DIMENSION.BUTTON_HEIGHT
+    assert button.height() == button_settings.BUTTON_HEIGHT
     assert tool_button.toolTip() == "Add"
     assert tool_button.property("tool-button") is True
 
@@ -50,4 +50,9 @@ def test_walkthrough_button_builds_internal_labels_and_rejects_missing_icon(
     assert button.ui.leading_svg.property("svg") is True
 
     with pytest.raises((TypeError, ValueError)):
-        WalkthroughButton(None, "Broken", leading_icon=None, trailing_icon=None)
+        WalkthroughButton(
+            None,  # type: ignore[arg-type]
+            "Broken",
+            leading_icon=None,  # type: ignore[arg-type]
+            trailing_icon=None,  # type: ignore[arg-type]
+        )

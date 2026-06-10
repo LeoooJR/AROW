@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 from shiboken6 import isValid
 
 from gui.blocks.base import Block
+from gui.blocks.top_bar.top_bar_settings import top_bar_settings
 from gui.colors import Theme, get_current_theme
 from gui.components import SVG, ToolButton
 from gui.icons import (
@@ -84,7 +85,7 @@ class TopBar(QWidget, Block):
         self.texts = TopBar.Text()
 
         # Set fixed height from settings
-        self.setFixedHeight(Settings.DIMENSION.HEADER_HEIGHT)
+        self.setFixedHeight(top_bar_settings.HEADER_HEIGHT)
 
         # Create horizontal layout for header
         layout = QHBoxLayout()
@@ -115,7 +116,7 @@ class TopBar(QWidget, Block):
         layout.addWidget(palette_button_wrapper)
 
         # Create palette thumb, a small frame that moves to indicate the selected palette button
-        thumb_size = Settings.DIMENSION.PALETTE_THUMB_SIZE
+        thumb_size = top_bar_settings.PALETTE_THUMB_SIZE
         palette_thumb = QFrame(palette_button_wrapper)
         palette_thumb.setObjectName("palette-thumb")
         palette_thumb.setFixedSize(thumb_size, thumb_size)
@@ -128,7 +129,7 @@ class TopBar(QWidget, Block):
         # Create name, the application name
         name = SVG(icon_qt_path(ApplicationIcons.NAME), self)
         name.setFixedSize(
-            Settings.DIMENSION.APP_NAME_WIDTH, Settings.DIMENSION.APP_NAME_HEIGHT
+            top_bar_settings.APP_NAME_WIDTH, top_bar_settings.APP_NAME_HEIGHT
         )
         # Add name to layout
         layout.addWidget(name, 1)
@@ -375,7 +376,7 @@ class TopBar(QWidget, Block):
         self._palette_thumb_anim = QPropertyAnimation(thumb, b"geometry")
         self._palette_thumb_anim.setStartValue(thumb.geometry())
         self._palette_thumb_anim.setEndValue(target)
-        self._palette_thumb_anim.setDuration(Settings.ANIMATION.PALETTE_SWITCH_DURATION)
+        self._palette_thumb_anim.setDuration(top_bar_settings.PALETTE_SWITCH_DURATION)
         self._palette_thumb_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
         self._palette_thumb_anim.setParent(self)
         self._palette_thumb_anim.start()
