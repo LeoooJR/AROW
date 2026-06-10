@@ -192,17 +192,23 @@ class TopBar(QWidget, Block):
         """Connect signals for the header widgets."""
 
         #### Signals for toggling the left and right panels visibility ####
-        left_btn = self.ui.left_panel_visibility_request_button
-        right_btn = self.ui.right_panel_visibility_request_button
-        left_btn.clicked.connect(
-            lambda: signals.UI.LeftPanelsVisibilityRequested.emit(
-                not bool(left_btn.property("visibility"))
-            )
+        self.ui.left_panel_visibility_request_button.clicked.connect(
+            self._on_left_panel_visibility_button_clicked
         )
-        right_btn.clicked.connect(
-            lambda: signals.UI.RightPanelsVisibilityRequested.emit(
-                not bool(right_btn.property("visibility"))
-            )
+        self.ui.right_panel_visibility_request_button.clicked.connect(
+            self._on_right_panel_visibility_button_clicked
+        )
+        signals.UI.DisplayLeftPanelsRequested.connect(
+            lambda: self._set_left_panels_button_displayed(True)
+        )
+        signals.UI.HideLeftPanelsRequested.connect(
+            lambda: self._set_left_panels_button_displayed(False)
+        )
+        signals.UI.DisplayRightPanelsRequested.connect(
+            lambda: self._set_right_panels_button_displayed(True)
+        )
+        signals.UI.HideRightPanelsRequested.connect(
+            lambda: self._set_right_panels_button_displayed(False)
         )
 
         #### Signals for toggling the palette ####
@@ -263,44 +269,6 @@ class TopBar(QWidget, Block):
         """Return the dark palette button."""
         return self.ui.dark_palette_button
 
-    def toggle_left_panels_visibility_request_button(self) -> None:
-        """Update left panels button icon and properties to the toggled state (call after body left panels visibility has been set).
-
-        Args:
-            None
-
-        Returns:
-            None
-        """
-        button = self.ui.left_panel_visibility_request_button
-        if button.property("inset"):
-            button.setProperty("inset", False)
-            button.setProperty("visibility", False)
-            button.set_icon(GenericIcons.LAYOUT_SIDEBAR)
-        else:
-            button.setProperty("inset", True)
-            button.setProperty("visibility", True)
-            button.set_icon(GenericIcons.LAYOUT_SIDEBAR_INSET)
-
-    def toggle_right_panels_visibility_request_button(self) -> None:
-        """Update right panels button icon and properties to the toggled state (call after body right panels visibility has been set).
-
-        Args:
-            None
-
-        Returns:
-            None
-        """
-        button = self.ui.right_panel_visibility_request_button
-        if button.property("inset"):
-            button.setProperty("inset", False)
-            button.setProperty("visibility", False)
-            button.set_icon(GenericIcons.LAYOUT_SIDEBAR_REVERSE)
-        else:
-            button.setProperty("inset", True)
-            button.setProperty("visibility", True)
-            button.set_icon(GenericIcons.LAYOUT_SIDEBAR_INSET_REVERSE)
-
     def apply_theme_icons(self, theme: Theme) -> None:
         """Refresh header chrome icon resources for ``theme``."""
         self.ui.light_palette_button.apply_theme_icons(theme)
@@ -324,6 +292,42 @@ class TopBar(QWidget, Block):
         right_btn.apply_theme_icons(theme)
 
     #### Private methods ####
+
+    def _on_left_panel_visibility_button_clicked(self) -> None:
+        """Toggle left sidebar visibility from the header button."""
+        if bool(self.ui.left_panel_visibility_request_button.property("visibility")):
+            signals.UI.HideLeftPanelsRequested.emit()
+        else:
+            signals.UI.DisplayLeftPanelsRequested.emit()
+
+    def _on_right_panel_visibility_button_clicked(self) -> None:
+        """Toggle right sidebar visibility from the header button."""
+        if bool(self.ui.right_panel_visibility_request_button.property("visibility")):
+            signals.UI.HideRightPanelsRequested.emit()
+        else:
+            signals.UI.DisplayRightPanelsRequested.emit()
+
+    def _set_left_panels_button_displayed(self, displayed: bool) -> None:
+        """Update left sidebar button icon and properties to match panel visibility."""
+        button = self.ui.left_panel_visibility_request_button
+        button.setProperty("inset", displayed)
+        button.setProperty("visibility", displayed)
+        button.set_icon(
+            GenericIcons.LAYOUT_SIDEBAR_INSET
+            if displayed
+            else GenericIcons.LAYOUT_SIDEBAR
+        )
+
+    def _set_right_panels_button_displayed(self, displayed: bool) -> None:
+        """Update right sidebar button icon and properties to match panel visibility."""
+        button = self.ui.right_panel_visibility_request_button
+        button.setProperty("inset", displayed)
+        button.setProperty("visibility", displayed)
+        button.set_icon(
+            GenericIcons.LAYOUT_SIDEBAR_INSET_REVERSE
+            if displayed
+            else GenericIcons.LAYOUT_SIDEBAR_REVERSE
+        )
 
     def _update_palette_thumb_geometry(self) -> None:
         """Position the palette thumb over the active theme button (initial or after layout)."""

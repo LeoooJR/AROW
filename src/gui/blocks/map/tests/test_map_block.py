@@ -68,10 +68,8 @@ def test_map_block_open_device_list_cta_shows_left_panels(qtbot) -> None:
     block = MapBlock()
     qtbot.addWidget(block)
 
-    with qtbot.waitSignal(signals.UI.LeftPanelsVisibilityRequested) as signal:
+    with qtbot.waitSignal(signals.UI.DisplayLeftPanelsRequested):
         block.ui.device_required_placeholder.ui.open_device_list_button.click()
-
-    assert signal.args == [True]
 
 
 def test_map_block_placeholder_helper_animation_starts(qtbot) -> None:

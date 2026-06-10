@@ -69,10 +69,10 @@ def test_top_bar_sidebar_buttons_emit_visibility_requests(qtbot) -> None:
     top_bar = TopBar()
     qtbot.addWidget(top_bar)
 
-    with qtbot.waitSignal(signals.UI.LeftPanelsVisibilityRequested) as left_signal:
+    with qtbot.waitSignal(signals.UI.HideLeftPanelsRequested):
         top_bar.left_panel_visibility_request_button.click()
-    with qtbot.waitSignal(signals.UI.RightPanelsVisibilityRequested) as right_signal:
+    with qtbot.waitSignal(signals.UI.HideRightPanelsRequested):
         top_bar.right_panel_visibility_request_button.click()
 
-    assert left_signal.args == [False]
-    assert right_signal.args == [False]
+    assert top_bar.left_panel_visibility_request_button.property("visibility") is False
+    assert top_bar.right_panel_visibility_request_button.property("visibility") is False

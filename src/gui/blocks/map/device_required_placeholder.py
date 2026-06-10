@@ -210,7 +210,7 @@ class DeviceRequiredMapPlaceholder(QFrame, Block):
     def _connect_signals(self) -> None:
         """Connect the CTA to the left-panel visibility request."""
         self.ui.open_device_list_button.clicked.connect(
-            lambda: signals.UI.LeftPanelsVisibilityRequested.emit(True)
+            signals.UI.DisplayLeftPanelsRequested.emit
         )
 
     def play_helper_animation(

@@ -247,8 +247,8 @@ class DeviceSelectionBlock(QFrame, Block):
         #### Signals for handling the UI constraints disabled ####
         signals.UI.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
 
-        signals.UI.LeftPanelsVisibilityRequested.connect(
-            self._on_left_panels_visibility_requested
+        signals.UI.DisplayLeftPanelsRequested.connect(
+            self._on_left_panels_display_requested
         )
 
         #### Signals for handling the device list model changes ####
@@ -335,10 +335,9 @@ class DeviceSelectionBlock(QFrame, Block):
             if isinstance(item, self._device_item_type):
                 item._sync_size_hint()
 
-    def _on_left_panels_visibility_requested(self, visible: bool) -> None:
-        """Hide the device selection panel when the left panels are hidden."""
-        if visible:
-            self._sync_available_device_item_presentation_state()
+    def _on_left_panels_display_requested(self) -> None:
+        """Resync device row presentation when the left panels are shown again."""
+        self._sync_available_device_item_presentation_state()
 
     def _on_authentification_succeeded(self, device: dict) -> None:
         """Add a newly authenticated device and mark it as the active selection."""

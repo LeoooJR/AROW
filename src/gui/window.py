@@ -576,26 +576,30 @@ class MainContainer(QWidget):
 
     def _connect_signals(self) -> None:
         """Connect main container to app signals."""
-        signals.UI.LeftPanelsVisibilityRequested.connect(
-            self._on_left_panels_visibility_requested
-        )
-        signals.UI.RightPanelsVisibilityRequested.connect(
-            self._on_right_panels_visibility_requested
-        )
+        signals.UI.DisplayLeftPanelsRequested.connect(self._display_left_panels)
+        signals.UI.HideLeftPanelsRequested.connect(self._hide_left_panels)
+        signals.UI.DisplayRightPanelsRequested.connect(self._display_right_panels)
+        signals.UI.HideRightPanelsRequested.connect(self._hide_right_panels)
         signals.DEVICE.AddDeviceRequested.connect(self._on_add_device_requested)
         signals.DEVICE.AuthentificationConfirmed.connect(
             self._on_authentification_confirmed
         )
 
-    def _on_left_panels_visibility_requested(self, visible: bool) -> None:
-        """Apply new left panels visibility to body and sync header button state."""
-        self.ui.body.set_left_panels_visibility(visible)
-        self.ui.header.toggle_left_panels_visibility_request_button()
+    def _display_left_panels(self) -> None:
+        """Show the left sidebar panels."""
+        self.ui.body.set_left_panels_visibility(True)
 
-    def _on_right_panels_visibility_requested(self, visible: bool) -> None:
-        """Apply new right panels visibility to body and sync header button state."""
-        self.ui.body.set_right_panels_visibility(visible)
-        self.ui.header.toggle_right_panels_visibility_request_button()
+    def _hide_left_panels(self) -> None:
+        """Hide the left sidebar panels."""
+        self.ui.body.set_left_panels_visibility(False)
+
+    def _display_right_panels(self) -> None:
+        """Show the right sidebar panels."""
+        self.ui.body.set_right_panels_visibility(True)
+
+    def _hide_right_panels(self) -> None:
+        """Hide the right sidebar panels."""
+        self.ui.body.set_right_panels_visibility(False)
 
     def _on_add_device_requested(self) -> None:
         """Handle the add device request."""

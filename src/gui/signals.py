@@ -13,8 +13,10 @@ class UISignals(QObject):
 
     UiConstraintsDisabled = Signal()
     UpdatePaletteSignal = Signal(str)
-    LeftPanelsVisibilityRequested = Signal(bool)
-    RightPanelsVisibilityRequested = Signal(bool)
+    DisplayLeftPanelsRequested = Signal()
+    HideLeftPanelsRequested = Signal()
+    DisplayRightPanelsRequested = Signal()
+    HideRightPanelsRequested = Signal()
     DeviceSelectionPanelVisibilityRequested = Signal(bool)
     ExtendDeviceSelectionPanelRequested = Signal()
     ShortenDeviceSelectionPanelRequested = Signal()
