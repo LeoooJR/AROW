@@ -142,7 +142,7 @@ class SimulationSubController(AppSubController):
         """Handle the remove device requested event."""
         try:
             self.model.delete_simulation_for_device(device_id)
-            self.view.forward_active_device_removed(device_id)
+            self.view.forward_remove_active_device_succeeded(device_id)
         except (
             ValueError
         ) as e:  # Simulation for device not found, the device was not active

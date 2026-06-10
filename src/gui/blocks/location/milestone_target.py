@@ -27,6 +27,9 @@ from gui.wrapper import (
 class MilestoneMetadataItem(HorizontalLayoutWrapper):
     """Compact key/value display for milestone metadata."""
 
+    texts: MilestoneMetadataItem.Text
+    ui: MilestoneMetadataItem.UI
+
     @dataclass(frozen=True)
     class Text:
         key: str
@@ -128,6 +131,9 @@ class MilestoneMetadataItem(HorizontalLayoutWrapper):
 
 class MilestoneTargetBlock(VerticalLayoutWrapper, Block):
     """Location panel block summarizing the selected milestone target."""
+
+    texts: MilestoneTargetBlock.Text
+    ui: MilestoneTargetBlock.UI
 
     @dataclass(frozen=True)
     class Text:
@@ -233,6 +239,7 @@ class MilestoneTargetBlock(VerticalLayoutWrapper, Block):
             parent,
             block_texts.target_button,
             icon=GenericIcons.CROSSHAIR,
+            theme_unresponsive=True,
         )
         target_button.setObjectName("location-target-button")
         target_button.setProperty("location-target-button", True)

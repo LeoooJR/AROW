@@ -26,6 +26,8 @@ class PlaceHolder(QFrame, Component):
     Text uses a softer color (PLACEHOLDER_TEXT). Use icon_path to show an icon above the label.
     """
 
+    _icon: GenericIcons | OperatingSystemIcons | ApplicationIcons | None
+
     @dataclass(frozen=True)
     class Text:
         """Optional plain-text snapshot when the body is a string."""
@@ -141,5 +143,5 @@ class PlaceHolder(QFrame, Component):
         if icon is None:
             return
 
-        self._icon: GenericIcons | OperatingSystemIcons | ApplicationIcons | None = icon
+        self._icon = icon
         self.ui.svg.set_path(icon_qt_path(self._icon))

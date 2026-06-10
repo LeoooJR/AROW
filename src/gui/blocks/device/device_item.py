@@ -218,7 +218,7 @@ class DeviceItem(QListWidgetItem):
         self._location: str = location
         self._last_communication_is_static: bool = isinstance(last_communication, str)
         self._last_communication_live_at: dt.datetime | None = (
-            None if self._last_communication_is_static else last_communication
+            last_communication if isinstance(last_communication, dt.datetime) else None
         )
 
         # Device item UI properties
@@ -388,7 +388,7 @@ class DeviceItem(QListWidgetItem):
         row_layout.addWidget(main_row)
         row.setLayout(row_layout)
 
-        self.ui: DeviceItem.UI = DeviceItem.UI(
+        self.ui = DeviceItem.UI(
             row=row,
             main_row=main_row,
             icon_frame=icon_frame,
@@ -626,7 +626,8 @@ class DeviceItem(QListWidgetItem):
     def _apply_badge(self) -> None:
         """Rebuild the badge label area from the current badge variant."""
         layout = self.ui.badge_container.layout()
-        assert layout is not None
+        if layout is None:
+            raise RuntimeError("badge_container layout is not initialized")
         self._clear_layout(layout)
         if self._badge == "none":
             return

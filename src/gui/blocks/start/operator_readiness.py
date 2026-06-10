@@ -19,6 +19,9 @@ from gui.wrapper import HorizontalLayoutWrapper, VerticalLayoutWrapper
 class ReadinessRow(HorizontalLayoutWrapper):
     """Compact operator-readiness status row."""
 
+    texts: ReadinessRow.Text
+    ui: ReadinessRow.UI
+
     @dataclass(frozen=True)
     class Text:
         label: str
@@ -107,6 +110,9 @@ class ReadinessRow(HorizontalLayoutWrapper):
 
 class OperatorReadinessBlock(VerticalLayoutWrapper, Block):
     """Welcome card summarizing operator workflow readiness."""
+
+    texts: OperatorReadinessBlock.Text
+    ui: OperatorReadinessBlock.UI
 
     ROWS_INDEX_MAPPING: dict[str, int] = {
         "host": 0,

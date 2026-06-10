@@ -21,7 +21,7 @@ from gui.icons import (
 from gui.settings import Settings
 
 
-class QtABCMeta(type(QObject), ABCMeta):
+class QtABCMeta(type(QObject), ABCMeta):  # type: ignore[misc]
     """Merge QObject's metaclass with ``ABCMeta`` for Qt-backed panels."""
 
     pass

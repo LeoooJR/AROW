@@ -9,7 +9,7 @@ from PySide6.QtCore import QObject
 from gui.colors import Theme
 
 
-class QtABCMeta(type(QObject), ABCMeta):
+class QtABCMeta(type(QObject), ABCMeta):  # type: ignore[misc]
     """Merge QObject's metaclass with abc.ABCMeta for Qt-backed blocks."""
 
     pass

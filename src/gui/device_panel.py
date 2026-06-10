@@ -112,9 +112,7 @@ class DevicePairingPanel(QFrame):
 
         self.setLayout(layout)
 
-        self.ui: DevicePairingPanel.UI = DevicePairingPanel.UI(
-            title=title, header=header, body=body
-        )
+        self.ui = DevicePairingPanel.UI(title=title, header=header, body=body)
 
         self._finalize_ui_hooks()
 

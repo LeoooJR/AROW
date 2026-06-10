@@ -67,10 +67,10 @@ class AuthentificationCard(QFrame, Component):
 
     def __init__(
         self,
-        parent: QWidget = None,
-        title: str = None,
-        icon_path: str = None,
-        description: str = None,
+        parent: QWidget | None = None,
+        title: str | None = None,
+        icon_path: str | None = None,
+        description: str | None = None,
     ):
         """Build the authentification card with OTP rows and confirm action.
 

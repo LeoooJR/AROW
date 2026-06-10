@@ -55,6 +55,7 @@ class WalkthroughButton(QPushButton, Component):
         text: str,
         leading_icon: GenericIcons | OperatingSystemIcons | ApplicationIcons,
         trailing_icon: GenericIcons | OperatingSystemIcons | ApplicationIcons,
+        theme_unresponsive: bool = False,
     ):
         """Build the custom walkthrough card button layout.
 
@@ -63,8 +64,11 @@ class WalkthroughButton(QPushButton, Component):
             text: Main descriptive label (word-wrapped).
             leading_icon: Left column SVG asset.
             trailing_icon: Top-right hint SVG asset.
+            theme_unresponsive: If True, the button will not change its theme when the application theme changes.
         """
         super().__init__(parent)
+
+        self._theme_unresponsive = theme_unresponsive
 
         valid_icon_types = GenericIcons | OperatingSystemIcons | ApplicationIcons
         if not isinstance(leading_icon, valid_icon_types):
@@ -151,6 +155,8 @@ class WalkthroughButton(QPushButton, Component):
 
     def apply_theme_icons(self, theme: Theme) -> None:
         """Refresh walkthrough row SVGs for the given palette."""
+        if self._theme_unresponsive:
+            return
         self.ui.leading_svg.set_path(icon_qt_path_for_theme(theme, self._leading_icon))
         self.ui.trailing_svg.set_path(
             icon_qt_path_for_theme(theme, self._trailing_icon)

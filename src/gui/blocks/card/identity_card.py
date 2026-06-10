@@ -353,7 +353,9 @@ class IdentityCardBlock(QFrame, Block):
         self, name: str, os: Literal["linux", "windows", "darwin"] | None, ip: str
     ) -> None:
         """Update host identity when controller reports host device metadata."""
-        assert os in ["linux", "windows", "darwin"]
+        if os is not None and os not in ("linux", "windows", "darwin"):
+            raise ValueError(f"Unsupported host OS: {os!r}")
+        os_icon: GenericIcons | OperatingSystemIcons
         if os == "linux":
             os_icon = OperatingSystemIcons.LINUX
         elif os == "windows":

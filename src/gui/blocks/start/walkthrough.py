@@ -19,6 +19,9 @@ from gui.wrapper import VerticalLayoutWrapper
 class WalkthroughBlock(VerticalLayoutWrapper, Block):
     """Welcome walkthrough card containing walkthrough actions."""
 
+    texts: WalkthroughBlock.Text
+    ui: WalkthroughBlock.UI
+
     @dataclass(frozen=True)
     class Text:
         walkthrough_label: Final[str] = "Walkthrough"

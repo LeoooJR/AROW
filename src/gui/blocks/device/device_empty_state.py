@@ -126,7 +126,9 @@ class DeviceEmptyState(QFrame, Block):
 
         status_badge = DotStatusBadge(self, text=self.texts.status, kind="ready")
 
-        add_button = Button(self, self.texts.add_button, icon=GenericIcons.PLUS)
+        add_button = Button(
+            self, self.texts.add_button, icon=GenericIcons.PLUS, theme_unresponsive=True
+        )
         add_button.setObjectName("device-empty-state-add-button")
 
         refresh_button = Button(

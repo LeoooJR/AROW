@@ -38,7 +38,7 @@ class Controller(ABC):
                 objects first, then call those hooks (see :class:`AppController`).
         """
         self._model: CoreRuntimeModel = model
-        self._view: MainWindow = view
+        self._view: MainWindow | None = view
         self._runner: AsyncRunner = runner if runner is not None else AsyncRunner(view)
         if not defer_signal_connect:
             self._connect_view_signals()
@@ -63,10 +63,12 @@ class Controller(ABC):
     @property
     def view(self) -> MainWindow:
         """Get the view for the application."""
+        if self._view is None:
+            raise RuntimeError("view is not available")
         return self._view
 
     @view.setter
-    def view(self, view: MainWindow) -> None:
+    def view(self, view: MainWindow | None) -> None:
         """Set the view for the application."""
         self._view = view
 

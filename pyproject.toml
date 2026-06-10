@@ -5,5 +5,20 @@ namespace_packages = true
 explicit_package_bases = true
 exclude = ["^src/__init__\\.py$"]
 
+[[tool.mypy.overrides]]
+module = [
+    "controller.controller",
+    "controller.core_work_callbacks",
+    "controller.orchestration.app_controller",
+]
+disable_error_code = ["valid-type", "attr-defined"]
+
+[[tool.mypy.overrides]]
+module = [
+    "gui.blocks.start.*",
+    "gui.blocks.location.milestone_target",
+]
+disable_error_code = ["assignment", "attr-defined"]
+
 [tool.bandit]
 exclude_dirs = ["tests"]

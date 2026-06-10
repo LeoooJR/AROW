@@ -150,9 +150,10 @@ class OTPInput(QWidget, Component):
             max_length: Per-cell max lengths; length must match ``otp_length``.
             echo_mode: Echo mode forwarded to each ``QLineEdit``.
         """
-        assert (
-            len(max_length) == otp_length
-        ), "Max length list must be the same length as the OTP length"
+        if len(max_length) != otp_length:
+            raise ValueError(
+                "Max length list must be the same length as the OTP length"
+            )
         super().__init__(parent)
         self.texts = OTPInput.Text()
         self.ui = OTPInput.UI()

@@ -167,7 +167,7 @@ class GridLayoutWrapper(QFrame):
     def __init__(
         self,
         parent: QWidget,
-        widgets: QWidget | list[(QWidget, int, int)] = [],
+        widgets: QWidget | list[tuple[QWidget, int, int]] = [],
         spacing: int = 0,
         margins: tuple = (0, 0, 0, 0),
         alignment: Qt.AlignmentFlag = Qt.AlignmentFlag.AlignCenter,
@@ -220,7 +220,7 @@ class GridLayoutWrapper(QFrame):
     def get_layout(self) -> QGridLayout:
         return self.layout()
 
-    def get_widgets(self) -> list[(QWidget, int, int)]:
+    def get_widgets(self) -> list[tuple[QWidget, int, int]]:
         return [
             (
                 self.layout().itemAt(i).widget(),

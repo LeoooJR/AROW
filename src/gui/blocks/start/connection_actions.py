@@ -19,6 +19,9 @@ from gui.wrapper import VerticalLayoutWrapper
 class ConnectionActionsBlock(VerticalLayoutWrapper, Block):
     """Welcome card containing interactive but currently unwired connection buttons."""
 
+    texts: ConnectionActionsBlock.Text
+    ui: ConnectionActionsBlock.UI
+
     @dataclass(frozen=True)
     class Text:
         title: Final[str] = "Connect your device"

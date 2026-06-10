@@ -32,7 +32,7 @@ class ActivityTracker(QObject):
         self._idle_stretch_index: int = 0
         self.reset_idle_timer()
 
-    def reset_idle_timer(self, msecs: int = None):
+    def reset_idle_timer(self, msecs: int | None = None):
         """Reset the idle timer.
 
         Args:

@@ -22,6 +22,8 @@ from gui.settings import Settings
 
 class ToolButton(QToolButton, Component):
 
+    _icon: GenericIcons | OperatingSystemIcons | ApplicationIcons | None
+
     @dataclass(frozen=True)
     class Text:
         """Tooltip copy associated with the tool button."""
@@ -40,6 +42,7 @@ class ToolButton(QToolButton, Component):
         icon: GenericIcons | OperatingSystemIcons | ApplicationIcons | None = None,
         tooltip: str | None = None,
         icon_size: int | None = None,
+        theme_unresponsive: bool = False,
     ):
         """Create a compact icon button with optional tooltip.
 
@@ -48,15 +51,17 @@ class ToolButton(QToolButton, Component):
             icon: Optional GenericIcons | OperatingSystemIcons | ApplicationIcons for the button face.
             tooltip: Hover tooltip string.
             icon_size: Optional square icon size override.
+            theme_unresponsive: If True, the button will not change its theme when the application theme changes.
         """
         super().__init__(parent)
 
         self.setProperty("tool-button", True)
+        self._theme_unresponsive = theme_unresponsive
 
         self.texts = ToolButton.Text(tooltip=tooltip)
 
         self._icon_size_px = icon_size or Settings.DIMENSION.TOOLBUTTON_ICON_SIZE
-        self._icon: GenericIcons | OperatingSystemIcons | ApplicationIcons | None = icon
+        self._icon = icon
         if self._icon is not None:
             self.setIcon(QIcon(icon_qt_path(self._icon)))
             self.setIconSize(self._icon_size())
@@ -79,6 +84,8 @@ class ToolButton(QToolButton, Component):
         pass
 
     def apply_theme_icons(self, theme: Theme) -> None:
+        if self._theme_unresponsive:
+            return
         if self._icon is not None:
             self.setIcon(QIcon(icon_qt_path_for_theme(theme, self._icon)))
 
@@ -97,6 +104,6 @@ class ToolButton(QToolButton, Component):
         if icon is None:
             return
 
-        self._icon: GenericIcons | OperatingSystemIcons | ApplicationIcons | None = icon
+        self._icon = icon
         self.setIcon(QIcon(icon_qt_path(self._icon)))
         self.setIconSize(self._icon_size())

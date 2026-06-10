@@ -18,6 +18,9 @@ from gui.wrapper import VerticalLayoutWrapper
 class StartRecentBlock(VerticalLayoutWrapper, Block):
     """Welcome card containing dated recent-session placeholders."""
 
+    texts: StartRecentBlock.Text
+    ui: StartRecentBlock.UI
+
     @dataclass(frozen=True)
     class Text:
         recent_label: Final[str] = "Recent sessions"

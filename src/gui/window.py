@@ -24,7 +24,7 @@ from shiboken6 import isValid
 
 import gui.faker as ui_faker
 import gui.ressources_rc  # noqa: F401
-from gui.__init__ import __application__
+from gui import __application__
 from gui.animation import animate_widget_visibility
 from gui.blocks.top_bar import TopBar
 from gui.colors import Theme, get_current_palette, set_current_theme
@@ -1064,7 +1064,7 @@ class MainWindow(QMainWindow):
     def forward_remove_active_device_succeeded(self, device_id: str) -> None:
         """Handle the active device removed."""
         logger.info("MainWindow: active device removed")
-        view_signals.ActiveDeviceRemoved.emit(device_id)
+        view_signals.RemoveActiveDeviceSucceeded.emit(device_id)
         self.ui.container.post_toast(
             self.texts.active_device_removed_success_toast.format(device=device_id),
             level="success",
