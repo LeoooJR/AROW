@@ -38,7 +38,7 @@ def test_otp_input_formats_valid_ip_and_tracks_invalid_indices(qtbot) -> None:
 
 
 def test_otp_input_rejects_mismatched_max_length() -> None:
-    with pytest.raises(AssertionError, match="Max length list"):
+    with pytest.raises(ValueError, match="Max length list"):
         OTPInput(None, otp_length=4, max_length=[1, 1])
 
 
