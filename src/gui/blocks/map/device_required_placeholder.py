@@ -15,7 +15,7 @@ from PySide6.QtCore import (
     QSize,
     Qt,
 )
-from PySide6.QtGui import QIcon, QPainter, QPen
+from PySide6.QtGui import QIcon, QPainter, QPen, QPolygonF
 from PySide6.QtWidgets import (
     QFrame,
     QGraphicsOpacityEffect,
@@ -96,16 +96,32 @@ class DeviceRequiredMapGlyph(QFrame):
         painter.drawEllipse(QRectF(90, 68, self._HAND_ICON_PX, self._HAND_ICON_PX))
         painter.drawPixmap(90, 68, hand_pixmap)
 
-        click_ray_pen = QPen(qcolor_from_css(palette.PRIMARY_BORDER), 1.4)
-        click_ray_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-        painter.setPen(click_ray_pen)
-        for start, end in (
-            (QPointF(116, 76), QPointF(124, 68)),
-            (QPointF(121, 88), QPointF(132, 86)),
-            (QPointF(110, 68), QPointF(112, 58)),
+        painter.setBrush(qcolor_from_css(palette.PRIMARY))
+        painter.setPen(Qt.PenStyle.NoPen)
+        for point, radius in (
+            (QPointF(110, 59), 3.2),
+            (QPointF(122, 66), 3.8),
+            (QPointF(126, 78), 3.0),
         ):
-            painter.drawLine(start, end)
+            self._draw_star(painter, point, radius)
         painter.end()
+
+    @staticmethod
+    def _draw_star(painter: QPainter, center: QPointF, radius: float) -> None:
+        """Draw a compact four-point sparkle."""
+        points = QPolygonF(
+            [
+                QPointF(center.x(), center.y() - radius),
+                QPointF(center.x() + radius * 0.32, center.y() - radius * 0.32),
+                QPointF(center.x() + radius, center.y()),
+                QPointF(center.x() + radius * 0.32, center.y() + radius * 0.32),
+                QPointF(center.x(), center.y() + radius),
+                QPointF(center.x() - radius * 0.32, center.y() + radius * 0.32),
+                QPointF(center.x() - radius, center.y()),
+                QPointF(center.x() - radius * 0.32, center.y() - radius * 0.32),
+            ]
+        )
+        painter.drawPolygon(points)
 
 
 class DeviceRequiredMapPlaceholder(QFrame, Block):
