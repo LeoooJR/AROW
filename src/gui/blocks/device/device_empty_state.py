@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Final
 
-from PySide6.QtCore import QRectF, QSize, Qt
+from PySide6.QtCore import QPointF, QRectF, QSize, Qt
 from PySide6.QtGui import QIcon, QPainter, QPen
 from PySide6.QtWidgets import (
     QFrame,
@@ -64,6 +64,21 @@ class DeviceDiscoveryGlyph(QFrame):
             top_left_x = center.x() - diameter / 2
             top_left_y = center.y() - diameter / 2
             painter.drawEllipse(QRectF(top_left_x, top_left_y, diameter, diameter))
+
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(qcolor_from_css(palette.PRIMARY))
+        for point, radius in (
+            (QPointF(center.x() - 22, center.y() - 18), 3.5),
+            (QPointF(center.x() + 34, center.y() - 24), 4.0),
+        ):
+            painter.drawEllipse(
+                QRectF(
+                    point.x() - radius,
+                    point.y() - radius,
+                    radius * 2,
+                    radius * 2,
+                )
+            )
 
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(qcolor_from_css(palette.PRIMARY_SOFT))
