@@ -9,10 +9,12 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QLabel, QSizePolicy, QWidget
 
 from gui.blocks.base import Block
+from gui.blocks.start.start_recent_placeholder import StartRecentPlaceholder
 from gui.blocks.start.start_settings import start_settings
 from gui.colors import Theme
 from gui.components import File
 from gui.settings import Settings
+from gui.signals import signals
 from gui.wrapper import VerticalLayoutWrapper
 
 
@@ -35,6 +37,7 @@ class StartRecentBlock(VerticalLayoutWrapper, Block):
     class UI:
         recent_label: QLabel
         recent_files_wrapper: VerticalLayoutWrapper
+        empty_placeholder: StartRecentPlaceholder
 
     def __init__(self, parent: QWidget | None = None):
         """Build the welcome start/recent card and placeholder recent files."""
@@ -49,6 +52,10 @@ class StartRecentBlock(VerticalLayoutWrapper, Block):
             spacing=Settings.SPACING.SM,
             margins=Settings.SPACING.MARGIN_NONE,
         )
+        recent_files_wrapper.setObjectName("start-recent-files-wrapper")
+
+        empty_placeholder = StartRecentPlaceholder(recent_files_wrapper)
+        recent_files_wrapper.add_widget(empty_placeholder)
 
         super().__init__(
             parent,
@@ -69,24 +76,60 @@ class StartRecentBlock(VerticalLayoutWrapper, Block):
         self.ui = StartRecentBlock.UI(
             recent_label=recent_label,
             recent_files_wrapper=recent_files_wrapper,
+            empty_placeholder=empty_placeholder,
         )
-        self._add_recent_placeholders(count=3)
+        self._sync_empty_placeholder_visibility()
         self._finalize_ui_hooks()
 
     def _add_recent_placeholders(self, count: int = 3) -> None:
         """Add generated recent-file display rows to the recent-files wrapper."""
         placeholder_items = self.texts.recent_files
-        for index in range(min(count, len(placeholder_items))):
+        existing_count = len(self._recent_file_widgets())
+        end_index = min(count, len(placeholder_items))
+        for index in range(existing_count, end_index):
             file_name, file_type, date_text = placeholder_items[index]
-            self.ui.recent_files_wrapper.add_widget(
-                File(
-                    self.ui.recent_files_wrapper,
-                    file_name=file_name,
-                    file_type=file_type,
-                    file_save=False,
-                    date_text=date_text,
-                )
-            )
+            self.add_file(file_name=file_name, file_type=file_type, date_text=date_text)
+
+    def add_file(
+        self,
+        file_name: str,
+        file_type: str,
+        date_text: str | None = None,
+    ) -> File:
+        """Add a recent-session file row and hide the empty placeholder if needed."""
+        file_widget = File(
+            self.ui.recent_files_wrapper,
+            file_name=file_name,
+            file_type=file_type,
+            file_save=False,
+            date_text=date_text,
+        )
+        self.ui.recent_files_wrapper.add_widget(file_widget)
+        self._sync_empty_placeholder_visibility()
+        return file_widget
+
+    def remove_file(self, file_widget: File) -> None:
+        """Remove a recent-session file row and show the placeholder when empty."""
+        layout = self.ui.recent_files_wrapper.get_layout()
+        layout.removeWidget(file_widget)
+        file_widget.setParent(None)
+        file_widget.deleteLater()
+        self._sync_empty_placeholder_visibility()
+
+    def _recent_file_widgets(self) -> list[File]:
+        """Return active recent-session file rows."""
+        layout = self.ui.recent_files_wrapper.get_layout()
+        rows: list[File] = []
+        for index in range(layout.count()):
+            item = layout.itemAt(index)
+            widget = item.widget() if item is not None else None
+            if isinstance(widget, File):
+                rows.append(widget)
+        return rows
+
+    def _sync_empty_placeholder_visibility(self) -> None:
+        """Show the empty state only when no recent-session rows are present."""
+        self.ui.empty_placeholder.setVisible(not self._recent_file_widgets())
 
     def _set_size_policy(self) -> None:
         """Set resize behavior for the card labels and recent-files wrapper."""
@@ -108,8 +151,8 @@ class StartRecentBlock(VerticalLayoutWrapper, Block):
         )
 
     def _connect_signals(self) -> None:
-        """Connect block signals; this static welcome card currently has none."""
-        pass
+        """Connect delayed UI seed hooks."""
+        signals.UI.UiConstraintsDisabled.connect(self._add_recent_placeholders)
 
     @property
     def recent_files_wrapper(self) -> VerticalLayoutWrapper:
@@ -118,6 +161,7 @@ class StartRecentBlock(VerticalLayoutWrapper, Block):
 
     def apply_theme_icons(self, theme: Theme) -> None:
         """Refresh icons for recent-file display rows."""
+        self.ui.empty_placeholder.apply_theme_icons(theme)
         lay = self.ui.recent_files_wrapper.get_layout()
         for index in range(lay.count()):
             item = lay.itemAt(index)
