@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Final
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QFontMetrics
 from PySide6.QtWidgets import QLabel, QSizePolicy, QWidget
 
 from gui.blocks.base import Block
@@ -54,6 +55,12 @@ class ReadinessRow(HorizontalLayoutWrapper):
         detail_widget = QLabel(detail, parent)
         detail_widget.setObjectName("readiness-row-detail")
         detail_widget.setProperty("readiness-row-detail", True)
+        detail_widget.setWordWrap(False)
+        width = max(1, detail_widget.contentsRect().width())
+        elided = QFontMetrics(detail_widget.font()).elidedText(
+            detail, Qt.TextElideMode.ElideRight, width
+        )
+        detail_widget.setText(elided)
 
         text_wrapper = VerticalLayoutWrapper(
             parent,

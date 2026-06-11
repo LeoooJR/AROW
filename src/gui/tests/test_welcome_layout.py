@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import pytest
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QWidget
 
+import gui.welcome as welcome_module
 from gui.settings import Settings
 from gui.welcome import WelcomePanel
 from gui.welcome_settings import welcome_settings
@@ -37,3 +39,54 @@ def test_welcome_panel_normal_workspace_mode_restores_expanding_content(qtbot) -
 
     assert panel.ui.content_wrapper.maximumWidth() == Settings.PANEL.UNBOUNDED_HEIGHT
     assert not panel.layout().itemAt(0).alignment() & Qt.AlignmentFlag.AlignHCenter
+
+
+def test_welcome_panel_theme_refresh_targets_visible_top_card(
+    monkeypatch, qtbot
+) -> None:
+    calls: list[tuple[str, str]] = []
+
+    class _StubCard(QWidget):
+        def __init__(self, role: str, parent=None) -> None:
+            super().__init__(parent)
+            self.role = role
+
+        def apply_theme_icons(self, theme):  # type: ignore[no-untyped-def]
+            calls.append((self.role, theme))
+
+    class _StubConnectionCard(_StubCard):
+        def __init__(self, parent=None) -> None:
+            super().__init__("connection", parent)
+
+    class _StubMilestoneCard(_StubCard):
+        def __init__(self, parent=None) -> None:
+            super().__init__("milestone", parent)
+
+    class _StubBriefingCard(_StubCard):
+        def __init__(self, parent=None) -> None:
+            super().__init__("briefing", parent)
+
+    class _StubRecentCard(_StubCard):
+        def __init__(self, parent=None) -> None:
+            super().__init__("recent", parent)
+
+    monkeypatch.setattr(welcome_module, "OperatorReadinessBlock", _StubBriefingCard)
+    monkeypatch.setattr(welcome_module, "ConnectionActionsBlock", _StubConnectionCard)
+    monkeypatch.setattr(welcome_module, "MilestoneTargetBlock", _StubMilestoneCard)
+    monkeypatch.setattr(welcome_module, "StartRecentBlock", _StubRecentCard)
+
+    panel = WelcomePanel()
+    qtbot.addWidget(panel)
+    panel.show()
+
+    panel.apply_theme_icons("dark")
+    assert ("connection", "dark") in calls
+    assert ("milestone", "dark") not in calls
+
+    calls.clear()
+    panel.ui.connection_card.hide()
+    panel.ui.milestone_card.show()
+
+    panel.apply_theme_icons("light")
+    assert ("connection", "light") not in calls
+    assert ("milestone", "light") in calls

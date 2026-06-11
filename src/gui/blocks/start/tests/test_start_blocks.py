@@ -10,6 +10,7 @@ from gui.blocks.start import (
     ConnectionActionsBlock,
     OperatorReadinessBlock,
     StartRecentBlock,
+    StartRecentPlaceholder,
     WalkthroughBlock,
 )
 from gui.components import File, StatusBadge, WalkthroughButton
@@ -33,9 +34,14 @@ def test_start_recent_block_generates_recent_file_rows(qtbot) -> None:
     block = StartRecentBlock()
     qtbot.addWidget(block)
 
+    assert isinstance(block.ui.empty_placeholder, StartRecentPlaceholder)
+    assert not block.ui.empty_placeholder.isHidden()
+
+    signals.UI.UiConstraintsDisabled.emit()
     rows = _recent_file_widgets(block)
 
     assert len(rows) == len(block.texts.recent_files)
+    assert block.ui.empty_placeholder.isHidden()
     assert all(row._file_name_label.text().strip() for row in rows)
     assert all(row._file_date_label is not None for row in rows)
 
@@ -49,6 +55,7 @@ def test_start_recent_block_theme_refresh_reaches_file_rows(monkeypatch, qtbot) 
     monkeypatch.setattr(File, "apply_theme_icons", spy_apply_theme_icons)
     block = StartRecentBlock()
     qtbot.addWidget(block)
+    block._add_recent_placeholders()
 
     block.apply_theme_icons("dark")
 
@@ -65,6 +72,25 @@ def test_start_recent_block_oversized_placeholder_count_is_capped(qtbot) -> None
 
     added = len(_recent_file_widgets(block)) - before
     assert added == len(block.texts.recent_files)
+
+
+def test_start_recent_block_add_and_remove_sync_empty_placeholder(qtbot) -> None:
+    block = StartRecentBlock()
+    qtbot.addWidget(block)
+
+    row = block.add_file(
+        file_name="activity_20260611.log",
+        file_type="log",
+        date_text="Last opened 2026-06-11",
+    )
+
+    assert _recent_file_widgets(block) == [row]
+    assert block.ui.empty_placeholder.isHidden()
+
+    block.remove_file(row)
+
+    assert _recent_file_widgets(block) == []
+    assert not block.ui.empty_placeholder.isHidden()
 
 
 def test_walkthrough_block_builds_expected_actions(qtbot) -> None:

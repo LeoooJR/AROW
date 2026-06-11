@@ -103,7 +103,7 @@ class WelcomePanel(QFrame):
 
     def apply_theme_icons(self, theme: Theme) -> None:
         self.ui.briefing_card.apply_theme_icons(theme)
-        if self.ui.milestone_card.isVisible():
+        if self.ui.connection_card.isVisible():
             self.ui.connection_card.apply_theme_icons(theme)
         if self.ui.milestone_card.isVisible():
             self.ui.milestone_card.apply_theme_icons(theme)
@@ -193,16 +193,12 @@ class WelcomePanel(QFrame):
         """Handle the device selection succeeded.
         Show the milestone card and hide the connection card.
         """
-        if self.ui.connection_card.isVisible():
-            self.ui.connection_card.hide()
-        if self.ui.milestone_card.isHidden():
-            self.ui.milestone_card.show()
+        self.ui.connection_card.hide()
+        self.ui.milestone_card.show()
 
     def _on_remove_active_device_succeeded(self, device_id: str) -> None:
         """Handle the remove active device succeeded.
         Hide the milestone card and show the connection card.
         """
-        if self.ui.milestone_card.isVisible():
-            self.ui.milestone_card.hide()
-        if self.ui.connection_card.isHidden():
-            self.ui.connection_card.show()
+        self.ui.milestone_card.hide()
+        self.ui.connection_card.show()

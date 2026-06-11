@@ -566,6 +566,11 @@ QFrame#connection-actions-body {{
     border: none;
 }}
 
+QFrame#start-recent-files-wrapper {{
+    background-color: {palette.TRANSPARENT};
+    border: none;
+}}
+
 QFrame#welcome-start-card,
 QFrame#welcome-walkthrough-card,
 QFrame#welcome-operator-readiness-card,
@@ -594,6 +599,26 @@ QLabel[welcome-tagline="true"] {{
     padding-left: {Settings.SPACING.MD}px;
     padding-right: {Settings.SPACING.MD}px;
     text-align: center;
+}}
+
+QFrame#start-recent-placeholder {{
+    background-color: {palette.PRIMARY_SOFT};
+    border: 1px solid {palette.PRIMARY_BORDER};
+    border-radius: {Settings.BORDER_RADIUS.MD}px;
+}}
+
+QFrame#start-recent-placeholder QLabel#start-recent-placeholder-title {{
+    background-color: {palette.TRANSPARENT};
+    color: {palette.TEXT_PRIMARY};
+    font-size: {Settings.FONT.SIZE_DEFAULT}px;
+    font-weight: {Settings.FONT.WEIGHT_DEMIBOLD};
+}}
+
+QFrame#start-recent-placeholder QLabel#start-recent-placeholder-description {{
+    background-color: {palette.TRANSPARENT};
+    color: {palette.TEXT_MUTED};
+    font-size: {Settings.FONT.SIZE_HELPER}px;
+    font-weight: {Settings.FONT.WEIGHT_NORMAL};
 }}
 
 QFrame#readiness-row {{

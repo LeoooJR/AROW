@@ -475,14 +475,14 @@ class Body(QWidget):
         """Handle post-connection UI updates for any successful connection flow."""
         self.ui.progress_bar.setValue(1)
         self.ui.tabs.setCurrentIndex(1)
-        self.ui.tabs.setTabVisible(2, True)
+        # self.ui.tabs.setTabVisible(2, True) # TODO: uncomment this when the device tab is implemented
 
     def _on_remove_active_device_succeeded(self, device_id: str) -> None:
         """Handle the active device removed."""
         logger.info("Body: active device removed", device_id=device_id)
         self.ui.progress_bar.setValue(0)
         self.ui.tabs.setCurrentIndex(0)
-        self.ui.tabs.setTabVisible(2, False)
+        # self.ui.tabs.setTabVisible(2, False) # TODO: uncomment this when the device tab is implemented
 
 
 class MainContainer(QWidget):

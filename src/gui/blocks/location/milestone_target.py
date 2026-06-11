@@ -186,8 +186,7 @@ class MilestoneTargetBlock(VerticalLayoutWrapper, Block):
         block_texts = MilestoneTargetBlock.Text()
 
         title = QLabel(block_texts.title, parent)
-        title.setObjectName("milestone-target-title")
-        title.setProperty("milestone-target-title", True)
+        title.setProperty("welcome-section-title", True)
 
         status_badge = StatusBadge(
             parent,

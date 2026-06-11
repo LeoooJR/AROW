@@ -702,6 +702,9 @@ class ActivityLogBlock(QFrame, Block):
             self._on_device_selection_succeeded
         )
         signals.DEVICE.DeviceSelectionFailed.connect(self._on_device_selection_failed)
+        signals.DEVICE.RemoveActiveDeviceSucceeded.connect(
+            self._on_remove_active_device_succeeded
+        )
 
         self.ui.logs_list.itemSelectionChanged.connect(
             self._sync_activity_selection_state
@@ -1060,6 +1063,16 @@ class ActivityLogBlock(QFrame, Block):
             "error",
             detail=f"{device_name} could not be selected for the simulation.",
             metadata={"target": device_name},
+        )
+
+    def _on_remove_active_device_succeeded(self, device_id: str) -> None:
+        """Record an activity when active device removal succeeds."""
+        self.add_activity(
+            "Active device removed",
+            "device",
+            "success",
+            detail=f"{device_id} has been removed from the simulation.",
+            metadata={"target": device_id},
         )
 
     def _on_activity_log_file_updated(self, log_file_path: str) -> None:
