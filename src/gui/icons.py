@@ -23,12 +23,12 @@ def _create_icon(filename: str, *, has_both_themes: bool = True) -> Icon:
     (for example raster logos) pass ``has_both_themes=False``.
     """
     if has_both_themes:
-        qt_paths: tuple[str, str] = (
+        qt_paths = (
             f":/statics/light/{filename}",
             f":/statics/dark/{filename}",
         )
     else:
-        qt_paths: tuple[str, str] = (f":/statics/{filename}", f":/statics/{filename}")
+        qt_paths = (f":/statics/{filename}", f":/statics/{filename}")
     stem = filename.rsplit(".", 1)[0]
     return Icon(stem.replace("-", " ").title(), *qt_paths)
 

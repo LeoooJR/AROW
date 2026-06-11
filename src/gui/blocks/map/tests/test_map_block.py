@@ -6,7 +6,7 @@ import pytest
 from PySide6.QtCore import QAbstractAnimation
 
 from gui.blocks.map import MapBlock
-from gui.signals import view_signals
+from gui.signals import signals
 
 pytestmark = pytest.mark.usefixtures("qapp")
 
@@ -68,10 +68,8 @@ def test_map_block_open_device_list_cta_shows_left_panels(qtbot) -> None:
     block = MapBlock()
     qtbot.addWidget(block)
 
-    with qtbot.waitSignal(view_signals.LeftPanelsVisibilityRequested) as signal:
+    with qtbot.waitSignal(signals.UI.DisplayLeftPanelsRequested):
         block.ui.device_required_placeholder.ui.open_device_list_button.click()
-
-    assert signal.args == [True]
 
 
 def test_map_block_placeholder_helper_animation_starts(qtbot) -> None:
@@ -79,7 +77,7 @@ def test_map_block_placeholder_helper_animation_starts(qtbot) -> None:
     qtbot.addWidget(block)
     block.show()
 
-    view_signals.MapTabActivated.emit()
+    signals.UI.MapTabActivated.emit()
     qtbot.wait(0)
 
     assert block._placeholder_helper_anim is not None
@@ -104,7 +102,7 @@ def test_map_block_placeholder_helper_animation_is_delegated(
         fake_play_helper_animation,
     )
 
-    view_signals.MapTabActivated.emit()
+    signals.UI.MapTabActivated.emit()
 
     assert calls == [None]
 
@@ -116,7 +114,7 @@ def test_map_block_connection_succeeded_updates_placeholder_and_animates(
     qtbot.addWidget(block)
     block.show()
 
-    view_signals.DeviceSelectionSucceeded.emit("d1", "Phone")
+    signals.DEVICE.DeviceSelectionSucceeded.emit("d1", "Phone")
     qtbot.wait(0)
 
     assert block.placeholder.currentWidget() is block.ui.map_loading_placeholder
@@ -129,7 +127,7 @@ def test_map_block_device_selection_failed_starts_helper_animation(qtbot) -> Non
     qtbot.addWidget(block)
     block.show()
 
-    view_signals.DeviceSelectionFailed.emit("d1", "Phone")
+    signals.DEVICE.DeviceSelectionFailed.emit("d1", "Phone")
     qtbot.wait(0)
 
     assert block._placeholder_helper_anim is not None
@@ -145,7 +143,7 @@ def test_map_block_active_device_removed_resets_placeholder_and_animates(
 
     block.show_map_loading_placeholder()
 
-    view_signals.ActiveDeviceRemoved.emit("d1")
+    signals.DEVICE.RemoveActiveDeviceSucceeded.emit("d1")
     qtbot.wait(0)
 
     assert block.placeholder.currentWidget() is block.ui.device_required_placeholder
@@ -158,7 +156,7 @@ def test_map_block_authentification_failed_starts_helper_animation(qtbot) -> Non
     qtbot.addWidget(block)
     block.show()
 
-    view_signals.AuthentificationFailed.emit("err", 1, "detail")
+    signals.DEVICE.AuthentificationFailed.emit("err", 1, "detail")
     qtbot.wait(0)
 
     assert block._placeholder_helper_anim is not None
@@ -174,7 +172,7 @@ def test_map_block_placeholder_helper_animation_noops_when_canvas_visible(
     block.canvas.setVisible(True)
     block.placeholder.setVisible(False)
 
-    view_signals.MapTabActivated.emit()
+    signals.UI.MapTabActivated.emit()
     qtbot.wait(0)
 
     assert block._placeholder_helper_anim is None

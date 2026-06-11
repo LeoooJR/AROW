@@ -11,15 +11,11 @@ import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-import importlib
-
 from PySide6.QtCore import QEventLoop
 from PySide6.QtWidgets import QApplication
 
-_async_mod = importlib.import_module("controller.async")
-AsyncRunner = _async_mod.AsyncRunner
-JobError = _async_mod.JobError
-JobSpecification = _async_mod.JobSpecification
+import controller.runner as runner_mod
+from controller.runner import AsyncRunner, JobError, JobSpecification
 
 pytestmark = [pytest.mark.async_jobs]
 
@@ -128,6 +124,8 @@ class _FakePool:
                 return
 
             try:
+                if job.fn is None:
+                    raise ValueError("JobSpecification.fn must be set (callable)")
                 result = job.fn(*job.args, **job.kwargs)
                 emit_completed(job_id, result)
             except Exception as e:  # noqa: BLE001 - test helper
@@ -182,8 +180,8 @@ def runner_factory(monkeypatch: pytest.MonkeyPatch) -> Callable[..., AsyncRunner
                 pool_by_job_id=pool_by_job_id,
             )
 
-        monkeypatch.setattr(_async_mod, "ThreadPool", make_thread_pool)
-        monkeypatch.setattr(_async_mod, "ProcessPool", make_process_pool)
+        monkeypatch.setattr(runner_mod, "ThreadPool", make_thread_pool)
+        monkeypatch.setattr(runner_mod, "ProcessPool", make_process_pool)
 
         runner = AsyncRunner()
         runner._test_shutdown_called = {

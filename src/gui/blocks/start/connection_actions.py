@@ -9,6 +9,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QLabel, QSizePolicy, QWidget
 
 from gui.blocks.base import Block
+from gui.blocks.start.start_settings import start_settings
 from gui.colors import Theme
 from gui.components import WalkthroughButton
 from gui.icons import GenericIcons
@@ -18,6 +19,9 @@ from gui.wrapper import VerticalLayoutWrapper
 
 class ConnectionActionsBlock(VerticalLayoutWrapper, Block):
     """Welcome card containing interactive but currently unwired connection buttons."""
+
+    texts: ConnectionActionsBlock.Text
+    ui: ConnectionActionsBlock.UI
 
     @dataclass(frozen=True)
     class Text:
@@ -80,10 +84,10 @@ class ConnectionActionsBlock(VerticalLayoutWrapper, Block):
             widgets=[title, body_wrapper],
             spacing=Settings.PANEL.SECTION_SPACING,
             margins=(
-                Settings.WELCOME.CARD_PADDING_LEFT,
-                Settings.WELCOME.CARD_PADDING_TOP,
-                Settings.WELCOME.CARD_PADDING_RIGHT,
-                Settings.WELCOME.CARD_PADDING_BOTTOM,
+                start_settings.CARD_PADDING_LEFT,
+                start_settings.CARD_PADDING_TOP,
+                start_settings.CARD_PADDING_RIGHT,
+                start_settings.CARD_PADDING_BOTTOM,
             ),
         )
         self.setObjectName("welcome-connection-actions-card")

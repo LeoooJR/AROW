@@ -4,8 +4,8 @@ from dataclasses import dataclass
 
 import pytest
 
-from core.adb import AdbClientException
-from core.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
+from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
+from core.adb.exceptions import AdbClientException
 from core.devices import Phone
 from core.models import CoreRuntimeModel
 from core.signals import (

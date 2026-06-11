@@ -27,7 +27,7 @@ from gui.components import (
 from gui.icons import GenericIcons
 from gui.panel import CollapsiblePanel, CollapsiblePanelConfig
 from gui.settings import Settings
-from gui.signals import view_signals
+from gui.signals import signals
 from gui.wrapper import (
     HorizontalLayoutWrapper,
     VerticalLayoutWrapper,
@@ -112,9 +112,7 @@ class DevicePairingPanel(QFrame):
 
         self.setLayout(layout)
 
-        self.ui: DevicePairingPanel.UI = DevicePairingPanel.UI(
-            title=title, header=header, body=body
-        )
+        self.ui = DevicePairingPanel.UI(title=title, header=header, body=body)
 
         self._finalize_ui_hooks()
 
@@ -183,7 +181,7 @@ class DeviceSelectionPanel(CollapsiblePanel):
                 title_icon=GenericIcons.DEVICE,
                 expanded_icon=GenericIcons.LAYOUT_TOPBAR_INSET,
                 collapsed_icon=GenericIcons.LAYOUT_TOPBAR,
-                visibility_signal=view_signals.DeviceSelectionPanelVisibilityRequested,
+                visibility_signal=signals.UI.DeviceSelectionPanelVisibilityRequested,
                 expand_button_tooltip=self.texts.expand_button_tooltip,
             ),
             parent,

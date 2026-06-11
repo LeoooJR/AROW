@@ -4,6 +4,7 @@ from typing import Final
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QFrame, QSizePolicy, QVBoxLayout
 
+from gui.blocks.location import MilestoneTargetBlock
 from gui.blocks.start import (
     ConnectionActionsBlock,
     OperatorReadinessBlock,
@@ -11,6 +12,8 @@ from gui.blocks.start import (
 )
 from gui.colors import Theme
 from gui.settings import Settings
+from gui.signals import signals
+from gui.welcome_settings import welcome_settings
 from gui.wrapper import HorizontalLayoutWrapper, VerticalLayoutWrapper
 
 
@@ -28,6 +31,7 @@ class WelcomePanel(QFrame):
 
         briefing_card: OperatorReadinessBlock
         connection_card: ConnectionActionsBlock
+        milestone_card: MilestoneTargetBlock
         start_card: StartRecentBlock
         top_row: HorizontalLayoutWrapper
         content_wrapper: VerticalLayoutWrapper
@@ -48,11 +52,14 @@ class WelcomePanel(QFrame):
 
         briefing_card = OperatorReadinessBlock(self)
         connection_card = ConnectionActionsBlock(self)
+        connection_card.show()
+        milestone_card = MilestoneTargetBlock(self)
+        milestone_card.hide()
         start_card = StartRecentBlock(self)
 
         top_row = HorizontalLayoutWrapper(
             self,
-            widgets=[briefing_card, connection_card],
+            widgets=[briefing_card, connection_card, milestone_card],
             spacing=Settings.PANEL.SECTION_SPACING,
             margins=Settings.SPACING.MARGIN_NONE,
         )
@@ -60,6 +67,7 @@ class WelcomePanel(QFrame):
         top_layout = top_row.get_layout()
         top_layout.setStretchFactor(briefing_card, 3)
         top_layout.setStretchFactor(connection_card, 2)
+        top_layout.setStretchFactor(milestone_card, 2)
 
         content_wrapper = VerticalLayoutWrapper(
             self,
@@ -85,6 +93,7 @@ class WelcomePanel(QFrame):
         self.ui: WelcomePanel.UI = WelcomePanel.UI(
             briefing_card=briefing_card,
             connection_card=connection_card,
+            milestone_card=milestone_card,
             start_card=start_card,
             top_row=top_row,
             content_wrapper=content_wrapper,
@@ -94,7 +103,10 @@ class WelcomePanel(QFrame):
 
     def apply_theme_icons(self, theme: Theme) -> None:
         self.ui.briefing_card.apply_theme_icons(theme)
-        self.ui.connection_card.apply_theme_icons(theme)
+        if self.ui.milestone_card.isVisible():
+            self.ui.connection_card.apply_theme_icons(theme)
+        if self.ui.milestone_card.isVisible():
+            self.ui.milestone_card.apply_theme_icons(theme)
         self.ui.start_card.apply_theme_icons(theme)
 
     def set_expanded_workspace_mode(self, enabled: bool) -> None:
@@ -120,7 +132,7 @@ class WelcomePanel(QFrame):
     def _apply_expanded_workspace_width(self) -> None:
         """Use available tab width while preventing ultra-wide card stretching."""
         target_width = min(
-            Settings.WELCOME.EXPANDED_CONTENT_MAX_WIDTH,
+            welcome_settings.EXPANDED_CONTENT_MAX_WIDTH,
             max(0, self.contentsRect().width() - (Settings.PANEL.CONTENT_PADDING * 2)),
         )
         self.ui.content_wrapper.setMinimumWidth(target_width)
@@ -139,7 +151,12 @@ class WelcomePanel(QFrame):
 
     def _connect_signals(self) -> None:
         """Connect signals for the welcome panel and its UI widgets."""
-        pass
+        signals.DEVICE.DeviceSelectionSucceeded.connect(
+            self._on_device_selection_succeeded
+        )
+        signals.DEVICE.RemoveActiveDeviceSucceeded.connect(
+            self._on_remove_active_device_succeeded
+        )
 
     def _set_alignment(self) -> None:
         """Centralize layout alignment for the panel and its UI widgets."""
@@ -159,6 +176,9 @@ class WelcomePanel(QFrame):
         self.ui.connection_card.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
         )
+        self.ui.milestone_card.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+        )
         self.ui.start_card.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
         )
@@ -168,3 +188,21 @@ class WelcomePanel(QFrame):
         self.ui.content_wrapper.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
         )
+
+    def _on_device_selection_succeeded(self, device_id: str, device_name: str) -> None:
+        """Handle the device selection succeeded.
+        Show the milestone card and hide the connection card.
+        """
+        if self.ui.connection_card.isVisible():
+            self.ui.connection_card.hide()
+        if self.ui.milestone_card.isHidden():
+            self.ui.milestone_card.show()
+
+    def _on_remove_active_device_succeeded(self, device_id: str) -> None:
+        """Handle the remove active device succeeded.
+        Hide the milestone card and show the connection card.
+        """
+        if self.ui.milestone_card.isVisible():
+            self.ui.milestone_card.hide()
+        if self.ui.connection_card.isHidden():
+            self.ui.connection_card.show()

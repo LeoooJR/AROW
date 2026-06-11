@@ -6,7 +6,7 @@ import pytest
 
 from gui.blocks.card import BridgeStatusCardBlock, IdentityCardBlock
 from gui.icons import OperatingSystemIcons
-from gui.signals import view_signals
+from gui.signals import signals
 
 pytestmark = pytest.mark.usefixtures("qapp")
 
@@ -53,7 +53,7 @@ def test_identity_card_debug_signal_restores_placeholder_values(qtbot) -> None:
         identity_state="error",
     )
 
-    view_signals.UiConstraintsDisabled.emit()
+    signals.UI.UiConstraintsDisabled.emit()
     qtbot.wait(0)
 
     assert card.content.host_name_label.text() == card.texts.placeholder_host_name
@@ -120,7 +120,7 @@ def test_bridge_status_card_debug_signal_restores_placeholder_values(qtbot) -> N
         indicator_state="error",
     )
 
-    view_signals.UiConstraintsDisabled.emit()
+    signals.UI.UiConstraintsDisabled.emit()
     qtbot.wait(0)
 
     assert (
@@ -146,7 +146,7 @@ def test_bridge_status_card_adb_server_started(qtbot) -> None:
     card = BridgeStatusCardBlock()
     qtbot.addWidget(card)
 
-    view_signals.ADBServerStarted.emit()
+    signals.ADB_SERVER.ADBServerStarted.emit()
     qtbot.wait(0)
 
     assert card.content.status_row.value_label.text() == "Running"
@@ -158,7 +158,7 @@ def test_bridge_status_card_adb_server_stopped(qtbot) -> None:
     card = BridgeStatusCardBlock()
     qtbot.addWidget(card)
 
-    view_signals.ADBServerStopped.emit()
+    signals.ADB_SERVER.ADBServerStopped.emit()
     qtbot.wait(0)
 
     assert card.content.status_row.value_label.text() == "Stopped"
@@ -170,7 +170,7 @@ def test_identity_card_host_device_information_updated(qtbot) -> None:
     card = IdentityCardBlock()
     qtbot.addWidget(card)
 
-    view_signals.HostDeviceInformationUpdated.emit("Build Host", "linux", "192.168.1.1")
+    signals.HOST.HostDeviceInformationUpdated.emit("Build Host", "linux", "192.168.1.1")
     qtbot.wait(0)
 
     assert card.content.host_name_label.text() == "Build Host"

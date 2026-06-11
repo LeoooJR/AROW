@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Final
 
-from collection import Repository
+from core.collection import Repository
 from core.devices import Phone
 from core.location import Location
 from logger import logger
@@ -29,10 +29,10 @@ class Simulation:
         default_factory=lambda: Location(lat=0.0, lon=0.0, label=None),
         metadata={"description": "The fake location to simulate on the device"},
     )
-    device: Final[Phone] = field(
+    device: Phone | None = field(
         default=None, metadata={"description": "The device of the simulation"}
     )
-    log_file: Path = field(
+    log_file: Path | None = field(
         default=None, metadata={"description": "The log file of the simulation"}
     )
     active: bool = field(

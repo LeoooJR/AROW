@@ -1,5 +1,5 @@
 """
-Tests for src/core/adb.py: ADB server commands (start-server, kill-server) only.
+Tests for core.adb.server: ADB server commands (start-server, kill-server) only.
 Success and error cases, with pytest markers.
 """
 
@@ -14,21 +14,21 @@ from pathlib import Path
 import pytest
 
 from core import ADB_BINARY_BUILD_NUMBER, ADB_BINARY_BUILD_VERSION, ADB_BINARY_VERSION
-from core.adb import (
-    _ADB_HISTORY_MAX_ENTRIES,
-    AdbBinary,
-    AdbClient,
+from core.adb.binary import AdbBinary
+from core.adb.client import AdbClient
+from core.adb.command import (
+    ADB_HISTORY_MAX_ENTRIES,
     AdbCommand,
     AdbCommandResult,
     AdbCommandResultStatus,
     AdbCommands,
-    AdbServer,
     _log_safe_argv,
     _log_safe_command_line,
     _log_safe_output_preview,
 )
+from core.adb.exceptions import AdbServerException
+from core.adb.server import AdbServer
 from core.devices import Phone, PhoneRepository
-from core.exceptions import AdbServerException
 
 pytestmark = [pytest.mark.adb, pytest.mark.adb_server]
 
@@ -464,13 +464,13 @@ class TestAdbServerExecuteResult:
         self, server: AdbServer
     ) -> None:
         """Server history keeps newest entries only."""
-        for _ in range(_ADB_HISTORY_MAX_ENTRIES + 3):
+        for _ in range(ADB_HISTORY_MAX_ENTRIES + 3):
             server.add_to_history(
                 AdbCommands.START_SERVER.value,
                 AdbCommandResult(status=AdbCommandResultStatus.SUCCESS),
             )
 
-        assert len(server.history) == _ADB_HISTORY_MAX_ENTRIES
+        assert len(server.history) == ADB_HISTORY_MAX_ENTRIES
 
 
 class TestAdbClientHistory:
@@ -481,13 +481,13 @@ class TestAdbClientHistory:
     ) -> None:
         client = AdbClient(adb_binary)
 
-        for _ in range(_ADB_HISTORY_MAX_ENTRIES + 3):
+        for _ in range(ADB_HISTORY_MAX_ENTRIES + 3):
             client.add_to_history(
                 AdbCommands.GET_DEVICES.value,
                 AdbCommandResult(status=AdbCommandResultStatus.SUCCESS),
             )
 
-        assert len(client.history) == _ADB_HISTORY_MAX_ENTRIES
+        assert len(client.history) == ADB_HISTORY_MAX_ENTRIES
 
     def test_client_remove_from_history_removes_matching_commands(
         self, adb_binary: AdbBinary

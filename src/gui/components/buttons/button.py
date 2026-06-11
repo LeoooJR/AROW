@@ -9,6 +9,7 @@ from PySide6.QtWidgets import QPushButton, QSizePolicy, QWidget
 
 from gui.colors import Theme
 from gui.components.base.component import Component
+from gui.components.buttons.button_settings import button_settings
 from gui.components.media import get_svg_size
 from gui.icons import (
     ApplicationIcons,
@@ -21,6 +22,8 @@ from gui.settings import Settings
 
 
 class Button(QPushButton, Component):
+
+    _icon: GenericIcons | OperatingSystemIcons | ApplicationIcons | None
 
     @dataclass(frozen=True)
     class Text:
@@ -39,6 +42,7 @@ class Button(QPushButton, Component):
         parent: QWidget | None,
         text: str,
         icon: GenericIcons | OperatingSystemIcons | ApplicationIcons | None = None,
+        theme_unresponsive: bool = False,
     ):
         """Create a styled primary button with optional icon.
 
@@ -46,7 +50,10 @@ class Button(QPushButton, Component):
             parent: Optional Qt parent widget for lifetime and hierarchy.
             text: Button label text.
             icon: Optional GenericIcons | OperatingSystemIcons | ApplicationIcons shown before the label.
+            theme_unresponsive: If True, the button will not change its theme when the application theme changes.
         """
+        self._theme_unresponsive = theme_unresponsive
+
         if icon is not None:
             super().__init__(QIcon(icon_qt_path(icon)), text, parent)
             self.setIconSize(get_svg_size(Settings.FONT.SIZE_DEFAULT))
@@ -64,7 +71,7 @@ class Button(QPushButton, Component):
         self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
-        self.setFixedHeight(Settings.DIMENSION.BUTTON_HEIGHT)
+        self.setFixedHeight(button_settings.BUTTON_HEIGHT)
         # Set minimum width based on content, but allow horizontal expansion
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.setMinimumWidth(self.sizeHint().width())
@@ -76,5 +83,7 @@ class Button(QPushButton, Component):
         pass
 
     def apply_theme_icons(self, theme: Theme) -> None:
+        if self._theme_unresponsive:
+            return
         if self._icon is not None:
             self.setIcon(QIcon(icon_qt_path_for_theme(theme, self._icon)))

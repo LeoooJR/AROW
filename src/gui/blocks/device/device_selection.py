@@ -22,11 +22,12 @@ from gui.animation import apply_highlight_level, compute_sine_pulse_level
 from gui.blocks.base import Block
 from gui.blocks.device.device_empty_state import DeviceEmptyState
 from gui.blocks.device.device_item import DeviceItem
+from gui.blocks.device.device_settings import device_settings
 from gui.colors import Theme
 from gui.components import GroupBox, HelperText, List, ToolButton
 from gui.icons import GenericIcons
 from gui.settings import Settings
-from gui.signals import view_signals
+from gui.signals import signals
 from gui.wrapper import GridLayoutWrapper, HorizontalLayoutWrapper
 from logger import logger
 
@@ -170,7 +171,7 @@ class DeviceSelectionBlock(QFrame, Block):
         self._refresh_timer = QTimer(self)
         self._refresh_timer.setSingleShot(False)
         self._refresh_timer.timeout.connect(self._on_refresh_timer_tick)
-        self._refresh_timer.setInterval(Settings.LIST.REFRESH_MS)
+        self._refresh_timer.setInterval(device_settings.REFRESH_MS)
         self._refresh_timer.start()
 
         self.ui.available_device_list.selectionModel().clear()  # Clear the selection model to avoid any residual selection when the list is empty.
@@ -220,33 +221,35 @@ class DeviceSelectionBlock(QFrame, Block):
         """Wire device list actions, selection events, and model-change refresh hooks."""
 
         #### Signals for handling the device list actions ####
-        self.ui.add_device_button.clicked.connect(view_signals.AddDeviceRequested.emit)
+        self.ui.add_device_button.clicked.connect(
+            signals.DEVICE.AddDeviceRequested.emit
+        )
         self.ui.refresh_button.clicked.connect(self._on_refresh_button_clicked)
         self.ui.available_device_list.itemClicked.connect(self._on_device_selected)
         self.ui.available_device_list.itemSelectionChanged.connect(
             self._sync_available_device_selection_state
         )
-        view_signals.RemoveDeviceRequested.connect(self._on_remove_device_requested)
+        signals.DEVICE.RemoveDeviceRequested.connect(self._on_remove_device_requested)
 
         #### Signals for handling the device selection panel visibility requests ####
-        view_signals.ExtendDeviceSelectionPanelRequested.connect(self.extend)
-        view_signals.ShortenDeviceSelectionPanelRequested.connect(self.shorten)
+        signals.UI.ExtendDeviceSelectionPanelRequested.connect(self.extend)
+        signals.UI.ShortenDeviceSelectionPanelRequested.connect(self.shorten)
 
         #### Signals for handling the authentification / selection workflow ####
-        view_signals.AuthentificationSucceeded.connect(
+        signals.DEVICE.AuthentificationSucceeded.connect(
             self._on_authentification_succeeded
         )
-        view_signals.DeviceSelectionSucceeded.connect(
+        signals.DEVICE.DeviceSelectionSucceeded.connect(
             self._on_device_selection_succeeded
         )
-        view_signals.DeviceSelectionFailed.connect(self._on_device_selection_failed)
-        view_signals.DevicesUpdated.connect(self._on_devices_updated)
+        signals.DEVICE.DeviceSelectionFailed.connect(self._on_device_selection_failed)
+        signals.DEVICE.DevicesUpdated.connect(self._on_devices_updated)
 
         #### Signals for handling the UI constraints disabled ####
-        view_signals.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
+        signals.UI.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
 
-        view_signals.LeftPanelsVisibilityRequested.connect(
-            self._on_left_panels_visibility_requested
+        signals.UI.DisplayLeftPanelsRequested.connect(
+            self._on_left_panels_display_requested
         )
 
         #### Signals for handling the device list model changes ####
@@ -258,8 +261,8 @@ class DeviceSelectionBlock(QFrame, Block):
         model.dataChanged.connect(self._on_available_device_list_model_changed)
 
         #### Signals for handling the helper animation requests ####
-        view_signals.RunHelperAnimationRequested.connect(self._on_run_helper_animation)
-        view_signals.MapTabActivated.connect(self._on_map_tab_activated)
+        signals.UI.RunHelperAnimationRequested.connect(self._on_run_helper_animation)
+        signals.UI.MapTabActivated.connect(self._on_map_tab_activated)
 
     def _on_ui_constraints_disabled(self) -> None:
         """Seed placeholder rows when UI constraints are disabled."""
@@ -280,7 +283,7 @@ class DeviceSelectionBlock(QFrame, Block):
         inset = Settings.SPACING.XS
         available_geometry = viewport.rect().adjusted(inset, inset, -inset, -inset)
         card_width = min(
-            Settings.LIST.DEVICE_EMPTY_STATE_WIDTH,
+            device_settings.EMPTY_STATE_WIDTH,
             available_geometry.width(),
         )
         card_x = available_geometry.x() + (
@@ -333,10 +336,9 @@ class DeviceSelectionBlock(QFrame, Block):
             if isinstance(item, self._device_item_type):
                 item._sync_size_hint()
 
-    def _on_left_panels_visibility_requested(self, visible: bool) -> None:
-        """Hide the device selection panel when the left panels are hidden."""
-        if visible:
-            self._sync_available_device_item_presentation_state()
+    def _on_left_panels_display_requested(self) -> None:
+        """Resync device row presentation when the left panels are shown again."""
+        self._sync_available_device_item_presentation_state()
 
     def _on_authentification_succeeded(self, device: dict) -> None:
         """Add a newly authenticated device and mark it as the active selection."""
@@ -362,7 +364,7 @@ class DeviceSelectionBlock(QFrame, Block):
         if item is None:
             return
         if isinstance(item, self._device_item_type):
-            view_signals.DeviceSelectionRequested.emit(item.id, item.name)
+            signals.DEVICE.DeviceSelectionRequested.emit(item.id, item.name)
         else:
             logger.warning(
                 "DeviceSelectionBlock: device item is not a DeviceItem", item=item
@@ -415,7 +417,7 @@ class DeviceSelectionBlock(QFrame, Block):
     def _on_refresh_button_clicked(self) -> None:
         """Emit a device-list refresh request from the refresh action button."""
         logger.info("Available device list refresh requested.")
-        view_signals.RefreshDeviceListRequested.emit()
+        signals.DEVICE.RefreshDeviceListRequested.emit()
 
     def _on_remove_device_requested(self, id: str) -> None:
         """Remove the matching device row when a row-level delete action is requested.
@@ -454,7 +456,7 @@ class DeviceSelectionBlock(QFrame, Block):
 
     def _on_highlight_pulse_tick(self) -> None:
         """Advance the transient attention pulse on the available-device list."""
-        cycle_ms = Settings.ANIMATION.ATTENTION_HIGHLIGHT_PULSE_CYCLE_MS
+        cycle_ms = device_settings.ATTENTION_HIGHLIGHT_PULSE_CYCLE_MS
         elapsed = self._highlight_elapsed.elapsed()
         level = compute_sine_pulse_level(elapsed, cycle_ms)
         apply_highlight_level(
@@ -498,12 +500,8 @@ class DeviceSelectionBlock(QFrame, Block):
         """Start the attention pulse and set the list highlight level."""
         self._stop_highlight_attention()
         self._highlight_elapsed.start()
-        self._highlight_pulse_timer.start(
-            Settings.ANIMATION.ATTENTION_HIGHLIGHT_UPDATE_MS
-        )
-        self._highlight_stop_timer.start(
-            Settings.ANIMATION.ATTENTION_HIGHLIGHT_DURATION
-        )
+        self._highlight_pulse_timer.start(device_settings.ATTENTION_HIGHLIGHT_UPDATE_MS)
+        self._highlight_stop_timer.start(device_settings.ATTENTION_HIGHLIGHT_DURATION)
 
     def _stop_highlight_attention(self) -> None:
         """Stop the attention pulse and reset the list highlight level."""

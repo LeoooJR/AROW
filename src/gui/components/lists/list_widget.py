@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 
 from gui.colors import Theme
 from gui.components.base.component import Component
+from gui.components.lists.list_settings import list_settings
 from gui.settings import Settings
 
 
@@ -38,8 +39,8 @@ class List(QListWidget, Component):
         self,
         parent: QWidget | None,
         items: list[str | QListWidgetItem] = [],
-        minimum_width: int = Settings.LIST.MIN_WIDTH,
-        minimum_height: int = Settings.LIST.MIN_HEIGHT,
+        minimum_width: int = list_settings.MIN_WIDTH,
+        minimum_height: int = list_settings.MIN_HEIGHT,
         selection_mode: QAbstractItemView.SelectionMode = QAbstractItemView.SelectionMode.SingleSelection,
         selection_behavior: QAbstractItemView.SelectionBehavior = QAbstractItemView.SelectionBehavior.SelectItems,
         edit_triggers: QAbstractItemView.EditTrigger = QAbstractItemView.EditTrigger.NoEditTriggers,
@@ -80,7 +81,7 @@ class List(QListWidget, Component):
         self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
-        self.setBaseSize(QSize(Settings.LIST.BASE_WIDTH, Settings.LIST.BASE_HEIGHT))
+        self.setBaseSize(QSize(list_settings.BASE_WIDTH, list_settings.BASE_HEIGHT))
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setSizeAdjustPolicy(QListWidget.SizeAdjustPolicy.AdjustToContents)
 

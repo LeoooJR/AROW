@@ -3,7 +3,15 @@ Stylesheet of the application.
 Light and dark stylesheets are built once from the color palette for each theme.
 """
 
+from gui.blocks.activity.activity_log_settings import activity_log_settings
+from gui.blocks.device.device_settings import device_settings
+from gui.blocks.map.map_settings import map_settings
 from gui.colors import get_current_theme, get_palette
+from gui.components.buttons.button_settings import button_settings
+from gui.components.containers.container_settings import container_settings
+from gui.components.indicators.indicator_settings import indicator_settings
+from gui.components.inputs.input_settings import input_settings
+from gui.components.lists.list_settings import list_settings
 from gui.settings import Settings
 
 
@@ -210,7 +218,7 @@ QProgressBar {{
     font-family: {Settings.FONT.FAMILY_CSS};
     font-size: {Settings.FONT.SIZE_HELPER}px;
     font-weight: {Settings.FONT.WEIGHT_NORMAL};
-    min-height: {Settings.DIMENSION.PROGRESSBAR_HEIGHT}px;
+    min-height: {indicator_settings.PROGRESSBAR_HEIGHT}px;
     text-align: center;
 }}
 
@@ -236,12 +244,12 @@ QComboBox {{
     border: 1px solid {palette.BORDER_SUBTLE};
     border-radius: {Settings.BORDER_RADIUS.MD}px;
     color: {palette.TEXT_PRIMARY};
-    min-height: {Settings.COMBOBOX.MIN_HEIGHT}px;
+    min-height: {input_settings.COMBOBOX.MIN_HEIGHT}px;
     min-width: 6em;
-    padding-left: {Settings.COMBOBOX.PADDING_LEFT}px;
-    padding-right: {Settings.COMBOBOX.PADDING_RIGHT}px;
-    padding-top: {Settings.COMBOBOX.PADDING_TOP}px;
-    padding-bottom: {Settings.COMBOBOX.PADDING_BOTTOM}px;
+    padding-left: {input_settings.COMBOBOX.PADDING_LEFT}px;
+    padding-right: {input_settings.COMBOBOX.PADDING_RIGHT}px;
+    padding-top: {input_settings.COMBOBOX.PADDING_TOP}px;
+    padding-bottom: {input_settings.COMBOBOX.PADDING_BOTTOM}px;
     text-align: center;
 }}
 
@@ -257,7 +265,7 @@ QComboBox:focus {{
 QComboBox::drop-down {{
     subcontrol-origin: padding;
     subcontrol-position: top right;
-    width: {Settings.COMBOBOX.DROPDOWN_WIDTH}px;
+    width: {input_settings.COMBOBOX.DROPDOWN_WIDTH}px;
     border-left: 1px solid {palette.BORDER_SUBTLE};
     border-top-right-radius: {Settings.BORDER_RADIUS.MD}px;
     border-bottom-right-radius: {Settings.BORDER_RADIUS.MD}px;
@@ -268,7 +276,7 @@ QComboBox QAbstractItemView {{
     border: 1px solid {palette.BORDER_SUBTLE};
     border-radius: {Settings.BORDER_RADIUS.MD}px;
     color: {palette.TEXT_PRIMARY};
-    min-width: {Settings.COMBOBOX.ITEM_VIEW_MIN_WIDTH}px;
+    min-width: {input_settings.COMBOBOX.ITEM_VIEW_MIN_WIDTH}px;
     outline: none;
     padding: 6px;
     selection-background-color: {palette.PRIMARY_SOFT};
@@ -313,9 +321,9 @@ QListWidget::item {{
     font-family: {Settings.FONT.FAMILY_CSS};
     font-size: {Settings.FONT.SIZE_DEFAULT}px;
     font-weight: {Settings.FONT.WEIGHT_NORMAL};
-    margin: {Settings.LIST.ITEM_MARGIN_VERTICAL}px 0px;
-    min-height: {Settings.LIST.ITEM_MIN_HEIGHT}px;
-    padding: {Settings.LIST.ITEM_PADDING_VERTICAL}px {Settings.LIST.ITEM_PADDING_HORIZONTAL}px;
+    margin: {list_settings.ITEM_MARGIN_VERTICAL}px 0px;
+    min-height: {list_settings.ITEM_MIN_HEIGHT}px;
+    padding: {list_settings.ITEM_PADDING_VERTICAL}px {list_settings.ITEM_PADDING_HORIZONTAL}px;
 }}
 
 QListWidget::item:selected {{
@@ -341,30 +349,30 @@ QListWidget QScrollBar:horizontal {{
     background-color: {palette.SURFACE};
     border: none;
     border-radius: {Settings.BORDER_RADIUS.SM}px;
-    margin: {Settings.LIST.SCROLLBAR_MARGIN}px;
+    margin: {list_settings.SCROLLBAR_MARGIN}px;
 }}
 
 QListWidget QScrollBar:vertical {{
-    width: {Settings.LIST.SCROLLBAR_WIDTH}px;
+    width: {list_settings.SCROLLBAR_WIDTH}px;
 }}
 
 QListWidget QScrollBar:horizontal {{
-    height: {Settings.LIST.SCROLLBAR_WIDTH}px;
+    height: {list_settings.SCROLLBAR_WIDTH}px;
 }}
 
 QListWidget QScrollBar::handle:vertical,
 QListWidget QScrollBar::handle:horizontal {{
     background-color: {palette.TEXT_MUTED};
     border-radius: {Settings.BORDER_RADIUS.SM}px;
-    margin: {Settings.LIST.SCROLLBAR_HANDLE_MARGIN}px;
+    margin: {list_settings.SCROLLBAR_HANDLE_MARGIN}px;
 }}
 
 QListWidget QScrollBar::handle:vertical {{
-    min-height: {Settings.LIST.SCROLLBAR_HANDLE_MIN_HEIGHT}px;
+    min-height: {list_settings.SCROLLBAR_HANDLE_MIN_HEIGHT}px;
 }}
 
 QListWidget QScrollBar::handle:horizontal {{
-    min-width: {Settings.LIST.SCROLLBAR_HANDLE_MIN_WIDTH}px;
+    min-width: {list_settings.SCROLLBAR_HANDLE_MIN_WIDTH}px;
 }}
 
 QListWidget QScrollBar::handle:vertical:hover,
@@ -477,8 +485,8 @@ QFrame[place-holder="true"] {{
     font-family: {Settings.FONT.FAMILY_CSS};
     font-size: {Settings.FONT.SIZE_DEFAULT}px;
     font-weight: {Settings.FONT.WEIGHT_NORMAL};
-    margin: {Settings.PLACEHOLDER.MARGIN}px;
-    padding: {Settings.PLACEHOLDER.PADDING}px;
+    margin: {container_settings.PLACEHOLDER.MARGIN}px;
+    padding: {container_settings.PLACEHOLDER.PADDING}px;
     text-align: center;
 }}
 
@@ -916,7 +924,7 @@ QFrame[map-placeholder-state="true"] {{
     background-color: {palette.PRIMARY_SOFT};
     border: 1px solid {palette.PRIMARY_BORDER};
     border-radius: {Settings.BORDER_RADIUS.MD}px;
-    margin: {Settings.PLACEHOLDER.MARGIN}px;
+    margin: {container_settings.PLACEHOLDER.MARGIN}px;
 }}
 
 QFrame[map-placeholder-state="true"] QLabel#map-placeholder-title {{
@@ -1013,10 +1021,10 @@ QFrame#device-item-icon-frame {{
     background-color: {palette.SURFACE_MUTED};
     border: 1px solid {palette.BORDER_SUBTLE};
     border-radius: {Settings.BORDER_RADIUS.SM}px;
-    max-height: {Settings.LIST.DEVICE_ITEM_ICON_FRAME}px;
-    max-width: {Settings.LIST.DEVICE_ITEM_ICON_FRAME}px;
-    min-height: {Settings.LIST.DEVICE_ITEM_ICON_FRAME}px;
-    min-width: {Settings.LIST.DEVICE_ITEM_ICON_FRAME}px;
+    max-height: {device_settings.ITEM_ICON_FRAME}px;
+    max-width: {device_settings.ITEM_ICON_FRAME}px;
+    min-height: {device_settings.ITEM_ICON_FRAME}px;
+    min-width: {device_settings.ITEM_ICON_FRAME}px;
 }}
 
 QLabel#device-item-name {{
@@ -1065,10 +1073,10 @@ QGroupBox QToolButton#device-item-trash {{
     background-color: {palette.TRANSPARENT};
     border: none;
     color: {palette.TEXT_MUTED};
-    max-height: {Settings.DIMENSION.TOOLBUTTON_HEIGHT}px;
-    max-width: {Settings.DIMENSION.TOOLBUTTON_HEIGHT}px;
-    min-height: {Settings.DIMENSION.TOOLBUTTON_HEIGHT}px;
-    min-width: {Settings.DIMENSION.TOOLBUTTON_HEIGHT}px;
+    max-height: {button_settings.TOOLBUTTON_HEIGHT}px;
+    max-width: {button_settings.TOOLBUTTON_HEIGHT}px;
+    min-height: {button_settings.TOOLBUTTON_HEIGHT}px;
+    min-width: {button_settings.TOOLBUTTON_HEIGHT}px;
     padding: 2px;
 }}
 
@@ -1321,7 +1329,7 @@ QLabel#activity-log-detail {{
     border-radius: {Settings.BORDER_RADIUS.SM}px;
     color: {palette.TEXT_MUTED};
     font-size: {Settings.FONT.SIZE_HELPER}px;
-    padding: {Settings.LIST.ACTIVITY_ITEM_DETAIL_PADDING}px;
+    padding: {activity_log_settings.ITEM_DETAIL_PADDING}px;
 }}
 
 QToolButton#activity-log-filter-button::menu-indicator {{
@@ -1409,7 +1417,7 @@ QWidget#location-longitude-widget:hover {{
 QWidget#location-latitude-widget QLabel,
 QWidget#location-longitude-widget QLabel {{
     color: {palette.TEXT_MUTED};
-    font-size: {Settings.LOCATION.LABEL_FONT_SIZE}px;
+    font-size: {map_settings.LABEL_FONT_SIZE}px;
 }}
 
 QMessageBox {{

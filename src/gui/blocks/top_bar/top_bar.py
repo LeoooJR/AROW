@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 from shiboken6 import isValid
 
 from gui.blocks.base import Block
+from gui.blocks.top_bar.top_bar_settings import top_bar_settings
 from gui.colors import Theme, get_current_theme
 from gui.components import SVG, ToolButton
 from gui.icons import (
@@ -33,7 +34,7 @@ from gui.icons import (
     icon_qt_path_for_theme,
 )
 from gui.settings import Settings
-from gui.signals import view_signals
+from gui.signals import signals
 from gui.wrapper import GridLayoutWrapper, HorizontalLayoutWrapper
 
 
@@ -84,7 +85,7 @@ class TopBar(QWidget, Block):
         self.texts = TopBar.Text()
 
         # Set fixed height from settings
-        self.setFixedHeight(Settings.DIMENSION.HEADER_HEIGHT)
+        self.setFixedHeight(top_bar_settings.HEADER_HEIGHT)
 
         # Create horizontal layout for header
         layout = QHBoxLayout()
@@ -115,7 +116,7 @@ class TopBar(QWidget, Block):
         layout.addWidget(palette_button_wrapper)
 
         # Create palette thumb, a small frame that moves to indicate the selected palette button
-        thumb_size = Settings.DIMENSION.PALETTE_THUMB_SIZE
+        thumb_size = top_bar_settings.PALETTE_THUMB_SIZE
         palette_thumb = QFrame(palette_button_wrapper)
         palette_thumb.setObjectName("palette-thumb")
         palette_thumb.setFixedSize(thumb_size, thumb_size)
@@ -128,7 +129,7 @@ class TopBar(QWidget, Block):
         # Create name, the application name
         name = SVG(icon_qt_path(ApplicationIcons.NAME), self)
         name.setFixedSize(
-            Settings.DIMENSION.APP_NAME_WIDTH, Settings.DIMENSION.APP_NAME_HEIGHT
+            top_bar_settings.APP_NAME_WIDTH, top_bar_settings.APP_NAME_HEIGHT
         )
         # Add name to layout
         layout.addWidget(name, 1)
@@ -192,17 +193,23 @@ class TopBar(QWidget, Block):
         """Connect signals for the header widgets."""
 
         #### Signals for toggling the left and right panels visibility ####
-        left_btn = self.ui.left_panel_visibility_request_button
-        right_btn = self.ui.right_panel_visibility_request_button
-        left_btn.clicked.connect(
-            lambda: view_signals.LeftPanelsVisibilityRequested.emit(
-                not bool(left_btn.property("visibility"))
-            )
+        self.ui.left_panel_visibility_request_button.clicked.connect(
+            self._on_left_panel_visibility_button_clicked
         )
-        right_btn.clicked.connect(
-            lambda: view_signals.RightPanelsVisibilityRequested.emit(
-                not bool(right_btn.property("visibility"))
-            )
+        self.ui.right_panel_visibility_request_button.clicked.connect(
+            self._on_right_panel_visibility_button_clicked
+        )
+        signals.UI.DisplayLeftPanelsRequested.connect(
+            lambda: self._set_left_panels_button_displayed(True)
+        )
+        signals.UI.HideLeftPanelsRequested.connect(
+            lambda: self._set_left_panels_button_displayed(False)
+        )
+        signals.UI.DisplayRightPanelsRequested.connect(
+            lambda: self._set_right_panels_button_displayed(True)
+        )
+        signals.UI.HideRightPanelsRequested.connect(
+            lambda: self._set_right_panels_button_displayed(False)
         )
 
         #### Signals for toggling the palette ####
@@ -263,44 +270,6 @@ class TopBar(QWidget, Block):
         """Return the dark palette button."""
         return self.ui.dark_palette_button
 
-    def toggle_left_panels_visibility_request_button(self) -> None:
-        """Update left panels button icon and properties to the toggled state (call after body left panels visibility has been set).
-
-        Args:
-            None
-
-        Returns:
-            None
-        """
-        button = self.ui.left_panel_visibility_request_button
-        if button.property("inset"):
-            button.setProperty("inset", False)
-            button.setProperty("visibility", False)
-            button.set_icon(GenericIcons.LAYOUT_SIDEBAR)
-        else:
-            button.setProperty("inset", True)
-            button.setProperty("visibility", True)
-            button.set_icon(GenericIcons.LAYOUT_SIDEBAR_INSET)
-
-    def toggle_right_panels_visibility_request_button(self) -> None:
-        """Update right panels button icon and properties to the toggled state (call after body right panels visibility has been set).
-
-        Args:
-            None
-
-        Returns:
-            None
-        """
-        button = self.ui.right_panel_visibility_request_button
-        if button.property("inset"):
-            button.setProperty("inset", False)
-            button.setProperty("visibility", False)
-            button.set_icon(GenericIcons.LAYOUT_SIDEBAR_REVERSE)
-        else:
-            button.setProperty("inset", True)
-            button.setProperty("visibility", True)
-            button.set_icon(GenericIcons.LAYOUT_SIDEBAR_INSET_REVERSE)
-
     def apply_theme_icons(self, theme: Theme) -> None:
         """Refresh header chrome icon resources for ``theme``."""
         self.ui.light_palette_button.apply_theme_icons(theme)
@@ -324,6 +293,42 @@ class TopBar(QWidget, Block):
         right_btn.apply_theme_icons(theme)
 
     #### Private methods ####
+
+    def _on_left_panel_visibility_button_clicked(self) -> None:
+        """Toggle left sidebar visibility from the header button."""
+        if bool(self.ui.left_panel_visibility_request_button.property("visibility")):
+            signals.UI.HideLeftPanelsRequested.emit()
+        else:
+            signals.UI.DisplayLeftPanelsRequested.emit()
+
+    def _on_right_panel_visibility_button_clicked(self) -> None:
+        """Toggle right sidebar visibility from the header button."""
+        if bool(self.ui.right_panel_visibility_request_button.property("visibility")):
+            signals.UI.HideRightPanelsRequested.emit()
+        else:
+            signals.UI.DisplayRightPanelsRequested.emit()
+
+    def _set_left_panels_button_displayed(self, displayed: bool) -> None:
+        """Update left sidebar button icon and properties to match panel visibility."""
+        button = self.ui.left_panel_visibility_request_button
+        button.setProperty("inset", displayed)
+        button.setProperty("visibility", displayed)
+        button.set_icon(
+            GenericIcons.LAYOUT_SIDEBAR_INSET
+            if displayed
+            else GenericIcons.LAYOUT_SIDEBAR
+        )
+
+    def _set_right_panels_button_displayed(self, displayed: bool) -> None:
+        """Update right sidebar button icon and properties to match panel visibility."""
+        button = self.ui.right_panel_visibility_request_button
+        button.setProperty("inset", displayed)
+        button.setProperty("visibility", displayed)
+        button.set_icon(
+            GenericIcons.LAYOUT_SIDEBAR_INSET_REVERSE
+            if displayed
+            else GenericIcons.LAYOUT_SIDEBAR_REVERSE
+        )
 
     def _update_palette_thumb_geometry(self) -> None:
         """Position the palette thumb over the active theme button (initial or after layout)."""
@@ -349,9 +354,9 @@ class TopBar(QWidget, Block):
 
         ### Palette button signal emission ###
         if button == self.ui.light_palette_button:
-            view_signals.UpdatePaletteSignal.emit("light")
+            signals.UI.UpdatePaletteSignal.emit("light")
         elif button == self.ui.dark_palette_button:
-            view_signals.UpdatePaletteSignal.emit("dark")
+            signals.UI.UpdatePaletteSignal.emit("dark")
 
         ### Palette thumb animation (move the thumb over the clicked button) ###
         thumb = self.ui.palette_thumb
@@ -371,7 +376,7 @@ class TopBar(QWidget, Block):
         self._palette_thumb_anim = QPropertyAnimation(thumb, b"geometry")
         self._palette_thumb_anim.setStartValue(thumb.geometry())
         self._palette_thumb_anim.setEndValue(target)
-        self._palette_thumb_anim.setDuration(Settings.ANIMATION.PALETTE_SWITCH_DURATION)
+        self._palette_thumb_anim.setDuration(top_bar_settings.PALETTE_SWITCH_DURATION)
         self._palette_thumb_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
         self._palette_thumb_anim.setParent(self)
         self._palette_thumb_anim.start()

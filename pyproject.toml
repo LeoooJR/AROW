@@ -1,2 +1,16 @@
+[tool.mypy]
+python_version = "3.12"
+mypy_path = ["src"]
+namespace_packages = true
+explicit_package_bases = true
+exclude = ["^src/__init__\\.py$"]
+
+[[tool.mypy.overrides]]
+module = [
+    "gui.blocks.start.*",
+    "gui.blocks.location.milestone_target",
+]
+disable_error_code = ["assignment", "attr-defined"]
+
 [tool.bandit]
 exclude_dirs = ["tests"]

@@ -12,7 +12,7 @@ from gui.device_panel import DeviceSelectionPanel
 from gui.host_panel import HostPanel
 from gui.location_panel import LocationPanel
 from gui.log_panel import LogPanel
-from gui.signals import view_signals
+from gui.signals import signals
 
 pytestmark = pytest.mark.usefixtures("qapp")
 
@@ -31,7 +31,7 @@ def test_collapsible_panel_button_toggles_and_emits_signal(
 ) -> None:
     panel = panel_cls()
     qtbot.addWidget(panel)
-    signal = getattr(view_signals, signal_name)
+    signal = getattr(signals.UI, signal_name)
 
     assert panel.is_panel_visible() is True
 

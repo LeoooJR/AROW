@@ -28,7 +28,7 @@ class AppSubController(ABC):
 
     @abstractmethod
     def connect_view_signals(self) -> None:
-        """Wire :data:`gui.signals.view_signals` for this domain."""
+        """Wire :data:`gui.signals.signals` for this domain."""
         ...
 
     @abstractmethod

@@ -27,11 +27,12 @@ from PySide6.QtWidgets import (
 )
 
 from gui.blocks.base import Block
+from gui.blocks.map.map_settings import map_settings
 from gui.colors import Theme, get_current_palette, get_current_theme, qcolor_from_css
 from gui.components.media import get_svg_size
 from gui.icons import GenericIcons, icon_qt_path_for_theme
 from gui.settings import Settings
-from gui.signals import view_signals
+from gui.signals import signals
 
 
 class DeviceRequiredMapGlyph(QFrame):
@@ -210,7 +211,7 @@ class DeviceRequiredMapPlaceholder(QFrame, Block):
     def _connect_signals(self) -> None:
         """Connect the CTA to the left-panel visibility request."""
         self.ui.open_device_list_button.clicked.connect(
-            lambda: view_signals.LeftPanelsVisibilityRequested.emit(True)
+            signals.UI.DisplayLeftPanelsRequested.emit
         )
 
     def play_helper_animation(
@@ -229,7 +230,7 @@ class DeviceRequiredMapPlaceholder(QFrame, Block):
             effect = QGraphicsOpacityEffect(self.ui.glyph)
             self.ui.glyph.setGraphicsEffect(effect)
 
-        half = Settings.ANIMATION.PLACEHOLDER_HELPER_DURATION // 2
+        half = map_settings.PLACEHOLDER_HELPER_DURATION // 2
         easing = QEasingCurve.Type.OutCubic
 
         anim_fade_out = QPropertyAnimation(effect, b"opacity")
@@ -247,7 +248,7 @@ class DeviceRequiredMapPlaceholder(QFrame, Block):
         animation = QSequentialAnimationGroup(self)
         animation.addAnimation(anim_fade_out)
         animation.addAnimation(anim_fade_in)
-        animation.setLoopCount(Settings.ANIMATION.PLACEHOLDER_HELPER_ITERATION)
+        animation.setLoopCount(map_settings.PLACEHOLDER_HELPER_ITERATION)
         animation.start()
         return animation
 

@@ -11,6 +11,7 @@ from PySide6.QtWidgets import QHBoxLayout, QLineEdit, QWidget
 
 from gui.colors import Theme
 from gui.components.base.component import Component
+from gui.components.inputs.input_settings import input_settings
 from gui.settings import Settings
 
 
@@ -150,9 +151,10 @@ class OTPInput(QWidget, Component):
             max_length: Per-cell max lengths; length must match ``otp_length``.
             echo_mode: Echo mode forwarded to each ``QLineEdit``.
         """
-        assert (
-            len(max_length) == otp_length
-        ), "Max length list must be the same length as the OTP length"
+        if len(max_length) != otp_length:
+            raise ValueError(
+                "Max length list must be the same length as the OTP length"
+            )
         super().__init__(parent)
         self.texts = OTPInput.Text()
         self.ui = OTPInput.UI()
@@ -172,7 +174,7 @@ class OTPInput(QWidget, Component):
             otp_input.setObjectName(f"otp-input-{i}")
             otp_input.setFrame(True)
             otp_input.setFixedSize(
-                Settings.DIMENSION.OTP_INPUT_SIZE, Settings.DIMENSION.OTP_INPUT_SIZE
+                input_settings.OTP.INPUT_SIZE, input_settings.OTP.INPUT_SIZE
             )
             otp_input.setAlignment(Qt.AlignmentFlag.AlignCenter)
             otp_input.setCursor(Qt.CursorShape.IBeamCursor)

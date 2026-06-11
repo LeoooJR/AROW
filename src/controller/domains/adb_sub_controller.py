@@ -24,7 +24,7 @@ from core.signals import (
     DeviceAuthentificationSucceededPayload,
     DevicesUpdatedPayload,
 )
-from gui.signals import view_signals
+from gui.signals import signals
 from gui.window import MainWindow
 from logger import logger
 
@@ -49,13 +49,13 @@ class AdbSubController(AppSubController):
 
     def connect_view_signals(self) -> None:
         """Connect view signals for ADB and pairing (called from AppController)."""
-        view_signals.AuthentificationConfirmed.connect(
+        signals.DEVICE.AuthentificationConfirmed.connect(
             self._on_authentification_confirmed
         )
-        view_signals.RefreshDeviceListRequested.connect(
+        signals.DEVICE.RefreshDeviceListRequested.connect(
             self._on_refresh_device_list_requested
         )
-        view_signals.RemoveDeviceRequested.connect(self._on_remove_device_requested)
+        signals.DEVICE.RemoveDeviceRequested.connect(self._on_remove_device_requested)
 
     def connect_model_signals(self) -> None:
         """Subscribe to core ADB and device events."""

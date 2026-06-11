@@ -6,7 +6,7 @@ import pytest
 
 from gui.blocks.top_bar import TopBar
 from gui.colors import get_current_theme, set_current_theme
-from gui.signals import view_signals
+from gui.signals import signals
 
 pytestmark = pytest.mark.usefixtures("qapp")
 
@@ -43,9 +43,9 @@ def test_top_bar_palette_buttons_emit_theme_requests(qtbot) -> None:
     top_bar = TopBar()
     qtbot.addWidget(top_bar)
 
-    with qtbot.waitSignal(view_signals.UpdatePaletteSignal) as dark_signal:
+    with qtbot.waitSignal(signals.UI.UpdatePaletteSignal) as dark_signal:
         top_bar.dark_palette_button.click()
-    with qtbot.waitSignal(view_signals.UpdatePaletteSignal) as light_signal:
+    with qtbot.waitSignal(signals.UI.UpdatePaletteSignal) as light_signal:
         top_bar.light_palette_button.click()
 
     assert dark_signal.args == ["dark"]
@@ -69,10 +69,10 @@ def test_top_bar_sidebar_buttons_emit_visibility_requests(qtbot) -> None:
     top_bar = TopBar()
     qtbot.addWidget(top_bar)
 
-    with qtbot.waitSignal(view_signals.LeftPanelsVisibilityRequested) as left_signal:
+    with qtbot.waitSignal(signals.UI.HideLeftPanelsRequested):
         top_bar.left_panel_visibility_request_button.click()
-    with qtbot.waitSignal(view_signals.RightPanelsVisibilityRequested) as right_signal:
+    with qtbot.waitSignal(signals.UI.HideRightPanelsRequested):
         top_bar.right_panel_visibility_request_button.click()
 
-    assert left_signal.args == [False]
-    assert right_signal.args == [False]
+    assert top_bar.left_panel_visibility_request_button.property("visibility") is False
+    assert top_bar.right_panel_visibility_request_button.property("visibility") is False

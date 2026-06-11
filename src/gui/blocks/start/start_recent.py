@@ -9,6 +9,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QLabel, QSizePolicy, QWidget
 
 from gui.blocks.base import Block
+from gui.blocks.start.start_settings import start_settings
 from gui.colors import Theme
 from gui.components import File
 from gui.settings import Settings
@@ -17,6 +18,9 @@ from gui.wrapper import VerticalLayoutWrapper
 
 class StartRecentBlock(VerticalLayoutWrapper, Block):
     """Welcome card containing dated recent-session placeholders."""
+
+    texts: StartRecentBlock.Text
+    ui: StartRecentBlock.UI
 
     @dataclass(frozen=True)
     class Text:
@@ -51,10 +55,10 @@ class StartRecentBlock(VerticalLayoutWrapper, Block):
             widgets=[recent_label, recent_files_wrapper],
             spacing=Settings.PANEL.SECTION_SPACING,
             margins=(
-                Settings.WELCOME.CARD_PADDING_LEFT,
-                Settings.WELCOME.CARD_PADDING_TOP,
-                Settings.WELCOME.CARD_PADDING_RIGHT,
-                Settings.WELCOME.CARD_PADDING_BOTTOM,
+                start_settings.CARD_PADDING_LEFT,
+                start_settings.CARD_PADDING_TOP,
+                start_settings.CARD_PADDING_RIGHT,
+                start_settings.CARD_PADDING_BOTTOM,
             ),
             stretch_at_end=True,
         )

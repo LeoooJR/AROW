@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from gui.components.file_display import File
-from gui.signals import view_signals
+from gui.signals import signals
 
 pytestmark = pytest.mark.usefixtures("qapp")
 
@@ -88,7 +88,7 @@ def test_file_display_save_as_emits_activity_log_file_update_requested(
     )
 
     emitted: list[str] = []
-    view_signals.ActivityLogFileUpdateRequested.connect(emitted.append)
+    signals.ACTIVITY_LOG.ActivityLogFileUpdateRequested.connect(emitted.append)
 
     file_widget._on_save_as_button_clicked()
 

@@ -17,11 +17,12 @@ from PySide6.QtWidgets import (
 
 from gui import faker as ui_faker
 from gui.blocks.base import Block
+from gui.blocks.card.card_settings import card_settings
 from gui.colors import Theme
 from gui.components import ConditionIndicator, GroupBox, LeadingIconLabel
 from gui.icons import ApplicationIcons, GenericIcons, OperatingSystemIcons
 from gui.settings import Settings
-from gui.signals import view_signals
+from gui.signals import signals
 from gui.wrapper import GridLayoutWrapper
 
 
@@ -48,7 +49,7 @@ class HostIdentityMetadataRow(QWidget):
 
         layout = QHBoxLayout()
         layout.setContentsMargins(*Settings.SPACING.MARGIN_NONE)
-        layout.setSpacing(Settings.HOST_PANEL.KEY_VALUE_SPACING)
+        layout.setSpacing(card_settings.KEY_VALUE_SPACING)
 
         key = QLabel(self.texts.key, self)
         key.setProperty("host-metadata-key", True)
@@ -143,7 +144,7 @@ class IdentityCardContent(QFrame, Block):
 
         layout = QVBoxLayout()
         layout.setContentsMargins(*Settings.SPACING.MARGIN_NONE)
-        layout.setSpacing(Settings.HOST_PANEL.ROW_SPACING)
+        layout.setSpacing(card_settings.ROW_SPACING)
 
         host_name = QLabel(self.texts.host_name, self)
         host_name.setProperty("host-title", True)
@@ -306,7 +307,7 @@ class IdentityCardBlock(QFrame, Block):
         wrapper = GridLayoutWrapper(
             self,
             spacing=Settings.SPACING.NONE,
-            margins=Settings.HOST_PANEL.WRAPPER_MARGIN,
+            margins=card_settings.WRAPPER_MARGIN,
         )
         wrapper.add_widget(group_box, 0, 0)
         wrapper.add_widget(
@@ -344,8 +345,8 @@ class IdentityCardBlock(QFrame, Block):
 
     def _connect_signals(self) -> None:
         """Connect card signals; placeholder/debug values are block-owned."""
-        view_signals.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
-        view_signals.HostDeviceInformationUpdated.connect(
+        signals.UI.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
+        signals.HOST.HostDeviceInformationUpdated.connect(
             self._on_host_device_information_updated
         )
 
@@ -353,7 +354,9 @@ class IdentityCardBlock(QFrame, Block):
         self, name: str, os: Literal["linux", "windows", "darwin"] | None, ip: str
     ) -> None:
         """Update host identity when controller reports host device metadata."""
-        assert os in ["linux", "windows", "darwin"]
+        if os is not None and os not in ("linux", "windows", "darwin"):
+            raise ValueError(f"Unsupported host OS: {os!r}")
+        os_icon: GenericIcons | OperatingSystemIcons
         if os == "linux":
             os_icon = OperatingSystemIcons.LINUX
         elif os == "windows":

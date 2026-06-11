@@ -15,6 +15,7 @@ from gui.colors import Theme
 from gui.components.base.component import Component
 from gui.components.buttons.button import Button
 from gui.components.buttons.tool_button import ToolButton
+from gui.components.containers.container_settings import container_settings
 from gui.components.inputs.otp import OTPInput, OTPType
 from gui.components.labels.demi_bold_text import DemiBoldText
 from gui.components.labels.helper_text import HelperText
@@ -22,7 +23,7 @@ from gui.components.media import get_svg_size
 from gui.components.media.svg import SVG
 from gui.icons import GenericIcons, icon_qt_path_for_theme
 from gui.settings import Settings
-from gui.signals import view_signals
+from gui.signals import signals
 from gui.wrapper import HorizontalLayoutWrapper, VerticalLayoutWrapper
 
 
@@ -67,10 +68,10 @@ class AuthentificationCard(QFrame, Component):
 
     def __init__(
         self,
-        parent: QWidget = None,
-        title: str = None,
-        icon_path: str = None,
-        description: str = None,
+        parent: QWidget | None = None,
+        title: str | None = None,
+        icon_path: str | None = None,
+        description: str | None = None,
     ):
         """Build the authentification card with OTP rows and confirm action.
 
@@ -232,8 +233,8 @@ class AuthentificationCard(QFrame, Component):
 
     def _set_size_policy(self) -> None:
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
-        self.setMinimumWidth(Settings.DIMENSION.AUTENTHIFICATION_CARD_MIN_WIDTH)
-        self.setMaximumWidth(Settings.DIMENSION.AUTENTHIFICATION_CARD_MAX_WIDTH)
+        self.setMinimumWidth(container_settings.AUTHENTIFICATION_CARD.MIN_WIDTH)
+        self.setMaximumWidth(container_settings.AUTHENTIFICATION_CARD.MAX_WIDTH)
         self.ui.close_button.setSizePolicy(
             QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed
         )
@@ -317,7 +318,7 @@ class AuthentificationCard(QFrame, Component):
 
     def _on_close_button_clicked(self) -> None:
         """Handle the close button clicked event."""
-        view_signals.AuthentificationCancelled.emit()
+        signals.DEVICE.AuthentificationCancelled.emit()
 
     def _is_ip_otp_input_valid(self) -> bool:
         return self.ui.ip_otp_input.is_valid()
@@ -359,7 +360,7 @@ class AuthentificationCard(QFrame, Component):
             raise_signal = False
 
         if raise_signal:
-            view_signals.AuthentificationConfirmed.emit(
+            signals.DEVICE.AuthentificationConfirmed.emit(
                 self.ui.ip_otp_input.text(),
                 self.ui.port_otp_input.text(),
                 self.ui.association_code_otp_input.text(),
@@ -391,7 +392,7 @@ class AuthentificationCard(QFrame, Component):
                 )
 
     def _on_invalid_highlight_pulse_tick(self) -> None:
-        cycle_ms = Settings.ANIMATION.ATTENTION_HIGHLIGHT_PULSE_CYCLE_MS
+        cycle_ms = container_settings.ATTENTION_HIGHLIGHT.PULSE_CYCLE_MS
         elapsed = self._invalid_highlight_elapsed.elapsed()
         level = compute_sine_pulse_level(elapsed, cycle_ms)
         self._set_invalid_otp_highlight_level(level)
@@ -408,10 +409,10 @@ class AuthentificationCard(QFrame, Component):
             return
         self._invalid_highlight_elapsed.start()
         self._invalid_highlight_pulse_timer.start(
-            Settings.ANIMATION.ATTENTION_HIGHLIGHT_UPDATE_MS
+            container_settings.ATTENTION_HIGHLIGHT.UPDATE_MS
         )
         self._invalid_highlight_stop_timer.start(
-            Settings.ANIMATION.ATTENTION_HIGHLIGHT_DURATION
+            container_settings.ATTENTION_HIGHLIGHT.DURATION
         )
 
     def stop_invalid_otp_highlight(self) -> None:

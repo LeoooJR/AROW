@@ -17,12 +17,13 @@ from PySide6.QtWidgets import (
 
 from gui import faker as ui_faker
 from gui.blocks.base import Block
+from gui.blocks.card.card_settings import card_settings
 from gui.colors import Theme
 from gui.components import SVG, ConditionIndicator, GroupBox
 from gui.components.media import get_svg_size
 from gui.icons import OperatingSystemIcons, icon_qt_path, icon_qt_path_for_theme
 from gui.settings import Settings
-from gui.signals import view_signals
+from gui.signals import signals
 from gui.wrapper import GridLayoutWrapper
 
 ADB_SERVER_STATE = Literal["running", "stopped", "starting", "error", "unknown"]
@@ -51,7 +52,7 @@ class AdbBridgeMetadataRow(QWidget):
 
         layout = QHBoxLayout()
         layout.setContentsMargins(*Settings.SPACING.MARGIN_NONE)
-        layout.setSpacing(Settings.HOST_PANEL.KEY_VALUE_SPACING)
+        layout.setSpacing(card_settings.KEY_VALUE_SPACING)
 
         key = QLabel(self.texts.key, self)
         key.setProperty("host-metadata-key", True)
@@ -158,7 +159,7 @@ class BridgeStatusContent(QFrame, Block):
 
         layout = QVBoxLayout()
         layout.setContentsMargins(*Settings.SPACING.MARGIN_NONE)
-        layout.setSpacing(Settings.HOST_PANEL.ROW_SPACING)
+        layout.setSpacing(card_settings.ROW_SPACING)
 
         android_svg = SVG(
             svg_path=icon_qt_path(OperatingSystemIcons.ANDROID), parent=self
@@ -358,7 +359,7 @@ class BridgeStatusCardBlock(QFrame, Block):
         wrapper = GridLayoutWrapper(
             self,
             spacing=Settings.SPACING.NONE,
-            margins=Settings.HOST_PANEL.WRAPPER_MARGIN,
+            margins=card_settings.WRAPPER_MARGIN,
         )
         wrapper.add_widget(group_box, 0, 0)
         wrapper.add_widget(
@@ -393,9 +394,9 @@ class BridgeStatusCardBlock(QFrame, Block):
 
     def _connect_signals(self) -> None:
         """Connect card signals; placeholder/debug values are block-owned."""
-        view_signals.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
-        view_signals.ADBServerStarted.connect(self._on_adb_server_started)
-        view_signals.ADBServerStopped.connect(self._on_adb_server_stopped)
+        signals.UI.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
+        signals.ADB_SERVER.ADBServerStarted.connect(self._on_adb_server_started)
+        signals.ADB_SERVER.ADBServerStopped.connect(self._on_adb_server_stopped)
 
     def _on_adb_server_started(self) -> None:
         """Update bridge card when the ADB server starts."""

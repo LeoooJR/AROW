@@ -9,7 +9,9 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, ClassVar
 
-from core.adb import AdbClient, AdbClientException, AdbServer, AdbServerException
+from core.adb.client import AdbClient
+from core.adb.exceptions import AdbClientException, AdbServerException
+from core.adb.server import AdbServer
 from core.devices import Phone
 from core.signals import (
     CoreSignal,

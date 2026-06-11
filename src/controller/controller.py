@@ -1,18 +1,18 @@
-import importlib
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from typing import Any
 
+from controller.runner import (
+    AsyncRunner,
+    JobError,
+    JobHandler,
+    JobSpecification,
+    ProgressEvent,
+    jobtype,
+)
 from core.models import CoreRuntimeModel
 from gui.window import MainWindow
 from logger import logger
-
-_async_mod = importlib.import_module("controller.async")
-AsyncRunner = _async_mod.AsyncRunner
-JobError = _async_mod.JobError
-JobHandler = _async_mod.JobHandler
-JobSpecification = _async_mod.JobSpecification
-ProgressEvent = _async_mod.ProgressEvent
 
 
 class Controller(ABC):
@@ -38,7 +38,7 @@ class Controller(ABC):
                 objects first, then call those hooks (see :class:`AppController`).
         """
         self._model: CoreRuntimeModel = model
-        self._view: MainWindow = view
+        self._view: MainWindow | None = view
         self._runner: AsyncRunner = runner if runner is not None else AsyncRunner(view)
         if not defer_signal_connect:
             self._connect_view_signals()
@@ -63,10 +63,12 @@ class Controller(ABC):
     @property
     def view(self) -> MainWindow:
         """Get the view for the application."""
+        if self._view is None:
+            raise RuntimeError("view is not available")
         return self._view
 
     @view.setter
-    def view(self, view: MainWindow) -> None:
+    def view(self, view: MainWindow | None) -> None:
         """Set the view for the application."""
         self._view = view
 
@@ -97,7 +99,7 @@ class Controller(ABC):
         on_failed: Callable[[JobError], None] | None = None,
         on_cancelled: Callable[[], None] | None = None,
         on_progress: Callable[[ProgressEvent], None] | None = None,
-        job_type: str = "auto",
+        job_type: jobtype = "auto",
         timeout: int | None = None,
         priority: int = 0,
         coalesce_key: str | None = None,

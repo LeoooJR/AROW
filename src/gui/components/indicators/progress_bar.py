@@ -9,6 +9,7 @@ from PySide6.QtWidgets import QProgressBar, QSizePolicy, QWidget
 
 from gui.colors import Theme
 from gui.components.base.component import Component
+from gui.components.indicators.indicator_settings import indicator_settings
 from gui.settings import Settings
 
 
@@ -54,7 +55,7 @@ class ProgressBar(QProgressBar, Component):
         self.texts = ProgressBar.Text()
         self.ui = ProgressBar.UI()
         self.setProperty("progress-bar", True)
-        self.setFixedHeight(Settings.DIMENSION.PROGRESSBAR_HEIGHT)
+        self.setFixedHeight(indicator_settings.PROGRESSBAR_HEIGHT)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.setInvertedAppearance(False)
         self.setMinimum(minimum)

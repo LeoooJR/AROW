@@ -7,7 +7,7 @@ from __future__ import annotations
 import pytest
 
 from core import ADB_BINARY_BUILD_NUMBER, ADB_BINARY_BUILD_VERSION, ADB_BINARY_VERSION
-from core.adb import ADB_COMMAND_PARSERS, ADBCommandParser, AdbCommands
+from core.adb.command import ADB_COMMAND_PARSERS, ADBCommandParser, AdbCommands
 from core.devices import DEFAULT_PHONE_DISPLAY_NAME, Phone
 
 pytestmark = [pytest.mark.adb_parser]

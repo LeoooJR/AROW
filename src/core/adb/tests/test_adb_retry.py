@@ -11,20 +11,20 @@ from pathlib import Path
 import pytest
 from tenacity import stop_after_attempt, wait_none
 
-from core.adb import (
-    AdbBinary,
-    AdbClient,
+from core.adb.binary import AdbBinary
+from core.adb.client import AdbClient
+from core.adb.command import (
     AdbCommand,
     AdbCommandResult,
     AdbCommandResultStatus,
     AdbCommands,
-    AdbServer,
     _AdbRetryProfile,
     _is_retryable_adb_exception,
-    _retry_profile_for,
+    retry_profile_for,
 )
+from core.adb.exceptions import AdbClientException, AdbServerException
+from core.adb.server import AdbServer
 from core.devices import Phone, PhoneRepository
-from core.exceptions import AdbClientException, AdbServerException
 
 
 def _fast_profile(command: AdbCommand, *, scope: str) -> _AdbRetryProfile:
@@ -49,7 +49,7 @@ def _fast_profile(command: AdbCommand, *, scope: str) -> _AdbRetryProfile:
 def adb_client(monkeypatch: pytest.MonkeyPatch) -> AdbClient:
     """AdbClient with a dummy binary path and fast retry profile."""
     monkeypatch.setattr(
-        "core.adb._retry_profile_for",
+        "core.adb.client.retry_profile_for",
         _fast_profile,
     )
     client = AdbClient(AdbBinary(path=Path("/mock/adb")))
@@ -60,7 +60,7 @@ def adb_client(monkeypatch: pytest.MonkeyPatch) -> AdbClient:
 def adb_server(monkeypatch: pytest.MonkeyPatch) -> AdbServer:
     """AdbServer built without __init__ side effects and fast retry profile."""
     monkeypatch.setattr(
-        "core.adb._retry_profile_for",
+        "core.adb.server.retry_profile_for",
         _fast_profile,
     )
     server = object.__new__(AdbServer)
@@ -317,11 +317,11 @@ class TestRetryProfiles:
     """Sanity checks for command-specific retry boundaries."""
 
     def test_pair_profile_has_wider_window_than_shell(self) -> None:
-        pair = _retry_profile_for(AdbCommands.PAIR.value, scope="client")
-        shell = _retry_profile_for(AdbCommands.GET_SERIAL_NO.value, scope="client")
+        pair = retry_profile_for(AdbCommands.PAIR.value, scope="client")
+        shell = retry_profile_for(AdbCommands.GET_SERIAL_NO.value, scope="client")
         assert pair.timeout_seconds >= shell.timeout_seconds
 
     def test_kill_server_profile_is_minimal(self) -> None:
-        kill = _retry_profile_for(AdbCommands.KILL_SERVER.value, scope="server")
-        start = _retry_profile_for(AdbCommands.START_SERVER.value, scope="server")
+        kill = retry_profile_for(AdbCommands.KILL_SERVER.value, scope="server")
+        start = retry_profile_for(AdbCommands.START_SERVER.value, scope="server")
         assert kill.timeout_seconds <= start.timeout_seconds

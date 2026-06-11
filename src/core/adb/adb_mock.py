@@ -10,21 +10,21 @@ from typing import Final
 from faker import Faker
 from faker.providers import DynamicProvider
 
-from core.adb import (
-    AdbBinary,
-    AdbClient,
+from core.adb.binary import AdbBinary
+from core.adb.client import AdbClient
+from core.adb.command import (
     AdbCommand,
     AdbCommandResult,
     AdbCommandResultStatus,
     AdbCommands,
-    AdbServer,
     _log_safe_argv,
     _log_safe_command_line,
     _log_safe_output_preview,
     _redacted_log_value,
 )
+from core.adb.exceptions import AdbClientException, AdbServerException
+from core.adb.server import AdbServer
 from core.devices import Phone
-from core.exceptions import AdbClientException, AdbServerException
 from logger import logger
 
 DEFAULT_MOCK_ADB_BINARY_PATH: Final[Path] = Path("/mock/adb")

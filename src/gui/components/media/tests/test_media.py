@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from gui.components.media import SVG, Image, get_svg_size
-from gui.settings import Settings
+from gui.components.media.svg_settings import svg_settings
 
 pytestmark = pytest.mark.usefixtures("qapp")
 
@@ -14,8 +14,8 @@ def test_svg_size_scales_from_font_size() -> None:
     small = get_svg_size(12)
     large = get_svg_size(24)
 
-    assert small.width() == int(Settings.SVG.MULTIPLIER_SMALL * 12)
-    assert large.width() == int(Settings.SVG.MULTIPLIER_LARGE * 24)
+    assert small.width() == int(svg_settings.MULTIPLIER_SMALL * 12)
+    assert large.width() == int(svg_settings.MULTIPLIER_LARGE * 24)
     assert small.width() == small.height()
 
 

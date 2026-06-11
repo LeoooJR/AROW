@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import importlib
 import time
+from typing import cast
 
 import pytest
 from PySide6.QtCore import QTimer
@@ -9,10 +9,7 @@ from PySide6.QtWidgets import QApplication
 
 import controller.orchestration.app_controller as app_controller
 from controller.orchestration.app_controller import AppController
-
-_async_mod = importlib.import_module("controller.async")
-JobHandler = _async_mod.JobHandler
-JobHandlerSignals = _async_mod.JobHandlerSignals
+from controller.runner import JobHandler, JobHandlerSignals
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -39,13 +36,13 @@ class _AppControllerProbe:
         self.runner = runner
 
     def _adb_bootstrap_jobs_pending(self) -> bool:
-        return AppController._adb_bootstrap_jobs_pending(self)
+        return AppController._adb_bootstrap_jobs_pending(cast(AppController, self))
 
 
 def _wait_for_bootstrap_jobs(runner: _RunnerStub) -> float:
     probe = _AppControllerProbe(runner)
     started = time.monotonic()
-    AppController._wait_for_adb_bootstrap_jobs(probe)
+    AppController._wait_for_adb_bootstrap_jobs(cast(AppController, probe))
     return time.monotonic() - started
 
 

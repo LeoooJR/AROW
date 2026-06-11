@@ -22,7 +22,7 @@ class MapSubController(AppSubController):
         super().__init__(app)
 
     def connect_view_signals(self) -> None:
-        """Connect map-relevant :data:`view_signals` when map UI is ready."""
+        """Connect map-relevant :data:`gui.signals.signals` when map UI is ready."""
         return
 
     def connect_model_signals(self) -> None:

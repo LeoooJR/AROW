@@ -3,7 +3,8 @@ from functools import cached_property
 from pathlib import Path
 from typing import Any, Callable
 
-from core.adb import AdbClient, AdbServer
+from core.adb.client import AdbClient
+from core.adb.server import AdbServer
 from core.application_paths import (
     get_or_create_application_dir,
     get_or_create_config_dir,
@@ -284,7 +285,8 @@ class CoreRuntimeModel(Model):
         Delete a simulation for a device by id.
         """
         for simulation in self._simulations:
-            if simulation.device.id == device_id:
+            device = simulation.device
+            if device is not None and device.id == device_id:
                 self.delete_simulation(simulation)
                 return
         raise ValueError(f"Simulation for device with id {device_id} not found")

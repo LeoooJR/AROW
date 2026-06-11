@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from core.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
+from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
 from core.devices import Phone
 from core.models import CoreRuntimeModel
 from core.work.authentificate_device_work import AuthentificateDeviceOutcome

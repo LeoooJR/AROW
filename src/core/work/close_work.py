@@ -3,7 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from core.adb import AdbServer, AdbServerException
+from core.adb.exceptions import AdbServerException
+from core.adb.server import AdbServer
 from core.signals import AdbServerStoppedPayload, CoreSignal
 from core.work.core_runtime_work import CoreRuntimeWork, CoreRuntimeWorkOutcome
 from logger import logger

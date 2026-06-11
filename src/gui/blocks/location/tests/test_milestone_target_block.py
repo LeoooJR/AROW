@@ -1,5 +1,7 @@
 """Tests for location milestone target blocks."""
 
+# mypy: disable-error-code=attr-defined
+
 from __future__ import annotations
 
 import pytest
@@ -7,7 +9,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtTest import QSignalSpy
 
 from gui.blocks.location import MilestoneMetadataItem, MilestoneTargetBlock
-from gui.signals import view_signals
+from gui.signals import signals
 
 pytestmark = pytest.mark.usefixtures("qapp")
 
@@ -67,7 +69,7 @@ def test_milestone_target_block_populates_placeholders_from_debug_signal(
     block = MilestoneTargetBlock()
     qtbot.addWidget(block)
 
-    view_signals.UiConstraintsDisabled.emit()
+    signals.UI.UiConstraintsDisabled.emit()
     qtbot.wait(0)
 
     assert block.ui.status_badge.text() == "Ready"
@@ -128,7 +130,7 @@ def test_milestone_metadata_item_elides_long_values_in_narrow_width(qtbot) -> No
 def test_milestone_target_button_emits_target_selection_request(qtbot) -> None:
     block = MilestoneTargetBlock()
     qtbot.addWidget(block)
-    spy = QSignalSpy(view_signals.TargetSelectionRequested)
+    spy = QSignalSpy(signals.UI.TargetSelectionRequested)
 
     qtbot.mouseClick(block.ui.target_button, Qt.MouseButton.LeftButton)
 

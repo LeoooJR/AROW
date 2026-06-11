@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
 from shiboken6 import isValid
 
 from gui import faker as ui_faker
+from gui.blocks.activity.activity_log_settings import activity_log_settings
 from gui.blocks.base import Block
 from gui.colors import Theme
 from gui.components import (
@@ -39,7 +40,7 @@ from gui.components import (
 )
 from gui.icons import GenericIcons, icon_qt_path, icon_qt_path_for_theme
 from gui.settings import Settings
-from gui.signals import view_signals
+from gui.signals import signals
 from gui.wrapper import HorizontalLayoutWrapper, VerticalLayoutWrapper
 
 ActivityCategory = Literal["simulation", "device", "location", "adb", "file", "system"]
@@ -239,14 +240,14 @@ class ActivityLogItem(QListWidgetItem):
         icon_label.setPixmap(
             QIcon(icon_qt_path(self._CATEGORY_ICON[entry.category])).pixmap(
                 QSize(
-                    Settings.LIST.ACTIVITY_ITEM_ICON_SIZE,
-                    Settings.LIST.ACTIVITY_ITEM_ICON_SIZE,
+                    activity_log_settings.ITEM_ICON_SIZE,
+                    activity_log_settings.ITEM_ICON_SIZE,
                 )
             )
         )
         icon_label.setFixedSize(
-            Settings.LIST.ACTIVITY_ITEM_ICON_SIZE,
-            Settings.LIST.ACTIVITY_ITEM_ICON_SIZE,
+            activity_log_settings.ITEM_ICON_SIZE,
+            activity_log_settings.ITEM_ICON_SIZE,
         )
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
@@ -262,8 +263,8 @@ class ActivityLogItem(QListWidgetItem):
         icon_frame.setProperty("activity-level", entry.level)
         icon_frame.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         icon_frame.setFixedSize(
-            Settings.LIST.ACTIVITY_ITEM_ROW_ICON_FRAME,
-            Settings.LIST.ACTIVITY_ITEM_ROW_ICON_FRAME,
+            activity_log_settings.ITEM_ROW_ICON_FRAME,
+            activity_log_settings.ITEM_ROW_ICON_FRAME,
         )
 
         message_label = QLabel(entry.message, row)
@@ -352,12 +353,12 @@ class ActivityLogItem(QListWidgetItem):
         main_row = HorizontalLayoutWrapper(
             row,
             widgets=[icon_frame, center, time_label],
-            spacing=Settings.LIST.ACTIVITY_ITEM_ROW_ICON_GAP,
+            spacing=activity_log_settings.ITEM_ROW_ICON_GAP,
             margins=(
-                Settings.LIST.ACTIVITY_ITEM_ROW_PADDING_H,
-                Settings.LIST.ACTIVITY_ITEM_ROW_PADDING_V,
-                Settings.LIST.ACTIVITY_ITEM_ROW_PADDING_H,
-                Settings.LIST.ACTIVITY_ITEM_ROW_PADDING_V,
+                activity_log_settings.ITEM_ROW_PADDING_H,
+                activity_log_settings.ITEM_ROW_PADDING_V,
+                activity_log_settings.ITEM_ROW_PADDING_H,
+                activity_log_settings.ITEM_ROW_PADDING_V,
             ),
         )
         main_row.get_layout().setStretchFactor(center, 1)
@@ -430,8 +431,8 @@ class ActivityLogItem(QListWidgetItem):
         self.ui.icon_label.setPixmap(
             QIcon(icon_path).pixmap(
                 QSize(
-                    Settings.LIST.ACTIVITY_ITEM_ICON_SIZE,
-                    Settings.LIST.ACTIVITY_ITEM_ICON_SIZE,
+                    activity_log_settings.ITEM_ICON_SIZE,
+                    activity_log_settings.ITEM_ICON_SIZE,
                 )
             )
         )
@@ -460,9 +461,9 @@ class ActivityLogItem(QListWidgetItem):
             measure_width = (
                 max(1, viewport_width - 2)
                 if viewport_width is not None
-                else Settings.LIST.ACTIVITY_ITEM_PREFERRED_WIDTH
+                else activity_log_settings.ITEM_PREFERRED_WIDTH
             )
-            hint_width = min(measure_width, Settings.LIST.ACTIVITY_ITEM_PREFERRED_WIDTH)
+            hint_width = min(measure_width, activity_log_settings.ITEM_PREFERRED_WIDTH)
             saved = QSize(row.width(), row.height())
             row.resize(measure_width, saved.height())
             if lay is not None:
@@ -476,7 +477,7 @@ class ActivityLogItem(QListWidgetItem):
             self.setSizeHint(
                 QSize(
                     hint_width,
-                    max(Settings.LIST.ACTIVITY_ITEM_ROW_MIN_HEIGHT, sh.height()),
+                    max(activity_log_settings.ITEM_ROW_MIN_HEIGHT, sh.height()),
                 )
             )
         finally:
@@ -687,18 +688,20 @@ class ActivityLogBlock(QFrame, Block):
 
     def _connect_signals(self) -> None:
         """Connect signals for the activity log block."""
-        view_signals.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
-        view_signals.ActivityLogFileUpdated.connect(self._on_activity_log_file_updated)
-        view_signals.ADBServerStarted.connect(self._on_adb_server_started)
-        view_signals.ADBServerStopped.connect(self._on_adb_server_stopped)
-        view_signals.AuthentificationSucceeded.connect(
+        signals.UI.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
+        signals.ACTIVITY_LOG.ActivityLogFileUpdated.connect(
+            self._on_activity_log_file_updated
+        )
+        signals.ADB_SERVER.ADBServerStarted.connect(self._on_adb_server_started)
+        signals.ADB_SERVER.ADBServerStopped.connect(self._on_adb_server_stopped)
+        signals.DEVICE.AuthentificationSucceeded.connect(
             self._on_authentification_succeeded
         )
-        view_signals.AuthentificationFailed.connect(self._on_authentification_failed)
-        view_signals.DeviceSelectionSucceeded.connect(
+        signals.DEVICE.AuthentificationFailed.connect(self._on_authentification_failed)
+        signals.DEVICE.DeviceSelectionSucceeded.connect(
             self._on_device_selection_succeeded
         )
-        view_signals.DeviceSelectionFailed.connect(self._on_device_selection_failed)
+        signals.DEVICE.DeviceSelectionFailed.connect(self._on_device_selection_failed)
 
         self.ui.logs_list.itemSelectionChanged.connect(
             self._sync_activity_selection_state

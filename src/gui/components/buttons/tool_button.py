@@ -10,6 +10,7 @@ from PySide6.QtWidgets import QToolButton, QWidget
 
 from gui.colors import Theme
 from gui.components.base.component import Component
+from gui.components.buttons.button_settings import button_settings
 from gui.icons import (
     ApplicationIcons,
     GenericIcons,
@@ -21,6 +22,8 @@ from gui.settings import Settings
 
 
 class ToolButton(QToolButton, Component):
+
+    _icon: GenericIcons | OperatingSystemIcons | ApplicationIcons | None
 
     @dataclass(frozen=True)
     class Text:
@@ -40,6 +43,7 @@ class ToolButton(QToolButton, Component):
         icon: GenericIcons | OperatingSystemIcons | ApplicationIcons | None = None,
         tooltip: str | None = None,
         icon_size: int | None = None,
+        theme_unresponsive: bool = False,
     ):
         """Create a compact icon button with optional tooltip.
 
@@ -48,15 +52,17 @@ class ToolButton(QToolButton, Component):
             icon: Optional GenericIcons | OperatingSystemIcons | ApplicationIcons for the button face.
             tooltip: Hover tooltip string.
             icon_size: Optional square icon size override.
+            theme_unresponsive: If True, the button will not change its theme when the application theme changes.
         """
         super().__init__(parent)
 
         self.setProperty("tool-button", True)
+        self._theme_unresponsive = theme_unresponsive
 
         self.texts = ToolButton.Text(tooltip=tooltip)
 
-        self._icon_size_px = icon_size or Settings.DIMENSION.TOOLBUTTON_ICON_SIZE
-        self._icon: GenericIcons | OperatingSystemIcons | ApplicationIcons | None = icon
+        self._icon_size_px = icon_size or button_settings.TOOLBUTTON_ICON_SIZE
+        self._icon = icon
         if self._icon is not None:
             self.setIcon(QIcon(icon_qt_path(self._icon)))
             self.setIconSize(self._icon_size())
@@ -69,7 +75,7 @@ class ToolButton(QToolButton, Component):
         self._finalize_ui_hooks()
 
     def _set_size_policy(self) -> None:
-        self.setFixedHeight(Settings.DIMENSION.TOOLBUTTON_HEIGHT)
+        self.setFixedHeight(button_settings.TOOLBUTTON_HEIGHT)
         self.setFixedWidth(self.sizeHint().width())
 
     def _set_alignment(self) -> None:
@@ -79,6 +85,8 @@ class ToolButton(QToolButton, Component):
         pass
 
     def apply_theme_icons(self, theme: Theme) -> None:
+        if self._theme_unresponsive:
+            return
         if self._icon is not None:
             self.setIcon(QIcon(icon_qt_path_for_theme(theme, self._icon)))
 
@@ -97,6 +105,6 @@ class ToolButton(QToolButton, Component):
         if icon is None:
             return
 
-        self._icon: GenericIcons | OperatingSystemIcons | ApplicationIcons | None = icon
+        self._icon = icon
         self.setIcon(QIcon(icon_qt_path(self._icon)))
         self.setIconSize(self._icon_size())

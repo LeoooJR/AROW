@@ -7,8 +7,8 @@ from __future__ import annotations
 import pytest
 
 from core import ADB_BINARY_BUILD_NUMBER, ADB_BINARY_BUILD_VERSION, ADB_BINARY_VERSION
-from core.adb import ADBCommandParser, AdbCommands
-from core.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
+from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
+from core.adb.command import ADBCommandParser, AdbCommands
 from core.models import CoreRuntimeModel
 from core.signals import CoreSignal
 

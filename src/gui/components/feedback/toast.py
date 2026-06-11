@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 
 from gui.colors import Theme, get_current_theme, get_palette
 from gui.components.base.component import Component
+from gui.components.feedback.feedback_settings import feedback_settings
 from gui.components.media import get_svg_size
 from gui.components.media.svg import SVG
 from gui.icons import GenericIcons, icon_qt_path
@@ -116,7 +117,7 @@ class Toast(QWidget, Component):
         """)
 
         inner_layout = QHBoxLayout(inner_widget)
-        inner_layout.setContentsMargins(*Settings.SPACING.MARGIN_TOAST)
+        inner_layout.setContentsMargins(*feedback_settings.TOAST.MARGIN)
         inner_layout.setSpacing(Settings.SPACING.ICON_SPACING)
 
         svg = SVG(icon_path, inner_widget)
@@ -132,8 +133,8 @@ class Toast(QWidget, Component):
         main_layout.addWidget(inner_widget)
 
         # Set minimum and maximum size for better appearance
-        self.setMinimumWidth(Settings.DIMENSION.TOAST_MIN_WIDTH)
-        self.setMaximumWidth(Settings.DIMENSION.TOAST_MAX_WIDTH)
+        self.setMinimumWidth(feedback_settings.TOAST.MIN_WIDTH)
+        self.setMaximumWidth(feedback_settings.TOAST.MAX_WIDTH)
         self.adjustSize()
 
         # Position the window
@@ -141,11 +142,11 @@ class Toast(QWidget, Component):
 
         # Add shadow effect to main widget for modern appearance
         shadow_effect = QGraphicsDropShadowEffect(self)
-        shadow_effect.setBlurRadius(Settings.SHADOW.BLUR_RADIUS)
-        shadow_effect.setXOffset(Settings.SHADOW.X_OFFSET)
-        shadow_effect.setYOffset(Settings.SHADOW.Y_OFFSET)
+        shadow_effect.setBlurRadius(feedback_settings.SHADOW.BLUR_RADIUS)
+        shadow_effect.setXOffset(feedback_settings.SHADOW.X_OFFSET)
+        shadow_effect.setYOffset(feedback_settings.SHADOW.Y_OFFSET)
         shadow_effect.setColor(
-            QColor(*Settings.SHADOW.COLOR_RGBA)
+            QColor(*feedback_settings.SHADOW.COLOR_RGBA)
         )  # Subtle black shadow with transparency
         self.setGraphicsEffect(shadow_effect)
 
@@ -160,7 +161,7 @@ class Toast(QWidget, Component):
 
         # Fade in animation
         self._fade_in = QPropertyAnimation(self._opacity_effect, b"opacity", self)
-        self._fade_in.setDuration(Settings.ANIMATION.TOAST_FADE_IN_DURATION)
+        self._fade_in.setDuration(feedback_settings.TOAST.FADE_IN_DURATION)
         self._fade_in.setStartValue(0.0)
         self._fade_in.setEndValue(1.0)
         self._fade_in.start()
@@ -188,7 +189,7 @@ class Toast(QWidget, Component):
         screen = QGuiApplication.primaryScreen()
         if screen:
             geo = screen.availableGeometry()
-            offset = Settings.DIMENSION.TOAST_OFFSET
+            offset = feedback_settings.TOAST.OFFSET
             x = geo.right() - self.width() - offset
             y = geo.bottom() - self.height() - offset
             self.move(x, y)

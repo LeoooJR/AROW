@@ -1,6 +1,6 @@
 # How to create and submit async jobs
 
-This guide describes how background work is queued in AROW, how results return to the Qt **main thread**, and how to plug in **custom callbacks**. It matches the implementation in `controller/async.py`, `controller/controller.py`, and domain wiring under `controller/orchestration/` and `controller/domains/`.
+This guide describes how background work is queued in AROW, how results return to the Qt **main thread**, and how to plug in **custom callbacks**. It matches the implementation in `controller/runner.py`, `controller/controller.py`, and domain wiring under `controller/orchestration/` and `controller/domains/`.
 
 ## Mental model
 
@@ -14,7 +14,7 @@ Heavy or blocking operations should run **outside** the GUI thread. The app rout
 
 ## End-to-end pathway
 
-1. **Something triggers the controller** — for example a global `view_signals` handler, a menu action, or a model event wired in `_connect_model_signals`.
+1. **Something triggers the controller** — for example a categorized `signals` handler (e.g. `signals.DEVICE.RefreshDeviceListRequested` from `gui.signals`), a menu action, or a model event wired in `_connect_model_signals`.
 2. **The controller submits a job** — usually via `Controller._submit_model_async_call(...)`, which wraps `AsyncRunner.submit(JobSpecification(...))` and binds per-job signals.
 3. **The runner picks a pool** — thread vs process from `job_type` or `"auto"` (see below).
 4. **The worker runs `JobSpecification.fn`** — with `args` / `kwargs`. This runs in a **worker thread or process**, not on the Qt main thread.
@@ -79,7 +79,7 @@ so every domain module shares **one** `AsyncRunner` from `AppController`.
 You can submit directly on the runner when you do not need the controller helper:
 
 ```python
-from controller.async import JobSpecification, AsyncRunner
+from controller.runner import JobSpecification, AsyncRunner
 
 runner: AsyncRunner = ...
 job = JobSpecification(
@@ -138,8 +138,8 @@ This keeps async submission sites readable (only **`fn`** and callback reference
 
 | Symbol | Module |
 |--------|--------|
-| `AsyncRunner`, `JobSpecification`, `JobHandler`, `JobHandlerSignals` | `controller.async` |
-| `JobError`, `ProgressEvent`, `CancelledError` | `controller.async` |
+| `AsyncRunner`, `JobSpecification`, `JobHandler`, `JobHandlerSignals` | `controller.runner` |
+| `JobError`, `ProgressEvent`, `CancelledError` | `controller.runner` |
 | `_submit_model_async_call` | `Controller` subclasses (`controller.orchestration.AppController`, …) |
 
 Tests with a fake runner live under **`src/core/tests/test_async_runner.py`** for behavioral examples.

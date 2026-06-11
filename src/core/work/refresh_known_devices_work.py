@@ -13,7 +13,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from core.adb import AdbClient, AdbServer
+from core.adb.client import AdbClient
+from core.adb.server import AdbServer
 from core.devices import (
     Phone,
     apply_phone_android_api_level_enrichment,
@@ -162,8 +163,13 @@ class RefreshKnownDevicesWork(CoreRuntimeWork[RefreshKnownDevicesOutcome]):
 
         if not isinstance(model, _CoreRuntimeModel):
             raise TypeError("apply_main_thread() requires CoreRuntimeModel")
-        model._adb_server.paired_devices.clear()
-        model._adb_server.paired_devices.add_all(outcome.devices)
+        adb_server = model._adb_server
+        if adb_server is None:
+            raise AttributeError(
+                "ADB server must be initialized before applying refresh outcome"
+            )
+        adb_server.paired_devices.clear()
+        adb_server.paired_devices.add_all(outcome.devices)
         model._signal_bus.emit(
             CoreSignal.DEVICES_UPDATED,
             DevicesUpdatedPayload(devices=outcome.devices),

@@ -9,6 +9,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QLabel, QSizePolicy, QWidget
 
 from gui.blocks.base import Block
+from gui.blocks.start.start_settings import start_settings
 from gui.colors import Theme
 from gui.components import WalkthroughButton
 from gui.icons import GenericIcons, OperatingSystemIcons
@@ -18,6 +19,9 @@ from gui.wrapper import VerticalLayoutWrapper
 
 class WalkthroughBlock(VerticalLayoutWrapper, Block):
     """Welcome walkthrough card containing walkthrough actions."""
+
+    texts: WalkthroughBlock.Text
+    ui: WalkthroughBlock.UI
 
     @dataclass(frozen=True)
     class Text:
@@ -62,10 +66,10 @@ class WalkthroughBlock(VerticalLayoutWrapper, Block):
             widgets=[walkthrough_label, walkthrough_buttons_wrapper],
             spacing=Settings.SPACING.XS,
             margins=(
-                Settings.WELCOME.CARD_PADDING_LEFT,
-                Settings.WELCOME.CARD_PADDING_TOP,
-                Settings.WELCOME.CARD_PADDING_RIGHT,
-                Settings.WELCOME.CARD_PADDING_BOTTOM,
+                start_settings.CARD_PADDING_LEFT,
+                start_settings.CARD_PADDING_TOP,
+                start_settings.CARD_PADDING_RIGHT,
+                start_settings.CARD_PADDING_BOTTOM,
             ),
             stretch_at_end=True,
         )
