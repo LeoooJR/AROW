@@ -85,6 +85,8 @@ class StartRecentBlock(VerticalLayoutWrapper, Block):
         """Add generated recent-file display rows to the recent-files wrapper."""
         placeholder_items = self.texts.recent_files
         existing_count = len(self._recent_file_widgets())
+        if 0 < existing_count < len(placeholder_items):
+            return
         end_index = min(count, len(placeholder_items))
         for index in range(existing_count, end_index):
             file_name, file_type, date_text = placeholder_items[index]

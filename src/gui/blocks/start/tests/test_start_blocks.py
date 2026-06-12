@@ -93,6 +93,23 @@ def test_start_recent_block_add_and_remove_sync_empty_placeholder(qtbot) -> None
     assert not block.ui.empty_placeholder.isHidden()
 
 
+def test_start_recent_block_does_not_mix_real_rows_with_seed_placeholders(
+    qtbot,
+) -> None:
+    block = StartRecentBlock()
+    qtbot.addWidget(block)
+
+    row = block.add_file(
+        file_name="activity_20260612.log",
+        file_type="log",
+        date_text="Last opened 2026-06-12",
+    )
+
+    signals.UI.UiConstraintsDisabled.emit()
+
+    assert _recent_file_widgets(block) == [row]
+
+
 def test_walkthrough_block_builds_expected_actions(qtbot) -> None:
     block = WalkthroughBlock()
     qtbot.addWidget(block)
