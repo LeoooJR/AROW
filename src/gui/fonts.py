@@ -41,10 +41,10 @@ class VariableFont:
 class VariableFonts(Enum):
     """Fonts used in the application."""
 
-    INTER: VariableFont = VariableFont(
+    INTER = VariableFont(
         name="Inter", path=_INTER_DIR / "Inter-VariableFont_opsz,wght.ttf"
     )
-    INTER_ITALIC: VariableFont = VariableFont(
+    INTER_ITALIC = VariableFont(
         name="Inter Italic", path=_INTER_DIR / "Inter-Italic-VariableFont_opsz,wght.ttf"
     )
 

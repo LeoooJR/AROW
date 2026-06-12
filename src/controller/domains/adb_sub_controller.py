@@ -15,7 +15,7 @@ from controller.core_work_callbacks import (
     StartupCoreRuntimeCallback,
 )
 from controller.domains.app_sub_controller import AppSubController
-from controller.helper import validate_model, validate_view
+from controller.helper import validate_model_entrypoint, validate_view
 from core.signals import (
     AdbServerStartedPayload,
     AdbServerStoppedPayload,
@@ -44,8 +44,8 @@ class AdbSubController(AppSubController):
         # self so AsyncRunner slots keep a long-lived CloseCoreRuntimeCallback on AdbAsyncJobCallbacks.
         self._pending_after_close_apply: Callable[[], None] | None = None
 
-    def _submit_model_async_call(self, *args, **kwargs):
-        return self._app._submit_model_async_call(*args, **kwargs)
+    def _submit_model_entrypoint_async_call(self, *args, **kwargs):
+        return self._app._submit_model_entrypoint_async_call(*args, **kwargs)
 
     def connect_view_signals(self) -> None:
         """Connect view signals for ADB and pairing (called from AppController)."""
@@ -59,14 +59,20 @@ class AdbSubController(AppSubController):
 
     def connect_model_signals(self) -> None:
         """Subscribe to core ADB and device events."""
-        self.model.subscribe(CoreSignal.ADB_SERVER_STARTED, self._on_adb_server_started)
-        self.model.subscribe(CoreSignal.ADB_SERVER_STOPPED, self._on_adb_server_stopped)
-        self.model.subscribe(CoreSignal.DEVICES_UPDATED, self._on_devices_updated)
-        self.model.subscribe(
+        self.model_entrypoint.subscribe(
+            CoreSignal.ADB_SERVER_STARTED, self._on_adb_server_started
+        )
+        self.model_entrypoint.subscribe(
+            CoreSignal.ADB_SERVER_STOPPED, self._on_adb_server_stopped
+        )
+        self.model_entrypoint.subscribe(
+            CoreSignal.DEVICES_UPDATED, self._on_devices_updated
+        )
+        self.model_entrypoint.subscribe(
             CoreSignal.DEVICE_AUTHENTIFICATION_SUCCEEDED,
             self._on_device_authentification_succeeded,
         )
-        self.model.subscribe(
+        self.model_entrypoint.subscribe(
             CoreSignal.DEVICE_AUTHENTIFICATION_FAILED,
             self._on_device_authentification_failed,
         )
@@ -79,14 +85,14 @@ class AdbSubController(AppSubController):
         """
         self._startup_core_runtime()
 
-    @validate_model
+    @validate_model_entrypoint
     def _startup_core_runtime(self) -> None:
         callback: StartupCoreRuntimeCallback = self._async_job_callbacks.startup
         if callback is None:
             raise ValueError("StartupCoreRuntimeCallback is not set")
-        self._submit_model_async_call(
+        self._submit_model_entrypoint_async_call(
             name="startup_core_runtime",
-            fn=self.model.startup,
+            fn=self.model_entrypoint.startup,
             description="Startup the core runtime",
             job_type="thread",
             coalesce_key="startup",
@@ -94,7 +100,7 @@ class AdbSubController(AppSubController):
             on_failed=callback.on_failed,
         )
 
-    @validate_model
+    @validate_model_entrypoint
     def _enqueue_host_install_identity_job(self) -> None:
         """
         After startup apply finishes, persist/load install UUID off the main thread and
@@ -105,9 +111,9 @@ class AdbSubController(AppSubController):
         )
         if callback is None:
             raise ValueError("HostInstallIdentityCallback is not set")
-        self._submit_model_async_call(
+        self._submit_model_entrypoint_async_call(
             name="host_install_identity",
-            fn=self.model.run_host_install_identity,
+            fn=self.model_entrypoint.run_host_install_identity,
             description="Load or create persisted host install UUID",
             job_type="thread",
             coalesce_key="host_install_identity",
@@ -115,7 +121,7 @@ class AdbSubController(AppSubController):
             on_failed=callback.on_failed,
         )
 
-    @validate_model
+    @validate_model_entrypoint
     def _on_authentification_confirmed(
         self, ip: str, port: str, association_code: str
     ) -> None:
@@ -132,9 +138,9 @@ class AdbSubController(AppSubController):
         if callback is None:
             raise ValueError("AuthentificateDeviceCallback is not set")
         _port = int(port)
-        self._submit_model_async_call(
+        self._submit_model_entrypoint_async_call(
             name="authentification_workflow",
-            fn=self.model.authentificate_device,
+            fn=self.model_entrypoint.authentificate_device,
             args=(ip, _port, association_code),
             description="Authenticate a device over ADB",
             job_type="thread",
@@ -143,7 +149,7 @@ class AdbSubController(AppSubController):
             on_failed=callback.on_failed,
         )
 
-    @validate_model
+    @validate_model_entrypoint
     def _on_refresh_device_list_requested(self) -> None:
         """ADB list query on a worker."""
         logger.debug("AdbSubController: refresh device list requested")
@@ -152,9 +158,9 @@ class AdbSubController(AppSubController):
         )
         if callback is None:
             raise ValueError("RefreshDeviceListCallback is not set")
-        self._submit_model_async_call(
+        self._submit_model_entrypoint_async_call(
             name="refresh_device_list",
-            fn=self.model.refresh_known_devices,
+            fn=self.model_entrypoint.refresh_known_devices,
             description="Refresh device list from ADB",
             job_type="thread",
             coalesce_key="refresh_device_list",
@@ -166,7 +172,7 @@ class AdbSubController(AppSubController):
         """Remove device from ADB on a worker."""
         pass  # TODO: Implement the thread job to remove device
 
-    @validate_model
+    @validate_model_entrypoint
     def _enqueue_close_core_runtime(
         self,
         *,
@@ -175,9 +181,9 @@ class AdbSubController(AppSubController):
         """Stop ADB on a worker; apply outcome on main thread via callback."""
         self._pending_after_close_apply = after_apply
         callback = self._async_job_callbacks.close
-        self._submit_model_async_call(
+        self._submit_model_entrypoint_async_call(
             name="close_core_runtime",
-            fn=self.model.close_core_runtime,
+            fn=self.model_entrypoint.close_core_runtime,
             description="Stop ADB server and detach core runtime",
             job_type="thread",
             coalesce_key="close",

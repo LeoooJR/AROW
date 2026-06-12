@@ -5,38 +5,40 @@ from typing import Any
 
 from PySide6.QtCore import QTimer
 
-from core.models import CoreRuntimeModel
+from core.entrypoint import ModelEntrypoint
 from gui.window import MainWindow
 from logger import logger
 
 
-def validate_model(function: Callable[..., Any]) -> Callable[..., Any]:
-    """Validate the model for the function.
+def validate_model_entrypoint(function: Callable[..., Any]) -> Callable[..., Any]:
+    """Validate the model entrypoint for the function.
 
     Args:
-        function: Function to validate the model for.
+        function: Function to validate the model entrypoint for.
 
     Returns:
-        Function: Function with the model validated.
+        Function: Function with the model entrypoint validated.
     """
 
     def wrapper(self, *args: Any, **kwargs: Any) -> Any:
-        if hasattr(self, "model"):
-            if not isinstance(self.model, CoreRuntimeModel):
+        if hasattr(self, "model_entrypoint"):
+            if not isinstance(self.model_entrypoint, ModelEntrypoint):
                 logger.warning(
-                    "Controller: model type mismatch",
-                    model_type=type(self.model).__name__,
+                    "Controller: model entrypoint type mismatch",
+                    model_entrypoint_type=type(self.model_entrypoint).__name__,
                 )
                 return
         elif hasattr(self, "_subcontroller"):
-            if not isinstance(self._subcontroller.model, CoreRuntimeModel):
+            if not isinstance(self._subcontroller.model_entrypoint, ModelEntrypoint):
                 logger.warning(
-                    "Controller: model type mismatch",
-                    model_type=type(self._subcontroller.model).__name__,
+                    "Controller: model entrypoint type mismatch",
+                    model_entrypoint_type=type(
+                        self._subcontroller.model_entrypoint
+                    ).__name__,
                 )
                 return
         else:
-            raise ValueError("Model not found")
+            raise ValueError("Model entrypoint not found")
         return function(self, *args, **kwargs)
 
     return wrapper

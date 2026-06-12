@@ -7,7 +7,7 @@ import pytest
 from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
 from core.adb.exceptions import AdbClientException
 from core.devices import Phone
-from core.models import CoreRuntimeModel
+from core.entrypoint import ModelEntrypoint
 from core.signals import (
     CoreSignal,
     DeviceAuthentificationFailedPayload,
@@ -126,8 +126,8 @@ def test_authenticate_work_invalid_input_fails_without_adb_pair_or_restart() -> 
     client = FakeAdbClient()
 
     outcome = AuthenticateDeviceWork(
-        adb_server=server,
-        adb_client=client,
+        adb_server=server,  # type: ignore[arg-type]
+        adb_client=client,  # type: ignore[arg-type]
         ip="999.168.1.1",
         port=37777,
         association_code="123456",
@@ -148,8 +148,8 @@ def test_authenticate_work_valid_input_pairs_and_returns_success() -> None:
     client = FakeAdbClient()
 
     outcome = AuthenticateDeviceWork(
-        adb_server=server,
-        adb_client=client,
+        adb_server=server,  # type: ignore[arg-type]
+        adb_client=client,  # type: ignore[arg-type]
         ip="192.168.1.10",
         port=37777,
         association_code="123456",
@@ -230,14 +230,16 @@ def test_mock_authenticate_non_protocol_failure_does_not_retry() -> None:
 def test_authenticate_apply_success_adds_phone_and_emits_signal() -> None:
     state = MockAdbState(seed=444, initial_devices=0)
     server = MockAdbServer(state=state)
-    model = CoreRuntimeModel()
-    model._adb_server = server
+    model_entrypoint = ModelEntrypoint()
+    model_entrypoint._adb_server = server
     phone = Phone(id="paired-phone", state="device")
     emitted: list[tuple[CoreSignal, object]] = []
-    model._signal_bus.emit = lambda signal, payload: emitted.append((signal, payload))
+    model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
+        (signal, payload)
+    )
 
     AuthenticateDeviceWork.apply_main_thread(
-        model, AuthentificateDeviceOutcome(success_phone=phone, failure=None)
+        model_entrypoint, AuthentificateDeviceOutcome(success_phone=phone, failure=None)
     )
 
     assert server.paired_devices.get("paired-phone") is phone
@@ -252,8 +254,8 @@ def test_authenticate_apply_success_adds_phone_and_emits_signal() -> None:
 def test_authenticate_apply_failure_emits_without_adding_phone() -> None:
     state = MockAdbState(seed=555, initial_devices=0)
     server = MockAdbServer(state=state)
-    model = CoreRuntimeModel()
-    model._adb_server = server
+    model_entrypoint = ModelEntrypoint()
+    model_entrypoint._adb_server = server
     failure = DeviceAuthentificationFailedPayload(
         ip="10.30.40.52",
         port=40406,
@@ -261,10 +263,13 @@ def test_authenticate_apply_failure_emits_without_adding_phone() -> None:
         reason="wrong pairing code",
     )
     emitted: list[tuple[CoreSignal, object]] = []
-    model._signal_bus.emit = lambda signal, payload: emitted.append((signal, payload))
+    model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
+        (signal, payload)
+    )
 
     AuthenticateDeviceWork.apply_main_thread(
-        model, AuthentificateDeviceOutcome(success_phone=None, failure=failure)
+        model_entrypoint,
+        AuthentificateDeviceOutcome(success_phone=None, failure=failure),
     )
 
     assert len(server.paired_devices) == 0

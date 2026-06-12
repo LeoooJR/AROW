@@ -34,7 +34,7 @@ from core.work.refresh_known_devices_work import enrich_phones_with_adb_shell_pr
 from logger import logger
 
 if TYPE_CHECKING:
-    from core.models import CoreRuntimeModel
+    from core.entrypoint import ModelEntrypoint
 
 
 def _use_mock_adb_effective(cli_or_model_flag: bool) -> bool:
@@ -118,7 +118,7 @@ def _start_adb_server() -> AdbServer:
     """
     Instantiate an ADB server bound to the shipped binary (blocking I/O on process start).
 
-    Does not update :class:`~core.models.CoreRuntimeModel` state; the startup job
+    Does not update :class:`~core.entrypoint.ModelEntrypoint` state; the startup job
     ``apply_main_thread`` path assigns ``_adb_server`` on the Qt main thread.
     """
     try:
@@ -205,25 +205,27 @@ class StartupCoreRuntimeWork(CoreRuntimeWork[StartupOutcome]):
         )
 
     @staticmethod
-    def apply_main_thread(model: CoreRuntimeModel, result: StartupOutcome) -> None:
+    def apply_main_thread(
+        model_entrypoint: ModelEntrypoint, result: StartupOutcome
+    ) -> None:
         """
         Own server/client state and emit on the bus (Qt main thread; AsyncRunner
         completion runs there).
         """
-        from core.models import CoreRuntimeModel as _CoreRuntimeModel
+        from core.entrypoint import ModelEntrypoint as _ModelEntrypoint
 
-        if not isinstance(model, _CoreRuntimeModel):
-            raise TypeError("apply_main_thread() requires CoreRuntimeModel")
+        if not isinstance(model_entrypoint, _ModelEntrypoint):
+            raise TypeError("apply_main_thread() requires ModelEntrypoint")
         if result.adb_server is not None:
-            model._adb_server = result.adb_server
+            model_entrypoint._adb_server = result.adb_server
         if result.adb_client is not None:
-            model._adb_client = result.adb_client
+            model_entrypoint._adb_client = result.adb_client
         if result.adb_server is not None:
-            model._signal_bus.emit(
+            model_entrypoint._signal_bus.emit(
                 CoreSignal.ADB_SERVER_STARTED,
                 AdbServerStartedPayload(adb_binary=result.adb_server.binary),
             )
-            model._signal_bus.emit(
+            model_entrypoint._signal_bus.emit(
                 CoreSignal.DEVICES_UPDATED,
                 DevicesUpdatedPayload(devices=result.devices),
             )

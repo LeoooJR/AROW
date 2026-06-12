@@ -39,7 +39,7 @@ from core.work.works_repository import CORE_RUNTIME_WORKS
 from logger import logger
 
 # Main-thread appliers keyed by exact worker outcome type (AsyncRunner completion).
-CoreRuntimeResultApplier = Callable[["CoreRuntimeModel", CoreRuntimeWorkOutcome], None]
+CoreRuntimeResultApplier = Callable[["ModelEntrypoint", CoreRuntimeWorkOutcome], None]
 
 _CORE_RUNTIME_RESULT_APPLIERS: dict[
     type[CoreRuntimeWorkOutcome], CoreRuntimeResultApplier
@@ -56,7 +56,7 @@ def register_core_runtime_result_applier(
     _CORE_RUNTIME_RESULT_APPLIERS[result_type] = applier
 
 
-class Model(ABC):
+class Entrypoint(ABC):
 
     def __init__(self):
 
@@ -77,12 +77,12 @@ class Model(ABC):
         self._signal_bus.unsubscribe(signal, handler)
 
 
-class CoreRuntimeModel(Model):
+class ModelEntrypoint(Entrypoint):
     """
-    Generic core model that owns runtime services used by controllers.
+    Core runtime entrypoint that owns services used by controllers.
 
     This class centralizes core infrastructure startup concerns so controllers
-    can interact with a stable model API rather than low-level core classes.
+    can interact with a stable entrypoint API rather than low-level core classes.
     """
 
     def __init__(self, *, use_mock_adb: bool = False) -> None:
@@ -182,7 +182,7 @@ class CoreRuntimeModel(Model):
 
     def restart_adb_server(self) -> None:
         """
-        Restart the ADB server and keep the instance in model state.
+        Restart the ADB server and keep the instance in entrypoint state.
         """
         if self._adb_server is not None:
             self._signal_bus.emit(
@@ -191,7 +191,7 @@ class CoreRuntimeModel(Model):
             )
             self._adb_server.restart()
             logger.info(
-                "CoreRuntimeModel: ADB server restarted",
+                "ModelEntrypoint: ADB server restarted",
                 adb_path=str(self._adb_server.binary.path),
             )
             self._signal_bus.emit(
@@ -204,7 +204,7 @@ class CoreRuntimeModel(Model):
             )
         else:
             logger.warning(
-                "CoreRuntimeModel: ADB server restart skipped (not running)",
+                "ModelEntrypoint: ADB server restart skipped (not running)",
             )
 
     def get_device(self, device_id: str) -> Phone | None:
@@ -221,7 +221,7 @@ class CoreRuntimeModel(Model):
 
     def get_known_devices(self, server: AdbServer | None = None) -> list[Phone]:
         """
-        List devices from a server instance, or from the current model server when
+        List devices from a server instance, or from the current entrypoint server when
         ``server`` is omitted (e.g. after startup has been applied on the main thread).
         """
         resolved: AdbServer | None = server if server is not None else self._adb_server
@@ -300,7 +300,7 @@ class CoreRuntimeModel(Model):
         applier = _CORE_RUNTIME_RESULT_APPLIERS.get(type(result))
         if applier is None:
             logger.error(
-                "CoreRuntimeModel.apply_result: unsupported result type",
+                "ModelEntrypoint.apply_result: unsupported result type",
                 result_type=type(result).__name__,
             )
             return

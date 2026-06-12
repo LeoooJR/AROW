@@ -1,9 +1,9 @@
 """
 Canonical catalog of :class:`~core.work.core_runtime_work.CoreRuntimeWork` types used with
-:class:`~core.models.CoreRuntimeModel` and :meth:`~core.models.CoreRuntimeModel.apply_result`.
+:class:`~core.entrypoint.ModelEntrypoint` and :meth:`~core.entrypoint.ModelEntrypoint.apply_result`.
 
 ``CORE_RUNTIME_WORKS`` is the single place to enumerate work/outcome pairs for debugging and
-registration. Registrations made only via :func:`~core.models.register_core_runtime_result_applier`
+registration. Registrations made only via :func:`~core.entrypoint.register_core_runtime_result_applier`
 do not appear in this repository.
 """
 
@@ -32,12 +32,12 @@ from core.work.startup_work import StartupCoreRuntimeWork, StartupOutcome
 
 @dataclass(frozen=True, slots=True)
 class CoreRuntimeWorkCatalogEntry:
-    """Stable id plus work/outcome types; optional hints for tracing model entrypoints."""
+    """Stable id plus work/outcome types; optional hints for tracing entrypoint methods."""
 
     id: str
     work_cls: type[CoreRuntimeWork[Any]]
     outcome_cls: type[CoreRuntimeWorkOutcome]
-    model_methods: tuple[str, ...] = ()
+    entrypoint_methods: tuple[str, ...] = ()
 
 
 class CoreRuntimeWorksRepository(Repository[CoreRuntimeWorkCatalogEntry]):
@@ -50,31 +50,31 @@ class CoreRuntimeWorksRepository(Repository[CoreRuntimeWorkCatalogEntry]):
                 id="core-runtime.startup",
                 work_cls=StartupCoreRuntimeWork,
                 outcome_cls=StartupOutcome,
-                model_methods=("CoreRuntimeModel.startup",),
+                entrypoint_methods=("ModelEntrypoint.startup",),
             ),
             CoreRuntimeWorkCatalogEntry(
                 id="core-runtime.authenticate-device",
                 work_cls=AuthenticateDeviceWork,
                 outcome_cls=AuthentificateDeviceOutcome,
-                model_methods=("CoreRuntimeModel.authentificate_device",),
+                entrypoint_methods=("ModelEntrypoint.authentificate_device",),
             ),
             CoreRuntimeWorkCatalogEntry(
                 id="core-runtime.host-install-identity",
                 work_cls=HostInstallIdentityWork,
                 outcome_cls=HostInstallIdentityOutcome,
-                model_methods=("CoreRuntimeModel.run_host_install_identity",),
+                entrypoint_methods=("ModelEntrypoint.run_host_install_identity",),
             ),
             CoreRuntimeWorkCatalogEntry(
                 id="core-runtime.refresh-known-devices",
                 work_cls=RefreshKnownDevicesWork,
                 outcome_cls=RefreshKnownDevicesOutcome,
-                model_methods=("CoreRuntimeModel.refresh_known_devices",),
+                entrypoint_methods=("ModelEntrypoint.refresh_known_devices",),
             ),
             CoreRuntimeWorkCatalogEntry(
                 id="core-runtime.close",
                 work_cls=CloseCoreRuntimeWork,
                 outcome_cls=CloseOutcome,
-                model_methods=("CoreRuntimeModel.close_core_runtime",),
+                entrypoint_methods=("ModelEntrypoint.close_core_runtime",),
             ),
         )
         self.add_all(list(entries))

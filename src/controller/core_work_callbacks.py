@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from controller.helper import validate_model
+from controller.helper import validate_model_entrypoint
 from controller.runner import JobError
 from core.work.authentificate_device_work import AuthentificateDeviceOutcome
 from core.work.close_work import CloseOutcome
@@ -45,10 +45,10 @@ class StartupCoreRuntimeCallback:
     def __init__(self, subcontroller: AdbSubController) -> None:
         self._subcontroller = subcontroller
 
-    @validate_model
+    @validate_model_entrypoint
     def on_completed(self, result: object) -> None:
         """Handle completion (Qt main thread, from AsyncRunner)."""
-        model = self._subcontroller.model
+        model_entrypoint = self._subcontroller.model_entrypoint
         if not isinstance(result, StartupOutcome):
             logger.error(
                 "AdbSubController: unexpected startup result type",
@@ -59,7 +59,7 @@ class StartupCoreRuntimeCallback:
             "AdbSubController: startup core runtime completed",
             adb_server=result.adb_server is not None,
         )
-        model.apply_result(result)
+        model_entrypoint.apply_result(result)
         self._subcontroller._enqueue_host_install_identity_job()
 
     def on_failed(self, error: JobError) -> None:
@@ -84,16 +84,16 @@ class AuthentificateDeviceCallback:
     def __init__(self, subcontroller: AdbSubController) -> None:
         self._subcontroller = subcontroller
 
-    @validate_model
+    @validate_model_entrypoint
     def on_completed(self, result: object) -> None:
-        model = self._subcontroller.model
+        model_entrypoint = self._subcontroller.model_entrypoint
         if not isinstance(result, AuthentificateDeviceOutcome):
             logger.error(
                 "AdbSubController: unexpected authentificate device result type",
                 result_type=type(result).__name__,
             )
             return
-        model.apply_result(result)
+        model_entrypoint.apply_result(result)
 
     def on_failed(self, error: JobError) -> None:
         log_authentificate_device_job_failure(error)
@@ -117,9 +117,9 @@ class RefreshDeviceListCallback:
     def __init__(self, subcontroller: AdbSubController) -> None:
         self._subcontroller = subcontroller
 
-    @validate_model
+    @validate_model_entrypoint
     def on_completed(self, result: object) -> None:
-        model = self._subcontroller.model
+        model_entrypoint = self._subcontroller.model_entrypoint
         if not isinstance(result, RefreshKnownDevicesOutcome):
             logger.error(
                 "AdbSubController: unexpected refresh_device_list result type",
@@ -132,7 +132,7 @@ class RefreshDeviceListCallback:
             device_count=len(device_ids),
             device_ids=device_ids,
         )
-        model.apply_result(result)
+        model_entrypoint.apply_result(result)
 
     def on_failed(self, error: JobError) -> None:
         log_refresh_device_list_job_failure(error)
@@ -156,16 +156,16 @@ class HostInstallIdentityCallback:
     def __init__(self, subcontroller: AdbSubController) -> None:
         self._subcontroller = subcontroller
 
-    @validate_model
+    @validate_model_entrypoint
     def on_completed(self, result: object) -> None:
-        model = self._subcontroller.model
+        model_entrypoint = self._subcontroller.model_entrypoint
         if not isinstance(result, HostInstallIdentityOutcome):
             logger.error(
                 "AdbSubController: unexpected host_install_identity result type",
                 result_type=type(result).__name__,
             )
             return
-        model.apply_result(result)
+        model_entrypoint.apply_result(result)
         logger.success(
             "AdbSubController: host install identity completed",
         )
@@ -200,9 +200,9 @@ class CloseCoreRuntimeCallback:
         if hook is not None:
             hook()
 
-    @validate_model
+    @validate_model_entrypoint
     def on_completed(self, result: object) -> None:
-        model = self._subcontroller.model
+        model_entrypoint = self._subcontroller.model_entrypoint
         if not isinstance(result, CloseOutcome):
             logger.error(
                 "AdbSubController: unexpected close_core_runtime result type",
@@ -210,7 +210,7 @@ class CloseCoreRuntimeCallback:
             )
             self._consume_pending_after_close_apply()
             return
-        model.apply_result(result)
+        model_entrypoint.apply_result(result)
         logger.success(
             "AdbSubController: close_core_runtime completed",
         )

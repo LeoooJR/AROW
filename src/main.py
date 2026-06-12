@@ -56,12 +56,12 @@ def main(
     if not interface_only:
 
         from controller import AppController
-        from core.models import CoreRuntimeModel
+        from core.entrypoint import ModelEntrypoint
 
-        simulation_model: CoreRuntimeModel = CoreRuntimeModel(use_mock_adb=mock_adb)
+        model_entrypoint: ModelEntrypoint = ModelEntrypoint(use_mock_adb=mock_adb)
 
         app_controller: AppController = AppController(
-            model=simulation_model, view=main_window
+            model_entrypoint=model_entrypoint, view=main_window
         )
 
     main_window.show()

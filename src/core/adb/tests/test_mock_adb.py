@@ -9,7 +9,7 @@ import pytest
 from core import ADB_BINARY_BUILD_NUMBER, ADB_BINARY_BUILD_VERSION, ADB_BINARY_VERSION
 from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
 from core.adb.command import ADBCommandParser, AdbCommands
-from core.models import CoreRuntimeModel
+from core.entrypoint import ModelEntrypoint
 from core.signals import CoreSignal
 
 pytestmark = [pytest.mark.mock_adb]
@@ -38,16 +38,18 @@ def test_mock_server_binary_version_output_matches_parser() -> None:
     assert str(parsed.path) == "/mock/adb"
 
 
-def test_core_runtime_model_startup_mock_returns_outcome_without_emitting() -> None:
-    model = CoreRuntimeModel(use_mock_adb=True)
+def test_model_entrypoint_startup_mock_returns_outcome_without_emitting() -> None:
+    model_entrypoint = ModelEntrypoint(use_mock_adb=True)
     emitted: list[tuple[CoreSignal, object]] = []
-    model._signal_bus.emit = lambda signal, payload: emitted.append((signal, payload))
+    model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
+        (signal, payload)
+    )
 
-    outcome = model.startup()
+    outcome = model_entrypoint.startup()
 
     assert isinstance(outcome.adb_server, MockAdbServer)
     assert isinstance(outcome.adb_client, MockAdbClient)
-    assert model.adb_server is None
+    assert model_entrypoint.adb_server is None
     assert emitted == []
     assert outcome.devices
     assert outcome.devices[0].descriptor.manufacturer.strip()

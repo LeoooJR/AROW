@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
-from core.models import CoreRuntimeModel
+from core.entrypoint import ModelEntrypoint
 from gui.window import MainWindow
 
 if TYPE_CHECKING:
@@ -13,14 +13,14 @@ if TYPE_CHECKING:
 
 
 class AppSubController(ABC):
-    """Subcontroller slice: shared access to app model/view and signal wiring hooks."""
+    """Subcontroller slice: shared access to app model entrypoint/view and signal wiring hooks."""
 
     def __init__(self, app: AppController) -> None:
         self._app = app
 
     @property
-    def model(self) -> CoreRuntimeModel:
-        return self._app.model
+    def model_entrypoint(self) -> ModelEntrypoint:
+        return self._app.model_entrypoint
 
     @property
     def view(self) -> MainWindow:

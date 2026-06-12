@@ -3,21 +3,22 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 from unittest.mock import MagicMock
 
 from controller.orchestration.app_controller import AppController
-from core.models import CoreRuntimeModel
+from core.entrypoint import ModelEntrypoint
 
 
 class _AppControllerActivityLogProbe:
     def __init__(self, application_dir: Path) -> None:
         self._activity_log_file: Path | None = None
-        self.model = MagicMock(spec=CoreRuntimeModel)
-        self.model.application_dir = application_dir
+        self.model_entrypoint = MagicMock(spec=ModelEntrypoint)
+        self.model_entrypoint.application_dir = application_dir
         self.view = MagicMock()
 
     def _resolve_activity_log_file(self) -> Path:
-        return AppController._resolve_activity_log_file(self)
+        return AppController._resolve_activity_log_file(cast(AppController, self))
 
 
 def test_resolve_activity_log_file_uses_timestamped_default(tmp_path: Path) -> None:

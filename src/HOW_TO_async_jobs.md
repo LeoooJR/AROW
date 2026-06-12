@@ -7,15 +7,15 @@ This guide describes how background work is queued in AROW, how results return t
 | Layer | Role |
 |--------|------|
 | **View (`gui/`)** | Emits signals or calls controller methods in response to UI events. Must not block on slow I/O or CPU-heavy work. |
-| **Controller (`controller/`)** | Decides *when* to run work, builds `JobSpecification`, connects completion callbacks, and applies results to the model or view on the main thread. `AppController` lives in `controller/orchestration/`; domain slices in `controller/domains/`. |
-| **Core (`core/`)** | Holds domain logic: pure functions, model methods, or small helpers that perform the actual work (ADB, startup, pairing, etc.). |
+| **Controller (`controller/`)** | Decides *when* to run work, builds `JobSpecification`, connects completion callbacks, and applies results to the model entrypoint or view on the main thread. `AppController` lives in `controller/orchestration/`; domain slices in `controller/domains/`. |
+| **Core (`core/`)** | Holds domain logic: pure functions, `ModelEntrypoint` methods, or small helpers that perform the actual work (ADB, startup, pairing, etc.). |
 
 Heavy or blocking operations should run **outside** the GUI thread. The app routes them through a single **`AsyncRunner`** (typically owned by `AppController`), using **`JobSpecification`** and **`JobHandler`**.
 
 ## End-to-end pathway
 
 1. **Something triggers the controller** — for example a categorized `signals` handler (e.g. `signals.DEVICE.RefreshDeviceListRequested` from `gui.signals`), a menu action, or a model event wired in `_connect_model_signals`.
-2. **The controller submits a job** — usually via `Controller._submit_model_async_call(...)`, which wraps `AsyncRunner.submit(JobSpecification(...))` and binds per-job signals.
+2. **The controller submits a job** — usually via `Controller._submit_model_entrypoint_async_call(...)`, which wraps `AsyncRunner.submit(JobSpecification(...))` and binds per-job signals.
 3. **The runner picks a pool** — thread vs process from `job_type` or `"auto"` (see below).
 4. **The worker runs `JobSpecification.fn`** — with `args` / `kwargs`. This runs in a **worker thread or process**, not on the Qt main thread.
 5. **Completion is marshaled to the main thread** — `AsyncRunner` uses internal Qt signals with `QueuedConnection` so **`Completed`**, **`Failed`**, and **`Cancelled`** slots run on the GUI thread.
@@ -39,12 +39,12 @@ flowchart LR
   R -->|QueuedConnection| CB
 ```
 
-## Preferred API: `_submit_model_async_call`
+## Preferred API: `_submit_model_entrypoint_async_call`
 
-`Controller` exposes a single helper intended for model-side async work:
+`Controller` exposes a single helper intended for model-entrypoint async work:
 
 ```python
-handle = self._submit_model_async_call(
+handle = self._submit_model_entrypoint_async_call(
     name="my_job",
     fn=my_callable,
     description="Optional human-readable description",
@@ -61,15 +61,15 @@ handle = self._submit_model_async_call(
 )
 ```
 
-- **`fn`**: callable executed in the background. Often `self.model.some_method` or a thin wrapper that calls `core` helpers.
-- **Callbacks**: optional; each connected slot runs on the **Qt main thread** after the runner emits the corresponding signal (see docstring on `_submit_model_async_call` in `controller/controller.py`).
+- **`fn`**: callable executed in the background. Often `self.model_entrypoint.some_method` or a thin wrapper that calls `core` helpers.
+- **Callbacks**: optional; each connected slot runs on the **Qt main thread** after the runner emits the corresponding signal (see docstring on `_submit_model_entrypoint_async_call` in `controller/controller.py`).
 - **Return value**: a **`JobHandler`** — use `handle.job_id` with `runner.cancel(job_id)` if you need to cancel (see “Cancellation” below).
 
 Subcontrollers that do not inherit `Controller` (e.g. `AdbSubController` in `controller/domains/`) typically delegate with:
 
 ```python
-def _submit_model_async_call(self, *args, **kwargs):
-    return self._app._submit_model_async_call(*args, **kwargs)
+def _submit_model_entrypoint_async_call(self, *args, **kwargs):
+    return self._app._submit_model_entrypoint_async_call(*args, **kwargs)
 ```
 
 so every domain module shares **one** `AsyncRunner` from `AppController`.
@@ -130,7 +130,7 @@ Existing code keeps completion handlers in dedicated modules (see **`controller/
 1. **Small classes** with **`on_completed(self, result: object)`** and **`on_failed(self, error: JobError)`**.
 2. **`__slots__`** plus **`__weakref__`** on the class when methods are used as Qt signal slots (Qt may weak-reference bound methods).
 3. **Validate `result`** before touching model/view; log unexpected types.
-4. **Apply model mutations on the main thread** inside **`on_completed`** — possibly via helpers such as **`apply_main_thread`** in **`core/`** when startup-style results bundle main-thread work.
+4. **Apply model entrypoint mutations on the main thread** inside **`on_completed`** — possibly via helpers such as **`apply_main_thread`** in **`core/`** when startup-style results bundle main-thread work.
 
 This keeps async submission sites readable (only **`fn`** and callback references) and centralizes error handling.
 
@@ -140,7 +140,7 @@ This keeps async submission sites readable (only **`fn`** and callback reference
 |--------|--------|
 | `AsyncRunner`, `JobSpecification`, `JobHandler`, `JobHandlerSignals` | `controller.runner` |
 | `JobError`, `ProgressEvent`, `CancelledError` | `controller.runner` |
-| `_submit_model_async_call` | `Controller` subclasses (`controller.orchestration.AppController`, …) |
+| `_submit_model_entrypoint_async_call` | `Controller` subclasses (`controller.orchestration.AppController`, …) |
 
 Tests with a fake runner live under **`src/core/tests/test_async_runner.py`** for behavioral examples.
 
@@ -149,5 +149,5 @@ Tests with a fake runner live under **`src/core/tests/test_async_runner.py`** fo
 1. Implement or reuse **core** logic callable as **`fn`** (returns a clear result type).
 2. Choose **`job_type`** (and **`coalesce_key`** if “latest wins” applies).
 3. Implement **`on_completed`** / **`on_failed`** (and optionally **`on_cancelled`**) with type checks and main-thread-safe updates.
-4. Submit via **`_submit_model_async_call`** from a **`Controller`** (or subcontroller delegating to **`AppController`**).
+4. Submit via **`_submit_model_entrypoint_async_call`** from a **`Controller`** (or subcontroller delegating to **`AppController`**).
 5. Avoid blocking the GUI thread; keep **`fn`** from touching Qt widgets directly.

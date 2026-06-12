@@ -9,7 +9,7 @@ from core import ADB_BINARY_BUILD_NUMBER, ADB_BINARY_BUILD_VERSION, ADB_BINARY_V
 from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
 from core.adb.binary import AdbBinary
 from core.devices import Phone
-from core.models import CoreRuntimeModel
+from core.entrypoint import ModelEntrypoint
 from core.signals import AdbServerStartedPayload, CoreSignal, DevicesUpdatedPayload
 from core.work import startup_work
 from core.work.startup_work import StartupCoreRuntimeWork, StartupOutcome
@@ -157,17 +157,19 @@ def test_startup_apply_binds_mock_runtime_and_emits_startup_signals() -> None:
     server = MockAdbServer(state=state)
     client = MockAdbClient(state=state)
     devices = server.get_known_devices()
-    model = CoreRuntimeModel()
+    model_entrypoint = ModelEntrypoint()
     emitted: list[tuple[CoreSignal, object]] = []
-    model._signal_bus.emit = lambda signal, payload: emitted.append((signal, payload))
+    model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
+        (signal, payload)
+    )
 
     StartupCoreRuntimeWork.apply_main_thread(
-        model,
+        model_entrypoint,
         StartupOutcome(adb_server=server, adb_client=client, devices=devices),
     )
 
-    assert model.adb_server is server
-    assert model._adb_client is client
+    assert model_entrypoint.adb_server is server
+    assert model_entrypoint._adb_client is client
     assert emitted == [
         (
             CoreSignal.ADB_SERVER_STARTED,

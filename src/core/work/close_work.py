@@ -10,12 +10,12 @@ from core.work.core_runtime_work import CoreRuntimeWork, CoreRuntimeWorkOutcome
 from logger import logger
 
 if TYPE_CHECKING:
-    from core.models import CoreRuntimeModel
+    from core.entrypoint import ModelEntrypoint
 
 
 def _stop_adb_server(adb_server: AdbServer) -> bool:
     """
-    Stop the ADB server and remove the instance from model state.
+    Stop the ADB server and remove the instance from entrypoint state.
     """
     if adb_server is not None:
         stopped_binary = adb_server.binary
@@ -24,18 +24,18 @@ def _stop_adb_server(adb_server: AdbServer) -> bool:
             adb_server.stop()
         except AdbServerException as e:
             logger.error(
-                "CoreRuntimeModel: Failed to stop ADB server",
+                "ModelEntrypoint: Failed to stop ADB server",
                 error=str(e),
             )
             return False
         logger.info(
-            "CoreRuntimeModel: ADB server stopped",
+            "ModelEntrypoint: ADB server stopped",
             adb_path=adb_path,
         )
         return True
     else:
         logger.warning(
-            "CoreRuntimeModel: ADB server stop skipped (not running)",
+            "ModelEntrypoint: ADB server stop skipped (not running)",
         )
         return False
 
@@ -65,21 +65,23 @@ class CloseCoreRuntimeWork(CoreRuntimeWork[CloseOutcome]):
             return CloseOutcome(adb_server=None)
 
     @staticmethod
-    def apply_main_thread(model: CoreRuntimeModel, result: CloseOutcome) -> None:
+    def apply_main_thread(
+        model_entrypoint: ModelEntrypoint, result: CloseOutcome
+    ) -> None:
         """
-        Apply the result of the close job to the model in the main thread.
+        Apply the result of the close job to the entrypoint in the main thread.
         """
-        from core.models import CoreRuntimeModel as _CoreRuntimeModel
+        from core.entrypoint import ModelEntrypoint as _ModelEntrypoint
 
-        if not isinstance(model, _CoreRuntimeModel):
-            raise TypeError("apply_main_thread() requires CoreRuntimeModel")
+        if not isinstance(model_entrypoint, _ModelEntrypoint):
+            raise TypeError("apply_main_thread() requires ModelEntrypoint")
         if result.adb_server is None:
             logger.warning(
-                "CoreRuntimeModel: close apply skipped stop signal (no stopped server)",
+                "ModelEntrypoint: close apply skipped stop signal (no stopped server)",
             )
             return
-        model._adb_server = None
-        model._signal_bus.emit(
+        model_entrypoint._adb_server = None
+        model_entrypoint._signal_bus.emit(
             CoreSignal.ADB_SERVER_STOPPED,
             AdbServerStoppedPayload(adb_binary=result.adb_server.binary),
         )

@@ -1,6 +1,6 @@
 """
 Abstract contract for AsyncRunner-backed core jobs: blocking ``run`` on a worker and
-``apply_main_thread`` on the Qt main thread (often via ``CoreRuntimeModel.apply_result``).
+``apply_main_thread`` on the Qt main thread (often via ``ModelEntrypoint.apply_result``).
 
 Asynchronous worker must return a :class:`CoreRuntimeWorkOutcome` subtype that can be applied on
 the main thread.
@@ -12,13 +12,13 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Generic, TypeVar
 
 if TYPE_CHECKING:
-    from core.models import CoreRuntimeModel
+    from core.entrypoint import ModelEntrypoint
 
 
 class CoreRuntimeWorkOutcome:
     """
     Marker base for payloads returned from :meth:`CoreRuntimeWork.run` and passed to
-    :meth:`CoreRuntimeWork.apply_main_thread` / :meth:`CoreRuntimeModel.apply_result`.
+    :meth:`CoreRuntimeWork.apply_main_thread` / :meth:`ModelEntrypoint.apply_result`.
 
     Concrete types are frozen dataclasses under ``src/core/work/``; they need not share fields.
     """
@@ -32,7 +32,7 @@ TOutcome = TypeVar("TOutcome", bound=CoreRuntimeWorkOutcome)
 class CoreRuntimeWork(ABC, Generic[TOutcome]):
     """
     Concrete subclasses carry worker inputs in ``__init__``, implement blocking ``run``, and expose
-    a static ``apply_main_thread(model, outcome)`` for dispatcher registration by outcome type
+    a static ``apply_main_thread(model_entrypoint, outcome)`` for dispatcher registration by outcome type
     (no sentinel worker instance needed).
     """
 
@@ -43,6 +43,6 @@ class CoreRuntimeWork(ABC, Generic[TOutcome]):
 
     @staticmethod
     @abstractmethod
-    def apply_main_thread(model: CoreRuntimeModel, outcome: TOutcome) -> None:
-        """Emit on the core bus / mutate model; call only from the Qt main thread."""
+    def apply_main_thread(model_entrypoint: ModelEntrypoint, outcome: TOutcome) -> None:
+        """Emit on the core bus / mutate entrypoint; call only from the Qt main thread."""
         ...

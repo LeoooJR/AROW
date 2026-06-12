@@ -8,7 +8,7 @@ import pytest
 
 from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
 from core.devices import Phone
-from core.models import CoreRuntimeModel
+from core.entrypoint import ModelEntrypoint
 from core.signals import CoreSignal, DevicesUpdatedPayload
 from core.work.refresh_known_devices_work import (
     RefreshKnownDevicesOutcome,
@@ -92,17 +92,19 @@ def test_refresh_known_devices_apply_replaces_devices_and_emits_update() -> None
     state = MockAdbState(seed=202, initial_devices=0)
     server = MockAdbServer(state=state)
     client = MockAdbClient(state=state)
-    model = CoreRuntimeModel()
-    model._adb_server = server
-    model._adb_client = client
+    model_entrypoint = ModelEntrypoint()
+    model_entrypoint._adb_server = server
+    model_entrypoint._adb_client = client
     stale_phone = Phone(id="stale-device", state="device")
     refreshed_phone = Phone(id="fresh-device", state="device")
     server.paired_devices.add(stale_phone)
     emitted: list[tuple[CoreSignal, object]] = []
-    model._signal_bus.emit = lambda signal, payload: emitted.append((signal, payload))
+    model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
+        (signal, payload)
+    )
 
     outcome = RefreshKnownDevicesOutcome(devices=[refreshed_phone])
-    RefreshKnownDevicesWork.apply_main_thread(model, outcome)
+    RefreshKnownDevicesWork.apply_main_thread(model_entrypoint, outcome)
 
     assert server.paired_devices.get("stale-device") is None
     assert server.paired_devices.get("fresh-device") is refreshed_phone

@@ -2,7 +2,7 @@
 Paired worker / apply for persisted host install UUID (``ComputerDescriptor.stable_key``).
 
 Disk I/O runs in :meth:`HostInstallIdentityWork.run`; the Qt main thread applies via
-:class:`HostInstallIdentityWork.apply_main_thread` through :meth:`CoreRuntimeModel.apply_result`.
+:class:`HostInstallIdentityWork.apply_main_thread` through :meth:`ModelEntrypoint.apply_result`.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from core.work.core_runtime_work import CoreRuntimeWork, CoreRuntimeWorkOutcome
 from logger import logger
 
 if TYPE_CHECKING:
-    from core.models import CoreRuntimeModel
+    from core.entrypoint import ModelEntrypoint
 
 _INSTALL_IDENTITY_FILENAME = "install_identity"
 
@@ -93,12 +93,12 @@ class HostInstallIdentityWork(CoreRuntimeWork[HostInstallIdentityOutcome]):
 
     @staticmethod
     def apply_main_thread(
-        model: CoreRuntimeModel, outcome: HostInstallIdentityOutcome
+        model_entrypoint: ModelEntrypoint, outcome: HostInstallIdentityOutcome
     ) -> None:
-        from core.models import CoreRuntimeModel as _CoreRuntimeModel
+        from core.entrypoint import ModelEntrypoint as _ModelEntrypoint
 
-        if not isinstance(model, _CoreRuntimeModel):
-            raise TypeError("apply_main_thread() requires CoreRuntimeModel")
+        if not isinstance(model_entrypoint, _ModelEntrypoint):
+            raise TypeError("apply_main_thread() requires ModelEntrypoint")
         token = (outcome.install_token or "").strip()
         if not token:
             logger.warning(
@@ -106,8 +106,8 @@ class HostInstallIdentityWork(CoreRuntimeWork[HostInstallIdentityOutcome]):
             )
             return
         key = compute_computer_stable_key(token)
-        model._host.descriptor.stable_key = key
-        model._signal_bus.emit(
+        model_entrypoint._host.descriptor.stable_key = key
+        model_entrypoint._signal_bus.emit(
             CoreSignal.HOST_COMPUTER_IDENTITY_UPDATED,
             HostComputerIdentityPayload(stable_key=key),
         )

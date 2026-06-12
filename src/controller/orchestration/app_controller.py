@@ -18,7 +18,7 @@ from controller.domains.map_sub_controller import MapSubController
 from controller.domains.simulation_sub_controller import SimulationSubController
 from controller.helper import validate_view, watchdog
 from core.application_paths import default_activity_log_file_path
-from core.models import CoreRuntimeModel
+from core.entrypoint import ModelEntrypoint
 from gui.signals import signals
 from gui.window import MainWindow
 from logger import logger
@@ -36,10 +36,10 @@ class AppController(Controller):
     delegates ADB, simulation, and map concerns to *SubController instances.
     """
 
-    def __init__(self, model: CoreRuntimeModel, view: MainWindow) -> None:
+    def __init__(self, model_entrypoint: ModelEntrypoint, view: MainWindow) -> None:
         # Subcontrollers need a fully constructed app reference; defer signal
         # wiring in Controller until children exist.
-        super().__init__(model, view, defer_signal_connect=True)
+        super().__init__(model_entrypoint, view, defer_signal_connect=True)
         self._simulation: SimulationSubController = SimulationSubController(
             self
         )  # Create simulation subcontroller before adb subcontroller to avoid race condition, signals are connected in the order of creation
@@ -80,7 +80,7 @@ class AppController(Controller):
         """Return the current app-wide activity log path, creating a default when unset."""
         if self._activity_log_file is None:
             self._activity_log_file = default_activity_log_file_path(
-                self.model.application_dir
+                self.model_entrypoint.application_dir
             )
         return self._activity_log_file
 

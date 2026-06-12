@@ -10,7 +10,7 @@ from controller.runner import (
     ProgressEvent,
     jobtype,
 )
-from core.models import CoreRuntimeModel
+from core.entrypoint import ModelEntrypoint
 from gui.window import MainWindow
 from logger import logger
 
@@ -20,7 +20,7 @@ class Controller(ABC):
 
     def __init__(
         self,
-        model: CoreRuntimeModel,
+        model_entrypoint: ModelEntrypoint,
         view: MainWindow,
         *,
         runner: AsyncRunner | None = None,
@@ -29,7 +29,7 @@ class Controller(ABC):
         """Initialize the controller.
 
         Args:
-            model: Model for the application.
+            model_entrypoint: Core runtime entrypoint for the application.
             view: View for the application.
             runner: If provided, use this :class:`AsyncRunner` (e.g. single shared
                 instance from the application controller). If omitted, create one.
@@ -37,7 +37,7 @@ class Controller(ABC):
                 ``_connect_model_signals`` here so a subclass can construct child
                 objects first, then call those hooks (see :class:`AppController`).
         """
-        self._model: CoreRuntimeModel = model
+        self._model_entrypoint: ModelEntrypoint = model_entrypoint
         self._view: MainWindow | None = view
         self._runner: AsyncRunner = runner if runner is not None else AsyncRunner(view)
         if not defer_signal_connect:
@@ -73,21 +73,21 @@ class Controller(ABC):
         self._view = view
 
     @property
-    def model(self) -> CoreRuntimeModel:
-        """Get the model for the application."""
-        return self._model
+    def model_entrypoint(self) -> ModelEntrypoint:
+        """Get the core runtime entrypoint for the application."""
+        return self._model_entrypoint
 
-    @model.setter
-    def model(self, model: CoreRuntimeModel) -> None:
-        """Set the model for the application."""
-        self._model = model
+    @model_entrypoint.setter
+    def model_entrypoint(self, model_entrypoint: ModelEntrypoint) -> None:
+        """Set the core runtime entrypoint for the application."""
+        self._model_entrypoint = model_entrypoint
 
     @property
     def runner(self) -> AsyncRunner:
         """Get the asynchronous runner for the application."""
         return self._runner
 
-    def _submit_model_async_call(
+    def _submit_model_entrypoint_async_call(
         self,
         *,
         name: str,
@@ -105,11 +105,11 @@ class Controller(ABC):
         coalesce_key: str | None = None,
     ) -> JobHandler:
         """
-        Submit a model-related async job and bind any provided callbacks.
+        Submit a model-entrypoint async job and bind any provided callbacks.
 
         Completed callbacks are invoked by AsyncRunner on the Qt main thread,
         which makes this helper the standard entry point for future controller
-        -> model async orchestration.
+        -> model entrypoint async orchestration.
 
         Args:
             name: Name of the job.
@@ -153,9 +153,9 @@ class Controller(ABC):
             handle_signals.Failed.connect(on_failed)
 
         logger.debug(
-            "Controller: async model job submitted",
+            "Controller: async model entrypoint job submitted",
             controller_type=type(self).__name__,
-            model_type=type(self.model).__name__,
+            model_entrypoint_type=type(self.model_entrypoint).__name__,
             job_id=handle.job_id,
             job_name=name,
             job_type=job_type,

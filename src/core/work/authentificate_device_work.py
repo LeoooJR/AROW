@@ -23,7 +23,7 @@ from core.work.refresh_known_devices_work import enrich_phones_with_adb_shell_pr
 from logger import logger
 
 if TYPE_CHECKING:
-    from core.models import CoreRuntimeModel
+    from core.entrypoint import ModelEntrypoint
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,7 +67,7 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
     Pair over ADB on a worker; emit success/failure from the main thread only.
 
     ``adb_server`` is used for retry (e.g. ``restart`` after protocol fault); server and
-    client mirror :class:`~core.models.CoreRuntimeModel` at job submit time.
+    client mirror :class:`~core.entrypoint.ModelEntrypoint` at job submit time.
     """
 
     def __init__(
@@ -92,7 +92,7 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
         validation_failure = PairingInputValidator.validate(ip, port, association_code)
         if validation_failure is not None:
             logger.warning(
-                "CoreRuntimeModel: device pairing input validation failed",
+                "ModelEntrypoint: device pairing input validation failed",
                 ip=ip,
                 port=port,
                 reason=validation_failure,
@@ -113,7 +113,7 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
         except AdbClientException as error:
             error_message: str = str(error)
             logger.warning(
-                "CoreRuntimeModel: device pairing failed (first attempt)",
+                "ModelEntrypoint: device pairing failed (first attempt)",
                 ip=ip,
                 port=port,
                 error=error_message,
@@ -122,7 +122,7 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
                 try:
                     adb_server.restart()
                     logger.info(
-                        "CoreRuntimeModel: ADB server restarted after protocol fault",
+                        "ModelEntrypoint: ADB server restarted after protocol fault",
                         ip=ip,
                         port=port,
                     )
@@ -133,7 +133,7 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
                     )
                 except (AdbClientException, AdbServerException) as retry_error:
                     logger.warning(
-                        "CoreRuntimeModel: authentification retry failed after ADB server restart",
+                        "ModelEntrypoint: authentification retry failed after ADB server restart",
                         ip=ip,
                         port=port,
                         error=str(retry_error),
@@ -150,27 +150,27 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
 
     @staticmethod
     def apply_main_thread(
-        model: CoreRuntimeModel, outcome: AuthentificateDeviceOutcome
+        model_entrypoint: ModelEntrypoint, outcome: AuthentificateDeviceOutcome
     ) -> None:
         """Emit authentification outcome on the core bus (Qt main thread only)."""
-        from core.models import CoreRuntimeModel as _CoreRuntimeModel
+        from core.entrypoint import ModelEntrypoint as _ModelEntrypoint
 
-        if not isinstance(model, _CoreRuntimeModel):
-            raise TypeError("apply_main_thread() requires CoreRuntimeModel")
+        if not isinstance(model_entrypoint, _ModelEntrypoint):
+            raise TypeError("apply_main_thread() requires ModelEntrypoint")
         if outcome.failure is not None:
-            model._signal_bus.emit(
+            model_entrypoint._signal_bus.emit(
                 CoreSignal.DEVICE_AUTHENTIFICATION_FAILED,
                 outcome.failure,
             )
             return
         if outcome.success_phone is not None:
-            if model._adb_server is not None:
-                model._adb_server.paired_devices.add(outcome.success_phone)
-            model._signal_bus.emit(
+            if model_entrypoint._adb_server is not None:
+                model_entrypoint._adb_server.paired_devices.add(outcome.success_phone)
+            model_entrypoint._signal_bus.emit(
                 CoreSignal.DEVICE_AUTHENTIFICATION_SUCCEEDED,
                 DeviceAuthentificationSucceededPayload(phone=outcome.success_phone),
             )
             return
         logger.warning(
-            "CoreRuntimeModel: authentificate device apply skipped (empty outcome)",
+            "ModelEntrypoint: authentificate device apply skipped (empty outcome)",
         )

@@ -7,7 +7,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from controller.domains.app_sub_controller import AppSubController
-from controller.helper import validate_model, validate_view
+from controller.helper import validate_model_entrypoint, validate_view
 from gui.signals import signals
 from logger import logger
 
@@ -44,21 +44,21 @@ class SimulationSubController(AppSubController):
     @validate_view
     def _send_host_device_information(self) -> None:
         self.view.forward_host_device_information_updated(
-            self.model.host.get_name(),
-            self.model.host.get_os(),
-            self.model.host.get_ip(),
+            self.model_entrypoint.host.get_name(),
+            self.model_entrypoint.host.get_os(),
+            self.model_entrypoint.host.get_ip(),
         )
 
     def is_simulation_active(self, id: str) -> bool:
         """Check if the simulation is active."""
-        return self.model.is_simulation_active(id)
+        return self.model_entrypoint.is_simulation_active(id)
 
     def run(self, id: str) -> None:
         """Run the simulation by setting it active."""
         if self.is_simulation_active(id):
             return
         try:
-            self.model.set_simulation_active(id, True)
+            self.model_entrypoint.set_simulation_active(id, True)
             # self.view.forward_simulation_started() # TODO: Implement this
         except ValueError as e:
             logger.error(
@@ -73,7 +73,7 @@ class SimulationSubController(AppSubController):
         if not self.is_simulation_active(id):
             return
         try:
-            self.model.set_simulation_active(id, False)
+            self.model_entrypoint.set_simulation_active(id, False)
             # self.view.forward_simulation_stopped() # TODO: Implement this
         except ValueError as e:
             logger.error(
@@ -88,7 +88,7 @@ class SimulationSubController(AppSubController):
         if not self.is_simulation_active(id):
             return
         try:
-            self.model.set_simulation_active(id, False)
+            self.model_entrypoint.set_simulation_active(id, False)
             # self.view.forward_simulation_paused() # TODO: Implement this
         except ValueError as e:
             logger.error(
@@ -103,7 +103,7 @@ class SimulationSubController(AppSubController):
         if self.is_simulation_active(id):
             return
         try:
-            self.model.set_simulation_active(id, True)
+            self.model_entrypoint.set_simulation_active(id, True)
             # self.view.forward_simulation_resumed() # TODO: Implement this
         except ValueError as e:
             logger.error(
@@ -113,7 +113,7 @@ class SimulationSubController(AppSubController):
             )
             return
 
-    @validate_model
+    @validate_model_entrypoint
     def _on_device_selection_confirmed(self, device_id: str, device_name: str) -> None:
         """In-memory selection of the active device (UI thread)."""
         logger.debug(
@@ -122,7 +122,7 @@ class SimulationSubController(AppSubController):
             input_device_name=device_name,
         )
         try:
-            sim_id: str = self.model.create_simulation(device_id=device_id)
+            sim_id: str = self.model_entrypoint.create_simulation(device_id=device_id)
             logger.success(
                 "SimulationSubController: active device set",
                 sim_id=sim_id,
@@ -141,7 +141,7 @@ class SimulationSubController(AppSubController):
     def _on_remove_device_requested(self, device_id: str) -> None:
         """Handle the remove device requested event."""
         try:
-            self.model.delete_simulation_for_device(device_id)
+            self.model_entrypoint.delete_simulation_for_device(device_id)
             self.view.forward_remove_active_device_succeeded(device_id)
         except (
             ValueError

@@ -28,7 +28,7 @@ from core.signals import CoreSignal, DevicesUpdatedPayload
 from core.work.core_runtime_work import CoreRuntimeWork, CoreRuntimeWorkOutcome
 
 if TYPE_CHECKING:
-    from core.models import CoreRuntimeModel
+    from core.entrypoint import ModelEntrypoint
 
 # Only states where ``adb -s … shell …`` reliably targets the handset.
 _EXECUTABLE_STATES = frozenset(("device",))
@@ -156,21 +156,21 @@ class RefreshKnownDevicesWork(CoreRuntimeWork[RefreshKnownDevicesOutcome]):
 
     @staticmethod
     def apply_main_thread(
-        model: CoreRuntimeModel,
+        model_entrypoint: ModelEntrypoint,
         outcome: RefreshKnownDevicesOutcome,
     ) -> None:
-        from core.models import CoreRuntimeModel as _CoreRuntimeModel
+        from core.entrypoint import ModelEntrypoint as _ModelEntrypoint
 
-        if not isinstance(model, _CoreRuntimeModel):
-            raise TypeError("apply_main_thread() requires CoreRuntimeModel")
-        adb_server = model._adb_server
+        if not isinstance(model_entrypoint, _ModelEntrypoint):
+            raise TypeError("apply_main_thread() requires ModelEntrypoint")
+        adb_server = model_entrypoint._adb_server
         if adb_server is None:
             raise AttributeError(
                 "ADB server must be initialized before applying refresh outcome"
             )
         adb_server.paired_devices.clear()
         adb_server.paired_devices.add_all(outcome.devices)
-        model._signal_bus.emit(
+        model_entrypoint._signal_bus.emit(
             CoreSignal.DEVICES_UPDATED,
             DevicesUpdatedPayload(devices=outcome.devices),
         )
