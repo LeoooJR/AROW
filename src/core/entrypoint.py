@@ -166,9 +166,15 @@ class ModelEntrypoint(Entrypoint):
 
     def run_host_install_identity(self) -> HostInstallIdentityOutcome:
         """
-        Load or create persisted install UUID (worker thread).
+        Load or create persisted install UUID (AsyncRunner worker thread).
 
         Apply on the main thread via :meth:`apply_result` after AsyncRunner completes.
+
+        returns:
+            HostInstallIdentityOutcome: The outcome of the work.
+                - install_token: The install token.
+        raises:
+            RuntimeError: If the install token is not created.
         """
         return HostInstallIdentityWork().run()
 

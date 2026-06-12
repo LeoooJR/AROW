@@ -85,7 +85,36 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
         self.association_code: str = association_code
 
     def run(self) -> AuthentificateDeviceOutcome:
-        """Authentificate a device over ADB (worker thread). Does not touch the core signal bus."""
+        """
+        Validate pairing inputs, pair over ADB, and enrich the paired phone
+        (AsyncRunner worker thread).
+
+        Invalid IP, port, or association code returns a failure outcome without
+        calling ADB. On :class:`~core.adb.exceptions.AdbClientException`, if the
+        message contains ``"protocol fault"`` (case-insensitive) and
+        ``adb_server`` is set, the server is restarted and pairing plus
+        enrichment are retried once. Shell enrichment after a successful pair is
+        best-effort (failures are swallowed inside the client). This method does
+        not touch the core signal bus; :meth:`apply_main_thread` emits success or
+        failure.
+
+        Returns:
+            AuthentificateDeviceOutcome: On success, ``success_phone`` is set and
+            ``failure`` is ``None``. On validation or handled pairing failure,
+            ``success_phone`` is ``None`` and ``failure`` carries
+            :class:`~core.signals.DeviceAuthentificationFailedPayload` with a
+            user-facing ``reason``. After a failed protocol-fault retry, ``reason``
+            is the **first** attempt's error message, not the retry error.
+
+        Raises:
+            None: Validation failures and handled
+            :class:`~core.adb.exceptions.AdbClientException` /
+            :class:`~core.adb.exceptions.AdbServerException` from pairing or
+            retry are converted into a failure outcome.
+            Exception: Any exception other than :class:`~core.adb.exceptions.AdbClientException`
+            on the first ``pair``/enrichment attempt, or any non-ADB exception
+            during ``adb_server.restart()``, propagates to AsyncRunner.
+        """
         adb_server = self.adb_server
         adb_client = self.adb_client
         ip, port, association_code = self.ip, self.port, self.association_code

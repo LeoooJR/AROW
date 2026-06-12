@@ -38,7 +38,22 @@ class CoreRuntimeWork(ABC, Generic[TOutcome]):
 
     @abstractmethod
     def run(self) -> TOutcome:
-        """Blocking work executed on an AsyncRunner worker thread."""
+        """
+        Execute blocking model work on an AsyncRunner worker thread.
+
+        Subclasses perform I/O or other blocking steps here and return a
+        :class:`CoreRuntimeWorkOutcome` subtype. Main-thread mutation and core-bus
+        emission belong in :meth:`apply_main_thread`, not in ``run``.
+
+        Returns:
+            TOutcome: Concrete outcome payload for the matching
+            :meth:`apply_main_thread` implementation.
+
+        Raises:
+            NotImplementedError: This abstract method has no body.
+            Exception: Concrete subclasses define which project exceptions may
+            propagate to AsyncRunner; see each work module's ``run`` docstring.
+        """
         ...
 
     @staticmethod

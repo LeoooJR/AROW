@@ -171,6 +171,7 @@ class HostInstallIdentityCallback:
         )
 
     def on_failed(self, error: JobError) -> None:
+        """Handle failure (Qt main thread, from AsyncRunner)."""
         log_host_install_identity_job_failure(error)
 
 

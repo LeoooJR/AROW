@@ -150,6 +150,29 @@ class RefreshKnownDevicesWork(CoreRuntimeWork[RefreshKnownDevicesOutcome]):
         self._adb_client = adb_client
 
     def run(self) -> RefreshKnownDevicesOutcome:
+        """
+        List devices from the bound server and enrich shell-targetable phones
+        via ADB shell properties (AsyncRunner worker thread).
+
+        Device listing uses :meth:`~core.adb.server.AdbServer.get_known_devices`.
+        Enrichment uses :func:`enrich_phones_with_adb_shell_properties`, which
+        only targets phones in the ``device`` state. Shell read failures are
+        logged and swallowed inside :class:`~core.adb.client.AdbClient`, so
+        enrichment degradation does not fail this job.
+
+        Returns:
+            RefreshKnownDevicesOutcome: ``devices`` — listed phones, mutated in
+            place with best-effort shell metadata for
+            :meth:`apply_main_thread` to persist and emit ``DEVICES_UPDATED``.
+
+        Raises:
+            AdbClientException: Device listing failed after server-side ADB
+            command retries (wraps :class:`~core.adb.exceptions.AdbServerException`
+            from subprocess timeout, I/O, or non-success ``adb devices -l``
+            result).
+            Exception: Any unexpected failure outside the documented ADB listing
+            path propagates to AsyncRunner.
+        """
         phones = self._adb_server.get_known_devices()
         enrich_phones_with_adb_shell_properties(self._adb_client, phones)
         return RefreshKnownDevicesOutcome(devices=phones)

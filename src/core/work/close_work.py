@@ -57,7 +57,25 @@ class CloseCoreRuntimeWork(CoreRuntimeWork[CloseOutcome]):
 
     def run(self) -> CloseOutcome:
         """
-        Execute close steps that may block (AsyncRunner worker thread).
+        Stop the bound ADB server on a worker thread (AsyncRunner).
+
+        Delegates to :func:`_stop_adb_server`, which calls
+        :meth:`~core.adb.server.AdbServer.stop` when a server instance is
+        provided. :meth:`apply_main_thread` clears entrypoint server state and
+        emits ``ADB_SERVER_STOPPED`` only when stop succeeded.
+
+        Returns:
+            CloseOutcome: ``adb_server`` set to the stopped server instance when
+            :func:`_stop_adb_server` reports success; ``adb_server=None`` when
+            stop was skipped (no server) or :class:`~core.adb.exceptions.AdbServerException`
+            was caught and logged.
+
+        Raises:
+            None: :class:`~core.adb.exceptions.AdbServerException` from
+            :meth:`~core.adb.server.AdbServer.stop` is caught inside
+            :func:`_stop_adb_server` and converted to ``adb_server=None``.
+            Exception: Any non-:class:`~core.adb.exceptions.AdbServerException`
+            raised by the server object or stop path propagates to AsyncRunner.
         """
         if _stop_adb_server(self._adb_server):
             return CloseOutcome(adb_server=self._adb_server)

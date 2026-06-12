@@ -89,6 +89,26 @@ class HostInstallIdentityWork(CoreRuntimeWork[HostInstallIdentityOutcome]):
     """
 
     def run(self) -> HostInstallIdentityOutcome:
+        """
+        Load or atomically create the persisted host install UUID
+        (AsyncRunner worker thread).
+
+        Delegates to :func:`_load_or_create_install_token`, which reads
+        ``install_identity`` under the application data directory or exclusive-
+        creates it on first launch. :meth:`apply_main_thread` derives
+        ``stable_key`` and emits ``HOST_COMPUTER_IDENTITY_UPDATED``.
+
+        Returns:
+            HostInstallIdentityOutcome: ``install_token`` — normalized
+            (casefolded) UUID string for main-thread application.
+
+        Raises:
+            OSError: Filesystem failure creating the application directory,
+            reading, unlinking, or writing ``install_identity`` (includes
+            :class:`PermissionError`).
+            RuntimeError: Exclusive create raced with another process and the
+            resulting file is empty or unreadable.
+        """
         return HostInstallIdentityOutcome(install_token=_load_or_create_install_token())
 
     @staticmethod

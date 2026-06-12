@@ -178,7 +178,38 @@ class StartupCoreRuntimeWork(CoreRuntimeWork[StartupOutcome]):
         self._use_mock_adb: bool = use_mock_adb
 
     def run(self) -> StartupOutcome:
-        """Execute startup steps that may block (AsyncRunner worker thread)."""
+        """
+        Start ADB server and client, snapshot paired devices, and enrich phones
+        from ADB shell properties (AsyncRunner worker thread).
+
+        Chooses mock vs real ADB from the constructor flag or ``AROW_USE_MOCK_ADB``.
+        Real path resolves the packaged binary, starts :class:`~core.adb.server.AdbServer`,
+        and builds :class:`~core.adb.client.AdbClient`. Mock path uses
+        :class:`~core.adb.adb_mock.MockAdbServer` / :class:`~core.adb.adb_mock.MockAdbClient`.
+        Shell enrichment is best-effort: ADB shell read failures are logged and
+        swallowed inside the client, so this method still returns an outcome.
+
+        Returns:
+            StartupOutcome: ``adb_server``, ``adb_client``, and ``devices`` for
+            :meth:`apply_main_thread` to assign on the model entrypoint and emit
+            ``ADB_SERVER_STARTED`` / ``DEVICES_UPDATED``.
+
+        Raises:
+            RuntimeError: Real ADB startup failed in :func:`_start_adb_server`
+            (unsupported OS, missing or non-executable binary, frozen metadata
+            mismatch, version preflight failure, or server start failure). Any
+            underlying exception is logged and chained as
+            ``"Failed to start ADB server"``.
+            RuntimeError: Unsupported OS or frozen-metadata mismatch during
+            :func:`_create_adb_client` binary resolution (not wrapped by
+            :func:`_start_adb_server`).
+            FileNotFoundError: Packaged ADB binary missing or not a file during
+            client creation after server startup succeeded.
+            AdbServerException: Mock server construction or :meth:`~core.adb.server.AdbServer.start`
+            failed when mock ADB is enabled (uncaught by the real-path wrapper).
+            Exception: Any unexpected failure from mock state construction,
+            enrichment helpers, or outcome construction propagates to AsyncRunner.
+        """
         use_mock = _use_mock_adb_effective(self._use_mock_adb)
         adb_server: AdbServer
         adb_client: AdbClient
