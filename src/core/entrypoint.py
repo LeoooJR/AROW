@@ -14,7 +14,6 @@ from core.signals import (
     AdbServerStartedPayload,
     AdbServerStoppedPayload,
     CoreSignal,
-    DeviceAuthentificationFailedPayload,
     DevicesUpdatedPayload,
     InMemoryCoreSignalBus,
     SignalHandler,
@@ -23,6 +22,7 @@ from core.simulation import Simulation, SimulationRepository
 from core.work.authentificate_device_work import (
     AuthenticateDeviceWork,
     AuthentificateDeviceOutcome,
+    DeviceAuthentificationError,
 )
 from core.work.close_work import CloseCoreRuntimeWork, CloseOutcome
 from core.work.core_runtime_work import CoreRuntimeWorkOutcome
@@ -35,6 +35,7 @@ from core.work.refresh_known_devices_work import (
     RefreshKnownDevicesWork,
 )
 from core.work.startup_work import StartupCoreRuntimeWork, StartupOutcome
+from core.work.work_failure import emit_core_error_raised
 from core.work.works_repository import CORE_RUNTIME_WORKS
 from logger import logger
 
@@ -45,6 +46,19 @@ _CORE_RUNTIME_RESULT_APPLIERS: dict[
     type[CoreRuntimeWorkOutcome], CoreRuntimeResultApplier
 ] = {
     entry.outcome_cls: entry.work_cls.apply_main_thread for entry in CORE_RUNTIME_WORKS
+}
+
+CoreRuntimeFailureApplier = Callable[["ModelEntrypoint", BaseException], None]
+
+_CORE_RUNTIME_FAILURE_APPLIERS: dict[str, CoreRuntimeFailureApplier] = {
+    entry.job_origin: entry.work_cls.apply_failure_main_thread
+    for entry in CORE_RUNTIME_WORKS
+}
+
+_CORE_RUNTIME_EXCEPTION_FAILURE_APPLIERS: dict[
+    type[BaseException], CoreRuntimeFailureApplier
+] = {
+    DeviceAuthentificationError: AuthenticateDeviceWork.apply_failure_main_thread,
 }
 
 
@@ -115,8 +129,11 @@ class ModelEntrypoint(Entrypoint):
         self, ip: str, port: int, association_code: str
     ) -> AuthentificateDeviceOutcome:
         """
-        Pair the device over ADB (worker thread). Does not emit on the core bus;
-        controllers apply outcomes on the main thread after AsyncRunner completes.
+        Pair the device over ADB (worker thread).
+
+        Success returns an outcome for main-thread apply; failures raise
+        :class:`~core.work.authentificate_device_work.DeviceAuthentificationError`
+        so AsyncRunner invokes the job ``on_failed`` callback.
         """
         if self._adb_server is None or self._adb_client is None:
             raise AttributeError(
@@ -124,26 +141,20 @@ class ModelEntrypoint(Entrypoint):
             )
         self._host.refresh_network_identity()
         if not self._host.is_network_available():
-            return AuthentificateDeviceOutcome(
-                success_phone=None,
-                failure=DeviceAuthentificationFailedPayload(
-                    ip=ip,
-                    port=port,
-                    association_code=association_code,
-                    reason="Host network is unavailable",
-                ),
+            raise DeviceAuthentificationError(
+                ip=ip,
+                port=port,
+                association_code=association_code,
+                reason="Host network is unavailable",
             )
         # Check if a device with this IP address on the current ADB server is already paired
         for device in self._adb_server.paired_devices:
             if device.ip == ip:
-                return AuthentificateDeviceOutcome(
-                    success_phone=None,
-                    failure=DeviceAuthentificationFailedPayload(
-                        ip=ip,
-                        port=port,
-                        association_code=association_code,
-                        reason="Device with this IP address is already paired",
-                    ),
+                raise DeviceAuthentificationError(
+                    ip=ip,
+                    port=port,
+                    association_code=association_code,
+                    reason="Device with this IP address is already paired",
                 )
         return AuthenticateDeviceWork(
             adb_server=self._adb_server,
@@ -181,8 +192,15 @@ class ModelEntrypoint(Entrypoint):
     def close_core_runtime(self) -> CloseOutcome:
         """
         Stop the ADB server (worker thread). Apply on the main thread via :meth:`apply_result`.
+
+        When no ADB server is active, returns ``CloseOutcome(adb_server=None)`` as a no-op
+        without invoking close work. Stop failures inside
+        :class:`~core.work.close_work.CloseCoreRuntimeWork` propagate to AsyncRunner.
         """
         if self._adb_server is None:
+            logger.warning(
+                "ModelEntrypoint: close_core_runtime skipped (no active ADB server)",
+            )
             return CloseOutcome(adb_server=None)
         return CloseCoreRuntimeWork(self._adb_server).run()
 
@@ -311,3 +329,61 @@ class ModelEntrypoint(Entrypoint):
             )
             return
         applier(self, result)
+
+    def apply_failure(self, error: BaseException | object) -> None:
+        """
+        Dispatch async worker failures to the matching ``apply_failure_main_thread`` helper.
+
+        Accepts a :class:`~controller.runner.JobError` duck-typed object (``origin``,
+        ``exception``, ``message``) or a plain :class:`BaseException`. Routing prefers
+        the async job ``origin`` so generic exceptions raised inside a specific work
+        still reach that work's failure handler.
+        """
+        origin, exc = _resolve_failure_origin_and_exception(error)
+        origin_applier = _CORE_RUNTIME_FAILURE_APPLIERS.get(origin)
+        if origin_applier is not None:
+            origin_applier(self, exc)
+            return
+        exception_applier = _resolve_exception_failure_applier(exc)
+        if exception_applier is not None:
+            exception_applier(self, exc)
+            return
+        logger.error(
+            "ModelEntrypoint.apply_failure: unregistered failure",
+            origin=origin or None,
+            exception_type=type(exc).__name__,
+            message=str(exc),
+        )
+        emit_core_error_raised(
+            self,
+            source="ModelEntrypoint",
+            message=str(exc),
+            error=exc,
+        )
+
+
+def _resolve_failure_origin_and_exception(
+    error: BaseException | object,
+) -> tuple[str, BaseException]:
+    """Normalize AsyncRunner ``JobError`` or plain exceptions for failure dispatch."""
+    origin = (getattr(error, "origin", None) or "").strip()
+    wrapped = getattr(error, "exception", None)
+    if isinstance(wrapped, BaseException):
+        return origin, wrapped
+    if isinstance(error, BaseException):
+        return origin, error
+    message = (getattr(error, "message", None) or str(error)).strip()
+    return origin, RuntimeError(message or "Async worker failure")
+
+
+def _resolve_exception_failure_applier(
+    exc: BaseException,
+) -> CoreRuntimeFailureApplier | None:
+    """Choose the most specific registered exception failure applier via MRO."""
+    for exc_type in type(exc).__mro__:
+        if exc_type is BaseException:
+            break
+        applier = _CORE_RUNTIME_EXCEPTION_FAILURE_APPLIERS.get(exc_type)
+        if applier is not None:
+            return applier
+    return None

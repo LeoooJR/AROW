@@ -131,12 +131,7 @@ class _FakePool:
             except Exception as e:  # noqa: BLE001 - test helper
                 emit_failed(
                     job_id,
-                    JobError(
-                        message=f"Job failed: {job.name}: {e!s}",
-                        traceback=_traceback.format_exc(),
-                        return_code=getattr(e, "returncode", None),
-                        timestamp=datetime.datetime.now(datetime.timezone.utc),
-                    ),
+                    runner_mod._job_error_from_exception(job_name=job.name, exc=e),
                 )
 
         if self._pending is not None:
@@ -265,6 +260,10 @@ class TestAsyncRunnerThreadSignals:
         assert handle.job_id == _job_id
         assert "Job failed: thread-failure" in err.message
         assert "boom" in err.message
+        assert err.origin == "thread-failure"
+        assert err.exception_type == "RuntimeError"
+        assert isinstance(err.exception, RuntimeError)
+        assert str(err.exception) == "boom"
         assert handle.job_id not in runner.history
 
         runner.shutdown()

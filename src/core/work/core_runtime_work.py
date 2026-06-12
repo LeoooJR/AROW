@@ -61,3 +61,11 @@ class CoreRuntimeWork(ABC, Generic[TOutcome]):
     def apply_main_thread(model_entrypoint: ModelEntrypoint, outcome: TOutcome) -> None:
         """Emit on the core bus / mutate entrypoint; call only from the Qt main thread."""
         ...
+
+    @staticmethod
+    @abstractmethod
+    def apply_failure_main_thread(
+        model_entrypoint: ModelEntrypoint, error: BaseException
+    ) -> None:
+        """Handle worker failure on the Qt main thread (via :meth:`~core.entrypoint.ModelEntrypoint.apply_failure`)."""
+        ...

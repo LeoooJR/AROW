@@ -3,41 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from core.adb.exceptions import AdbServerException
 from core.adb.server import AdbServer
 from core.signals import AdbServerStoppedPayload, CoreSignal
 from core.work.core_runtime_work import CoreRuntimeWork, CoreRuntimeWorkOutcome
+from core.work.work_failure import emit_core_error_raised
 from logger import logger
 
 if TYPE_CHECKING:
     from core.entrypoint import ModelEntrypoint
-
-
-def _stop_adb_server(adb_server: AdbServer) -> bool:
-    """
-    Stop the ADB server and remove the instance from entrypoint state.
-    """
-    if adb_server is not None:
-        stopped_binary = adb_server.binary
-        adb_path = str(stopped_binary.path)
-        try:
-            adb_server.stop()
-        except AdbServerException as e:
-            logger.error(
-                "ModelEntrypoint: Failed to stop ADB server",
-                error=str(e),
-            )
-            return False
-        logger.info(
-            "ModelEntrypoint: ADB server stopped",
-            adb_path=adb_path,
-        )
-        return True
-    else:
-        logger.warning(
-            "ModelEntrypoint: ADB server stop skipped (not running)",
-        )
-        return False
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,28 +32,26 @@ class CloseCoreRuntimeWork(CoreRuntimeWork[CloseOutcome]):
         """
         Stop the bound ADB server on a worker thread (AsyncRunner).
 
-        Delegates to :func:`_stop_adb_server`, which calls
-        :meth:`~core.adb.server.AdbServer.stop` when a server instance is
-        provided. :meth:`apply_main_thread` clears entrypoint server state and
-        emits ``ADB_SERVER_STOPPED`` only when stop succeeded.
+        Calls :meth:`~core.adb.server.AdbServer.stop` on the server instance bound at
+        job construction. :meth:`apply_main_thread` clears entrypoint server state and
+        emits ``ADB_SERVER_STOPPED`` when stop succeeds.
 
         Returns:
-            CloseOutcome: ``adb_server`` set to the stopped server instance when
-            :func:`_stop_adb_server` reports success; ``adb_server=None`` when
-            stop was skipped (no server) or :class:`~core.adb.exceptions.AdbServerException`
-            was caught and logged.
+            CloseOutcome: ``adb_server`` set to the stopped server instance.
 
         Raises:
-            None: :class:`~core.adb.exceptions.AdbServerException` from
-            :meth:`~core.adb.server.AdbServer.stop` is caught inside
-            :func:`_stop_adb_server` and converted to ``adb_server=None``.
-            Exception: Any non-:class:`~core.adb.exceptions.AdbServerException`
-            raised by the server object or stop path propagates to AsyncRunner.
+            AdbServerException: Stop command failed after subprocess retries.
+            Exception: Any unexpected failure from the server stop path propagates to
+            AsyncRunner.
         """
-        if _stop_adb_server(self._adb_server):
-            return CloseOutcome(adb_server=self._adb_server)
-        else:
-            return CloseOutcome(adb_server=None)
+        stopped_binary = self._adb_server.binary
+        adb_path = str(stopped_binary.path)
+        self._adb_server.stop()
+        logger.info(
+            "ModelEntrypoint: ADB server stopped",
+            adb_path=adb_path,
+        )
+        return CloseOutcome(adb_server=self._adb_server)
 
     @staticmethod
     def apply_main_thread(
@@ -102,4 +73,19 @@ class CloseCoreRuntimeWork(CoreRuntimeWork[CloseOutcome]):
         model_entrypoint._signal_bus.emit(
             CoreSignal.ADB_SERVER_STOPPED,
             AdbServerStoppedPayload(adb_binary=result.adb_server.binary),
+        )
+
+    @staticmethod
+    def apply_failure_main_thread(
+        model_entrypoint: ModelEntrypoint, error: BaseException
+    ) -> None:
+        from core.entrypoint import ModelEntrypoint as _ModelEntrypoint
+
+        if not isinstance(model_entrypoint, _ModelEntrypoint):
+            raise TypeError("apply_failure_main_thread() requires ModelEntrypoint")
+        emit_core_error_raised(
+            model_entrypoint,
+            source="CloseCoreRuntimeWork",
+            message=str(error),
+            error=error,
         )

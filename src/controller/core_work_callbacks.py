@@ -62,8 +62,10 @@ class StartupCoreRuntimeCallback:
         model_entrypoint.apply_result(result)
         self._subcontroller._enqueue_host_install_identity_job()
 
+    @validate_model_entrypoint
     def on_failed(self, error: JobError) -> None:
         log_startup_job_failure(error)
+        self._subcontroller.model_entrypoint.apply_failure(error)
 
 
 def log_authentificate_device_job_failure(error: JobError) -> None:
@@ -95,8 +97,10 @@ class AuthentificateDeviceCallback:
             return
         model_entrypoint.apply_result(result)
 
+    @validate_model_entrypoint
     def on_failed(self, error: JobError) -> None:
         log_authentificate_device_job_failure(error)
+        self._subcontroller.model_entrypoint.apply_failure(error)
 
 
 def log_refresh_device_list_job_failure(error: JobError) -> None:
@@ -134,8 +138,10 @@ class RefreshDeviceListCallback:
         )
         model_entrypoint.apply_result(result)
 
+    @validate_model_entrypoint
     def on_failed(self, error: JobError) -> None:
         log_refresh_device_list_job_failure(error)
+        self._subcontroller.model_entrypoint.apply_failure(error)
 
 
 def log_host_install_identity_job_failure(error: JobError) -> None:
@@ -173,6 +179,7 @@ class HostInstallIdentityCallback:
     def on_failed(self, error: JobError) -> None:
         """Handle failure (Qt main thread, from AsyncRunner)."""
         log_host_install_identity_job_failure(error)
+        self._subcontroller.model_entrypoint.apply_failure(error)
 
 
 def log_close_core_runtime_job_failure(error: JobError) -> None:
@@ -219,6 +226,7 @@ class CloseCoreRuntimeCallback:
 
     def on_failed(self, error: JobError) -> None:
         log_close_core_runtime_job_failure(error)
+        self._subcontroller.model_entrypoint.apply_failure(error)
         self._consume_pending_after_close_apply()
 
 

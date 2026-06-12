@@ -31,6 +31,7 @@ from core.signals import (
 )
 from core.work.core_runtime_work import CoreRuntimeWork, CoreRuntimeWorkOutcome
 from core.work.refresh_known_devices_work import enrich_phones_with_adb_shell_properties
+from core.work.work_failure import emit_core_error_raised
 from logger import logger
 
 if TYPE_CHECKING:
@@ -142,7 +143,7 @@ def _start_adb_server() -> AdbServer:
             "startup_work: failed to start ADB server",
             error=str(error),
         )
-        raise RuntimeError("Failed to start ADB server") from error
+        raise
 
 
 def _create_adb_client() -> AdbClient:
@@ -260,3 +261,18 @@ class StartupCoreRuntimeWork(CoreRuntimeWork[StartupOutcome]):
                 CoreSignal.DEVICES_UPDATED,
                 DevicesUpdatedPayload(devices=result.devices),
             )
+
+    @staticmethod
+    def apply_failure_main_thread(
+        model_entrypoint: ModelEntrypoint, error: BaseException
+    ) -> None:
+        from core.entrypoint import ModelEntrypoint as _ModelEntrypoint
+
+        if not isinstance(model_entrypoint, _ModelEntrypoint):
+            raise TypeError("apply_failure_main_thread() requires ModelEntrypoint")
+        emit_core_error_raised(
+            model_entrypoint,
+            source="StartupCoreRuntimeWork",
+            message=str(error),
+            error=error,
+        )

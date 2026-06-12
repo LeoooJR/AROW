@@ -7,7 +7,10 @@ import pytest
 from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
 from core.devices import Phone
 from core.entrypoint import ModelEntrypoint
-from core.work.authentificate_device_work import AuthentificateDeviceOutcome
+from core.work.authentificate_device_work import (
+    AuthentificateDeviceOutcome,
+    DeviceAuthentificationError,
+)
 
 pytestmark = [pytest.mark.async_jobs]
 
@@ -48,15 +51,15 @@ class TestModelEntrypoint:
         model_entrypoint._adb_client = client
         _mark_host_network_available(model_entrypoint)
 
-        outcome = model_entrypoint.authentificate_device(duplicate_ip, port, code)
+        with pytest.raises(DeviceAuthentificationError) as exc_info:
+            model_entrypoint.authentificate_device(duplicate_ip, port, code)
 
         mock_work_cls.assert_not_called()
-        assert outcome.success_phone is None
-        assert outcome.failure is not None
-        assert outcome.failure.ip == duplicate_ip
-        assert outcome.failure.port == port
-        assert outcome.failure.association_code == code
-        assert outcome.failure.reason == "Device with this IP address is already paired"
+        error = exc_info.value
+        assert error.ip == duplicate_ip
+        assert error.port == port
+        assert error.association_code == code
+        assert error.reason == "Device with this IP address is already paired"
 
     @patch("core.entrypoint.AuthenticateDeviceWork")
     def test_authentificate_device_delegates_to_work_when_ip_not_paired(
@@ -71,9 +74,7 @@ class TestModelEntrypoint:
         code = "000000"
         server.paired_devices.add(Phone(id="other-handset", ip="10.0.0.8", port=port))
         expected_phone = Phone(id="new-pair", ip=requested_ip, port=port)
-        expected_outcome = AuthentificateDeviceOutcome(
-            success_phone=expected_phone, failure=None
-        )
+        expected_outcome = AuthentificateDeviceOutcome(success_phone=expected_phone)
         mock_work_cls.return_value.run.return_value = expected_outcome
 
         model_entrypoint = ModelEntrypoint()
@@ -103,15 +104,13 @@ class TestModelEntrypoint:
         model_entrypoint.host.descriptor.network_available = False
         model_entrypoint.host.refresh_network_identity = lambda: None  # type: ignore[method-assign]
 
-        outcome = model_entrypoint.authentificate_device(
-            "192.168.1.42", 37777, "123456"
-        )
+        with pytest.raises(DeviceAuthentificationError) as exc_info:
+            model_entrypoint.authentificate_device("192.168.1.42", 37777, "123456")
 
         mock_work_cls.assert_not_called()
-        assert outcome.success_phone is None
-        assert outcome.failure is not None
-        assert outcome.failure.reason == "Host network is unavailable"
-        assert outcome.failure.ip == "192.168.1.42"
+        error = exc_info.value
+        assert error.reason == "Host network is unavailable"
+        assert error.ip == "192.168.1.42"
 
     @patch("core.entrypoint.AuthenticateDeviceWork")
     def test_authentificate_device_refreshes_host_network_before_gating(
@@ -129,7 +128,8 @@ class TestModelEntrypoint:
             model_entrypoint.host.descriptor.network_available = True
 
         model_entrypoint.host.refresh_network_identity = refresh_network_identity  # type: ignore[method-assign]
-        expected_outcome = AuthentificateDeviceOutcome(success_phone=None, failure=None)
+        expected_phone = Phone(id="paired", state="device")
+        expected_outcome = AuthentificateDeviceOutcome(success_phone=expected_phone)
         mock_work_cls.return_value.run.return_value = expected_outcome
 
         outcome = model_entrypoint.authentificate_device(
@@ -158,8 +158,8 @@ class TestModelEntrypoint:
         model_entrypoint.host.descriptor.network_available = False
         model_entrypoint.host.refresh_network_identity = lambda: None  # type: ignore[method-assign]
 
-        outcome = model_entrypoint.authentificate_device(duplicate_ip, port, code)
+        with pytest.raises(DeviceAuthentificationError) as exc_info:
+            model_entrypoint.authentificate_device(duplicate_ip, port, code)
 
         mock_work_cls.assert_not_called()
-        assert outcome.failure is not None
-        assert outcome.failure.reason == "Host network is unavailable"
+        assert exc_info.value.reason == "Host network is unavailable"

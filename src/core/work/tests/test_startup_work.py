@@ -114,11 +114,9 @@ def test_start_adb_server_rejects_binary_version_mismatch(
     )
     monkeypatch.setattr(startup_work, "AdbServer", FakeAdbServer)
 
-    with pytest.raises(RuntimeError, match="Failed to start ADB server") as exc_info:
+    with pytest.raises(RuntimeError, match="frozen metadata"):
         startup_work._start_adb_server()
 
-    assert isinstance(exc_info.value.__cause__, RuntimeError)
-    assert "frozen metadata" in str(exc_info.value.__cause__)
     assert constructed == []
 
 

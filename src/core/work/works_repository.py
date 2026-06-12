@@ -37,6 +37,7 @@ class CoreRuntimeWorkCatalogEntry:
     id: str
     work_cls: type[CoreRuntimeWork[Any]]
     outcome_cls: type[CoreRuntimeWorkOutcome]
+    job_origin: str
     entrypoint_methods: tuple[str, ...] = ()
 
 
@@ -50,30 +51,35 @@ class CoreRuntimeWorksRepository(Repository[CoreRuntimeWorkCatalogEntry]):
                 id="core-runtime.startup",
                 work_cls=StartupCoreRuntimeWork,
                 outcome_cls=StartupOutcome,
+                job_origin="startup_core_runtime",
                 entrypoint_methods=("ModelEntrypoint.startup",),
             ),
             CoreRuntimeWorkCatalogEntry(
                 id="core-runtime.authenticate-device",
                 work_cls=AuthenticateDeviceWork,
                 outcome_cls=AuthentificateDeviceOutcome,
+                job_origin="authentification_workflow",
                 entrypoint_methods=("ModelEntrypoint.authentificate_device",),
             ),
             CoreRuntimeWorkCatalogEntry(
                 id="core-runtime.host-install-identity",
                 work_cls=HostInstallIdentityWork,
                 outcome_cls=HostInstallIdentityOutcome,
+                job_origin="host_install_identity",
                 entrypoint_methods=("ModelEntrypoint.run_host_install_identity",),
             ),
             CoreRuntimeWorkCatalogEntry(
                 id="core-runtime.refresh-known-devices",
                 work_cls=RefreshKnownDevicesWork,
                 outcome_cls=RefreshKnownDevicesOutcome,
+                job_origin="refresh_device_list",
                 entrypoint_methods=("ModelEntrypoint.refresh_known_devices",),
             ),
             CoreRuntimeWorkCatalogEntry(
                 id="core-runtime.close",
                 work_cls=CloseCoreRuntimeWork,
                 outcome_cls=CloseOutcome,
+                job_origin="close_core_runtime",
                 entrypoint_methods=("ModelEntrypoint.close_core_runtime",),
             ),
         )
@@ -81,12 +87,15 @@ class CoreRuntimeWorksRepository(Repository[CoreRuntimeWorkCatalogEntry]):
 
         outcomes = [e.outcome_cls for e in entries]
         work_types = [e.work_cls for e in entries]
+        job_origins = [e.job_origin for e in entries]
         if len(outcomes) != len(set(outcomes)):
             raise AssertionError(
                 "Duplicate outcome_cls in CORE_RUNTIME_WORKS bootstrap"
             )
         if len(work_types) != len(set(work_types)):
             raise AssertionError("Duplicate work_cls in CORE_RUNTIME_WORKS bootstrap")
+        if len(job_origins) != len(set(job_origins)):
+            raise AssertionError("Duplicate job_origin in CORE_RUNTIME_WORKS bootstrap")
 
 
 CORE_RUNTIME_WORKS = CoreRuntimeWorksRepository()

@@ -43,6 +43,31 @@ class JobError:
         metadata={"description": "The timestamp of the error"},
         default=datetime.datetime.now(),
     )
+    exception: Optional[BaseException] = field(
+        metadata={"description": "Original exception raised by the worker"},
+        default=None,
+    )
+    exception_type: str = field(
+        metadata={"description": "Qualified name of the original exception type"},
+        default="",
+    )
+    origin: str = field(
+        metadata={"description": "Async job name that produced this failure"},
+        default="",
+    )
+
+
+def _job_error_from_exception(*, job_name: str, exc: Exception) -> JobError:
+    """Build a :class:`JobError` that preserves the original exception and job origin."""
+    return JobError(
+        message=f"Job failed: {job_name}: {exc!s}",
+        traceback=_traceback.format_exc(),
+        return_code=getattr(exc, "returncode", None),
+        timestamp=datetime.datetime.now(datetime.timezone.utc),
+        exception=exc,
+        exception_type=type(exc).__qualname__,
+        origin=job_name,
+    )
 
 
 @dataclass(frozen=True)
@@ -237,12 +262,7 @@ class ProcessPool:
             except Exception as e:
                 emit_failed(
                     job_id,
-                    JobError(
-                        message=f"Job failed: {job.name}: {e!s}",
-                        traceback=_traceback.format_exc(),
-                        return_code=getattr(e, "returncode", None),
-                        timestamp=datetime.datetime.now(datetime.timezone.utc),
-                    ),
+                    _job_error_from_exception(job_name=job.name, exc=e),
                 )
 
         fut.add_done_callback(_on_done)
@@ -353,12 +373,7 @@ class ThreadPool:
             except Exception as e:
                 emit_failed(
                     job_id,
-                    JobError(
-                        message=f"Job failed: {job.name}: {e!s}",
-                        traceback=_traceback.format_exc(),
-                        return_code=getattr(e, "returncode", None),
-                        timestamp=datetime.datetime.now(datetime.timezone.utc),
-                    ),
+                    _job_error_from_exception(job_name=job.name, exc=e),
                 )
 
         fut.add_done_callback(_on_done)

@@ -1,0 +1,161 @@
+from __future__ import annotations
+
+import pytest
+
+from controller.runner import JobError
+from core.entrypoint import ModelEntrypoint
+from core.signals import (
+    CoreSignal,
+    DeviceAuthentificationFailedPayload,
+    ErrorRaisedPayload,
+)
+from core.work.authentificate_device_work import DeviceAuthentificationError
+
+pytestmark = [pytest.mark.async_jobs]
+
+
+def test_apply_failure_routes_auth_error_by_origin() -> None:
+    model_entrypoint = ModelEntrypoint()
+    emitted: list[tuple[CoreSignal, object]] = []
+    model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
+        (signal, payload)
+    )
+    auth_error = DeviceAuthentificationError(
+        ip="10.0.0.5",
+        port=37777,
+        association_code="123456",
+        reason="Invalid IPv4 address",
+    )
+    job_error = JobError(
+        message="Job failed: authentification_workflow: Invalid IPv4 address",
+        traceback="",
+        exception=auth_error,
+        exception_type=type(auth_error).__qualname__,
+        origin="authentification_workflow",
+    )
+
+    model_entrypoint.apply_failure(job_error)
+
+    assert emitted == [
+        (
+            CoreSignal.DEVICE_AUTHENTIFICATION_FAILED,
+            DeviceAuthentificationFailedPayload(
+                ip="10.0.0.5",
+                port=37777,
+                association_code="123456",
+                reason="Invalid IPv4 address",
+            ),
+        )
+    ]
+
+
+def test_apply_failure_routes_generic_exception_by_origin() -> None:
+    model_entrypoint = ModelEntrypoint()
+    emitted: list[tuple[CoreSignal, object]] = []
+    model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
+        (signal, payload)
+    )
+    generic = RuntimeError("unexpected auth bug")
+    job_error = JobError(
+        message="Job failed: authentification_workflow: unexpected auth bug",
+        traceback="",
+        exception=generic,
+        exception_type=type(generic).__qualname__,
+        origin="authentification_workflow",
+    )
+
+    model_entrypoint.apply_failure(job_error)
+
+    assert len(emitted) == 1
+    signal, payload = emitted[0]
+    assert signal == CoreSignal.ERROR_RAISED
+    assert isinstance(payload, ErrorRaisedPayload)
+    assert payload.source == "AuthenticateDeviceWork"
+    assert payload.message == "unexpected auth bug"
+    assert payload.error is generic
+
+
+@pytest.mark.parametrize(
+    ("origin", "expected_source"),
+    [
+        ("startup_core_runtime", "StartupCoreRuntimeWork"),
+        ("refresh_device_list", "RefreshKnownDevicesWork"),
+        ("host_install_identity", "HostInstallIdentityWork"),
+        ("close_core_runtime", "CloseCoreRuntimeWork"),
+    ],
+)
+def test_apply_failure_routes_generic_exception_for_each_work_origin(
+    origin: str, expected_source: str
+) -> None:
+    model_entrypoint = ModelEntrypoint()
+    emitted: list[tuple[CoreSignal, object]] = []
+    model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
+        (signal, payload)
+    )
+    generic = RuntimeError("worker blew up")
+    job_error = JobError(
+        message=f"Job failed: {origin}: worker blew up",
+        traceback="",
+        exception=generic,
+        exception_type=type(generic).__qualname__,
+        origin=origin,
+    )
+
+    model_entrypoint.apply_failure(job_error)
+
+    assert len(emitted) == 1
+    signal, payload = emitted[0]
+    assert signal == CoreSignal.ERROR_RAISED
+    assert isinstance(payload, ErrorRaisedPayload)
+    assert payload.source == expected_source
+    assert payload.error is generic
+
+
+def test_apply_failure_falls_back_to_exception_type_without_origin() -> None:
+    model_entrypoint = ModelEntrypoint()
+    emitted: list[tuple[CoreSignal, object]] = []
+    model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
+        (signal, payload)
+    )
+    auth_error = DeviceAuthentificationError(
+        ip="1.2.3.4",
+        port=12345,
+        association_code="654321",
+        reason="wrong pairing code",
+    )
+
+    model_entrypoint.apply_failure(auth_error)
+
+    assert emitted == [
+        (
+            CoreSignal.DEVICE_AUTHENTIFICATION_FAILED,
+            DeviceAuthentificationFailedPayload(
+                ip="1.2.3.4",
+                port=12345,
+                association_code="654321",
+                reason="wrong pairing code",
+            ),
+        )
+    ]
+
+
+def test_apply_failure_uses_generic_handler_for_unknown_job_error() -> None:
+    model_entrypoint = ModelEntrypoint()
+    emitted: list[tuple[CoreSignal, object]] = []
+    model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
+        (signal, payload)
+    )
+    job_error = JobError(
+        message="Job failed: unknown_job: boom",
+        traceback="",
+        origin="unknown_job",
+    )
+
+    model_entrypoint.apply_failure(job_error)
+
+    assert len(emitted) == 1
+    signal, payload = emitted[0]
+    assert signal == CoreSignal.ERROR_RAISED
+    assert isinstance(payload, ErrorRaisedPayload)
+    assert payload.source == "ModelEntrypoint"
+    assert payload.message == "Job failed: unknown_job: boom"

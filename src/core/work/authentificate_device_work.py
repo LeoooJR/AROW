@@ -13,6 +13,7 @@ from core.adb.client import AdbClient
 from core.adb.exceptions import AdbClientException, AdbServerException
 from core.adb.server import AdbServer
 from core.devices import Phone
+from core.exceptions import CoreException
 from core.signals import (
     CoreSignal,
     DeviceAuthentificationFailedPayload,
@@ -20,23 +21,42 @@ from core.signals import (
 )
 from core.work.core_runtime_work import CoreRuntimeWork, CoreRuntimeWorkOutcome
 from core.work.refresh_known_devices_work import enrich_phones_with_adb_shell_properties
+from core.work.work_failure import emit_core_error_raised
 from logger import logger
 
 if TYPE_CHECKING:
     from core.entrypoint import ModelEntrypoint
 
 
+class DeviceAuthentificationError(CoreException):
+    """Pairing failed; propagates to AsyncRunner ``on_failed`` for user-facing reporting."""
+
+    def __init__(
+        self,
+        *,
+        ip: str,
+        port: int,
+        association_code: str,
+        reason: str,
+    ) -> None:
+        self.ip = ip
+        self.port = port
+        self.association_code = association_code
+        self.reason = reason
+        super().__init__(reason)
+
+
 @dataclass(frozen=True, slots=True)
 class AuthentificateDeviceOutcome(CoreRuntimeWorkOutcome):
     """
-    Result of :meth:`AuthenticateDeviceWork.run` (worker).
+    Success result of :meth:`AuthenticateDeviceWork.run` (worker).
 
-    On success, ``run`` already applies ``ro.serialno`` enrichment to ``success_phone``
-    (shared object); :meth:`AuthenticateDeviceWork.apply_main_thread` only emits on the core bus.
+    On success, ``run`` already applies shell enrichment to ``success_phone``;
+    :meth:`AuthenticateDeviceWork.apply_main_thread` emits on the core bus.
+    Failures raise :class:`DeviceAuthentificationError` instead of returning an outcome.
     """
 
-    success_phone: Phone | None = None
-    failure: DeviceAuthentificationFailedPayload | None = None
+    success_phone: Phone
 
 
 class PairingInputValidator:
@@ -64,7 +84,7 @@ class PairingInputValidator:
 
 class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
     """
-    Pair over ADB on a worker; emit success/failure from the main thread only.
+    Pair over ADB on a worker; emit success from the main thread only.
 
     ``adb_server`` is used for retry (e.g. ``restart`` after protocol fault); server and
     client mirror :class:`~core.entrypoint.ModelEntrypoint` at job submit time.
@@ -89,31 +109,21 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
         Validate pairing inputs, pair over ADB, and enrich the paired phone
         (AsyncRunner worker thread).
 
-        Invalid IP, port, or association code returns a failure outcome without
-        calling ADB. On :class:`~core.adb.exceptions.AdbClientException`, if the
-        message contains ``"protocol fault"`` (case-insensitive) and
-        ``adb_server`` is set, the server is restarted and pairing plus
-        enrichment are retried once. Shell enrichment after a successful pair is
-        best-effort (failures are swallowed inside the client). This method does
-        not touch the core signal bus; :meth:`apply_main_thread` emits success or
-        failure.
+        Invalid IP, port, or association code raises
+        :class:`DeviceAuthentificationError` without calling ADB. On
+        :class:`~core.adb.exceptions.AdbClientException`, if the message contains
+        ``"protocol fault"`` (case-insensitive) and ``adb_server`` is set, the server
+        is restarted and pairing plus enrichment are retried once. Shell enrichment after
+        a successful pair is best-effort (failures are swallowed inside the client).
+        User-facing failure reporting happens in the controller ``on_failed`` callback.
 
         Returns:
-            AuthentificateDeviceOutcome: On success, ``success_phone`` is set and
-            ``failure`` is ``None``. On validation or handled pairing failure,
-            ``success_phone`` is ``None`` and ``failure`` carries
-            :class:`~core.signals.DeviceAuthentificationFailedPayload` with a
-            user-facing ``reason``. After a failed protocol-fault retry, ``reason``
-            is the **first** attempt's error message, not the retry error.
+            AuthentificateDeviceOutcome: ``success_phone`` after pairing and enrichment.
 
         Raises:
-            None: Validation failures and handled
-            :class:`~core.adb.exceptions.AdbClientException` /
-            :class:`~core.adb.exceptions.AdbServerException` from pairing or
-            retry are converted into a failure outcome.
-            Exception: Any exception other than :class:`~core.adb.exceptions.AdbClientException`
-            on the first ``pair``/enrichment attempt, or any non-ADB exception
-            during ``adb_server.restart()``, propagates to AsyncRunner.
+            DeviceAuthentificationError: Validation failure or pairing/retry failure.
+            Exception: Any unexpected failure outside the documented pairing path
+            propagates to AsyncRunner.
         """
         adb_server = self.adb_server
         adb_client = self.adb_client
@@ -126,19 +136,16 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
                 port=port,
                 reason=validation_failure,
             )
-            return AuthentificateDeviceOutcome(
-                success_phone=None,
-                failure=DeviceAuthentificationFailedPayload(
-                    ip=ip,
-                    port=port,
-                    association_code=association_code,
-                    reason=validation_failure,
-                ),
+            raise DeviceAuthentificationError(
+                ip=ip,
+                port=port,
+                association_code=association_code,
+                reason=validation_failure,
             )
         try:
             phone = adb_client.pair(ip, port, association_code)
             enrich_phones_with_adb_shell_properties(adb_client, [phone])
-            return AuthentificateDeviceOutcome(success_phone=phone, failure=None)
+            return AuthentificateDeviceOutcome(success_phone=phone)
         except AdbClientException as error:
             error_message: str = str(error)
             logger.warning(
@@ -157,9 +164,7 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
                     )
                     phone = adb_client.pair(ip, port, association_code)
                     enrich_phones_with_adb_shell_properties(adb_client, [phone])
-                    return AuthentificateDeviceOutcome(
-                        success_phone=phone, failure=None
-                    )
+                    return AuthentificateDeviceOutcome(success_phone=phone)
                 except (AdbClientException, AdbServerException) as retry_error:
                     logger.warning(
                         "ModelEntrypoint: authentification retry failed after ADB server restart",
@@ -167,39 +172,57 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
                         port=port,
                         error=str(retry_error),
                     )
-            return AuthentificateDeviceOutcome(
-                success_phone=None,
-                failure=DeviceAuthentificationFailedPayload(
-                    ip=ip,
-                    port=port,
-                    association_code=association_code,
-                    reason=error_message,
-                ),
-            )
+                    raise DeviceAuthentificationError(
+                        ip=ip,
+                        port=port,
+                        association_code=association_code,
+                        reason=str(retry_error),
+                    ) from retry_error
+            raise DeviceAuthentificationError(
+                ip=ip,
+                port=port,
+                association_code=association_code,
+                reason=error_message,
+            ) from error
 
     @staticmethod
     def apply_main_thread(
         model_entrypoint: ModelEntrypoint, outcome: AuthentificateDeviceOutcome
     ) -> None:
-        """Emit authentification outcome on the core bus (Qt main thread only)."""
+        """Emit successful authentification on the core bus (Qt main thread only)."""
         from core.entrypoint import ModelEntrypoint as _ModelEntrypoint
 
         if not isinstance(model_entrypoint, _ModelEntrypoint):
             raise TypeError("apply_main_thread() requires ModelEntrypoint")
-        if outcome.failure is not None:
+        if model_entrypoint._adb_server is not None:
+            model_entrypoint._adb_server.paired_devices.add(outcome.success_phone)
+        model_entrypoint._signal_bus.emit(
+            CoreSignal.DEVICE_AUTHENTIFICATION_SUCCEEDED,
+            DeviceAuthentificationSucceededPayload(phone=outcome.success_phone),
+        )
+
+    @staticmethod
+    def apply_failure_main_thread(
+        model_entrypoint: ModelEntrypoint, error: BaseException
+    ) -> None:
+        from core.entrypoint import ModelEntrypoint as _ModelEntrypoint
+
+        if not isinstance(model_entrypoint, _ModelEntrypoint):
+            raise TypeError("apply_failure_main_thread() requires ModelEntrypoint")
+        if isinstance(error, DeviceAuthentificationError):
             model_entrypoint._signal_bus.emit(
                 CoreSignal.DEVICE_AUTHENTIFICATION_FAILED,
-                outcome.failure,
+                DeviceAuthentificationFailedPayload(
+                    ip=error.ip,
+                    port=error.port,
+                    association_code=error.association_code,
+                    reason=error.reason,
+                ),
             )
             return
-        if outcome.success_phone is not None:
-            if model_entrypoint._adb_server is not None:
-                model_entrypoint._adb_server.paired_devices.add(outcome.success_phone)
-            model_entrypoint._signal_bus.emit(
-                CoreSignal.DEVICE_AUTHENTIFICATION_SUCCEEDED,
-                DeviceAuthentificationSucceededPayload(phone=outcome.success_phone),
-            )
-            return
-        logger.warning(
-            "ModelEntrypoint: authentificate device apply skipped (empty outcome)",
+        emit_core_error_raised(
+            model_entrypoint,
+            source="AuthenticateDeviceWork",
+            message=str(error),
+            error=error,
         )
