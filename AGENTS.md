@@ -24,6 +24,33 @@ Follow the project MVC split:
 - View: `src/gui`
 - Controller: `src/controller`
 
+## Git workflow
+
+This repository uses two long-lived branches:
+
+| Branch | Role |
+|--------|------|
+| **`dev`** | Integration branch — all day-to-day development lands here |
+| **`main`** | Stable branch — production-ready releases only |
+
+`main` is not the default target for agent automation or routine pull requests.
+
+### Rules for agents and contributors
+
+- **Branch from `dev`:** create feature or fix branches from an up-to-date `dev` checkout.
+- **Open pull requests against `dev`:** never open routine PRs targeting `main`.
+- **Do not commit directly to `main`:** routine work merges into `dev` via PR; `main` is updated only through intentional release promotion from `dev`.
+- **Compare against `dev`:** use `dev...HEAD` for reviews and PR summaries (not `main...HEAD`).
+- **Keep branches short-lived:** one logical change per branch; rebase or update from `dev` before opening or updating a PR.
+
+### Typical flow
+
+1. `git checkout dev && git pull`
+2. `git checkout -b agent/<tool>/<short-description>` (or an equivalent feature branch name)
+3. Commit on the feature branch
+4. Open a PR with **base branch `dev`**
+5. After merge, delete the feature branch when no longer needed
+
 ## Architecture boundaries
 
 - Keep ADB calls inside `src/core/adb.py`.
