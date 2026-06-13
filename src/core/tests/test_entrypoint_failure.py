@@ -10,6 +10,7 @@ from core.signals import (
     ErrorRaisedPayload,
 )
 from core.work.authentificate_device_work import DeviceAuthentificationError
+from core.work.core_runtime_work import CoreRuntimeWork
 
 pytestmark = [pytest.mark.async_jobs]
 
@@ -137,6 +138,30 @@ def test_apply_failure_falls_back_to_exception_type_without_origin() -> None:
             ),
         )
     ]
+
+
+def test_emit_generic_error_emits_error_raised_payload() -> None:
+    model_entrypoint = ModelEntrypoint()
+    emitted: list[tuple[CoreSignal, object]] = []
+    model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
+        (signal, payload)
+    )
+    error = RuntimeError("direct helper test")
+
+    CoreRuntimeWork.emit_generic_error(
+        model_entrypoint,
+        source="TestSource",
+        message="direct helper test",
+        error=error,
+    )
+
+    assert len(emitted) == 1
+    signal, payload = emitted[0]
+    assert signal == CoreSignal.ERROR_RAISED
+    assert isinstance(payload, ErrorRaisedPayload)
+    assert payload.source == "TestSource"
+    assert payload.message == "direct helper test"
+    assert payload.error is error
 
 
 def test_apply_failure_uses_generic_handler_for_unknown_job_error() -> None:

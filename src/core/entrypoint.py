@@ -25,7 +25,7 @@ from core.work.authentificate_device_work import (
     DeviceAuthentificationError,
 )
 from core.work.close_work import CloseCoreRuntimeWork, CloseOutcome
-from core.work.core_runtime_work import CoreRuntimeWorkOutcome
+from core.work.core_runtime_work import CoreRuntimeWork, CoreRuntimeWorkOutcome
 from core.work.host_install_identity_work import (
     HostInstallIdentityOutcome,
     HostInstallIdentityWork,
@@ -35,7 +35,6 @@ from core.work.refresh_known_devices_work import (
     RefreshKnownDevicesWork,
 )
 from core.work.startup_work import StartupCoreRuntimeWork, StartupOutcome
-from core.work.work_failure import emit_core_error_raised
 from core.work.works_repository import CORE_RUNTIME_WORKS
 from logger import logger
 
@@ -354,7 +353,7 @@ class ModelEntrypoint(Entrypoint):
             exception_type=type(exc).__name__,
             message=str(exc),
         )
-        emit_core_error_raised(
+        CoreRuntimeWork.emit_generic_error(
             self,
             source="ModelEntrypoint",
             message=str(exc),

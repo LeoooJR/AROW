@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 from core.adb.server import AdbServer
 from core.signals import AdbServerStoppedPayload, CoreSignal
 from core.work.core_runtime_work import CoreRuntimeWork, CoreRuntimeWorkOutcome
-from core.work.work_failure import emit_core_error_raised
 from logger import logger
 
 if TYPE_CHECKING:
@@ -83,7 +82,7 @@ class CloseCoreRuntimeWork(CoreRuntimeWork[CloseOutcome]):
 
         if not isinstance(model_entrypoint, _ModelEntrypoint):
             raise TypeError("apply_failure_main_thread() requires ModelEntrypoint")
-        emit_core_error_raised(
+        CloseCoreRuntimeWork.emit_generic_error(
             model_entrypoint,
             source="CloseCoreRuntimeWork",
             message=str(error),

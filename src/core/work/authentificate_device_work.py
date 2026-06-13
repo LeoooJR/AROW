@@ -21,7 +21,6 @@ from core.signals import (
 )
 from core.work.core_runtime_work import CoreRuntimeWork, CoreRuntimeWorkOutcome
 from core.work.refresh_known_devices_work import enrich_phones_with_adb_shell_properties
-from core.work.work_failure import emit_core_error_raised
 from logger import logger
 
 if TYPE_CHECKING:
@@ -220,7 +219,7 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
                 ),
             )
             return
-        emit_core_error_raised(
+        AuthenticateDeviceWork.emit_generic_error(
             model_entrypoint,
             source="AuthenticateDeviceWork",
             message=str(error),

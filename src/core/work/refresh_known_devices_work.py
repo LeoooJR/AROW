@@ -26,7 +26,6 @@ from core.devices import (
 )
 from core.signals import CoreSignal, DevicesUpdatedPayload
 from core.work.core_runtime_work import CoreRuntimeWork, CoreRuntimeWorkOutcome
-from core.work.work_failure import emit_core_error_raised
 
 if TYPE_CHECKING:
     from core.entrypoint import ModelEntrypoint
@@ -207,7 +206,7 @@ class RefreshKnownDevicesWork(CoreRuntimeWork[RefreshKnownDevicesOutcome]):
 
         if not isinstance(model_entrypoint, _ModelEntrypoint):
             raise TypeError("apply_failure_main_thread() requires ModelEntrypoint")
-        emit_core_error_raised(
+        RefreshKnownDevicesWork.emit_generic_error(
             model_entrypoint,
             source="RefreshKnownDevicesWork",
             message=str(error),

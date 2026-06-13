@@ -11,6 +11,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Generic, TypeVar
 
+from core.signals import CoreSignal, ErrorRaisedPayload
+
 if TYPE_CHECKING:
     from core.entrypoint import ModelEntrypoint
 
@@ -69,3 +71,18 @@ class CoreRuntimeWork(ABC, Generic[TOutcome]):
     ) -> None:
         """Handle worker failure on the Qt main thread (via :meth:`~core.entrypoint.ModelEntrypoint.apply_failure`)."""
         ...
+
+    @staticmethod
+    def emit_generic_error(
+        model_entrypoint: ModelEntrypoint,
+        *,
+        source: str,
+        message: str,
+        error: BaseException | None = None,
+    ) -> None:
+        """Emit a generic error on the core signal bus (Qt main thread)."""
+        payload_error = error if isinstance(error, Exception) else None
+        model_entrypoint._signal_bus.emit(
+            CoreSignal.ERROR_RAISED,
+            ErrorRaisedPayload(source=source, message=message, error=payload_error),
+        )
