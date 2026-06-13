@@ -4,12 +4,22 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from core.adb.server import AdbServer
+from core.exceptions import CoreException
 from core.signals import AdbServerStoppedPayload, CoreSignal
 from core.work.core_runtime_work import CoreRuntimeWork, CoreRuntimeWorkOutcome
+from core.work.helper import preflight
 from logger import logger
 
 if TYPE_CHECKING:
     from core.entrypoint import ModelEntrypoint
+
+
+class CloseCoreRuntimeError(CoreException):
+    """Close core runtime work failed."""
+
+    def __init__(self, reason: str) -> None:
+        self.reason = reason
+        super().__init__(reason)
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,6 +37,12 @@ class CloseCoreRuntimeWork(CoreRuntimeWork[CloseOutcome]):
     def __init__(self, adb_server: AdbServer) -> None:
         self._adb_server = adb_server
 
+    @preflight(
+        check_server_started=True,
+        error_to_raise=lambda self: CloseCoreRuntimeError(
+            "ADB server must be running before close work can stop it"
+        ),
+    )
     def run(self) -> CloseOutcome:
         """
         Stop the bound ADB server on a worker thread (AsyncRunner).

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import pytest
 
 from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
+from core.adb.binary import AdbBinary
 from core.adb.exceptions import AdbClientException
 from core.devices import Phone
 from core.entrypoint import ModelEntrypoint
@@ -32,6 +34,7 @@ class PairCall:
 class FakeAdbClient:
     def __init__(self) -> None:
         self.pair_calls: list[PairCall] = []
+        self.binary = AdbBinary(path=Path("/mock/adb"))
 
     def pair(self, ip: str, port: int, association_code: str) -> Phone:
         self.pair_calls.append(PairCall(ip, port, association_code))
@@ -56,6 +59,12 @@ class FakeAdbServer:
 
     def restart(self) -> None:
         self.restart_calls += 1
+
+    def is_server_running(self) -> bool:
+        return True
+
+    def refresh_mdns_availability(self) -> bool:
+        return True
 
 
 class RestartCountingMockAdbServer(MockAdbServer):

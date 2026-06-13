@@ -20,6 +20,7 @@ from core.signals import (
     DeviceAuthentificationSucceededPayload,
 )
 from core.work.core_runtime_work import CoreRuntimeWork, CoreRuntimeWorkOutcome
+from core.work.helper import preflight
 from core.work.refresh_known_devices_work import enrich_phones_with_adb_shell_properties
 from logger import logger
 
@@ -103,6 +104,28 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
         self.port: int = port
         self.association_code: str = association_code
 
+    @staticmethod
+    def _preflight_error(work: object) -> DeviceAuthentificationError:
+        if not isinstance(work, AuthenticateDeviceWork):
+            return DeviceAuthentificationError(
+                ip="",
+                port=0,
+                association_code="",
+                reason="ADB runtime preflight failed",
+            )
+        return DeviceAuthentificationError(
+            ip=work.ip,
+            port=work.port,
+            association_code=work.association_code,
+            reason="ADB runtime preflight failed",
+        )
+
+    @preflight(
+        check_server_started=True,
+        check_client_created=True,
+        check_mdns_available=True,
+        error_to_raise=_preflight_error,
+    )
     def run(self) -> AuthentificateDeviceOutcome:
         """
         Validate pairing inputs, pair over ADB, and enrich the paired phone

@@ -87,6 +87,25 @@ class AdbClient:
             if entry[0] != command
         )
 
+    def status(self, phone: Phone) -> str:
+        """
+        Read the ADB connection state of a specific device via ``adb -s <id> get-state``.
+        """
+        command = AdbCommands.STATUS.value
+        try:
+            result = self._execute(command, phone)
+            raise_client_for_result(command, result)
+        except AdbClientException as exc:
+            raise AdbClientException(
+                f"Failed to get device state for {phone.descriptor.id}: {exc}"
+            ) from exc
+        state = (result.output or "").strip()
+        if not state:
+            raise AdbClientException(
+                f"Empty device state from get-state for {phone.descriptor.id}"
+            )
+        return state
+
     def pair(self, ip: str, port: int, association_code: str) -> Phone:
         """
         Pair with a device and return a ``Phone`` parsed from adb output (``guid=`` id).

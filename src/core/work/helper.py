@@ -1,0 +1,128 @@
+"""Preflight decorator for core runtime work ``run()`` methods."""
+
+from __future__ import annotations
+
+from functools import wraps
+from typing import Any, Callable, TypeVar
+
+from logger import logger
+
+TOutcome = TypeVar("TOutcome")
+
+PreflightErrorFactory = Callable[[object], BaseException]
+
+_SERVER_ATTRS = ("_adb_server", "adb_server")
+_CLIENT_ATTRS = ("_adb_client", "adb_client")
+
+
+def _resolve_attr(work: object, names: tuple[str, ...]) -> object | None:
+    for name in names:
+        if hasattr(work, name):
+            value = getattr(work, name)
+            if value is not None:
+                return value
+    return None
+
+
+def _resolve_server(work: object) -> object | None:
+    return _resolve_attr(work, _SERVER_ATTRS)
+
+
+def _resolve_client(work: object) -> object | None:
+    return _resolve_attr(work, _CLIENT_ATTRS)
+
+
+def _validate_client_usable(client: object) -> bool:
+    """Validate that the client has binary metadata required for ADB execution."""
+    binary = getattr(client, "binary", None)
+    if binary is None:
+        return False
+    path = getattr(binary, "path", None)
+    return path is not None and str(path).strip() != ""
+
+
+def _server_is_running(server: object) -> bool:
+    probe = getattr(server, "is_server_running", None)
+    if not callable(probe):
+        return False
+    return bool(probe())
+
+
+def _server_mdns_available(server: object) -> bool:
+    refresh = getattr(server, "refresh_mdns_availability", None)
+    if not callable(refresh):
+        return False
+    return bool(refresh())
+
+
+def _raise_preflight_error(
+    work: object,
+    error_to_raise: BaseException | PreflightErrorFactory | None,
+) -> None:
+    if error_to_raise is None:
+        raise RuntimeError("Core runtime work preflight failed")
+    if callable(error_to_raise):
+        raise error_to_raise(work)
+    raise error_to_raise
+
+
+def preflight(
+    *,
+    check_server_started: bool = False,
+    check_client_created: bool = False,
+    check_mdns_available: bool = False,
+    error_to_raise: BaseException | PreflightErrorFactory | None = None,
+) -> Callable[[Callable[..., TOutcome]], Callable[..., TOutcome]]:
+    """
+    Run active ADB preflight checks before a work ``run()`` body.
+
+    Entrypoint callers may still perform cheap property guards; this decorator
+    performs runtime health probes once the work instance holds server/client refs.
+    """
+
+    def decorator(
+        run_method: Callable[..., TOutcome],
+    ) -> Callable[..., TOutcome]:
+        @wraps(run_method)
+        def wrapper(self: object, *args: Any, **kwargs: Any) -> TOutcome:
+            server: object | None = None
+
+            if check_server_started or check_mdns_available:
+                server = _resolve_server(self)
+                if server is None:
+                    logger.warning(
+                        "preflight: ADB server missing on work instance",
+                        work_type=type(self).__name__,
+                    )
+                    _raise_preflight_error(self, error_to_raise)
+
+            if check_server_started and server is not None:
+                if not _server_is_running(server):
+                    logger.warning(
+                        "preflight: ADB server health probe failed",
+                        work_type=type(self).__name__,
+                    )
+                    _raise_preflight_error(self, error_to_raise)
+
+            if check_client_created:
+                client = _resolve_client(self)
+                if client is None or not _validate_client_usable(client):
+                    logger.warning(
+                        "preflight: ADB client missing or not usable",
+                        work_type=type(self).__name__,
+                    )
+                    _raise_preflight_error(self, error_to_raise)
+
+            if check_mdns_available and server is not None:
+                if not _server_mdns_available(server):
+                    logger.warning(
+                        "preflight: ADB mDNS unavailable",
+                        work_type=type(self).__name__,
+                    )
+                    _raise_preflight_error(self, error_to_raise)
+
+            return run_method(self, *args, **kwargs)
+
+        return wrapper
+
+    return decorator

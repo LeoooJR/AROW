@@ -24,12 +24,14 @@ from core.adb.binary import AdbBinary
 from core.adb.client import AdbClient
 from core.adb.server import AdbServer
 from core.devices import Phone
+from core.exceptions import CoreException
 from core.signals import (
     AdbServerStartedPayload,
     CoreSignal,
     DevicesUpdatedPayload,
 )
 from core.work.core_runtime_work import CoreRuntimeWork, CoreRuntimeWorkOutcome
+from core.work.helper import preflight
 from core.work.refresh_known_devices_work import enrich_phones_with_adb_shell_properties
 from logger import logger
 
@@ -152,6 +154,14 @@ def _create_adb_client() -> AdbClient:
     return AdbClient(binary=adb_binary)
 
 
+class StartupCoreRuntimeError(CoreException):
+    """Startup core runtime work failed."""
+
+    def __init__(self, reason: str) -> None:
+        self.reason = reason
+        super().__init__(reason)
+
+
 @dataclass(frozen=True, slots=True)
 class StartupOutcome(CoreRuntimeWorkOutcome):
     """Outcome of the async startup job (build on a worker, apply on the main thread)."""
@@ -177,6 +187,7 @@ class StartupCoreRuntimeWork(CoreRuntimeWork[StartupOutcome]):
     def __init__(self, use_mock_adb: bool = False) -> None:
         self._use_mock_adb: bool = use_mock_adb
 
+    @preflight()
     def run(self) -> StartupOutcome:
         """
         Start ADB server and client, snapshot paired devices, and enrich phones

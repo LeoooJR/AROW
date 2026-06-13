@@ -24,8 +24,10 @@ from core.devices import (
     apply_phone_product_model_enrichment,
     apply_phone_ro_serial_enrichment,
 )
+from core.exceptions import CoreException
 from core.signals import CoreSignal, DevicesUpdatedPayload
 from core.work.core_runtime_work import CoreRuntimeWork, CoreRuntimeWorkOutcome
+from core.work.helper import preflight
 
 if TYPE_CHECKING:
     from core.entrypoint import ModelEntrypoint
@@ -133,6 +135,14 @@ def enrich_phones_with_adb_shell_properties(
         _enrich_phone_with_shell_properties(adb_client, phone)
 
 
+class RefreshKnownDevicesError(CoreException):
+    """Refresh known devices work failed."""
+
+    def __init__(self, reason: str) -> None:
+        self.reason = reason
+        super().__init__(reason)
+
+
 @dataclass(frozen=True, slots=True)
 class RefreshKnownDevicesOutcome(CoreRuntimeWorkOutcome):
     """Result of :meth:`RefreshKnownDevicesWork.run` (worker thread)."""
@@ -149,6 +159,13 @@ class RefreshKnownDevicesWork(CoreRuntimeWork[RefreshKnownDevicesOutcome]):
         self._adb_server = adb_server
         self._adb_client = adb_client
 
+    @preflight(
+        check_server_started=True,
+        check_client_created=True,
+        error_to_raise=lambda self: RefreshKnownDevicesError(
+            "ADB server and client must be initialized and healthy before refreshing devices"
+        ),
+    )
     def run(self) -> RefreshKnownDevicesOutcome:
         """
         List devices from the bound server and enrich shell-targetable phones

@@ -14,8 +14,10 @@ from typing import TYPE_CHECKING
 
 from core.application_paths import get_or_create_application_dir
 from core.devices import compute_computer_stable_key
+from core.exceptions import CoreException
 from core.signals import CoreSignal, HostComputerIdentityPayload
 from core.work.core_runtime_work import CoreRuntimeWork, CoreRuntimeWorkOutcome
+from core.work.helper import preflight
 from logger import logger
 
 if TYPE_CHECKING:
@@ -76,6 +78,14 @@ def _load_or_create_install_token() -> str:
     return new_token.casefold()
 
 
+class HostInstallIdentityError(CoreException):
+    """Host install identity work failed."""
+
+    def __init__(self, reason: str) -> None:
+        self.reason = reason
+        super().__init__(reason)
+
+
 @dataclass(frozen=True, slots=True)
 class HostInstallIdentityOutcome(CoreRuntimeWorkOutcome):
     """Result of :meth:`HostInstallIdentityWork.run` (worker thread)."""
@@ -88,6 +98,7 @@ class HostInstallIdentityWork(CoreRuntimeWork[HostInstallIdentityOutcome]):
     Persist / load install token on a worker; apply stable_key and emit on the main thread.
     """
 
+    @preflight()
     def run(self) -> HostInstallIdentityOutcome:
         """
         Load or atomically create the persisted host install UUID

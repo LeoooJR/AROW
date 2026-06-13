@@ -171,6 +171,97 @@ class TestAdbServerStartSuccess:
         assert server.mdns_available is False
 
 
+class TestAdbServerHealthProbe:
+    """Gentle ``adb start-server`` health probe for server preflight."""
+
+    def test_is_server_running_true_on_empty_success_output(
+        self, server: AdbServer, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def fake_execute(_command: AdbCommand) -> AdbCommandResult:
+            return AdbCommandResult(
+                status=AdbCommandResultStatus.SUCCESS,
+                output="",
+                error="",
+                return_code=0,
+            )
+
+        monkeypatch.setattr(server, "_execute", fake_execute)
+        assert server.is_server_running() is True
+
+    def test_is_server_running_false_on_non_empty_output(
+        self, server: AdbServer, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def fake_execute(_command: AdbCommand) -> AdbCommandResult:
+            return AdbCommandResult(
+                status=AdbCommandResultStatus.SUCCESS,
+                output="* daemon not running; starting now at tcp:5037\n",
+                error="",
+                return_code=0,
+            )
+
+        monkeypatch.setattr(server, "_execute", fake_execute)
+        assert server.is_server_running() is False
+
+    def test_is_server_running_false_on_non_zero_exit(
+        self, server: AdbServer, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def fake_execute(_command: AdbCommand) -> AdbCommandResult:
+            return AdbCommandResult(
+                status=AdbCommandResultStatus.ERROR,
+                output="",
+                error="failed",
+                return_code=1,
+            )
+
+        monkeypatch.setattr(server, "_execute", fake_execute)
+        assert server.is_server_running() is False
+
+    def test_is_server_running_false_on_execute_exception(
+        self, server: AdbServer, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def fake_execute(_command: AdbCommand) -> AdbCommandResult:
+            raise AdbServerException("start-server failed")
+
+        monkeypatch.setattr(server, "_execute", fake_execute)
+        assert server.is_server_running() is False
+
+
+class TestAdbClientDeviceStatus:
+    """Device ``adb get-state`` belongs on the client, not the server."""
+
+    def test_client_status_returns_trimmed_device_state(
+        self, adb_binary: AdbBinary, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from core.adb.client import AdbClient
+
+        client = AdbClient(adb_binary)
+        phone = Phone(id="abc123", state="device")
+
+        def fake_execute(
+            command: AdbCommand,
+            target_phone: Phone | None = None,
+            positional_arguments: list[str] | None = None,
+        ) -> AdbCommandResult:
+            assert target_phone is phone
+            assert command.command == "get-state"
+            return AdbCommandResult(
+                status=AdbCommandResultStatus.SUCCESS,
+                output="device\n",
+                error="",
+                return_code=0,
+                phone=target_phone,
+            )
+
+        monkeypatch.setattr(client, "_execute", fake_execute)
+        assert client.status(phone) == "device"
+
+    def test_status_command_describes_device_state_not_server(self) -> None:
+        status = AdbCommands.STATUS.value
+        assert status.command == "get-state"
+        assert "device" in status.description.casefold()
+        assert "server" not in status.name.casefold()
+
+
 class TestAdbBinaryDefaults:
     """Bundled ADB binary metadata defaults."""
 

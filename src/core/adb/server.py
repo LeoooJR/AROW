@@ -233,12 +233,37 @@ class AdbServer:
         )
         return self._mdns_available
 
-    def status(self) -> None:
-        """Get the status of the adb server."""
-        command = AdbCommands.STATUS.value
-        result = self._execute(command)
-        if result.status != AdbCommandResultStatus.SUCCESS:
-            raise AdbServerException(f"Failed to get status of adb server: {result}")
+    def is_server_running(self) -> bool:
+        """
+        Gentle server health probe via ``adb start-server``.
+
+        Returns ``True`` when the command succeeds with return code ``0`` and no output
+        (server already running). Returns ``False`` on non-zero exit, non-empty output,
+        or execution failure.
+        """
+        command = AdbCommands.START_SERVER.value
+        try:
+            result = self._execute(command)
+        except AdbServerException as exc:
+            logger.warning(
+                "AdbServer: server health probe failed",
+                error=str(exc),
+            )
+            return False
+        if result.return_code != 0:
+            logger.warning(
+                "AdbServer: server health probe returned non-zero exit",
+                return_code=result.return_code,
+            )
+            return False
+        combined = f"{result.output or ''}{result.error or ''}".strip()
+        if combined:
+            logger.warning(
+                "AdbServer: server health probe returned unexpected output",
+                output_preview=combined[:200],
+            )
+            return False
+        return True
 
     def get_known_devices(self) -> list[Phone]:
         """Get the known devices."""

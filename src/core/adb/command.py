@@ -688,7 +688,9 @@ class AdbCommands(Enum):
         name="Kill ADB Server", description="Kill the ADB server", command="kill-server"
     )
     STATUS = AdbCommand(
-        name="ADB status", description="Get the ADB server state", command="get-state"
+        name="Get device state",
+        description="Get the ADB connection state of a specific device (adb get-state)",
+        command="get-state",
     )
     GET_DEVICES = AdbCommand(
         name="Get devices",

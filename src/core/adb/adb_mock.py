@@ -356,6 +356,9 @@ class MockAdbClient(AdbClient):
             out = self._state.devices_l_blob()
         elif command.command == "shell":
             out = self._fake_shell_stdout(phone=phone, args=list(command.args))
+        elif command.command == "get-state" and phone is not None:
+            device_state = (phone.descriptor.state or "device").strip()
+            out = f"{device_state}\n"
         else:
             out = ""
 
