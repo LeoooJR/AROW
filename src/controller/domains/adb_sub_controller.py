@@ -7,6 +7,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
+from PySide6.QtCore import QTimer
+
 from controller.core_work_callbacks import (
     AdbAsyncJobCallbacks,
     AuthentificateDeviceCallback,
@@ -15,7 +17,7 @@ from controller.core_work_callbacks import (
     StartupCoreRuntimeCallback,
 )
 from controller.domains.app_sub_controller import AppSubController
-from controller.helper import validate_model_entrypoint, validate_view
+from controller.helper import repeat, validate_model_entrypoint, validate_view
 from core.signals import (
     AdbServerStartedPayload,
     AdbServerStoppedPayload,
@@ -31,6 +33,8 @@ from logger import logger
 if TYPE_CHECKING:
     from controller.orchestration.app_controller import AppController
 
+_REFRESH_DEVICE_LIST_INTERVAL_MS = 30000
+
 
 class AdbSubController(AppSubController):
     """Subcontroller for ADB server and device list flows (no own AsyncRunner)."""
@@ -40,6 +44,12 @@ class AdbSubController(AppSubController):
         self._async_job_callbacks: AdbAsyncJobCallbacks = (
             AdbAsyncJobCallbacks.for_subcontroller(self)
         )
+        self._is_refreshing_device_list: bool = (
+            False  # Prevent multiple concurrent refresh device list requests
+        )
+        self._refresh_device_list_timer: QTimer = repeat(
+            _REFRESH_DEVICE_LIST_INTERVAL_MS
+        )(self._on_refresh_device_list_requested)
         # One-shot hook after CloseCoreRuntime apply (e.g. quit nested QEventLoop); held on
         # self so AsyncRunner slots keep a long-lived CloseCoreRuntimeCallback on AdbAsyncJobCallbacks.
         self._pending_after_close_apply: Callable[[], None] | None = None
@@ -152,12 +162,17 @@ class AdbSubController(AppSubController):
     @validate_model_entrypoint
     def _on_refresh_device_list_requested(self) -> None:
         """ADB list query on a worker."""
+        if (
+            self._is_refreshing_device_list
+        ):  # Guard to prevent multiple concurrent refresh device list requests
+            return
         logger.debug("AdbSubController: refresh device list requested")
         callback: RefreshDeviceListCallback = (
             self._async_job_callbacks.refresh_device_list
         )
         if callback is None:
             raise ValueError("RefreshDeviceListCallback is not set")
+        self._is_refreshing_device_list = True  # Set guard to prevent multiple concurrent refresh device list requests
         self._submit_model_entrypoint_async_call(
             name="refresh_device_list",
             fn=self.model_entrypoint.refresh_known_devices,
