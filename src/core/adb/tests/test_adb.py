@@ -172,57 +172,48 @@ class TestAdbServerStartSuccess:
 
 
 class TestAdbServerHealthProbe:
-    """Gentle ``adb start-server`` health probe for server preflight."""
+    """Server-running checks should read lifecycle history without new ADB side effects."""
 
-    def test_is_server_running_true_on_empty_success_output(
-        self, server: AdbServer, monkeypatch: pytest.MonkeyPatch
+    def test_is_server_running_true_after_successful_start(
+        self, server: AdbServer
     ) -> None:
-        def fake_execute(_command: AdbCommand) -> AdbCommandResult:
-            return AdbCommandResult(
+        server.add_to_history(
+            AdbCommands.START_SERVER.value,
+            AdbCommandResult(
                 status=AdbCommandResultStatus.SUCCESS,
                 output="",
                 error="",
                 return_code=0,
-            )
-
-        monkeypatch.setattr(server, "_execute", fake_execute)
+            ),
+        )
         assert server.is_server_running() is True
 
-    def test_is_server_running_false_on_non_empty_output(
-        self, server: AdbServer, monkeypatch: pytest.MonkeyPatch
+    def test_is_server_running_false_after_successful_stop(
+        self, server: AdbServer
     ) -> None:
-        def fake_execute(_command: AdbCommand) -> AdbCommandResult:
-            return AdbCommandResult(
+        server.add_to_history(
+            AdbCommands.START_SERVER.value,
+            AdbCommandResult(
                 status=AdbCommandResultStatus.SUCCESS,
-                output="* daemon not running; starting now at tcp:5037\n",
+                output="",
                 error="",
                 return_code=0,
-            )
-
-        monkeypatch.setattr(server, "_execute", fake_execute)
-        assert server.is_server_running() is False
-
-    def test_is_server_running_false_on_non_zero_exit(
-        self, server: AdbServer, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        def fake_execute(_command: AdbCommand) -> AdbCommandResult:
-            return AdbCommandResult(
-                status=AdbCommandResultStatus.ERROR,
+            ),
+        )
+        server.add_to_history(
+            AdbCommands.KILL_SERVER.value,
+            AdbCommandResult(
+                status=AdbCommandResultStatus.SUCCESS,
                 output="",
-                error="failed",
-                return_code=1,
-            )
-
-        monkeypatch.setattr(server, "_execute", fake_execute)
+                error="",
+                return_code=0,
+            ),
+        )
         assert server.is_server_running() is False
 
-    def test_is_server_running_false_on_execute_exception(
-        self, server: AdbServer, monkeypatch: pytest.MonkeyPatch
+    def test_is_server_running_false_without_lifecycle_history(
+        self, server: AdbServer
     ) -> None:
-        def fake_execute(_command: AdbCommand) -> AdbCommandResult:
-            raise AdbServerException("start-server failed")
-
-        monkeypatch.setattr(server, "_execute", fake_execute)
         assert server.is_server_running() is False
 
 
