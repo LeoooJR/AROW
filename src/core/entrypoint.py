@@ -9,7 +9,13 @@ from core.application_paths import (
     get_or_create_application_dir,
     get_or_create_config_dir,
 )
-from core.devices import Computer, Phone
+from core.devices import (
+    Computer,
+    Phone,
+    PhoneRepository,
+    apply_discovered_phone_state,
+    paired_phone_matches_discovery,
+)
 from core.signals import (
     AdbServerStartedPayload,
     AdbServerStoppedPayload,
@@ -252,6 +258,99 @@ class ModelEntrypoint(Entrypoint):
             return []
         return resolved.get_known_devices()
 
+    def reconcile_paired_devices(self, phones: list[Phone]) -> bool:
+        """
+        Reconcile paired devices with a freshly discovered handset list.
+
+        Existing ``Phone`` instances are updated in place when they match by ADB
+        connection id or non-empty ``stable_key`` (wireless/USB reconnect).
+        Handsets absent from ``phones`` are removed and any linked simulation is
+        dropped best-effort.
+
+        Returns:
+            True when the paired repository or simulations changed; False when
+            the outcome is already reflected (caller may skip UI refresh).
+        """
+        if self._adb_server is None:
+            raise AttributeError(
+                "ADB server must be initialized before reconciling paired devices"
+            )
+        paired_devices = self._adb_server.paired_devices
+        discovered_phones = _dedupe_discovered_phones(phones)
+        paired_by_stable_key = _index_paired_phones_by_stable_key(
+            paired_devices
+        )  # Create a dictionary of paired devices by stable key
+        matched_paired_ids: set[int] = (
+            set()
+        )  # Set of paired device ids that have been matched
+        changed = False
+
+        for discovered in discovered_phones:
+            paired = paired_devices.get(discovered.id)
+            if (
+                paired is None
+            ):  # A reconnect can update the ADB id, but stable key remains the same
+                stable_key = (discovered.stable_key or "").strip()
+                if stable_key:
+                    paired = paired_by_stable_key.get(stable_key)
+
+            if paired is not None:  # A device has been found, by ADB id or stable key
+                matched_paired_ids.add(id(paired))
+                if paired_phone_matches_discovery(
+                    paired, discovered
+                ):  # If no property changed, skip
+                    continue
+                old_connection_id = paired.id
+                if (
+                    old_connection_id != discovered.id
+                ):  # If the ADB id changed, remove the paired device
+                    paired_devices.remove(paired)
+                apply_discovered_phone_state(
+                    paired, discovered
+                )  # Update the paired device with the new properties, if a simulation is bound to the device, it will be updated with the new properties
+                if (
+                    old_connection_id != discovered.id
+                ):  # If the ADB id changed, add the updated paired device back
+                    paired_devices.add(paired)
+                changed = (
+                    True  # At least one device was updated, UI needs to be refreshed
+                )
+                continue
+
+            paired_devices.add(
+                discovered
+            )  # A new device has been found, add it to the paired devices
+            matched_paired_ids.add(id(discovered))
+            changed = (
+                True  # At least one new device was found, UI needs to be refreshed
+            )
+
+        for paired in list(paired_devices):
+            if (
+                id(paired) in matched_paired_ids
+            ):  # No operation needed for this device, the device stay as is, updated or newly added
+                continue
+            paired_devices.remove(
+                paired
+            )  # Remove the device from the paired devices, it is not in the newly discovered devices
+            try:
+                self.delete_simulation_for_device(
+                    paired.id
+                )  # Delete the simulation for the device
+            except (
+                ValueError
+            ):  # The simulation for the device was not found, it was not active
+                pass
+            changed = True  # At least one device was removed, UI needs to be refreshed
+
+        if changed:
+            logger.info(
+                "ModelEntrypoint: reconciled paired devices",
+                discovered_count=len(discovered_phones),
+                paired_count=len(paired_devices),
+            )
+        return changed
+
     def create_simulation(self, device_id: str) -> str:
         """
         Create a new simulation.
@@ -359,6 +458,33 @@ class ModelEntrypoint(Entrypoint):
             message=str(exc),
             error=exc,
         )
+
+
+def _dedupe_discovered_phones(phones: list[Phone]) -> list[Phone]:
+    """Keep the last discovery payload per ADB connection id; skip blank ids."""
+    deduped: dict[str, Phone] = {}
+    for phone in phones:
+        device_id = (phone.id or "").strip()
+        if not device_id:
+            logger.warning(
+                "ModelEntrypoint: skipping discovered phone with empty id",
+                phone_repr=repr(phone),
+            )
+            continue
+        deduped[device_id] = phone
+    return list(deduped.values())
+
+
+def _index_paired_phones_by_stable_key(
+    paired_devices: PhoneRepository,
+) -> dict[str, Phone]:
+    """Map non-empty stable keys to currently paired handsets (first wins)."""
+    indexed: dict[str, Phone] = {}
+    for paired in paired_devices:
+        stable_key = (paired.stable_key or "").strip()
+        if stable_key and stable_key not in indexed:
+            indexed[stable_key] = paired
+    return indexed
 
 
 def _resolve_failure_origin_and_exception(

@@ -111,3 +111,26 @@ def test_refresh_known_devices_apply_replaces_devices_and_emits_update() -> None
     assert emitted == [
         (CoreSignal.DEVICES_UPDATED, DevicesUpdatedPayload(devices=[refreshed_phone]))
     ]
+
+
+def test_refresh_known_devices_apply_skips_emit_when_devices_unchanged() -> None:
+    """Unchanged discovery payloads avoid redundant DEVICES_UPDATED emissions."""
+    state = MockAdbState(seed=203, initial_devices=0)
+    server = MockAdbServer(state=state)
+    client = MockAdbClient(state=state)
+    model_entrypoint = ModelEntrypoint()
+    model_entrypoint._adb_server = server
+    model_entrypoint._adb_client = client
+    phone = Phone(id="device-1", state="device", model="Pixel")
+    server.paired_devices.add(phone)
+    emitted: list[tuple[CoreSignal, object]] = []
+    model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
+        (signal, payload)
+    )
+
+    outcome = RefreshKnownDevicesOutcome(
+        devices=[Phone(id="device-1", state="device", model="Pixel")]
+    )
+    RefreshKnownDevicesWork.apply_main_thread(model_entrypoint, outcome)
+
+    assert emitted == []

@@ -342,6 +342,32 @@ class Phone(Device[PhoneDescriptor]):
         transport_id: str | None = None,
         android_api_level: int | None = None,
     ) -> None:
+        """
+        Create a new phone device.
+
+        Args:
+            id: The id of the phone. This is the ADB connection id.
+            name: The name of the phone. This is the display name of the phone.
+            os: The operating system of the phone.
+            ip: The ip address of the phone.
+            port: The port of the phone.
+            device: The device of the phone.
+            product: The product of the phone.
+            model: The model of the phone.
+            state: The state of the phone.
+            hardware_serial: The hardware serial of the phone.
+            manufacturer: The manufacturer of the phone.
+            transport_id: The transport id of the phone.
+            android_api_level: The android api level of the phone.
+
+        Returns:
+            None
+
+        Raises:
+            TypeError: If the type of the arguments is not correct.
+            ValueError: If the value of the arguments is not correct.
+            Exception: If the phone device creation fails.
+        """
         prod = product or ""
         mod = model or ""
         man_u = manufacturer or ""
@@ -424,6 +450,54 @@ class Phone(Device[PhoneDescriptor]):
     @property
     def hardware_serial(self) -> str:
         return self._descriptor.hardware_serial
+
+
+# Descriptor fields refreshed from a newly listed Phone during paired-device reconcile.
+# ``last_communication`` is applied on updates but ignored for no-op detection.
+_DISCOVERED_PHONE_DESCRIPTOR_FIELDS = (
+    "name",
+    "os",
+    "ip",
+    "port",
+    "product",
+    "model",
+    "device",
+    "transport_id",
+    "state",
+    "hardware_serial",
+    "stable_key",
+    "manufacturer",
+    "android_api_level",
+    "shell_device_name",
+)
+
+
+def apply_discovered_phone_state(paired: Phone, discovered: Phone) -> None:
+    """
+    Copy freshly listed descriptor fields onto an existing paired handset instance.
+
+    Preserves the paired object identity so simulations and UI references stay valid.
+    Caller must re-key ``PhoneRepository`` when ``paired.id`` and ``discovered.id`` differ.
+    """
+    for field_name in _DISCOVERED_PHONE_DESCRIPTOR_FIELDS:
+        setattr(
+            paired.descriptor,
+            field_name,
+            getattr(discovered.descriptor, field_name),
+        )
+    paired.descriptor.id = discovered.id
+    paired.descriptor.last_communication = discovered.descriptor.last_communication
+
+
+def paired_phone_matches_discovery(paired: Phone, discovered: Phone) -> bool:
+    """True when discovery would not change user-visible handset state."""
+    if paired.id != discovered.id:
+        return False
+    return all(
+        getattr(paired.descriptor, field_name)
+        == getattr(discovered.descriptor, field_name)
+        for field_name in _DISCOVERED_PHONE_DESCRIPTOR_FIELDS
+    )
 
 
 def sync_phone_display_name(phone: Phone) -> None:
@@ -656,6 +730,7 @@ class PhoneRepository(Repository[Phone]):
     def __init__(self) -> None:
         super().__init__()
         self._working_device: Phone | None = None
+        # TO DO: add a reference to the simulation repository, so both repositories are synchronized
 
     @property
     def working_device(self) -> Phone | None:
