@@ -16,7 +16,7 @@ from controller.controller import Controller
 from controller.domains.adb_sub_controller import AdbSubController
 from controller.domains.map_sub_controller import MapSubController
 from controller.domains.simulation_sub_controller import SimulationSubController
-from controller.helper import validate_view, watchdog
+from controller.helper import validate_model_entrypoint, validate_view, watchdog
 from core.application_paths import default_activity_log_file_path
 from core.entrypoint import ModelEntrypoint
 from gui.signals import signals
@@ -48,7 +48,7 @@ class AppController(Controller):
         self._activity_log_file: Path | None = None
         self._connect_view_signals()
         self._connect_model_signals()
-        self._simulation.send_host_device_information()
+        self._send_host_device_information()
         self._send_activity_log_file_to_view()
         self._adb.run_startup()
 
@@ -76,6 +76,22 @@ class AppController(Controller):
         if qt_app is not None:
             qt_app.aboutToQuit.connect(self._on_application_about_to_quit)
 
+    def _connect_model_signals(self) -> None:
+        self._simulation.connect_model_signals()
+        self._adb.connect_model_signals()
+        self._map.connect_model_signals()
+
+    @validate_model_entrypoint
+    @validate_view
+    def _send_host_device_information(self) -> None:
+        """Send the host device information to the view. Run once after the main window is wired."""
+        self.view.forward_host_device_information_updated(
+            self.model_entrypoint.host.get_name(),
+            self.model_entrypoint.host.get_os(),
+            self.model_entrypoint.host.get_ip(),
+        )
+
+    @validate_model_entrypoint
     def _resolve_activity_log_file(self) -> Path:
         """Return the current app-wide activity log path, creating a default when unset."""
         if self._activity_log_file is None:
@@ -100,11 +116,6 @@ class AppController(Controller):
         self._activity_log_file = Path(path)
         view = cast(MainWindow, self.view)
         view.forward_activity_log_file_updated(path)
-
-    def _connect_model_signals(self) -> None:
-        self._simulation.connect_model_signals()
-        self._adb.connect_model_signals()
-        self._map.connect_model_signals()
 
     def _adb_bootstrap_jobs_pending(self) -> bool:
         """True while startup or chained host-install jobs are still in the runner queue."""

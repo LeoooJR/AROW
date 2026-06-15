@@ -33,22 +33,6 @@ class SimulationSubController(AppSubController):
         # Simulation-specific model subscriptions (none yet) — extension point.
         return
 
-    def send_host_device_information(self) -> None:
-        """
-        Send the host device information to the view.
-
-        Run once after the main window is wired.
-        """
-        self._send_host_device_information()
-
-    @validate_view
-    def _send_host_device_information(self) -> None:
-        self.view.forward_host_device_information_updated(
-            self.model_entrypoint.host.get_name(),
-            self.model_entrypoint.host.get_os(),
-            self.model_entrypoint.host.get_ip(),
-        )
-
     def is_simulation_active(self, id: str) -> bool:
         """Check if the simulation is active."""
         return self.model_entrypoint.is_simulation_active(id)
