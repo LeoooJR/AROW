@@ -44,9 +44,6 @@ class AdbSubController(AppSubController):
         self._async_job_callbacks: AdbAsyncJobCallbacks = (
             AdbAsyncJobCallbacks.for_subcontroller(self)
         )
-        self._is_refreshing_device_list: bool = (
-            False  # Prevent multiple concurrent refresh device list requests
-        )
         self._refresh_device_list_timer: QTimer = repeat(
             _REFRESH_DEVICE_LIST_INTERVAL_MS
         )(self._on_refresh_device_list_requested)
@@ -162,23 +159,19 @@ class AdbSubController(AppSubController):
     @validate_model_entrypoint
     def _on_refresh_device_list_requested(self) -> None:
         """ADB list query on a worker."""
-        if (
-            self._is_refreshing_device_list
-        ):  # Guard to prevent multiple concurrent refresh device list requests
-            return
         logger.debug("AdbSubController: refresh device list requested")
         callback: RefreshDeviceListCallback = (
             self._async_job_callbacks.refresh_device_list
         )
         if callback is None:
             raise ValueError("RefreshDeviceListCallback is not set")
-        self._is_refreshing_device_list = True  # Set guard to prevent multiple concurrent refresh device list requests
         self._submit_model_entrypoint_async_call(
             name="refresh_device_list",
             fn=self.model_entrypoint.refresh_known_devices,
             description="Refresh device list from ADB",
             job_type="thread",
             coalesce_key="refresh_device_list",
+            at_most_once=True,
             on_completed=callback.on_completed,
             on_failed=callback.on_failed,
         )

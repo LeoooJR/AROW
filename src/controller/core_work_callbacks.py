@@ -137,13 +137,11 @@ class RefreshDeviceListCallback:
             device_ids=device_ids,
         )
         model_entrypoint.apply_result(result)
-        self._subcontroller._is_refreshing_device_list = False  # Clear guard to prevent multiple concurrent refresh device list requests
 
     @validate_model_entrypoint
     def on_failed(self, error: JobError) -> None:
         log_refresh_device_list_job_failure(error)
         self._subcontroller.model_entrypoint.apply_failure(error)
-        self._subcontroller._is_refreshing_device_list = False  # Clear guard to prevent multiple concurrent refresh device list requests
 
 
 def log_host_install_identity_job_failure(error: JobError) -> None:

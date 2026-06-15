@@ -218,6 +218,7 @@ class TestAsyncRunnerThreadSignals:
             type="thread",
         )
         handle = runner.submit(spec)
+        assert handle is not None
         assert handle.job_id in runner.history
 
         _process_events_until(lambda: len(completed) == 1 or len(failed) == 1)
@@ -252,6 +253,7 @@ class TestAsyncRunnerThreadSignals:
             type="thread",
         )
         handle = runner.submit(spec)
+        assert handle is not None
         assert handle.job_id in runner.history
 
         _process_events_until(lambda: len(failed) == 1)
@@ -293,6 +295,7 @@ class TestAsyncRunnerThreadSignals:
             type="thread",
         )
         handle = runner.submit(spec)
+        assert handle is not None
         runner.cancel(handle.job_id)
         assert handle.job_id in pending
         pending[handle.job_id]()
@@ -330,6 +333,7 @@ class TestAsyncRunnerProcessAndCoalesce:
             type="process",
         )
         handle = runner.submit(spec)
+        assert handle is not None
         assert handle.job_id in runner.history
 
         _process_events_until(lambda: len(failed) == 1)
@@ -369,6 +373,7 @@ class TestAsyncRunnerProcessAndCoalesce:
             type="thread",
         )
         handle1 = runner.submit(spec1)
+        assert handle1 is not None
 
         # Submit a second job with the same coalesce_key. This should cancel `handle1`.
         spec2 = JobSpecification(
@@ -383,6 +388,7 @@ class TestAsyncRunnerProcessAndCoalesce:
             type="thread",
         )
         handle2 = runner.submit(spec2)
+        assert handle2 is not None
         assert handle1.job_id in runner.history
         assert handle2.job_id in runner.history
 
@@ -431,6 +437,7 @@ class TestAsyncRunnerProcessAndCoalesce:
             type="auto",
         )
         handle_process = runner.submit(spec_process)
+        assert handle_process is not None
 
         # Auto -> thread (coalesce_key == "location")
         spec_thread = JobSpecification(
@@ -445,6 +452,7 @@ class TestAsyncRunnerProcessAndCoalesce:
             type="auto",
         )
         handle_thread = runner.submit(spec_thread)
+        assert handle_thread is not None
 
         _process_events_until(
             lambda: handle_process.job_id in completed_results
@@ -476,8 +484,71 @@ class TestAsyncRunnerProcessAndCoalesce:
                 type="thread",
             )
         )
+        assert handle is not None
 
         _process_events_until(lambda: handle.job_id not in runner.history)
         assert "device" not in runner._coalesce_latest
+
+        runner.shutdown()
+
+    def test_at_most_once_rejects_duplicate_while_first_job_is_active(
+        self,
+        runner_factory: Callable[..., AsyncRunner],
+    ) -> None:
+        """Second submit with same coalesce_key returns None and leaves the first job running."""
+        pending: dict[str, Callable[[], None]] = {}
+        runner = runner_factory(thread_pending=pending)
+
+        cancelled: list[str] = []
+        completed: list[tuple[str, object]] = []
+
+        runner.signals.Cancelled.connect(lambda job_id: cancelled.append(job_id))
+        runner.signals.Completed.connect(
+            lambda job_id, result: completed.append((job_id, result))
+        )
+
+        spec1 = JobSpecification(
+            name="refresh-1",
+            description="",
+            fn=_return_value,
+            args=("refresh-1-result",),
+            kwargs={},
+            timeout=None,
+            priority=0,
+            coalesce_key="refresh_device_list",
+            at_most_once=True,
+            type="thread",
+        )
+        handle1 = runner.submit(spec1)
+        assert handle1 is not None
+        assert handle1.job_id in runner.history
+        assert handle1.job_id in pending
+
+        spec2 = JobSpecification(
+            name="refresh-2",
+            description="",
+            fn=_return_value,
+            args=("refresh-2-result",),
+            kwargs={},
+            timeout=None,
+            priority=0,
+            coalesce_key="refresh_device_list",
+            at_most_once=True,
+            type="thread",
+        )
+        handle2 = runner.submit(spec2)
+        assert handle2 is None
+        assert len(runner.history) == 1
+        assert handle1.job_id in runner.history
+        assert not handle1.cancel_token.is_cancelled()
+        assert len(pending) == 1
+
+        pending[handle1.job_id]()
+        _process_events_until(lambda: len(completed) == 1)
+        assert cancelled == []
+        assert completed[0][0] == handle1.job_id
+        assert completed[0][1] == "refresh-1-result"
+        assert handle1.job_id not in runner.history
+        assert "refresh_device_list" not in runner._coalesce_latest
 
         runner.shutdown()
