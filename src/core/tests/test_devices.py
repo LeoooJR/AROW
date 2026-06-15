@@ -25,6 +25,7 @@ from core.devices import (
     compute_computer_stable_key,
     compute_phone_stable_key,
     connect_to_device,
+    phone_stable_key_is_collision_resistant,
 )
 
 pytestmark = [pytest.mark.devices]
@@ -257,6 +258,20 @@ class TestComputePhoneStableKey:
             fingerprint_when_no_serial=True,
         )
         assert a == b and a.startswith("fp:v1:")
+
+    @pytest.mark.parametrize(
+        ("stable_key", "expected"),
+        [
+            ("hw:v1:SER-123", True),
+            ("fp:v1:deadbeef", False),
+            ("pc:v1:install:host-token", False),
+            ("", False),
+        ],
+    )
+    def test_collision_resistance_only_allows_tier_one_keys(
+        self, stable_key: str, expected: bool
+    ) -> None:
+        assert phone_stable_key_is_collision_resistant(stable_key) is expected
 
 
 class TestPhoneDescriptorHash:
