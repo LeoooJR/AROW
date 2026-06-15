@@ -15,6 +15,7 @@ from core.devices import (
     PhoneRepository,
     apply_discovered_phone_state,
     paired_phone_matches_discovery,
+    phone_stable_key_is_collision_resistant,
 )
 from core.signals import (
     AdbServerStartedPayload,
@@ -291,7 +292,7 @@ class ModelEntrypoint(Entrypoint):
                 paired is None
             ):  # A reconnect can update the ADB id, but stable key remains the same
                 stable_key = (discovered.stable_key or "").strip()
-                if stable_key:
+                if phone_stable_key_is_collision_resistant(stable_key):
                     paired = paired_by_stable_key.get(stable_key)
 
             if paired is not None:  # A device has been found, by ADB id or stable key

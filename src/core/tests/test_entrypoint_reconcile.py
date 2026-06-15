@@ -7,7 +7,12 @@ from pathlib import Path
 import pytest
 
 from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
-from core.devices import Phone
+from core.devices import (
+    Phone,
+    apply_phone_manufacturer_enrichment,
+    apply_phone_product_model_enrichment,
+    apply_phone_ro_serial_enrichment,
+)
 from core.entrypoint import ModelEntrypoint
 from core.simulation import SimulationRepository
 
@@ -121,3 +126,28 @@ def test_reconcile_preserves_simulation_reference_on_in_place_update(
     assert simulation is not None
     assert simulation.device is paired
     assert simulation.device.descriptor.model == "New model"
+
+
+def test_reconcile_does_not_merge_devices_on_tier2_stable_key_collision(
+    tmp_path: Path,
+) -> None:
+    """Tier-2 fingerprint keys are not safe enough to rebind a different paired phone."""
+    model_entrypoint, server = _model_with_server(tmp_path)
+    paired_a = Phone(id="10.0.0.1:5555", state="device", model="Pixel 8")
+    paired_b = Phone(id="10.0.0.2:5555", state="device", model="Pixel 8")
+    discovered_a = Phone(id="10.0.0.1:44444", state="device", model="Pixel 8")
+    discovered_b = Phone(id="10.0.0.2:5555", state="device", model="Pixel 8")
+    for phone in (paired_a, paired_b, discovered_a, discovered_b):
+        apply_phone_manufacturer_enrichment(phone, "Google")
+        apply_phone_product_model_enrichment(phone, "Pixel 8")
+        apply_phone_ro_serial_enrichment(phone, "")
+        assert phone.stable_key.startswith("fp:v1:")
+    server.paired_devices.add(paired_a)
+    server.paired_devices.add(paired_b)
+
+    changed = model_entrypoint.reconcile_paired_devices([discovered_a, discovered_b])
+
+    assert changed is True
+    assert server.paired_devices.get("10.0.0.1:5555") is None
+    assert server.paired_devices.get("10.0.0.1:44444") is discovered_a
+    assert server.paired_devices.get("10.0.0.2:5555") is paired_b

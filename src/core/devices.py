@@ -91,6 +91,16 @@ def compute_phone_stable_key(
     return ""
 
 
+def phone_stable_key_is_collision_resistant(stable_key: str) -> bool:
+    """
+    True when a stable key is safe to use for cross-session handset reconciliation.
+
+    Tier-2 fingerprint keys are intentionally excluded because the codebase documents
+    that identical devices can collide on them.
+    """
+    return stable_key.startswith(_STABLE_HW_PREFIX)
+
+
 def compute_computer_stable_key(install_token: str) -> str:
     """
     Stable logical host identity from the persisted install UUID (controller-owned file).
