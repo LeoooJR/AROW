@@ -103,7 +103,8 @@ class Controller(ABC):
         timeout: int | None = None,
         priority: int = 0,
         coalesce_key: str | None = None,
-    ) -> JobHandler:
+        at_most_once: bool = False,
+    ) -> JobHandler | None:
         """
         Submit a model-entrypoint async job and bind any provided callbacks.
 
@@ -125,9 +126,9 @@ class Controller(ABC):
             timeout: Timeout for the job.
             priority: Priority of the job (0-100).
             coalesce_key: Key to coalesce the job (none, location, network, device).
-
+            at_most_once: At most one job running with the same coalesce key.
         Returns:
-            JobHandler: JobHandler for the job. This can be used to cancel the job.
+            JobHandler | None: JobHandler for the job. This can be used to cancel the job. None if the job was not submitted.
         """
         job = JobSpecification(
             name=name,
@@ -139,8 +140,11 @@ class Controller(ABC):
             priority=priority,
             coalesce_key=coalesce_key,
             type=job_type,
+            at_most_once=at_most_once,
         )
         handle = self.runner.submit(job)
+        if handle is None:
+            return None
         handle_signals = self.runner.bind_handle_signals(handle)
 
         if on_progress is not None:

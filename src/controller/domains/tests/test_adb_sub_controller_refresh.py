@@ -1,4 +1,4 @@
-"""Tests for AdbSubController device-list refresh guard and repeat timer wiring."""
+"""Tests for AdbSubController device-list refresh wiring and at_most_once submission."""
 
 from __future__ import annotations
 
@@ -79,7 +79,6 @@ def test_init_wires_repeat_timer_for_refresh(
     assert (
         wired_refresh_handler.__name__ == adb._on_refresh_device_list_requested.__name__
     )
-    assert adb._is_refreshing_device_list is False
 
 
 def test_on_refresh_device_list_requested_submits_async_job(
@@ -95,6 +94,7 @@ def test_on_refresh_device_list_requested_submits_async_job(
     assert submit_kwargs["name"] == "refresh_device_list"
     assert submit_kwargs["job_type"] == "thread"
     assert submit_kwargs["coalesce_key"] == "refresh_device_list"
+    assert submit_kwargs["at_most_once"] is True
     assert submit_kwargs["fn"] == app.model_entrypoint.refresh_known_devices
     assert submit_kwargs["description"] == "Refresh device list from ADB"
     assert (
@@ -105,28 +105,13 @@ def test_on_refresh_device_list_requested_submits_async_job(
         submit_kwargs["on_failed"]
         == adb._async_job_callbacks.refresh_device_list.on_failed
     )
-    assert adb._is_refreshing_device_list is True
 
 
-def test_on_refresh_device_list_requested_skips_when_already_refreshing(
+def test_refresh_callback_on_completed_applies_result(
     patch_repeat_timer: dict[str, Any],
 ) -> None:
     app = _AppStub()
     adb = _make_adb_sub_controller(app)
-    adb._is_refreshing_device_list = True
-
-    adb._on_refresh_device_list_requested()
-
-    assert app.submitted == []
-    assert adb._is_refreshing_device_list is True
-
-
-def test_refresh_callback_on_completed_clears_guard(
-    patch_repeat_timer: dict[str, Any],
-) -> None:
-    app = _AppStub()
-    adb = _make_adb_sub_controller(app)
-    adb._is_refreshing_device_list = True
     apply_calls: list[object] = []
     app.model_entrypoint.apply_result = lambda result: apply_calls.append(result)  # type: ignore[method-assign]
     callback = adb._async_job_callbacks.refresh_device_list
@@ -135,15 +120,13 @@ def test_refresh_callback_on_completed_clears_guard(
     callback.on_completed(outcome)
 
     assert apply_calls == [outcome]
-    assert adb._is_refreshing_device_list is False
 
 
-def test_refresh_callback_on_failed_clears_guard_and_applies_failure(
+def test_refresh_callback_on_failed_applies_failure(
     patch_repeat_timer: dict[str, Any],
 ) -> None:
     app = _AppStub()
     adb = _make_adb_sub_controller(app)
-    adb._is_refreshing_device_list = True
     failure_calls: list[object] = []
     app.model_entrypoint.apply_failure = lambda error: failure_calls.append(error)  # type: ignore[method-assign]
     callback = RefreshDeviceListCallback(adb)
@@ -156,4 +139,3 @@ def test_refresh_callback_on_failed_clears_guard_and_applies_failure(
     callback.on_failed(error)
 
     assert failure_calls == [error]
-    assert adb._is_refreshing_device_list is False

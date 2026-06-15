@@ -138,9 +138,13 @@ class JobSpecification:
     )
     coalesce_key: Optional[str] = field(
         metadata={"description": "The key to coalesce the job"}, default=None
-    )
+    )  # Submitting a job while there is already one running with the same coalesce key will cancel the previous job (the job still run to completion, here "cancel" means that the result will be discarded)
     type: jobtype = field(
         metadata={"description": "The type of the job"}, default="auto"
+    )
+    at_most_once: bool = field(
+        metadata={"description": "At most one job running with the same coalesce key"},
+        default=False,
     )
 
 
@@ -465,10 +469,12 @@ class AsyncRunner(QObject):
         """Expose runner-level signals for connections."""
         return self._signals
 
-    def submit(self, job: JobSpecification) -> JobHandler:
+    def submit(self, job: JobSpecification) -> JobHandler | None:
         """
         Submit a job to the async runner. Validates spec and dispatches to
         process or thread pool according to _resolve_job_type.
+        Returns:
+            JobHandler | None: JobHandler for the job. This can be used to cancel the job. None if the job was not submitted.
         """
         if job.fn is None:
             raise ValueError("JobSpecification.fn must be set (callable)")
@@ -479,11 +485,17 @@ class AsyncRunner(QObject):
             job_id=job_id, name=job.name, cancel_token=cancel_token
         )
         job_handler_signals = JobHandlerSignals()
-        self.history[job_id] = (job_handler, job_handler_signals)
 
         if job.coalesce_key is not None:
             latest_job = self._coalesce_latest.get(job.coalesce_key)
             if latest_job and latest_job in self.history:
+                # "At most one" coalescing
+                if job.at_most_once:
+                    logger.info(
+                        "Async job coalesce: at most one job running with the same coalesce key",
+                        coalesce_key=job.coalesce_key,
+                    )
+                    return None
                 logger.info(
                     "Async job coalesce: superseding previous job",
                     coalesce_key=job.coalesce_key,
@@ -491,8 +503,15 @@ class AsyncRunner(QObject):
                     new_job_id=job_id,
                     name=job.name,
                 )
-                self.cancel(latest_job)
-            self._coalesce_latest[job.coalesce_key] = job_id
+                # "Latest wins" coalescing
+                self.cancel(
+                    latest_job
+                )  # Cancel the previous job (emits Cancelled signal at the end of the job)
+            self._coalesce_latest[job.coalesce_key] = (
+                job_id  # Update the latest job id for this coalesce key
+            )
+
+        self.history[job_id] = (job_handler, job_handler_signals)
 
         def _marshal_progress(_job_id: str, _progress: ProgressEvent) -> None:
             self._progress_ready.emit(_job_id, _progress)
