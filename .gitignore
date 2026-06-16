@@ -215,3 +215,6 @@ __marimo__/
 
 # Codex
 .codex/
+
+# Agents output
+tasks/**/*.png
