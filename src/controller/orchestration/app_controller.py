@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 from PySide6.QtCore import QEventLoop, QTimer
 from PySide6.QtWidgets import QApplication
@@ -17,8 +17,8 @@ from controller.domains.adb_sub_controller import AdbSubController
 from controller.domains.map_sub_controller import MapSubController
 from controller.domains.simulation_sub_controller import SimulationSubController
 from controller.helper import validate_model_entrypoint, validate_view, watchdog
-from core.application_paths import default_activity_log_file_path
 from core.entrypoint import ModelEntrypoint
+from core.signals import ActivityLogFileUpdatedPayload, CoreSignal
 from gui.signals import signals
 from gui.window import MainWindow
 from logger import logger
@@ -45,11 +45,9 @@ class AppController(Controller):
         )  # Create simulation subcontroller before adb subcontroller to avoid race condition, signals are connected in the order of creation
         self._adb: AdbSubController = AdbSubController(self)
         self._map: MapSubController = MapSubController(self)
-        self._activity_log_file: Path | None = None
         self._connect_view_signals()
         self._connect_model_signals()
         self._send_host_device_information()
-        self._send_activity_log_file_to_view()
         self._adb.run_startup()
 
     @property
@@ -80,6 +78,9 @@ class AppController(Controller):
         self._simulation.connect_model_signals()
         self._adb.connect_model_signals()
         self._map.connect_model_signals()
+        self.model_entrypoint.subscribe(
+            CoreSignal.ACTIVITY_LOG_FILE_UPDATED, self._on_activity_log_file_updated
+        )
 
     @validate_model_entrypoint
     @validate_view
@@ -92,30 +93,24 @@ class AppController(Controller):
         )
 
     @validate_model_entrypoint
-    def _resolve_activity_log_file(self) -> Path:
-        """Return the current app-wide activity log path, creating a default when unset."""
-        if self._activity_log_file is None:
-            self._activity_log_file = default_activity_log_file_path(
-                self.model_entrypoint.application_dir
-            )
-        return self._activity_log_file
-
-    @validate_view
-    def _send_activity_log_file_to_view(self) -> None:
-        view = cast(MainWindow, self.view)
-        log_file = self._resolve_activity_log_file()
-        view.forward_activity_log_file_updated(str(log_file))
-
-    @validate_view
     def _on_activity_log_file_update_requested(self, path: str) -> None:
-        """Update the app-wide activity log file path and refresh the view."""
+        """Update the app-wide activity log file path."""
         logger.debug(
             "AppController: activity log file update requested",
             path=path,
         )
-        self._activity_log_file = Path(path)
-        view = cast(MainWindow, self.view)
-        view.forward_activity_log_file_updated(path)
+        self.model_entrypoint.activity_log_file = Path(path)
+
+    @validate_view
+    def _on_activity_log_file_updated(
+        self, payload: ActivityLogFileUpdatedPayload
+    ) -> None:
+        """Forward the activity log file updated signal to the view."""
+        logger.debug(
+            "AppController: activity log file updated",
+            path=payload.path,
+        )
+        self.view.forward_activity_log_file_updated(str(payload.path))
 
     def _adb_bootstrap_jobs_pending(self) -> bool:
         """True while startup or chained host-install jobs are still in the runner queue."""

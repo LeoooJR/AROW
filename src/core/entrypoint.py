@@ -1,11 +1,12 @@
 from abc import ABC
 from functools import cached_property
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Literal, overload
 
 from core.adb.client import AdbClient
 from core.adb.server import AdbServer
 from core.application_paths import (
+    default_activity_log_file_path,
     get_or_create_application_dir,
     get_or_create_config_dir,
 )
@@ -18,12 +19,21 @@ from core.devices import (
     phone_stable_key_is_collision_resistant,
 )
 from core.signals import (
+    ActivityLogFileUpdatedPayload,
     AdbServerStartedPayload,
+    AdbServerStateChangedPayload,
     AdbServerStoppedPayload,
     CoreSignal,
+    DeviceAuthentificationFailedPayload,
+    DeviceAuthentificationSucceededPayload,
     DevicesUpdatedPayload,
+    ErrorRaisedPayload,
+    HostComputerIdentityPayload,
     InMemoryCoreSignalBus,
+    LogMessagePayload,
     SignalHandler,
+    SimulationPositionChangedPayload,
+    SimulationStateChangedPayload,
 )
 from core.simulation import Simulation, SimulationRepository
 from core.work.authentificate_device_work import (
@@ -56,11 +66,13 @@ _CORE_RUNTIME_RESULT_APPLIERS: dict[
 
 CoreRuntimeFailureApplier = Callable[["ModelEntrypoint", BaseException], None]
 
+# Map job origin (name of the job) to the failure applier
 _CORE_RUNTIME_FAILURE_APPLIERS: dict[str, CoreRuntimeFailureApplier] = {
     entry.job_origin: entry.work_cls.apply_failure_main_thread
     for entry in CORE_RUNTIME_WORKS
 }
 
+# Map exception type to the failure applier
 _CORE_RUNTIME_EXCEPTION_FAILURE_APPLIERS: dict[
     type[BaseException], CoreRuntimeFailureApplier
 ] = {
@@ -90,10 +102,186 @@ class Entrypoint(ABC):
     def application_dir(self) -> Path:
         return get_or_create_application_dir()
 
-    def subscribe(self, signal: CoreSignal, handler: SignalHandler[object]) -> None:
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.ADB_SERVER_STARTED],
+        handler: SignalHandler[AdbServerStartedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.ADB_SERVER_STOPPED],
+        handler: SignalHandler[AdbServerStoppedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.ADB_SERVER_STATE_CHANGED],
+        handler: SignalHandler[AdbServerStateChangedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.DEVICE_AUTHENTIFICATION_SUCCEEDED],
+        handler: SignalHandler[DeviceAuthentificationSucceededPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.DEVICE_AUTHENTIFICATION_FAILED],
+        handler: SignalHandler[DeviceAuthentificationFailedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.DEVICES_UPDATED],
+        handler: SignalHandler[DevicesUpdatedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_STATE_CHANGED],
+        handler: SignalHandler[SimulationStateChangedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_POSITION_CHANGED],
+        handler: SignalHandler[SimulationPositionChangedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.ERROR_RAISED],
+        handler: SignalHandler[ErrorRaisedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.LOG_MESSAGE],
+        handler: SignalHandler[LogMessagePayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.HOST_COMPUTER_IDENTITY_UPDATED],
+        handler: SignalHandler[HostComputerIdentityPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.ACTIVITY_LOG_FILE_UPDATED],
+        handler: SignalHandler[ActivityLogFileUpdatedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(self, signal: CoreSignal, handler: SignalHandler[object]) -> None: ...
+
+    def subscribe(self, signal: CoreSignal, handler: SignalHandler[Any]) -> None:
         self._signal_bus.subscribe(signal, handler)
 
-    def unsubscribe(self, signal: CoreSignal, handler: SignalHandler[object]) -> None:
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.ADB_SERVER_STARTED],
+        handler: SignalHandler[AdbServerStartedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.ADB_SERVER_STOPPED],
+        handler: SignalHandler[AdbServerStoppedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.ADB_SERVER_STATE_CHANGED],
+        handler: SignalHandler[AdbServerStateChangedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.DEVICE_AUTHENTIFICATION_SUCCEEDED],
+        handler: SignalHandler[DeviceAuthentificationSucceededPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.DEVICE_AUTHENTIFICATION_FAILED],
+        handler: SignalHandler[DeviceAuthentificationFailedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.DEVICES_UPDATED],
+        handler: SignalHandler[DevicesUpdatedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_STATE_CHANGED],
+        handler: SignalHandler[SimulationStateChangedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_POSITION_CHANGED],
+        handler: SignalHandler[SimulationPositionChangedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.ERROR_RAISED],
+        handler: SignalHandler[ErrorRaisedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.LOG_MESSAGE],
+        handler: SignalHandler[LogMessagePayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.HOST_COMPUTER_IDENTITY_UPDATED],
+        handler: SignalHandler[HostComputerIdentityPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.ACTIVITY_LOG_FILE_UPDATED],
+        handler: SignalHandler[ActivityLogFileUpdatedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self, signal: CoreSignal, handler: SignalHandler[object]
+    ) -> None: ...
+
+    def unsubscribe(self, signal: CoreSignal, handler: SignalHandler[Any]) -> None:
         self._signal_bus.unsubscribe(signal, handler)
 
 
@@ -111,6 +299,8 @@ class ModelEntrypoint(Entrypoint):
         self._adb_server: AdbServer | None = None
         self._adb_client: AdbClient | None = None
         self._use_mock_adb: bool = use_mock_adb
+        self._activity_log_file: Path | None = None
+        self._resolve_activity_log_file()
         self._simulations: SimulationRepository = SimulationRepository(
             self.application_dir / "simulations"
         )
@@ -124,6 +314,32 @@ class ModelEntrypoint(Entrypoint):
     def adb_server(self) -> AdbServer | None:
         """Return the active ADB server instance if available."""
         return self._adb_server
+
+    @property
+    def activity_log_file(self) -> Path | None:
+        """Return the current app-wide activity log path, creating a default when unset."""
+        return self._resolve_activity_log_file()
+
+    @activity_log_file.setter
+    def activity_log_file(self, value: Path) -> None:
+        """Set the current app-wide activity log path."""
+        self._activity_log_file = value
+        self._signal_bus.emit(
+            CoreSignal.ACTIVITY_LOG_FILE_UPDATED,
+            ActivityLogFileUpdatedPayload(path=value),
+        )
+
+    def _resolve_activity_log_file(self) -> Path:
+        """Resolve the current app-wide activity log path, creating a default when unset."""
+        if self._activity_log_file is None:
+            self._activity_log_file = default_activity_log_file_path(
+                self.application_dir
+            )
+            self._signal_bus.emit(
+                CoreSignal.ACTIVITY_LOG_FILE_UPDATED,
+                ActivityLogFileUpdatedPayload(path=self._activity_log_file),
+            )
+        return self._activity_log_file
 
     def startup(self) -> StartupOutcome:
         """

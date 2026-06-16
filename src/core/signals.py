@@ -1,9 +1,22 @@
+"""
+Core domain signal bus: identifiers, typed payloads, and in-memory dispatch.
+
+When adding a new core signal:
+1. Add a ``CoreSignal`` enum member.
+2. Add the payload dataclass.
+3. Register the pair in ``CORE_SIGNAL_PAYLOAD_TYPES``.
+4. Add matching ``@overload`` entries for ``subscribe``, ``unsubscribe``, and ``emit``
+   on ``CoreSignalBus`` / ``InMemoryCoreSignalBus`` and ``Entrypoint``.
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Protocol, TypeVar
+from pathlib import Path
+from typing import Any, Literal, Protocol, TypeVar, overload
 
 from core.adb.binary import AdbBinary
 from core.devices import Phone
@@ -32,6 +45,7 @@ class CoreSignal(StrEnum):
     ERROR_RAISED = "error.raised"
     LOG_MESSAGE = "log.message"
     HOST_COMPUTER_IDENTITY_UPDATED = "host.computer.identity.updated"
+    ACTIVITY_LOG_FILE_UPDATED = "activity.log.file.updated"
 
 
 @dataclass(frozen=True, slots=True)
@@ -118,6 +132,29 @@ class LogMessagePayload:
     message: str
 
 
+@dataclass(frozen=True, slots=True)
+class ActivityLogFileUpdatedPayload:
+    """Payload emitted when the activity log file is updated."""
+
+    path: Path
+
+
+CORE_SIGNAL_PAYLOAD_TYPES: Mapping[CoreSignal, type[object]] = {
+    CoreSignal.ADB_SERVER_STARTED: AdbServerStartedPayload,
+    CoreSignal.ADB_SERVER_STOPPED: AdbServerStoppedPayload,
+    CoreSignal.ADB_SERVER_STATE_CHANGED: AdbServerStateChangedPayload,
+    CoreSignal.DEVICE_AUTHENTIFICATION_SUCCEEDED: DeviceAuthentificationSucceededPayload,
+    CoreSignal.DEVICE_AUTHENTIFICATION_FAILED: DeviceAuthentificationFailedPayload,
+    CoreSignal.DEVICES_UPDATED: DevicesUpdatedPayload,
+    CoreSignal.SIMULATION_STATE_CHANGED: SimulationStateChangedPayload,
+    CoreSignal.SIMULATION_POSITION_CHANGED: SimulationPositionChangedPayload,
+    CoreSignal.ERROR_RAISED: ErrorRaisedPayload,
+    CoreSignal.LOG_MESSAGE: LogMessagePayload,
+    CoreSignal.HOST_COMPUTER_IDENTITY_UPDATED: HostComputerIdentityPayload,
+    CoreSignal.ACTIVITY_LOG_FILE_UPDATED: ActivityLogFileUpdatedPayload,
+}
+
+
 PayloadT = TypeVar("PayloadT", contravariant=True)
 
 
@@ -146,8 +183,95 @@ class CoreSignalBus(ABC):
     lock-free reads, or thread-safe observer management.
     """
 
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.ADB_SERVER_STARTED],
+        handler: SignalHandler[AdbServerStartedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.ADB_SERVER_STOPPED],
+        handler: SignalHandler[AdbServerStoppedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.ADB_SERVER_STATE_CHANGED],
+        handler: SignalHandler[AdbServerStateChangedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.DEVICE_AUTHENTIFICATION_SUCCEEDED],
+        handler: SignalHandler[DeviceAuthentificationSucceededPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.DEVICE_AUTHENTIFICATION_FAILED],
+        handler: SignalHandler[DeviceAuthentificationFailedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.DEVICES_UPDATED],
+        handler: SignalHandler[DevicesUpdatedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_STATE_CHANGED],
+        handler: SignalHandler[SimulationStateChangedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_POSITION_CHANGED],
+        handler: SignalHandler[SimulationPositionChangedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.ERROR_RAISED],
+        handler: SignalHandler[ErrorRaisedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.LOG_MESSAGE],
+        handler: SignalHandler[LogMessagePayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.HOST_COMPUTER_IDENTITY_UPDATED],
+        handler: SignalHandler[HostComputerIdentityPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.ACTIVITY_LOG_FILE_UPDATED],
+        handler: SignalHandler[ActivityLogFileUpdatedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(self, signal: CoreSignal, handler: SignalHandler[object]) -> None: ...
+
     @abstractmethod
-    def subscribe(self, signal: CoreSignal, handler: SignalHandler[object]) -> None:
+    def subscribe(self, signal: CoreSignal, handler: SignalHandler[Any]) -> None:
         """
         Register a handler for one core signal.
 
@@ -156,8 +280,97 @@ class CoreSignalBus(ABC):
         """
         ...
 
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.ADB_SERVER_STARTED],
+        handler: SignalHandler[AdbServerStartedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.ADB_SERVER_STOPPED],
+        handler: SignalHandler[AdbServerStoppedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.ADB_SERVER_STATE_CHANGED],
+        handler: SignalHandler[AdbServerStateChangedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.DEVICE_AUTHENTIFICATION_SUCCEEDED],
+        handler: SignalHandler[DeviceAuthentificationSucceededPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.DEVICE_AUTHENTIFICATION_FAILED],
+        handler: SignalHandler[DeviceAuthentificationFailedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.DEVICES_UPDATED],
+        handler: SignalHandler[DevicesUpdatedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_STATE_CHANGED],
+        handler: SignalHandler[SimulationStateChangedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_POSITION_CHANGED],
+        handler: SignalHandler[SimulationPositionChangedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.ERROR_RAISED],
+        handler: SignalHandler[ErrorRaisedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.LOG_MESSAGE],
+        handler: SignalHandler[LogMessagePayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.HOST_COMPUTER_IDENTITY_UPDATED],
+        handler: SignalHandler[HostComputerIdentityPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.ACTIVITY_LOG_FILE_UPDATED],
+        handler: SignalHandler[ActivityLogFileUpdatedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self, signal: CoreSignal, handler: SignalHandler[object]
+    ) -> None: ...
+
     @abstractmethod
-    def unsubscribe(self, signal: CoreSignal, handler: SignalHandler[object]) -> None:
+    def unsubscribe(self, signal: CoreSignal, handler: SignalHandler[Any]) -> None:
         """
         Remove a previously registered handler for one core signal.
 
@@ -165,8 +378,95 @@ class CoreSignalBus(ABC):
         """
         ...
 
+    @overload
+    def emit(
+        self,
+        signal: Literal[CoreSignal.ADB_SERVER_STARTED],
+        payload: AdbServerStartedPayload,
+    ) -> None: ...
+
+    @overload
+    def emit(
+        self,
+        signal: Literal[CoreSignal.ADB_SERVER_STOPPED],
+        payload: AdbServerStoppedPayload,
+    ) -> None: ...
+
+    @overload
+    def emit(
+        self,
+        signal: Literal[CoreSignal.ADB_SERVER_STATE_CHANGED],
+        payload: AdbServerStateChangedPayload,
+    ) -> None: ...
+
+    @overload
+    def emit(
+        self,
+        signal: Literal[CoreSignal.DEVICE_AUTHENTIFICATION_SUCCEEDED],
+        payload: DeviceAuthentificationSucceededPayload,
+    ) -> None: ...
+
+    @overload
+    def emit(
+        self,
+        signal: Literal[CoreSignal.DEVICE_AUTHENTIFICATION_FAILED],
+        payload: DeviceAuthentificationFailedPayload,
+    ) -> None: ...
+
+    @overload
+    def emit(
+        self,
+        signal: Literal[CoreSignal.DEVICES_UPDATED],
+        payload: DevicesUpdatedPayload,
+    ) -> None: ...
+
+    @overload
+    def emit(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_STATE_CHANGED],
+        payload: SimulationStateChangedPayload,
+    ) -> None: ...
+
+    @overload
+    def emit(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_POSITION_CHANGED],
+        payload: SimulationPositionChangedPayload,
+    ) -> None: ...
+
+    @overload
+    def emit(
+        self,
+        signal: Literal[CoreSignal.ERROR_RAISED],
+        payload: ErrorRaisedPayload,
+    ) -> None: ...
+
+    @overload
+    def emit(
+        self,
+        signal: Literal[CoreSignal.LOG_MESSAGE],
+        payload: LogMessagePayload,
+    ) -> None: ...
+
+    @overload
+    def emit(
+        self,
+        signal: Literal[CoreSignal.HOST_COMPUTER_IDENTITY_UPDATED],
+        payload: HostComputerIdentityPayload,
+    ) -> None: ...
+
+    @overload
+    def emit(
+        self,
+        signal: Literal[CoreSignal.ACTIVITY_LOG_FILE_UPDATED],
+        payload: ActivityLogFileUpdatedPayload,
+    ) -> None: ...
+
+    @overload
+    def emit(self, signal: CoreSignal, payload: Any) -> None: ...
+
     @abstractmethod
-    def emit(self, signal: CoreSignal, payload: object) -> None:
+    def emit(self, signal: CoreSignal, payload: Any) -> None:
         """
         Publish one payload to all handlers subscribed to the signal.
 
@@ -190,9 +490,96 @@ class InMemoryCoreSignalBus(CoreSignalBus):
     """
 
     def __init__(self) -> None:
-        self._subscribers: dict[CoreSignal, list[SignalHandler[object]]] = {}
+        self._subscribers: dict[CoreSignal, list[SignalHandler[Any]]] = {}
 
-    def subscribe(self, signal: CoreSignal, handler: SignalHandler[object]) -> None:
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.ADB_SERVER_STARTED],
+        handler: SignalHandler[AdbServerStartedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.ADB_SERVER_STOPPED],
+        handler: SignalHandler[AdbServerStoppedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.ADB_SERVER_STATE_CHANGED],
+        handler: SignalHandler[AdbServerStateChangedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.DEVICE_AUTHENTIFICATION_SUCCEEDED],
+        handler: SignalHandler[DeviceAuthentificationSucceededPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.DEVICE_AUTHENTIFICATION_FAILED],
+        handler: SignalHandler[DeviceAuthentificationFailedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.DEVICES_UPDATED],
+        handler: SignalHandler[DevicesUpdatedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_STATE_CHANGED],
+        handler: SignalHandler[SimulationStateChangedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_POSITION_CHANGED],
+        handler: SignalHandler[SimulationPositionChangedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.ERROR_RAISED],
+        handler: SignalHandler[ErrorRaisedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.LOG_MESSAGE],
+        handler: SignalHandler[LogMessagePayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.HOST_COMPUTER_IDENTITY_UPDATED],
+        handler: SignalHandler[HostComputerIdentityPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.ACTIVITY_LOG_FILE_UPDATED],
+        handler: SignalHandler[ActivityLogFileUpdatedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(self, signal: CoreSignal, handler: SignalHandler[object]) -> None: ...
+
+    def subscribe(self, signal: CoreSignal, handler: SignalHandler[Any]) -> None:
         """
         Register a handler for one signal.
 
@@ -212,7 +599,96 @@ class InMemoryCoreSignalBus(CoreSignalBus):
             subscriber_count=len(handlers),
         )
 
-    def unsubscribe(self, signal: CoreSignal, handler: SignalHandler[object]) -> None:
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.ADB_SERVER_STARTED],
+        handler: SignalHandler[AdbServerStartedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.ADB_SERVER_STOPPED],
+        handler: SignalHandler[AdbServerStoppedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.ADB_SERVER_STATE_CHANGED],
+        handler: SignalHandler[AdbServerStateChangedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.DEVICE_AUTHENTIFICATION_SUCCEEDED],
+        handler: SignalHandler[DeviceAuthentificationSucceededPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.DEVICE_AUTHENTIFICATION_FAILED],
+        handler: SignalHandler[DeviceAuthentificationFailedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.DEVICES_UPDATED],
+        handler: SignalHandler[DevicesUpdatedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_STATE_CHANGED],
+        handler: SignalHandler[SimulationStateChangedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_POSITION_CHANGED],
+        handler: SignalHandler[SimulationPositionChangedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.ERROR_RAISED],
+        handler: SignalHandler[ErrorRaisedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.LOG_MESSAGE],
+        handler: SignalHandler[LogMessagePayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.HOST_COMPUTER_IDENTITY_UPDATED],
+        handler: SignalHandler[HostComputerIdentityPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.ACTIVITY_LOG_FILE_UPDATED],
+        handler: SignalHandler[ActivityLogFileUpdatedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self, signal: CoreSignal, handler: SignalHandler[object]
+    ) -> None: ...
+
+    def unsubscribe(self, signal: CoreSignal, handler: SignalHandler[Any]) -> None:
         """
         Remove a handler from one signal.
 
@@ -233,7 +709,94 @@ class InMemoryCoreSignalBus(CoreSignalBus):
             subscriber_count=len(self._subscribers.get(signal, [])),
         )
 
-    def emit(self, signal: CoreSignal, payload: object) -> None:
+    @overload
+    def emit(
+        self,
+        signal: Literal[CoreSignal.ADB_SERVER_STARTED],
+        payload: AdbServerStartedPayload,
+    ) -> None: ...
+
+    @overload
+    def emit(
+        self,
+        signal: Literal[CoreSignal.ADB_SERVER_STOPPED],
+        payload: AdbServerStoppedPayload,
+    ) -> None: ...
+
+    @overload
+    def emit(
+        self,
+        signal: Literal[CoreSignal.ADB_SERVER_STATE_CHANGED],
+        payload: AdbServerStateChangedPayload,
+    ) -> None: ...
+
+    @overload
+    def emit(
+        self,
+        signal: Literal[CoreSignal.DEVICE_AUTHENTIFICATION_SUCCEEDED],
+        payload: DeviceAuthentificationSucceededPayload,
+    ) -> None: ...
+
+    @overload
+    def emit(
+        self,
+        signal: Literal[CoreSignal.DEVICE_AUTHENTIFICATION_FAILED],
+        payload: DeviceAuthentificationFailedPayload,
+    ) -> None: ...
+
+    @overload
+    def emit(
+        self,
+        signal: Literal[CoreSignal.DEVICES_UPDATED],
+        payload: DevicesUpdatedPayload,
+    ) -> None: ...
+
+    @overload
+    def emit(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_STATE_CHANGED],
+        payload: SimulationStateChangedPayload,
+    ) -> None: ...
+
+    @overload
+    def emit(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_POSITION_CHANGED],
+        payload: SimulationPositionChangedPayload,
+    ) -> None: ...
+
+    @overload
+    def emit(
+        self,
+        signal: Literal[CoreSignal.ERROR_RAISED],
+        payload: ErrorRaisedPayload,
+    ) -> None: ...
+
+    @overload
+    def emit(
+        self,
+        signal: Literal[CoreSignal.LOG_MESSAGE],
+        payload: LogMessagePayload,
+    ) -> None: ...
+
+    @overload
+    def emit(
+        self,
+        signal: Literal[CoreSignal.HOST_COMPUTER_IDENTITY_UPDATED],
+        payload: HostComputerIdentityPayload,
+    ) -> None: ...
+
+    @overload
+    def emit(
+        self,
+        signal: Literal[CoreSignal.ACTIVITY_LOG_FILE_UPDATED],
+        payload: ActivityLogFileUpdatedPayload,
+    ) -> None: ...
+
+    @overload
+    def emit(self, signal: CoreSignal, payload: Any) -> None: ...
+
+    def emit(self, signal: CoreSignal, payload: Any) -> None:
         """
         Emit one payload to all current handlers of a signal.
 
