@@ -293,6 +293,35 @@ Icons should remain simple, mostly monochrome, and functional.
 - Keep Qt resource updates in sync with `src/gui/ressources.qrc` and recompile `src/gui/ressources_rc.py` when assets change.
 - Preserve the MVC boundaries: GUI styling belongs in `src/gui`, device metadata in `src/gui/device.py`, ADB behavior in `src/core/adb.py`, and async work through `src/controller/runner.py`.
 
+## Screenshot Test Architecture
+
+Use offscreen screenshot tests to verify visual design with production styling from `src/gui/stylesheet.py`.
+
+### When to use each level
+
+- **Wide GUI design tasks:** iterate with a whole-application offscreen screenshot when the change affects layout, panels, shell spacing, navigation, theme behavior, or multiple areas at once. Use the existing full-window tests under `src/gui/tests/` (for example `test_main_window_offscreen.py`) or capture `MainWindow` after startup.
+- **Focused component or block design tasks:** iterate by running the dedicated `test_*_screenshot.py` for the specific component or block category under `src/gui/components/` or `src/gui/blocks/`.
+
+### Shared harness
+
+- Helpers live in `src/gui/tests/screenshot_helpers.py`.
+- Screenshot tests apply `stylesheet_light` or `stylesheet_dark` explicitly, register bundled fonts, and load Qt resources before capture.
+- Each screenshot test is marked with `@pytest.mark.screenshot`.
+- Screenshot files use stable names and are written in override mode: each run replaces the previous PNG so the current iteration always analyzes up-to-date images.
+
+### Running screenshot tests
+
+```bash
+pytest src/gui/components src/gui/blocks -m screenshot -v
+```
+
+To persist artifacts for side-by-side review:
+
+```bash
+mkdir -p tasks/gui-screenshots
+AROW_GUI_SCREENSHOT_DIR=tasks/gui-screenshots pytest src/gui/components src/gui/blocks -m screenshot -v
+```
+
 ## Design Checklist
 
 Before finishing a GUI change, check:
