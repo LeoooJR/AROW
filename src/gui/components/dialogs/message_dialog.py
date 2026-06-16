@@ -5,10 +5,20 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Final
 
+from PySide6.QtCore import QSize
+from PySide6.QtGui import QIcon, QPixmap
 from PySide6.QtWidgets import QLabel, QMessageBox, QWidget
 
 from gui.colors import Theme
 from gui.components.base.component import Component
+from gui.components.dialogs.dialog_settings import dialog_settings
+from gui.icons import GenericIcons, icon_qt_path, icon_qt_path_for_theme
+
+
+def _message_dialog_icon_pixmap(qt_path: str) -> QPixmap:
+    """Return a message-box icon pixmap scaled to the configured dialog size."""
+    size = dialog_settings.MESSAGE_ICON_SIZE
+    return QIcon(qt_path).pixmap(QSize(size, size))
 
 
 class WarningDialog(QMessageBox, Component):
@@ -30,17 +40,26 @@ class WarningDialog(QMessageBox, Component):
 
         pass
 
-    def __init__(self, parent: QWidget = None, title=str, text=str, detailed_text=str):
+    def __init__(
+        self,
+        parent: QWidget = None,
+        icon: GenericIcons | None = None,
+        title=str,
+        text=str,
+        detailed_text=str,
+    ):
         """Show a warning message with Yes/Cancel actions.
 
         Args:
             parent: Optional parent window for modality placement.
+            icon: Icon to display in the dialog.
             title: Window title string.
             text: Primary message body.
             detailed_text: Expanded explanation shown in the details area.
         """
 
         super().__init__(parent)
+        self._icon = icon
         self.texts = WarningDialog.Text(
             title=title,
             text=text,
@@ -55,7 +74,10 @@ class WarningDialog(QMessageBox, Component):
         )
         self.setDetailedText(self.texts.detailed_text)
         self.setInformativeText(self.texts.informative_text)
-        self.setIcon(QMessageBox.Icon.Warning)
+        if icon is not None:
+            self.setIconPixmap(_message_dialog_icon_pixmap(icon_qt_path(icon)))
+        else:
+            self.setIcon(QMessageBox.Icon.Warning)
 
         for label in self.findChildren(QLabel):
             if label.text() == self.informativeText():
@@ -74,7 +96,10 @@ class WarningDialog(QMessageBox, Component):
         pass
 
     def apply_theme_icons(self, theme: Theme) -> None:
-        pass
+        if self._icon is not None:
+            self.setIconPixmap(
+                _message_dialog_icon_pixmap(icon_qt_path_for_theme(theme, self._icon))
+            )
 
 
 class QuestionDialog(QMessageBox, Component):
@@ -96,17 +121,26 @@ class QuestionDialog(QMessageBox, Component):
 
         pass
 
-    def __init__(self, parent: QWidget = None, title=str, text=str, detailed_text=str):
+    def __init__(
+        self,
+        parent: QWidget = None,
+        icon: GenericIcons | None = None,
+        title=str,
+        text=str,
+        detailed_text=str,
+    ):
         """Show a question message with Yes/Cancel actions.
 
         Args:
             parent: Optional parent window for modality placement.
+            icon: Icon to display in the dialog.
             title: Window title string.
             text: Primary message body.
             detailed_text: Expanded explanation shown in the details area.
         """
 
         super().__init__(parent)
+        self._icon = icon
         self.texts = QuestionDialog.Text(
             title=title,
             text=text,
@@ -121,7 +155,10 @@ class QuestionDialog(QMessageBox, Component):
         )
         self.setDetailedText(self.texts.detailed_text)
         self.setInformativeText(self.texts.informative_text)
-        self.setIcon(QMessageBox.Icon.Question)
+        if icon is not None:
+            self.setIconPixmap(_message_dialog_icon_pixmap(icon_qt_path(icon)))
+        else:
+            self.setIcon(QMessageBox.Icon.Question)
 
         for label in self.findChildren(QLabel):
             if label.text() == self.informativeText():
@@ -140,4 +177,7 @@ class QuestionDialog(QMessageBox, Component):
         pass
 
     def apply_theme_icons(self, theme: Theme) -> None:
-        pass
+        if self._icon is not None:
+            self.setIconPixmap(
+                _message_dialog_icon_pixmap(icon_qt_path_for_theme(theme, self._icon))
+            )

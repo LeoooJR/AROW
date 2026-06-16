@@ -606,6 +606,7 @@ class MainContainer(QWidget):
         logger.info("MainContainer: add device requested")
         dialog = QuestionDialog(
             self,
+            icon=GenericIcons.DEVICE,
             title=self.texts.add_device_dialog_title,
             text=self.texts.add_device_dialog_text,
             detailed_text=self.texts.add_device_dialog_detailed_text,
@@ -956,6 +957,7 @@ class MainWindow(QMainWindow):
         )
         dialog = QuestionDialog(
             self,
+            icon=GenericIcons.DEVICE,
             title=self.texts.connect_device_dialog_title,
             text=self.texts.connect_device_dialog_text.format(device=device_name),
             detailed_text=self.texts.connect_device_dialog_detailed_text.format(
