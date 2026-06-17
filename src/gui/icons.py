@@ -1,3 +1,17 @@
+"""
+Qt GUI icon registry: theme-aware resource paths for widgets and blocks.
+
+When registering a new icon:
+1. Add the asset under ``src/gui/statics/light/`` and ``src/gui/statics/dark/`` (or a single
+   ``src/gui/statics/`` file for theme-agnostic rasters).
+2. List the file in ``src/gui/ressources.qrc`` and recompile with
+   ``pyside6-rcc src/gui/ressources.qrc -o src/gui/ressources_rc.py``.
+3. Add an enum member on ``GenericIcons``, ``OperatingSystemIcons``, or ``ApplicationIcons`` via
+   ``_create_icon`` (set ``has_both_themes=False`` for shared rasters).
+4. Consume the icon through ``icon_qt_path`` / ``icon_qt_path_for_theme`` and propagate theme
+   refreshes via existing ``apply_theme_icons`` hooks where needed.
+"""
+
 from dataclasses import dataclass
 from enum import Enum
 

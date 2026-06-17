@@ -3,6 +3,16 @@ Bundled UI fonts: register with Qt after :class:`~PySide6.QtWidgets.QApplication
 
 :class:`~PySide6.QtGui.QFontDatabase.addApplicationFont` is unsafe without a GUI application
 instance on some platforms; keep registration out of ``settings.py`` and call from startup.
+
+When registering a new bundled font:
+1. Add font files under ``src/gui/statics/fonts/<family>/`` (variable ``.ttf`` at family root,
+   or static cuts under ``<family>/static/``).
+2. Add a ``VariableFonts`` enum member when the family ships a variable font file; otherwise
+   rely on ``StaticFonts.discover()`` for static cuts only.
+3. Update ``FontSettings`` in ``src/gui/settings.py`` (``FAMILY``, ``FAMILY_CSS``, weights) when
+   the new face becomes the application default.
+4. Ensure startup calls ``register_bundled_fonts()`` after ``QApplication`` is created
+   (see ``src/main.py`` and GUI test helpers).
 """
 
 from __future__ import annotations

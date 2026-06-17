@@ -3,6 +3,16 @@ Central hub for GUI-originating signals (cross-component wiring).
 
 Signals are grouped into logical categories for easy access and maintenance,
 mirroring the organization of ``gui.settings``.
+
+When adding a new GUI signal:
+1. Add the ``Signal(...)`` on the appropriate category class (``UISignals``, ``DeviceSignals``,
+   etc.) with typed arguments matching the payload contract.
+2. Emit from the view or block that originates the user intent; connect handlers in the
+   controller (``src/controller/domains/``) or other GUI slots as needed.
+3. Keep domain events that belong to the core layer in ``src/core/signals.py`` instead; adapt
+   them in the controller rather than duplicating core payloads on the GUI bus.
+4. Add or extend GUI integration tests when the signal drives navigation, panel state, or async
+   job submission.
 """
 
 from PySide6.QtCore import QObject, Signal

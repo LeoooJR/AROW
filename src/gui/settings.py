@@ -3,6 +3,14 @@ Application-wide GUI settings.
 
 Component- and block-specific settings live next to their owners in ``*_settings.py``
 modules under ``gui/components`` and ``gui/blocks``.
+
+When adding a new shared setting:
+1. Decide scope: app-wide tokens belong here; owner-local values belong in the matching
+   ``*_settings.py`` beside the component or block.
+2. Add the field on the appropriate dataclass (``FontSettings``, ``SpacingSettings``, etc.).
+3. Expose it through the ``Settings`` singleton when multiple modules need the same token.
+4. Replace hardcoded literals in consumers with ``Settings.<GROUP>.<FIELD>`` (or the owner-local
+   singleton when scope is local).
 """
 
 from dataclasses import dataclass

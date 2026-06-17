@@ -1,4 +1,15 @@
-"""Synthetic placeholder strings for GUI demo and empty states."""
+"""
+Synthetic placeholder strings for GUI demo and empty states.
+
+When adding a new Faker provider end to end:
+1. Add a typed elements tuple (``Final[tuple[str, ...]]``) when choices come from a fixed pool.
+2. Register a ``DynamicProvider`` on the module ``faker`` instance with a unique
+   ``provider_name`` matching the accessor you will call.
+3. Add a ``generate_*`` wrapper in this module for consumers to import.
+4. Wire the wrapper into block or panel ``Text`` dataclass ``default_factory`` values (or other
+   placeholder seed sites) that should use the new string pool.
+5. Call ``seed_ui_faker`` in tests when deterministic placeholder output is required.
+"""
 
 from __future__ import annotations
 

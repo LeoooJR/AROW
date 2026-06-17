@@ -1,6 +1,14 @@
 """
-This file contains the colors used in the application.
-Light and dark mode values follow the AROW design system in DESIGN.md.
+Application color tokens: theme-aware values and palette helpers.
+
+Light and dark mode values follow the AROW design system in ``DESIGN.md``.
+
+When adding a new color:
+1. Add a ``Colors`` enum member with light and dark ``Color`` values aligned to ``DESIGN.md``.
+2. Add the matching field on ``Palette`` so ``get_palette`` can resolve it.
+3. Reference the token from ``src/gui/stylesheet.py`` or painter code via ``get_palette`` /
+   ``get_current_palette`` (not one-off hex literals in widgets).
+4. Extend theme or painter tests under ``src/gui/tests/`` when the token drives painted UI.
 """
 
 from __future__ import annotations
