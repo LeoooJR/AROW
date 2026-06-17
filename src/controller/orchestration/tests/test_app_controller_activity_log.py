@@ -59,3 +59,16 @@ def test_on_activity_log_file_updated_forwards_path_to_view(monkeypatch) -> None
     probe.view.forward_activity_log_file_updated.assert_called_once_with(
         str(custom_path)
     )
+
+
+def test_sync_activity_log_file_to_view_forwards_current_model_path(monkeypatch) -> None:
+    probe = _AppControllerActivityLogProbe()
+    custom_path = Path("/tmp/custom/activity_20260531.log")
+    probe.model_entrypoint.activity_log_file = custom_path
+    _patch_controller_type_checks(monkeypatch, probe)
+
+    AppController._sync_activity_log_file_to_view(cast(AppController, probe))
+
+    probe.view.forward_activity_log_file_updated.assert_called_once_with(
+        str(custom_path)
+    )
