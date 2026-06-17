@@ -47,6 +47,7 @@ class AppController(Controller):
         self._map: MapSubController = MapSubController(self)
         self._connect_view_signals()
         self._connect_model_signals()
+        self._sync_activity_log_file_to_view()
         self._send_host_device_information()
         self._adb.run_startup()
 
@@ -111,6 +112,18 @@ class AppController(Controller):
             path=payload.path,
         )
         self.view.forward_activity_log_file_updated(str(payload.path))
+
+    @validate_model_entrypoint
+    @validate_view
+    def _sync_activity_log_file_to_view(self) -> None:
+        """Push the current activity log file to the view after controller wiring."""
+        log_file = self.model_entrypoint.activity_log_file
+        if log_file is None:
+            return
+        AppController._on_activity_log_file_updated(
+            self,
+            ActivityLogFileUpdatedPayload(path=log_file),
+        )
 
     def _adb_bootstrap_jobs_pending(self) -> bool:
         """True while startup or chained host-install jobs are still in the runner queue."""
