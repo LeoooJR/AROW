@@ -1,3 +1,22 @@
+"""
+ADB command catalog: descriptors, stdout parsers, retry profiles, and log redaction.
+
+When adding a new command:
+1. Add an ``AdbCommands`` enum member with its ``AdbCommand`` descriptor.
+2. When stdout must be parsed, add a ``_parse_*`` helper and an ``ADBCommandParser`` member,
+   then register the pair in ``ADB_COMMAND_PARSERS`` (and update
+   ``test_adb_command_parsers_registry`` in ``src/core/adb/tests/test_adb_parser.py``).
+3. Expose the command from ``AdbClient`` or ``AdbServer`` when model code should call it.
+4. Tune ``retry_profile_for`` when the default stop/wait/timeout profile is wrong for the
+   subcommand shape.
+5. Update ``_command_output_is_sensitive`` and ``_log_safe_argv`` (and related helpers) when
+   argv or output may contain secrets, device ids, or location payloads.
+6. Extend ``_RETRYABLE_ADB_MESSAGE_FRAGMENTS`` or ``_PERMANENT_ADB_MESSAGE_FRAGMENTS`` when
+   new ADB failure messages should change retry behavior.
+7. Capture sample output in ``adb-commands-output`` and add parser coverage in
+   ``src/core/adb/tests/test_adb_parser.py``.
+"""
+
 from __future__ import annotations
 
 import datetime
