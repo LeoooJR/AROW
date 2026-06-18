@@ -1,4 +1,4 @@
-"""Tests for SimulationSubController simulation lifecycle and device wiring."""
+"""Tests for SimulationSubController simulation lifecycle and signal wiring."""
 
 from __future__ import annotations
 
@@ -12,7 +12,8 @@ from controller.orchestration.app_controller import AppController
 from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
 from core.devices import Phone
 from core.entrypoint import ModelEntrypoint
-from core.simulation import SimulationRepository
+from core.signals import CoreSignal, SimulationCreatedPayload
+from core.simulation import Simulation, SimulationRepository
 
 
 class _AppProbe:
@@ -59,7 +60,34 @@ def _view_mock(subcontroller: SimulationSubController) -> MagicMock:
     return cast(MagicMock, cast(_AppProbe, subcontroller._app).view)
 
 
-def test_device_selection_confirmed_creates_simulation_and_forwards_success(
+def _create_simulation_id(model_entrypoint: ModelEntrypoint, device_id: str) -> str:
+    """Create a simulation and return its id via SIMULATION_CREATED."""
+    captured: list[str] = []
+
+    def capture(payload: SimulationCreatedPayload) -> None:
+        captured.append(payload.simulation.id)
+
+    model_entrypoint.subscribe(CoreSignal.SIMULATION_CREATED, capture)
+    model_entrypoint.create_simulation(device_id)
+    assert len(captured) == 1
+    return captured[0]
+
+
+def test_connect_model_signals_subscribes_to_simulation_created(tmp_path: Path) -> None:
+    model_entrypoint = _make_model(tmp_path)
+    subcontroller = _make_subcontroller(model_entrypoint)
+    subscribe = MagicMock()
+    model_entrypoint.subscribe = subscribe  # type: ignore[method-assign]
+
+    subcontroller.connect_model_signals()
+
+    subscribe.assert_called_once_with(
+        CoreSignal.SIMULATION_CREATED,
+        subcontroller._on_simulation_created,
+    )
+
+
+def test_device_selection_confirmed_creates_simulation_and_waits_for_signal(
     monkeypatch, tmp_path: Path
 ) -> None:
     model_entrypoint = _make_model(
@@ -75,7 +103,7 @@ def test_device_selection_confirmed_creates_simulation_and_forwards_success(
     assert simulations[0].device is not None
     assert simulations[0].device.id == "device-1"
     view = _view_mock(subcontroller)
-    view.forward_device_selection_succeeded.assert_called_once_with("device-1", "Pixel")
+    view.forward_device_selection_succeeded.assert_not_called()
     view.forward_device_selection_failed.assert_not_called()
 
 
@@ -96,13 +124,50 @@ def test_device_selection_confirmed_forwards_failure_when_device_is_unknown(
     view.forward_device_selection_succeeded.assert_not_called()
 
 
+def test_on_simulation_created_forwards_success_with_simulation_id(
+    tmp_path: Path,
+) -> None:
+    model_entrypoint = _make_model(
+        tmp_path, device=Phone(id="device-1", state="device", model="Pixel")
+    )
+    subcontroller = _make_subcontroller(model_entrypoint)
+    simulation_id = _create_simulation_id(model_entrypoint, "device-1")
+    simulation = model_entrypoint.get_simulation(simulation_id)
+    assert simulation is not None
+    assert simulation.device is not None
+
+    subcontroller._on_simulation_created(
+        SimulationCreatedPayload(simulation=simulation)
+    )
+
+    _view_mock(
+        subcontroller
+    ).forward_device_selection_succeeded.assert_called_once_with(
+        simulation_id,
+        "device-1",
+        simulation.device.name,
+    )
+
+
+def test_on_simulation_created_ignores_payload_without_device(tmp_path: Path) -> None:
+    model_entrypoint = _make_model(tmp_path)
+    subcontroller = _make_subcontroller(model_entrypoint)
+    simulation = Simulation(device=None)
+
+    subcontroller._on_simulation_created(
+        SimulationCreatedPayload(simulation=simulation)
+    )
+
+    _view_mock(subcontroller).forward_device_selection_succeeded.assert_not_called()
+
+
 def test_remove_device_requested_deletes_simulation_and_forwards_success(
     tmp_path: Path,
 ) -> None:
     model_entrypoint = _make_model(
         tmp_path, device=Phone(id="device-1", state="device", model="Pixel")
     )
-    simulation_id = model_entrypoint.create_simulation("device-1")
+    simulation_id = _create_simulation_id(model_entrypoint, "device-1")
     subcontroller = _make_subcontroller(model_entrypoint)
 
     subcontroller._on_remove_device_requested("device-1")
@@ -132,7 +197,7 @@ def test_run_stop_pause_and_resume_update_simulation_active_state(
     model_entrypoint = _make_model(
         tmp_path, device=Phone(id="device-1", state="device", model="Pixel")
     )
-    simulation_id = model_entrypoint.create_simulation("device-1")
+    simulation_id = _create_simulation_id(model_entrypoint, "device-1")
     subcontroller = _make_subcontroller(model_entrypoint)
 
     subcontroller.run(simulation_id)
