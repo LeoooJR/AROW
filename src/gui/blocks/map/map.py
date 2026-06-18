@@ -16,6 +16,7 @@ from PySide6.QtCore import (
     QUrl,
 )
 from PySide6.QtGui import QFont
+from PySide6.QtWebEngineCore import QWebEngineSettings
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWidgets import (
     QFrame,
@@ -41,6 +42,22 @@ from gui.settings import Settings
 from gui.signals import signals
 from gui.wrapper import GridLayoutWrapper, HorizontalLayoutWrapper
 from logger import logger
+
+_INVALIDATE_LEAFLET_MAPS_JS = """
+(function () {
+  if (typeof L === "undefined") {
+    return;
+  }
+  for (var key in window) {
+    try {
+      var value = window[key];
+      if (value && value.invalidateSize && value._container) {
+        value.invalidateSize(true);
+      }
+    } catch (error) {}
+  }
+})();
+"""
 
 
 class Canvas(QWebEngineView):
@@ -71,7 +88,27 @@ class Canvas(QWebEngineView):
         self.setObjectName("map-canvas")
         self.setMinimumSize(map_settings.CANVAS_SIZE, map_settings.CANVAS_SIZE)
 
+        web_settings = self.settings()
+        web_settings.setAttribute(
+            QWebEngineSettings.WebAttribute.JavascriptEnabled, True
+        )
+        web_settings.setAttribute(
+            QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls,
+            True,
+        )
+        web_settings.setAttribute(
+            QWebEngineSettings.WebAttribute.LocalContentCanAccessFileUrls,
+            True,
+        )
+        self.loadFinished.connect(self._on_load_finished)
+
         self._finalize_ui_hooks()
+
+    def _on_load_finished(self, ok: bool) -> None:
+        """Refresh Leaflet map layout after local HTML loads in the canvas."""
+        if not ok:
+            return
+        self.page().runJavaScript(_INVALIDATE_LEAFLET_MAPS_JS)
 
     def _finalize_ui_hooks(self) -> None:
         """Run the final UI setup hooks for the canvas."""
@@ -786,8 +823,9 @@ class MapBlock(QWidget):
                 path=str(html_path),
             )
             return
-        self.ui.canvas.load(QUrl.fromLocalFile(str(html_path.resolve())))
+        load_url = QUrl.fromLocalFile(str(html_path.resolve()))
         self.show_map_canvas()
+        self.ui.canvas.load(load_url)
         logger.info(
             "MapBlock: map HTML loaded into canvas",
             simulation_id=simulation_id,
