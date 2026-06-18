@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from numbers import Real
 from typing import Final
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, Slot
 from PySide6.QtGui import QFontMetrics
 from PySide6.QtWidgets import QLabel, QSizePolicy, QWidget
 
@@ -104,6 +104,7 @@ class MilestoneMetadataItem(HorizontalLayoutWrapper):
         """Return the unelided displayed value."""
         return self._raw_value
 
+    @Slot()
     def _refresh_value_elision(self) -> None:
         """Render the raw value with right-side elision inside the available width."""
         self._pending_value_elision_refresh = False
@@ -345,6 +346,9 @@ class MilestoneTargetBlock(VerticalLayoutWrapper, Block):
                 status_kind or self.ui.status_badge.kind(),
             )
 
+    ### Slots ###
+
+    @Slot()
     def _on_ui_constraints_disabled(self) -> None:
         """Re-apply placeholder values when UI constraints are disabled."""
         self.set_placeholder_values()

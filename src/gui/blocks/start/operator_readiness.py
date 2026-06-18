@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Final
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Slot
 from PySide6.QtGui import QFontMetrics
 from PySide6.QtWidgets import QLabel, QSizePolicy, QWidget
 
@@ -222,9 +222,13 @@ class OperatorReadinessBlock(VerticalLayoutWrapper, Block):
     def apply_theme_icons(self, theme: Theme) -> None:
         pass
 
+    ### Slots ###
+
+    @Slot()
     def _on_ui_constraints_disabled(self) -> None:
         pass
 
+    @Slot()
     def _on_adb_server_started(self) -> None:
         """Update the readiness row when the ADB server starts."""
         self.ui.rows[self.ROWS_INDEX_MAPPING["host"]].update(
@@ -234,6 +238,7 @@ class OperatorReadinessBlock(VerticalLayoutWrapper, Block):
             status_kind="ready",
         )
 
+    @Slot()
     def _on_adb_server_stopped(self) -> None:
         """Update the readiness row when the ADB server stops."""
         self.ui.rows[self.ROWS_INDEX_MAPPING["host"]].update(
@@ -243,6 +248,7 @@ class OperatorReadinessBlock(VerticalLayoutWrapper, Block):
             status_kind="error",
         )
 
+    @Slot(str, str, str)
     def _on_device_selection_succeeded(
         self, simulation_id: str, device_id: str, device_name: str
     ) -> None:
@@ -254,6 +260,7 @@ class OperatorReadinessBlock(VerticalLayoutWrapper, Block):
             status_kind="ready",
         )
 
+    @Slot(str)
     def _on_remove_active_device_succeeded(self, device_id: str) -> None:
         """Update the readiness row when the active device is removed."""
         self.ui.rows[self.ROWS_INDEX_MAPPING["device"]].update(

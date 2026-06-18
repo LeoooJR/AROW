@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Final, Literal
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Slot
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -398,14 +398,19 @@ class BridgeStatusCardBlock(QFrame, Block):
         signals.ADB_SERVER.ADBServerStarted.connect(self._on_adb_server_started)
         signals.ADB_SERVER.ADBServerStopped.connect(self._on_adb_server_stopped)
 
+    ### Slots ###
+
+    @Slot()
     def _on_adb_server_started(self) -> None:
         """Update bridge card when the ADB server starts."""
         self.set_adb_values(server_state="running", indicator_state="valid")
 
+    @Slot()
     def _on_adb_server_stopped(self) -> None:
         """Update bridge card when the ADB server stops."""
         self.set_adb_values(server_state="stopped", indicator_state="error")
 
+    @Slot()
     def _on_ui_constraints_disabled(self) -> None:
         """Re-apply placeholder values when UI constraints are disabled."""
         self.set_placeholder_values()

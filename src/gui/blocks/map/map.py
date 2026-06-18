@@ -14,6 +14,7 @@ from PySide6.QtCore import (
     QSequentialAnimationGroup,
     Qt,
     QUrl,
+    Slot,
 )
 from PySide6.QtGui import QFont
 from PySide6.QtWebEngineCore import QWebEngineSettings
@@ -104,6 +105,7 @@ class Canvas(QWebEngineView):
 
         self._finalize_ui_hooks()
 
+    @Slot(bool)
     def _on_load_finished(self, ok: bool) -> None:
         """Refresh Leaflet map layout after local HTML loads in the canvas."""
         if not ok:
@@ -636,6 +638,7 @@ class Coordinates(QFrame):
         self._state_animation_group.addAnimation(anim_on)
         self._state_animation_group.start()
 
+    @Slot()
     def _on_play_button_clicked(self) -> None:
         """Handle the play button click."""
         if self.ui.play_button.property("toggle"):
@@ -839,6 +842,9 @@ class MapBlock(QWidget):
         self.ui.map_loading_placeholder.apply_theme_icons(theme)
         self.ui.coordinates.apply_theme_icons(theme)
 
+    ### Slots ###
+
+    @Slot(str, str, str)
     def _on_device_selection_succeeded(
         self, simulation_id: str, device_id: str, device_name: str
     ) -> None:
@@ -848,14 +854,17 @@ class MapBlock(QWidget):
         signals.UI.RenderMapRequested.emit(simulation_id)
         self._load_map_html(simulation_id)
 
+    @Slot(str, str)
     def _on_device_selection_failed(self, device_id: str, device_name: str) -> None:
         """Pulse placeholder when device selection fails."""
         self._on_run_helper_animation()
 
+    @Slot()
     def _on_authentification_failed(self, *_args) -> None:
         """Pulse placeholder when authentification fails."""
         self._on_run_helper_animation()
 
+    @Slot(str)
     def _on_remove_active_device_succeeded(self, device_id: str) -> None:
         """Reset placeholder when the active device is removed."""
         self.show_device_required_placeholder()
@@ -863,6 +872,7 @@ class MapBlock(QWidget):
         self.ui.canvas.setVisible(False)
         self._on_run_helper_animation()
 
+    @Slot()
     def _on_run_helper_animation(self) -> None:
         """Run the placeholder helper animation."""
         if not self.ui.placeholder.isVisible():

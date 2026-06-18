@@ -1,4 +1,4 @@
-from PySide6.QtCore import QElapsedTimer, QEvent, QObject, QTimer, Signal
+from PySide6.QtCore import QElapsedTimer, QEvent, QObject, QTimer, Signal, Slot
 
 from gui.settings import Settings
 
@@ -48,6 +48,9 @@ class ActivityTracker(QObject):
         self.became_active.emit()
         self.reset_idle_timer()
 
+    ### Slots ###
+
+    @Slot()
     def _on_idle_timeout(self):
         self._is_idle = True
         self.became_idle.emit()

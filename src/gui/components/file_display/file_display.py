@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Final
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, Slot
 from PySide6.QtGui import QFontMetrics
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QWidget
 from shiboken6 import isValid
@@ -159,6 +159,9 @@ class File(QWidget, Component):
         if hasattr(self, "_save_as_button"):
             self._save_as_button.apply_theme_icons(theme)
 
+    ### Slots ###
+
+    @Slot()
     def _on_save_as_button_clicked(self) -> None:
         """Handle the save as button click event."""
         dialog = FileSaveDialog(self)
@@ -202,6 +205,7 @@ class File(QWidget, Component):
         positive_widths = [width for width in widths if width > 0]
         return min(positive_widths) if positive_widths else 0
 
+    @Slot()
     def _update_file_name_display(self) -> None:
         self._pending_name_elide_update = False
         if not isValid(self):

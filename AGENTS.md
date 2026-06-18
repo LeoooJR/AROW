@@ -236,6 +236,13 @@ GUI settings are split between **app-wide tokens** and **owner-local modules**, 
 - Add new GUI-originating signals to the appropriate category class in `src/gui/signals.py`; do not define new global GUI signals elsewhere unless there is a compelling architectural reason.
 - Do not use the legacy `view_signals` / flat `ViewSignals` API in new or updated code.
 
+### Slots
+
+- Any custom method connected via `.connect(...)` or `QTimer.singleShot(...)` must use the `@Slot(...)` decorator from `PySide6.QtCore`.
+- Prefer typed `@Slot` signatures aligned with the connected signal contract in `src/gui/signals.py` (e.g. `@Slot(bool)`, `@Slot(str, str, str)`).
+- Use named handler methods instead of lambda slot targets.
+- Do not decorate direct `.emit` bridges (`clicked.connect(signals.DEVICE.AddDeviceRequested.emit)`) or Qt built-in methods (`close`, `setChecked`).
+
 ### Stylesheets
 
 - Keep styling in `src/gui/stylesheet.py`.

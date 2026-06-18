@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Final
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Slot
 from PySide6.QtWidgets import QFrame, QSizePolicy, QVBoxLayout
 
 from gui.blocks.location import MilestoneTargetBlock
@@ -189,6 +189,9 @@ class WelcomePanel(QFrame):
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
         )
 
+    ### Slots ###
+
+    @Slot(str, str, str)
     def _on_device_selection_succeeded(
         self, simulation_id: str, device_id: str, device_name: str
     ) -> None:
@@ -198,6 +201,7 @@ class WelcomePanel(QFrame):
         self.ui.connection_card.hide()
         self.ui.milestone_card.show()
 
+    @Slot(str)
     def _on_remove_active_device_succeeded(self, device_id: str) -> None:
         """Handle the remove active device succeeded.
         Hide the milestone card and show the connection card.

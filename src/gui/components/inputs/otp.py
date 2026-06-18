@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Slot
 from PySide6.QtGui import QIntValidator
 from PySide6.QtWidgets import QHBoxLayout, QLineEdit, QWidget
 
@@ -188,9 +188,7 @@ class OTPInput(QWidget, Component):
                 otp_input.setValidator(OTPValidator.PORT.value)
             elif otp_type == OTPType.ASSOCIATION_CODE:
                 otp_input.setValidator(OTPValidator.ASSOCIATION_CODE.value)
-            otp_input.textChanged.connect(
-                lambda text, idx=i: self._on_otp_text_changed(idx, text)
-            )
+            self._connect_otp_text_changed(i, otp_input)
 
             layout.addWidget(otp_input)
             self._otp_inputs.append(otp_input)
@@ -211,6 +209,18 @@ class OTPInput(QWidget, Component):
     def apply_theme_icons(self, theme: Theme) -> None:
         pass
 
+    def _connect_otp_text_changed(self, index: int, otp_input: QLineEdit) -> None:
+        """Connect one OTP cell to the shared text-changed handler."""
+
+        @Slot(str)
+        def on_text_changed(text: str) -> None:
+            self._on_otp_text_changed(index, text)
+
+        otp_input.textChanged.connect(on_text_changed)
+
+    ### Slots ###
+
+    @Slot(int, str)
     def _on_otp_text_changed(self, index: int, text: str) -> None:
         if index < self._otp_length - 1 and len(text) == self._max_length[index]:
             self._otp_inputs[index + 1].setFocus()

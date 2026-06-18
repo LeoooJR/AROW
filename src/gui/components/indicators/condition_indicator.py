@@ -10,6 +10,7 @@ from PySide6.QtCore import (
     QPropertyAnimation,
     QSequentialAnimationGroup,
     Qt,
+    Slot,
 )
 from PySide6.QtGui import QColor, QPainter
 from PySide6.QtWidgets import QFrame, QGraphicsOpacityEffect, QWidget
@@ -146,6 +147,7 @@ class ConditionIndicator(QFrame, Component):
                 self._pulse_group.stop()
             self._pulse_group = None
 
+    @Slot()
     def _on_pulse_finished(self) -> None:
         if self._state in ("warning", "error") and self._pulse_group is not None:
             self._pulse_group.start()

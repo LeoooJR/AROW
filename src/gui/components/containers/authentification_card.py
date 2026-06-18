@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Final
 
 from loguru import logger
-from PySide6.QtCore import QElapsedTimer, Qt, QTimer
+from PySide6.QtCore import QElapsedTimer, Qt, QTimer, Slot
 from PySide6.QtGui import QFont, QShowEvent
 from PySide6.QtWidgets import QFrame, QLineEdit, QSizePolicy, QVBoxLayout, QWidget
 
@@ -316,6 +316,9 @@ class AuthentificationCard(QFrame, Component):
         self.ui.close_button.apply_theme_icons(theme)
         self.ui.icon.set_path(icon_qt_path_for_theme(theme, GenericIcons.DEVICE))
 
+    ### Slots ###
+
+    @Slot()
     def _on_close_button_clicked(self) -> None:
         """Handle the close button clicked event."""
         signals.DEVICE.AuthentificationCancelled.emit()
@@ -329,6 +332,7 @@ class AuthentificationCard(QFrame, Component):
     def _is_association_code_otp_input_valid(self) -> bool:
         return self.ui.association_code_otp_input.is_valid()
 
+    @Slot()
     def _on_confirm_button_clicked(self) -> None:
 
         raise_signal: bool = True
@@ -391,6 +395,7 @@ class AuthentificationCard(QFrame, Component):
                     otp_line_edit, "otp-invalid-highlight-level", line_level
                 )
 
+    @Slot()
     def _on_invalid_highlight_pulse_tick(self) -> None:
         cycle_ms = container_settings.ATTENTION_HIGHLIGHT.PULSE_CYCLE_MS
         elapsed = self._invalid_highlight_elapsed.elapsed()
@@ -415,6 +420,7 @@ class AuthentificationCard(QFrame, Component):
             container_settings.ATTENTION_HIGHLIGHT.DURATION
         )
 
+    @Slot()
     def stop_invalid_otp_highlight(self) -> None:
         """Stop OTP invalid highlight animation and restore default label/input styles."""
         self._invalid_highlight_pulse_timer.stop()

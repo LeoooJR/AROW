@@ -6,6 +6,7 @@ import datetime as dt
 from dataclasses import dataclass
 from typing import Final
 
+from PySide6.QtCore import Slot
 from PySide6.QtWidgets import QSizePolicy, QWidget
 
 from gui.blocks.activity import (
@@ -107,6 +108,7 @@ class LogPanel(CollapsiblePanel):
         super().resizeEvent(event)
         self.refresh_layout()
 
+    @Slot()
     def refresh_layout(self, *, deferred: bool = True) -> None:
         self.ui.activity_log_block.refresh_layout(deferred=deferred)
 

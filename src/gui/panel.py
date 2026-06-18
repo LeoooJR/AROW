@@ -6,7 +6,7 @@ from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
-from PySide6.QtCore import QObject, Qt
+from PySide6.QtCore import QObject, Qt, Slot
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QSizePolicy, QVBoxLayout, QWidget
 
@@ -151,9 +151,7 @@ class CollapsiblePanel(QFrame, ABC, metaclass=QtABCMeta):
     def _connect_signals(self) -> None:
         """Wire shared visibility behavior and subclass-specific signals."""
         self._panel_expand_button.clicked.connect(self.toggle_panel_visibility)
-        self._panel_expand_button.clicked.connect(
-            lambda: self._panel_config.visibility_signal.emit(self.is_panel_visible())
-        )
+        self._panel_expand_button.clicked.connect(self._emit_panel_visibility_changed)
         self._connect_body_signals()
 
     def is_panel_visible(self) -> bool:
@@ -172,6 +170,7 @@ class CollapsiblePanel(QFrame, ABC, metaclass=QtABCMeta):
             self._set_panel_visible(False)
         self._after_panel_visibility_changed()
 
+    @Slot()
     def toggle_panel_visibility(self) -> None:
         """Toggle the panel body visibility."""
         if self.is_panel_visible():
@@ -179,6 +178,13 @@ class CollapsiblePanel(QFrame, ABC, metaclass=QtABCMeta):
         else:
             self.show_panel()
         self.updateGeometry()
+
+    ### Slots ###
+
+    @Slot()
+    def _emit_panel_visibility_changed(self) -> None:
+        """Emit the panel visibility signal after the toggle state updates."""
+        self._panel_config.visibility_signal.emit(self.is_panel_visible())
 
     def apply_theme_icons(self, theme: Theme) -> None:
         """Refresh shared chrome icons and subclass-owned icons."""

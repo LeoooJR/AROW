@@ -6,7 +6,7 @@ import datetime as dt
 from dataclasses import dataclass
 from typing import Final, Literal
 
-from PySide6.QtCore import QEvent, QSize, Qt, QTimer
+from PySide6.QtCore import QEvent, QSize, Qt, QTimer, Slot
 from PySide6.QtGui import QFont, QFontMetrics, QIcon, QResizeEvent
 from PySide6.QtWidgets import (
     QLabel,
@@ -860,6 +860,7 @@ class DeviceItem(QListWidgetItem):
         self._set_label_text(self.ui.name_label, self._text)
         self._set_label_text(self.ui.subtitle_label, subtitle)
 
+    @Slot()
     def _sync_size_hint(self) -> None:
         """Recalculate the item size hint for the current list width and state."""
         if self._sync_size_hint_in_progress:
@@ -977,6 +978,7 @@ class DeviceItem(QListWidgetItem):
 
     ### Slots ###
 
+    @Slot()
     def _on_trash_button_clicked(self) -> None:
         """Handle the trash button click event."""
         signals.DEVICE.RemoveDeviceRequested.emit(self._id)

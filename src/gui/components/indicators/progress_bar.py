@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Slot
 from PySide6.QtWidgets import QProgressBar, QSizePolicy, QWidget
 
 from gui.colors import Theme
@@ -79,6 +79,7 @@ class ProgressBar(QProgressBar, Component):
     def apply_theme_icons(self, theme: Theme) -> None:
         pass
 
+    @Slot(int)
     def _update_format(self, value: int) -> None:
         if 0 <= value < len(self._step_labels):
             self.setFormat(f"{value}. {self._step_labels[value]}")

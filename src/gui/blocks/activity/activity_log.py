@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Final, Literal
 
-from PySide6.QtCore import QSize, Qt, QTimer
+from PySide6.QtCore import QSize, Qt, QTimer, Slot
 from PySide6.QtGui import QAction, QFont, QIcon
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -154,7 +154,8 @@ class ActivityFilterOption(QCheckBox):
         self.toggled.connect(self.sync_display)
         self.sync_display()
 
-    def sync_display(self) -> None:
+    @Slot(bool)
+    def sync_display(self, _checked: bool = False) -> None:
         """Refresh the visible check marker beside the option text."""
         marker = "✓" if self.isChecked() else " "
         self.setText(f"{marker} {self._label}")
@@ -854,7 +855,8 @@ class ActivityLogBlock(QFrame, Block):
         else:
             self.ui.event_count_label.setText(f"{visible_count} events")
 
-    def _on_filter_action_toggled(self) -> None:
+    @Slot(bool)
+    def _on_filter_action_toggled(self, _checked: bool = False) -> None:
         """Recompute active filters from checked menu actions."""
         selected_categories = {
             category
@@ -878,6 +880,7 @@ class ActivityLogBlock(QFrame, Block):
         )
         self._render_activities()
 
+    @Slot()
     def _sync_activity_selection_state(self) -> None:
         """Mirror QListWidget selection state onto each custom activity row."""
         for item in self.ui.logs_list.iter_items():
@@ -899,6 +902,7 @@ class ActivityLogBlock(QFrame, Block):
             if isinstance(item, ActivityLogItem):
                 item.apply_theme_icons(theme)
 
+    @Slot()
     def refresh_layout(self, *, deferred: bool = True) -> None:
         """Refresh list geometry after panel/sidebar visibility changes."""
         if self.layout() is not None:
@@ -912,6 +916,7 @@ class ActivityLogBlock(QFrame, Block):
         if deferred:
             QTimer.singleShot(0, self._refresh_layout_deferred)
 
+    @Slot()
     def _refresh_layout_deferred(self) -> None:
         """Skip deferred refreshes once Qt has started tearing the block down."""
         if not isValid(self):
@@ -999,11 +1004,15 @@ class ActivityLogBlock(QFrame, Block):
             checkbox.blockSignals(False)
             action.blockSignals(False)
 
+    ### Slots ###
+
+    @Slot()
     def _on_ui_constraints_disabled(self) -> None:
         """Record an activity when the UI constraints are disabled."""
         self._seed_placeholder_activities()
         self._render_activities()
 
+    @Slot()
     def _on_adb_server_started(self) -> None:
         """Record an activity when the ADB server starts."""
         self.add_activity(
@@ -1013,6 +1022,7 @@ class ActivityLogBlock(QFrame, Block):
             metadata={"state": "running"},
         )
 
+    @Slot()
     def _on_adb_server_stopped(self) -> None:
         """Record an activity when the ADB server stops."""
         self.add_activity(
@@ -1022,6 +1032,7 @@ class ActivityLogBlock(QFrame, Block):
             metadata={"state": "idle"},
         )
 
+    @Slot(dict)
     def _on_authentification_succeeded(self, device: dict) -> None:
         """Record an activity when device pairing succeeds."""
         name = str(device.get("name", "Android device"))
@@ -1033,6 +1044,7 @@ class ActivityLogBlock(QFrame, Block):
             metadata={"device": name},
         )
 
+    @Slot(str, int, str)
     def _on_authentification_failed(
         self, ip: str, port: int, association_code: str
     ) -> None:
@@ -1045,6 +1057,7 @@ class ActivityLogBlock(QFrame, Block):
             metadata={"target": f"{ip}:{port}"},
         )
 
+    @Slot(str, str, str)
     def _on_device_selection_succeeded(
         self, simulation_id: str, device_id: str, device_name: str
     ) -> None:
@@ -1057,6 +1070,7 @@ class ActivityLogBlock(QFrame, Block):
             metadata={"target": device_name},
         )
 
+    @Slot(str, str)
     def _on_device_selection_failed(self, device_id: str, device_name: str) -> None:
         """Record an activity when active-device selection fails."""
         self.add_activity(
@@ -1067,6 +1081,7 @@ class ActivityLogBlock(QFrame, Block):
             metadata={"target": device_name},
         )
 
+    @Slot(str)
     def _on_remove_active_device_succeeded(self, device_id: str) -> None:
         """Record an activity when active device removal succeeds."""
         self.add_activity(
@@ -1077,6 +1092,7 @@ class ActivityLogBlock(QFrame, Block):
             metadata={"target": device_id},
         )
 
+    @Slot(str)
     def _on_activity_log_file_updated(self, log_file_path: str) -> None:
         """Set the file row from the app-wide activity log path."""
         if not log_file_path:

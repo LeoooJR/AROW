@@ -12,6 +12,7 @@ from PySide6.QtCore import (
     QRect,
     Qt,
     QTimer,
+    Slot,
 )
 from PySide6.QtWidgets import (
     QAbstractButton,
@@ -200,16 +201,14 @@ class TopBar(QWidget, Block):
             self._on_right_panel_visibility_button_clicked
         )
         signals.UI.DisplayLeftPanelsRequested.connect(
-            lambda: self._set_left_panels_button_displayed(True)
+            self._on_display_left_panels_requested
         )
-        signals.UI.HideLeftPanelsRequested.connect(
-            lambda: self._set_left_panels_button_displayed(False)
-        )
+        signals.UI.HideLeftPanelsRequested.connect(self._on_hide_left_panels_requested)
         signals.UI.DisplayRightPanelsRequested.connect(
-            lambda: self._set_right_panels_button_displayed(True)
+            self._on_display_right_panels_requested
         )
         signals.UI.HideRightPanelsRequested.connect(
-            lambda: self._set_right_panels_button_displayed(False)
+            self._on_hide_right_panels_requested
         )
 
         #### Signals for toggling the palette ####
@@ -294,6 +293,29 @@ class TopBar(QWidget, Block):
 
     #### Private methods ####
 
+    ### Slots ###
+
+    @Slot()
+    def _on_display_left_panels_requested(self) -> None:
+        """Sync left sidebar button state when panels are shown."""
+        self._set_left_panels_button_displayed(True)
+
+    @Slot()
+    def _on_hide_left_panels_requested(self) -> None:
+        """Sync left sidebar button state when panels are hidden."""
+        self._set_left_panels_button_displayed(False)
+
+    @Slot()
+    def _on_display_right_panels_requested(self) -> None:
+        """Sync right sidebar button state when panels are shown."""
+        self._set_right_panels_button_displayed(True)
+
+    @Slot()
+    def _on_hide_right_panels_requested(self) -> None:
+        """Sync right sidebar button state when panels are hidden."""
+        self._set_right_panels_button_displayed(False)
+
+    @Slot()
     def _on_left_panel_visibility_button_clicked(self) -> None:
         """Toggle left sidebar visibility from the header button."""
         if bool(self.ui.left_panel_visibility_request_button.property("visibility")):
@@ -301,6 +323,7 @@ class TopBar(QWidget, Block):
         else:
             signals.UI.DisplayLeftPanelsRequested.emit()
 
+    @Slot()
     def _on_right_panel_visibility_button_clicked(self) -> None:
         """Toggle right sidebar visibility from the header button."""
         if bool(self.ui.right_panel_visibility_request_button.property("visibility")):
@@ -330,6 +353,7 @@ class TopBar(QWidget, Block):
             else GenericIcons.LAYOUT_SIDEBAR_REVERSE
         )
 
+    @Slot()
     def _update_palette_thumb_geometry(self) -> None:
         """Position the palette thumb over the active theme button (initial or after layout)."""
         if not isValid(self):
@@ -349,6 +373,7 @@ class TopBar(QWidget, Block):
         thumb.setGeometry(QRect(x, y, tw, th))
         btn.raise_()
 
+    @Slot(QAbstractButton)
     def _on_palette_button_clicked(self, button: QAbstractButton) -> None:
         """Handle the palette button click."""
 

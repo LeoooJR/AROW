@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Final
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Slot
 from PySide6.QtWidgets import QLabel, QSizePolicy, QWidget
 
 from gui.blocks.base import Block
@@ -81,6 +81,7 @@ class StartRecentBlock(VerticalLayoutWrapper, Block):
         self._sync_empty_placeholder_visibility()
         self._finalize_ui_hooks()
 
+    @Slot()
     def _add_recent_placeholders(self, count: int = 3) -> None:
         """Add generated recent-file display rows to the recent-files wrapper."""
         placeholder_items = self.texts.recent_files

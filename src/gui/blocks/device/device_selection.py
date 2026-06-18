@@ -14,6 +14,7 @@ from PySide6.QtCore import (
     QObject,
     Qt,
     QTimer,
+    Slot,
 )
 from PySide6.QtWidgets import QFrame, QSizePolicy, QVBoxLayout, QWidget
 
@@ -264,10 +265,14 @@ class DeviceSelectionBlock(QFrame, Block):
         signals.UI.RunHelperAnimationRequested.connect(self._on_run_helper_animation)
         signals.UI.MapTabActivated.connect(self._on_map_tab_activated)
 
+    ### Slots ###
+
+    @Slot()
     def _on_ui_constraints_disabled(self) -> None:
         """Seed placeholder rows when UI constraints are disabled."""
         self.add_list_items_placeholder()
 
+    @Slot()
     def _on_refresh_timer_tick(self, *, now: dt.datetime | None = None) -> None:
         """Refresh live last-communication labels on every device row."""
         ref = now if now is not None else dt.datetime.now()
@@ -307,6 +312,7 @@ class DeviceSelectionBlock(QFrame, Block):
         if is_empty:
             self._reposition_available_device_empty_state()
 
+    @Slot()
     def _on_available_device_list_model_changed(self, *args) -> None:
         """Refresh placeholder, selection styling, and row sizes after list changes."""
         self._update_available_device_empty_state_visibility()
@@ -324,6 +330,7 @@ class DeviceSelectionBlock(QFrame, Block):
             else:
                 item.shorten()
 
+    @Slot()
     def _sync_available_device_selection_state(self) -> None:
         """Mirror QListWidget selection state onto each custom device row widget."""
         for item in self.ui.available_device_list.iter_items():
@@ -336,10 +343,12 @@ class DeviceSelectionBlock(QFrame, Block):
             if isinstance(item, self._device_item_type):
                 item._sync_size_hint()
 
+    @Slot()
     def _on_left_panels_display_requested(self) -> None:
         """Resync device row presentation when the left panels are shown again."""
         self._sync_available_device_item_presentation_state()
 
+    @Slot(dict)
     def _on_authentification_succeeded(self, device: dict) -> None:
         """Add a newly authenticated device and mark it as the active selection."""
         self._has_active_device = (
@@ -359,6 +368,7 @@ class DeviceSelectionBlock(QFrame, Block):
         self.ui.available_device_list.sortItems()
         self._on_available_device_list_model_changed()
 
+    @Slot(object)
     def _on_device_selected(self, item) -> None:
         """Request selection of the clicked device item."""
         if item is None:
@@ -370,6 +380,7 @@ class DeviceSelectionBlock(QFrame, Block):
                 "DeviceSelectionBlock: device item is not a DeviceItem", item=item
             )
 
+    @Slot(str, str, str)
     def _on_device_selection_succeeded(
         self, simulation_id: str, device_id: str, device_name: str
     ) -> None:
@@ -388,6 +399,7 @@ class DeviceSelectionBlock(QFrame, Block):
         # Refresh the device list.
         self._on_available_device_list_model_changed()
 
+    @Slot(str, str)
     def _on_device_selection_failed(self, device_id: str, device_name: str) -> None:
         """Clear the current row selection after selection failure."""
         self._has_active_device = False
@@ -397,6 +409,7 @@ class DeviceSelectionBlock(QFrame, Block):
         self.ui.available_device_list.sortItems()
         self._on_available_device_list_model_changed()
 
+    @Slot(object)
     def _on_devices_updated(self, devices: list[dict]) -> None:
         """Replace the available-device list from controller-provided device data."""
         self._has_active_device = False
@@ -416,11 +429,13 @@ class DeviceSelectionBlock(QFrame, Block):
         self.ui.available_device_list.sortItems()
         self._on_available_device_list_model_changed()
 
+    @Slot()
     def _on_refresh_button_clicked(self) -> None:
         """Emit a device-list refresh request from the refresh action button."""
         logger.info("Available device list refresh requested.")
         signals.DEVICE.RefreshDeviceListRequested.emit()
 
+    @Slot(str)
     def _on_remove_device_requested(self, id: str) -> None:
         """Remove the matching device row when a row-level delete action is requested.
         id: The id of the device to remove.
@@ -456,6 +471,7 @@ class DeviceSelectionBlock(QFrame, Block):
             if isinstance(lw_item, self._device_item_type):
                 lw_item.apply_theme_icons(theme)
 
+    @Slot()
     def _on_highlight_pulse_tick(self) -> None:
         """Advance the transient attention pulse on the available-device list."""
         cycle_ms = device_settings.ATTENTION_HIGHLIGHT_PULSE_CYCLE_MS
@@ -486,12 +502,14 @@ class DeviceSelectionBlock(QFrame, Block):
             return False
         return True
 
+    @Slot()
     def _on_run_helper_animation(self) -> None:
         """Start attention pulse when idle helper is requested and guards pass."""
         if not self._should_run_device_attention_highlight():
             return
         self._start_highlight_attention()
 
+    @Slot()
     def _on_map_tab_activated(self) -> None:
         """Start attention pulse when the Map tab is activated and guards pass."""
         if not self._should_run_device_attention_highlight():
@@ -505,6 +523,7 @@ class DeviceSelectionBlock(QFrame, Block):
         self._highlight_pulse_timer.start(device_settings.ATTENTION_HIGHLIGHT_UPDATE_MS)
         self._highlight_stop_timer.start(device_settings.ATTENTION_HIGHLIGHT_DURATION)
 
+    @Slot()
     def _stop_highlight_attention(self) -> None:
         """Stop the attention pulse and reset the list highlight level."""
         self._highlight_pulse_timer.stop()
@@ -551,11 +570,13 @@ class DeviceSelectionBlock(QFrame, Block):
         )
         self._on_available_device_list_model_changed()
 
+    @Slot()
     def extend(self) -> None:
         """Expand all device rows to show extended metadata and actions."""
         self._is_extended = True
         self._sync_available_device_item_presentation_state()
 
+    @Slot()
     def shorten(self) -> None:
         """Collapse all device rows back to their compact presentation."""
         self._is_extended = False

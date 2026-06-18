@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Final, Literal
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Slot
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -350,6 +350,9 @@ class IdentityCardBlock(QFrame, Block):
             self._on_host_device_information_updated
         )
 
+    ### Slots ###
+
+    @Slot(str, str, str)
     def _on_host_device_information_updated(
         self, name: str, os: Literal["linux", "windows", "darwin"] | None, ip: str
     ) -> None:
@@ -373,6 +376,7 @@ class IdentityCardBlock(QFrame, Block):
             identity_state="valid",
         )
 
+    @Slot()
     def _on_ui_constraints_disabled(self) -> None:
         """Re-apply placeholder values when UI constraints are disabled."""
         self.set_placeholder_values()

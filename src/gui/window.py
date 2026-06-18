@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from time import monotonic
 from typing import Deque, Final, Optional
 
-from PySide6.QtCore import QSize, Qt, QTimer
+from PySide6.QtCore import QSize, Qt, QTimer, Slot
 from PySide6.QtGui import QColor, QFont, QIcon, QPalette, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
@@ -321,11 +321,15 @@ class Body(QWidget):
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
         )
 
+    ### Slots ###
+
+    @Slot(int)
     def _on_tab_changed(self, index: int) -> None:
         if index != self.TAB_MAP:
             return
         signals.UI.MapTabActivated.emit()
 
+    @Slot(bool)
     def _on_log_panel_toggled(self, visible: bool) -> None:
         """Handle the log panel visibility request."""
         if not visible:
@@ -337,6 +341,7 @@ class Body(QWidget):
             self.ui.host_panel.shorten_panel()
         self._refresh_log_panel_layout_later()
 
+    @Slot(bool)
     def _on_host_panel_toggled(self, visible: bool) -> None:
         """Handle the host panel visibility request."""
         if not visible:
@@ -345,6 +350,7 @@ class Body(QWidget):
             )  # Show log panel when host panel is hidden, one panel must be visible at all times in UI
         self._refresh_log_panel_layout_later()
 
+    @Slot(bool)
     def _on_device_selection_panel_toggled(self, visible: bool) -> None:
         """Handle the device panel visibility request."""
         if not visible:
@@ -352,6 +358,7 @@ class Body(QWidget):
                 True
             )  # Show location panel when device panel is hidden, one panel must be visible at all times in UI
 
+    @Slot(bool)
     def _on_location_panel_toggled(self, visible: bool) -> None:
         """Handle the location panel visibility request."""
         if not visible:
@@ -359,6 +366,7 @@ class Body(QWidget):
                 True
             )  # Show device panel when location panel is hidden, one panel must be visible at all times in UI
 
+    @Slot()
     def _on_target_selection_requested(self) -> None:
         """Route the location panel CTA to the existing map selection surface."""
         if self.ui.tabs.currentIndex() != self.TAB_MAP:
@@ -444,9 +452,19 @@ class Body(QWidget):
         delay_ms = Settings.ANIMATION.PANEL_VISIBILITY_DURATION + Settings.SPACING.SM
         if enabled:
             self._set_welcome_workspace_mode(True)
-            QTimer.singleShot(delay_ms, lambda: self._set_welcome_workspace_mode(True))
+            QTimer.singleShot(delay_ms, self._enable_welcome_workspace_mode_deferred)
             return
-        QTimer.singleShot(delay_ms, lambda: self._set_welcome_workspace_mode(False))
+        QTimer.singleShot(delay_ms, self._disable_welcome_workspace_mode_deferred)
+
+    @Slot()
+    def _enable_welcome_workspace_mode_deferred(self) -> None:
+        """Apply expanded welcome layout after sidebar hide animation."""
+        self._set_welcome_workspace_mode(True)
+
+    @Slot()
+    def _disable_welcome_workspace_mode_deferred(self) -> None:
+        """Restore default welcome layout after sidebar show animation."""
+        self._set_welcome_workspace_mode(False)
 
     def _set_welcome_workspace_mode(self, enabled: bool) -> None:
         welcome = self.ui.tabs.widget(0)
@@ -471,6 +489,7 @@ class Body(QWidget):
         self.ui.host_panel.apply_theme_icons(theme)
         self.ui.log_panel.apply_theme_icons(theme)
 
+    @Slot(str, str, str)
     def _on_device_selection_succeeded(
         self, simulation_id: str, device_id: str, device_name: str
     ) -> None:
@@ -479,6 +498,7 @@ class Body(QWidget):
         self.ui.tabs.setCurrentIndex(1)
         # self.ui.tabs.setTabVisible(2, True) # TODO: uncomment this when the device tab is implemented
 
+    @Slot(str)
     def _on_remove_active_device_succeeded(self, device_id: str) -> None:
         """Handle the active device removed."""
         logger.info("Body: active device removed", device_id=device_id)
@@ -587,22 +607,29 @@ class MainContainer(QWidget):
             self._on_authentification_confirmed
         )
 
+    ### Slots ###
+
+    @Slot()
     def _display_left_panels(self) -> None:
         """Show the left sidebar panels."""
         self.ui.body.set_left_panels_visibility(True)
 
+    @Slot()
     def _hide_left_panels(self) -> None:
         """Hide the left sidebar panels."""
         self.ui.body.set_left_panels_visibility(False)
 
+    @Slot()
     def _display_right_panels(self) -> None:
         """Show the right sidebar panels."""
         self.ui.body.set_right_panels_visibility(True)
 
+    @Slot()
     def _hide_right_panels(self) -> None:
         """Hide the right sidebar panels."""
         self.ui.body.set_right_panels_visibility(False)
 
+    @Slot()
     def _on_add_device_requested(self) -> None:
         """Handle the add device request."""
         logger.info("MainContainer: add device requested")
@@ -621,6 +648,7 @@ class MainContainer(QWidget):
         else:
             signals.DEVICE.AuthentificationCancelled.emit()
 
+    @Slot()
     def _on_authentification_confirmed(self) -> None:
         """Handle the authentification confirmation."""
         logger.info("MainContainer: authentification confirmation received")
@@ -650,6 +678,7 @@ class MainContainer(QWidget):
         self._toast_queue.append((text, level))
         self._show_next_toast()
 
+    @Slot()
     def _show_next_toast(self) -> None:
         """Show next toast only when no active toast is visible."""
         current_toast = self.ui.toast
@@ -674,6 +703,7 @@ class MainContainer(QWidget):
             self.ui.toast = None
             QTimer.singleShot(0, self._show_next_toast)
 
+    @Slot()
     def _on_active_toast_destroyed(self) -> None:
         """Show the next queued toast once the active one is gone."""
         self.ui.toast = None
@@ -907,6 +937,9 @@ class MainWindow(QMainWindow):
             self._on_device_selection_requested
         )
 
+    ### Slots ###
+
+    @Slot(str)
     def _on_palette_update(self, theme: Theme) -> None:
         """Handle the palette update."""
         set_current_theme(theme)
@@ -929,6 +962,7 @@ class MainWindow(QMainWindow):
         self.ui.container.apply_theme_icons(theme)
         self.ui.authentification_overlay.apply_theme_icons(theme)
 
+    @Slot()
     def _on_idle(self) -> None:
         """Handle the idle state: run helper and highlight device lists to draw attention."""
         logger.info("MainWindow: idle state detected")
@@ -943,6 +977,7 @@ class MainWindow(QMainWindow):
         """Forward the ADB server stopped signal."""
         signals.ADB_SERVER.ADBServerStopped.emit()
 
+    @Slot(str, str)
     def _on_device_selection_requested(self, device_id: str, device_name: str) -> None:
         """Handle the device selection request."""
         if device_id is None:
@@ -986,17 +1021,20 @@ class MainWindow(QMainWindow):
         finally:
             self._device_selection_dialog_open = False
 
+    @Slot()
     def _on_authentification_requested(self) -> None:
         """Handle the authentification request."""
         self.ui.authentification_overlay.setGeometry(self.ui.container.rect())
         self.ui.authentification_overlay.raise_()
         self.ui.authentification_overlay.setVisible(True)
 
+    @Slot()
     def _on_authentification_cancelled(self) -> None:
         """Handle the authentification cancelled."""
         logger.info("MainWindow: authentification cancelled")
         self.ui.authentification_overlay.hide()
 
+    @Slot()
     def _on_authentification_confirmed(self) -> None:
         """Handle the authentification confirmation."""
         logger.info("MainWindow: authentification confirmed")
