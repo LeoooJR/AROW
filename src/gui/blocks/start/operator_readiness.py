@@ -243,7 +243,9 @@ class OperatorReadinessBlock(VerticalLayoutWrapper, Block):
             status_kind="error",
         )
 
-    def _on_device_selection_succeeded(self, device_id: str, device_name: str) -> None:
+    def _on_device_selection_succeeded(
+        self, simulation_id: str, device_id: str, device_name: str
+    ) -> None:
         """Update the readiness row when the device selection succeeds."""
         self.ui.rows[self.ROWS_INDEX_MAPPING["device"]].update(
             label="Device",

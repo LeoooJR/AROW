@@ -71,6 +71,8 @@ class SimulationRepository(Repository[Simulation]):
 
     def add(self, item: Simulation) -> None:
         super().add(item)
-        item.log_file = self._save_dir / f"{item.id}.log"
+        simulation_dir = Path(self._save_dir / item.id)
+        simulation_dir.mkdir(parents=True, exist_ok=True)
+        item.log_file = simulation_dir / f"{item.id}.log"
         with open(item.log_file, "w") as f:
             f.write(f"Simulation {item.id} created at {datetime.now().isoformat()}\n")

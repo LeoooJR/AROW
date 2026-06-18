@@ -36,6 +36,7 @@ class UISignals(QObject):
     LogPanelVisibilityRequested = Signal(bool)
     RunHelperAnimationRequested = Signal()
     MapTabActivated = Signal()
+    RenderMapRequested = Signal(str)
 
 
 class ADBServerSignals(QObject):
@@ -57,7 +58,7 @@ class DeviceSignals(QObject):
     DeviceSelectionRequested = Signal(str, str)
     DeviceSelectionCancelled = Signal()
     DeviceSelectionConfirmed = Signal(str, str)
-    DeviceSelectionSucceeded = Signal(str, str)
+    DeviceSelectionSucceeded = Signal(str, str, str)
     DeviceSelectionFailed = Signal(str, str)
     RefreshDeviceListRequested = Signal()
     DevicesUpdated = Signal(object)

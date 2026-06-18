@@ -1045,7 +1045,9 @@ class ActivityLogBlock(QFrame, Block):
             metadata={"target": f"{ip}:{port}"},
         )
 
-    def _on_device_selection_succeeded(self, device_id: str, device_name: str) -> None:
+    def _on_device_selection_succeeded(
+        self, simulation_id: str, device_id: str, device_name: str
+    ) -> None:
         """Record an activity when active-device selection succeeds."""
         self.add_activity(
             "Active device selected",

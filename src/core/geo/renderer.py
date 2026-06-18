@@ -7,9 +7,10 @@ import pandas as pd
 import xyzservices.providers as xyz
 from folium.plugins import Fullscreen, MarkerCluster, MousePosition, Search
 from folium.utilities import JsCode
-from geo.datasets import DatasetManager
-from geo.icons import Icons
 from loguru import logger
+
+from core.geo.datasets import DatasetManager
+from core.geo.icons import Icons
 
 # Columns embedded in Folium GeoJSON for milestone layers (tooltip/popup only).
 _MILESTONE_GEOJSON_COLUMNS: Final[Tuple[str, ...]] = (
@@ -512,22 +513,24 @@ class MapRenderer:
 
         folium.LayerControl().add_to(self.map)
 
-    def to_html(self, prefix: str = ""):
-
-        path = f"{prefix}.html"
-        self.map.save(path)
+    def to_html(self, path: Path, prefix: str = "") -> Path:
+        """Write the Folium map to disk and return the HTML file path."""
+        output_dir = Path(path)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        html_path = output_dir / f"{prefix}.html"
+        self.map.save(html_path)
         try:
-            size_bytes = Path(path).stat().st_size
+            size_bytes = html_path.stat().st_size
         except OSError as e:
             logger.warning(
-                "Saved map HTML but could not stat file", path=path, error=str(e)
+                "Saved map HTML but could not stat file",
+                path=str(html_path),
+                error=str(e),
             )
         else:
-            logger.info("Map HTML written", path=path, size_bytes=size_bytes)
-
-
-if __name__ == "__main__":
-
-    manager: MapRenderer = MapRenderer()
-
-    manager.to_html(prefix="map")
+            logger.info(
+                "Map HTML written",
+                path=str(html_path),
+                size_bytes=size_bytes,
+            )
+        return html_path

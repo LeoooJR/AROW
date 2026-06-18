@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from controller.domains.app_sub_controller import AppSubController
+from gui.signals import signals
 
 if TYPE_CHECKING:
     from controller.orchestration.app_controller import AppController
@@ -23,8 +24,12 @@ class MapSubController(AppSubController):
 
     def connect_view_signals(self) -> None:
         """Connect map-relevant :data:`gui.signals.signals` when map UI is ready."""
-        return
+        signals.UI.RenderMapRequested.connect(self._on_render_map_requested)
 
     def connect_model_signals(self) -> None:
         """Subscribe to map-relevant :class:`CoreSignal` values when needed."""
         return
+
+    def _on_render_map_requested(self, simulation_id: str) -> None:
+        """Render the map."""
+        self.model_entrypoint.render_map(simulation_id)

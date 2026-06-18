@@ -18,6 +18,7 @@ from core.devices import (
     paired_phone_matches_discovery,
     phone_stable_key_is_collision_resistant,
 )
+from core.geo.renderer import MapRenderer
 from core.signals import (
     ActivityLogFileUpdatedPayload,
     AdbServerStartedPayload,
@@ -32,6 +33,7 @@ from core.signals import (
     InMemoryCoreSignalBus,
     LogMessagePayload,
     SignalHandler,
+    SimulationCreatedPayload,
     SimulationPositionChangedPayload,
     SimulationStateChangedPayload,
 )
@@ -147,6 +149,13 @@ class Entrypoint(ABC):
     @overload
     def subscribe(
         self,
+        signal: Literal[CoreSignal.SIMULATION_CREATED],
+        handler: SignalHandler[SimulationCreatedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
         signal: Literal[CoreSignal.SIMULATION_STATE_CHANGED],
         handler: SignalHandler[SimulationStateChangedPayload],
     ) -> None: ...
@@ -232,6 +241,13 @@ class Entrypoint(ABC):
         self,
         signal: Literal[CoreSignal.DEVICES_UPDATED],
         handler: SignalHandler[DevicesUpdatedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_CREATED],
+        handler: SignalHandler[SimulationCreatedPayload],
     ) -> None: ...
 
     @overload
@@ -568,16 +584,30 @@ class ModelEntrypoint(Entrypoint):
             )
         return changed
 
-    def create_simulation(self, device_id: str) -> str:
+    def create_simulation(self, device_id: str) -> None:
         """
         Create a new simulation.
+
+        Emits a SIMULATION_CREATED signal.
+
+        Args:
+            device_id: The id of the device to create the simulation for.
+
+        Returns:
+            None
+
+        Raises:
+            AttributeError: If the device is not found.
         """
         device: Phone | None = self.get_device(device_id)
         if device is None:
             raise AttributeError(f"Device with id {device_id} not found")
         simulation: Simulation = Simulation(device=device)
         self._simulations.add(simulation)
-        return simulation.id
+        self._signal_bus.emit(
+            CoreSignal.SIMULATION_CREATED,
+            SimulationCreatedPayload(simulation=simulation),
+        )
 
     def get_simulation(self, id: str) -> Simulation | None:
         """
@@ -629,6 +659,41 @@ class ModelEntrypoint(Entrypoint):
                 self.delete_simulation(simulation)
                 return
         raise ValueError(f"Simulation for device with id {device_id} not found")
+
+    def render_map(self, simulation_id: str) -> None:
+        """
+        Render the map for a simulation and write HTML under the application dir.
+
+        Args:
+            simulation_id: The id of the simulation whose map should be rendered.
+
+        Raises:
+            ValueError: If the simulation id is unknown.
+            RuntimeError: If map rendering or HTML export fails.
+        """
+        simulation: Simulation | None = self._simulations.get(simulation_id)
+        if simulation is None:
+            raise ValueError(f"Simulation with id {simulation_id} not found")
+        output_dir = self.application_dir / "simulations" / simulation.id / "map"
+        try:
+            manager: MapRenderer = MapRenderer()
+            html_path = manager.to_html(path=output_dir, prefix=simulation.id)
+        except Exception as error:
+            logger.error(
+                "ModelEntrypoint: failed to render map",
+                simulation_id=simulation_id,
+                output_dir=str(output_dir),
+                error=str(error),
+                exc_info=True,
+            )
+            raise RuntimeError(
+                f"Failed to render map for simulation {simulation_id}"
+            ) from error
+        logger.info(
+            "ModelEntrypoint: map rendered",
+            simulation_id=simulation_id,
+            html_path=str(html_path),
+        )
 
     def apply_result(self, result: CoreRuntimeWorkOutcome) -> None:
         """

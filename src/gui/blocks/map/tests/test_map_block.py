@@ -114,7 +114,7 @@ def test_map_block_connection_succeeded_updates_placeholder_and_animates(
     qtbot.addWidget(block)
     block.show()
 
-    signals.DEVICE.DeviceSelectionSucceeded.emit("d1", "Phone")
+    signals.DEVICE.DeviceSelectionSucceeded.emit("sim-1", "d1", "Phone")
     qtbot.wait(0)
 
     assert block.placeholder.currentWidget() is block.ui.map_loading_placeholder

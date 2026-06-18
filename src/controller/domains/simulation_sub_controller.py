@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 from controller.domains.app_sub_controller import AppSubController
 from controller.helper import validate_model_entrypoint, validate_view
+from core.signals import CoreSignal, SimulationCreatedPayload
 from gui.signals import signals
 from logger import logger
 
@@ -31,7 +32,10 @@ class SimulationSubController(AppSubController):
 
     def connect_model_signals(self) -> None:
         # Simulation-specific model subscriptions (none yet) — extension point.
-        return
+        self.model_entrypoint.subscribe(
+            CoreSignal.SIMULATION_CREATED,
+            self._on_simulation_created,
+        )
 
     def is_simulation_active(self, id: str) -> bool:
         """Check if the simulation is active."""
@@ -106,14 +110,7 @@ class SimulationSubController(AppSubController):
             input_device_name=device_name,
         )
         try:
-            sim_id: str = self.model_entrypoint.create_simulation(device_id=device_id)
-            logger.success(
-                "SimulationSubController: active device set",
-                sim_id=sim_id,
-                device_id=device_id,
-                device_name=device_name,
-            )
-            self.view.forward_device_selection_succeeded(device_id, device_name)
+            self.model_entrypoint.create_simulation(device_id=device_id)
         except AttributeError as e:
             logger.error(
                 "SimulationSubController: failed to get device",
@@ -143,3 +140,24 @@ class SimulationSubController(AppSubController):
                 device_id=device_id,
             )
             return
+
+    def _on_simulation_created(self, payload: SimulationCreatedPayload) -> None:
+        """Handle the simulation created event."""
+        device = payload.simulation.device
+        if device is None:
+            logger.error(
+                "SimulationSubController: simulation created without device",
+                simulation_id=payload.simulation.id,
+            )
+            return
+        logger.success(
+            "SimulationSubController: simulation created",
+            simulation_id=payload.simulation.id,
+            device_id=device.id,
+            device_name=device.name,
+        )
+        self.view.forward_device_selection_succeeded(
+            payload.simulation.id,
+            device.id,
+            device.name,
+        )

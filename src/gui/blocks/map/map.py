@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Final, cast
 
 from PySide6.QtCore import (
@@ -12,6 +13,7 @@ from PySide6.QtCore import (
     QPropertyAnimation,
     QSequentialAnimationGroup,
     Qt,
+    QUrl,
 )
 from PySide6.QtGui import QFont
 from PySide6.QtWebEngineWidgets import QWebEngineView
@@ -26,6 +28,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from core.application_paths import get_or_create_application_dir
 from gui.blocks.map.device_required_placeholder import DeviceRequiredMapPlaceholder
 from gui.blocks.map.map_loading_placeholder import MapLoadingPlaceholder
 from gui.blocks.map.map_settings import map_settings
@@ -652,6 +655,9 @@ class MapBlock(QWidget):
 
         canvas = Canvas(self)
         layout.addWidget(canvas, 1)
+        canvas.setMinimumSize(
+            map_settings.MIN_WIDTH_LARGE, map_settings.MIN_HEIGHT_SMALL
+        )
         canvas.setVisible(False)
 
         placeholder = QStackedWidget(self)
@@ -698,6 +704,9 @@ class MapBlock(QWidget):
     def _set_size_policy(self) -> None:
         """Centralize size policies for the map view and its UI widgets (window resizing)."""
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.ui.canvas.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
         self.ui.placeholder.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
@@ -749,6 +758,41 @@ class MapBlock(QWidget):
     def show_map_loading_placeholder(self) -> None:
         """Show the placeholder used while the map is being generated."""
         self.ui.placeholder.setCurrentWidget(self.ui.map_loading_placeholder)
+        self.ui.placeholder.setVisible(True)
+        self.ui.canvas.setVisible(False)
+
+    def show_map_canvas(self) -> None:
+        """Hide placeholders and show the rendered map canvas."""
+        self.ui.placeholder.setVisible(False)
+        self.ui.canvas.setVisible(True)
+
+    def _map_html_path(self, simulation_id: str) -> Path:
+        """Return the expected on-disk HTML path for a simulation map."""
+        return (
+            get_or_create_application_dir()
+            / "simulations"
+            / simulation_id
+            / "map"
+            / f"{simulation_id}.html"
+        )
+
+    def _load_map_html(self, simulation_id: str) -> None:
+        """Load the rendered map HTML into the canvas when available."""
+        html_path = self._map_html_path(simulation_id)
+        if not html_path.is_file():
+            logger.warning(
+                "MapBlock: rendered map HTML not found",
+                simulation_id=simulation_id,
+                path=str(html_path),
+            )
+            return
+        self.ui.canvas.load(QUrl.fromLocalFile(str(html_path.resolve())))
+        self.show_map_canvas()
+        logger.info(
+            "MapBlock: map HTML loaded into canvas",
+            simulation_id=simulation_id,
+            path=str(html_path),
+        )
 
     def apply_theme_icons(self, theme: Theme) -> None:
         """Refresh theme-dependent icons for all map block children."""
@@ -757,10 +801,14 @@ class MapBlock(QWidget):
         self.ui.map_loading_placeholder.apply_theme_icons(theme)
         self.ui.coordinates.apply_theme_icons(theme)
 
-    def _on_device_selection_succeeded(self, device_id: str, device_name: str) -> None:
+    def _on_device_selection_succeeded(
+        self, simulation_id: str, device_id: str, device_name: str
+    ) -> None:
         """Update placeholder after auth or device selection succeeds."""
         self.show_map_loading_placeholder()
         self._on_run_helper_animation()
+        signals.UI.RenderMapRequested.emit(simulation_id)
+        self._load_map_html(simulation_id)
 
     def _on_device_selection_failed(self, device_id: str, device_name: str) -> None:
         """Pulse placeholder when device selection fails."""
@@ -773,6 +821,8 @@ class MapBlock(QWidget):
     def _on_remove_active_device_succeeded(self, device_id: str) -> None:
         """Reset placeholder when the active device is removed."""
         self.show_device_required_placeholder()
+        self.ui.placeholder.setVisible(True)
+        self.ui.canvas.setVisible(False)
         self._on_run_helper_animation()
 
     def _on_run_helper_animation(self) -> None:

@@ -438,7 +438,7 @@ def test_device_selection_block_map_tab_skips_highlight_when_device_selected(
         last_communication="Active now",
     )
     block.available_device_list.setCurrentItem(item)
-    signals.DEVICE.DeviceSelectionSucceeded.emit("device-1", "Phone")
+    signals.DEVICE.DeviceSelectionSucceeded.emit("sim-1", "device-1", "Phone")
     qtbot.wait(0)
 
     signals.UI.MapTabActivated.emit()

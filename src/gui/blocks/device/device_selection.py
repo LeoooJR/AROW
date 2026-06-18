@@ -370,7 +370,9 @@ class DeviceSelectionBlock(QFrame, Block):
                 "DeviceSelectionBlock: device item is not a DeviceItem", item=item
             )
 
-    def _on_device_selection_succeeded(self, device_id: str, device_name: str) -> None:
+    def _on_device_selection_succeeded(
+        self, simulation_id: str, device_id: str, device_name: str
+    ) -> None:
         """Mark the currently selected row active after selection succeeds."""
         self._has_active_device = True
         selected_item = self.ui.available_device_list.currentItem()

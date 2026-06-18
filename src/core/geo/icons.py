@@ -34,5 +34,5 @@ class Icons(Enum):
 
     BASE_URL = Path(__file__).resolve().parent / "assets"
 
-    STATION: folium.CustomIcon = create_custom_icon(BASE_URL / "station.svg")
-    MILESTONE: folium.CustomIcon = create_custom_icon(BASE_URL / "milestone.svg")
+    STATION = create_custom_icon(BASE_URL / "station.svg")
+    MILESTONE = create_custom_icon(BASE_URL / "milestone.svg")

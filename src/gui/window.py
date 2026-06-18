@@ -471,7 +471,9 @@ class Body(QWidget):
         self.ui.host_panel.apply_theme_icons(theme)
         self.ui.log_panel.apply_theme_icons(theme)
 
-    def _on_device_selection_succeeded(self, device: str) -> None:
+    def _on_device_selection_succeeded(
+        self, simulation_id: str, device_id: str, device_name: str
+    ) -> None:
         """Handle post-connection UI updates for any successful connection flow."""
         self.ui.progress_bar.setValue(1)
         self.ui.tabs.setCurrentIndex(1)
@@ -972,7 +974,11 @@ class MainWindow(QMainWindow):
                     logger.warning(
                         "MainWindow: device selection request skipped (UI constraints disabled)",
                     )
-                    self.forward_device_selection_succeeded(device_id, device_name)
+                    self.forward_device_selection_succeeded(
+                        f"demo-simulation-{device_id}",
+                        device_id,
+                        device_name,
+                    )
                 else:
                     signals.DEVICE.DeviceSelectionConfirmed.emit(device_id, device_name)
             else:
@@ -1018,11 +1024,13 @@ class MainWindow(QMainWindow):
         )
 
     def forward_device_selection_succeeded(
-        self, device_id: str, device_name: str
+        self, simulation_id: str, device_id: str, device_name: str
     ) -> None:
         """Handle the device selection succeeded without adding a new list entry."""
         logger.info("MainWindow: device selection succeeded", device=device_name)
-        signals.DEVICE.DeviceSelectionSucceeded.emit(device_id, device_name)
+        signals.DEVICE.DeviceSelectionSucceeded.emit(
+            simulation_id, device_id, device_name
+        )
         self.ui.container.post_toast(
             self.texts.device_selection_success_toast.format(device=device_name),
             level="success",

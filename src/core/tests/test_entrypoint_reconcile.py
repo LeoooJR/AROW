@@ -14,9 +14,23 @@ from core.devices import (
     apply_phone_ro_serial_enrichment,
 )
 from core.entrypoint import ModelEntrypoint
+from core.signals import CoreSignal, SimulationCreatedPayload
 from core.simulation import SimulationRepository
 
 pytestmark = [pytest.mark.devices]
+
+
+def _create_simulation_id(model_entrypoint: ModelEntrypoint, device_id: str) -> str:
+    """Create a simulation and return its id via the SIMULATION_CREATED signal."""
+    captured: list[str] = []
+
+    def capture(payload: SimulationCreatedPayload) -> None:
+        captured.append(payload.simulation.id)
+
+    model_entrypoint.subscribe(CoreSignal.SIMULATION_CREATED, capture)
+    model_entrypoint.create_simulation(device_id)
+    assert len(captured) == 1
+    return captured[0]
 
 
 def _model_with_server(
@@ -48,7 +62,7 @@ def test_reconcile_removes_stale_device_and_simulation(tmp_path: Path) -> None:
     model_entrypoint, server = _model_with_server(tmp_path)
     stale_phone = Phone(id="stale-device", state="device")
     server.paired_devices.add(stale_phone)
-    simulation_id = model_entrypoint.create_simulation("stale-device")
+    simulation_id = _create_simulation_id(model_entrypoint, "stale-device")
 
     changed = model_entrypoint.reconcile_paired_devices([])
 
@@ -117,7 +131,7 @@ def test_reconcile_preserves_simulation_reference_on_in_place_update(
     model_entrypoint, server = _model_with_server(tmp_path)
     paired = Phone(id="device-1", state="device", model="Old model")
     server.paired_devices.add(paired)
-    simulation_id = model_entrypoint.create_simulation("device-1")
+    simulation_id = _create_simulation_id(model_entrypoint, "device-1")
     discovered = Phone(id="device-1", state="device", model="New model")
 
     model_entrypoint.reconcile_paired_devices([discovered])

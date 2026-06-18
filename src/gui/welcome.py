@@ -189,7 +189,9 @@ class WelcomePanel(QFrame):
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
         )
 
-    def _on_device_selection_succeeded(self, device_id: str, device_name: str) -> None:
+    def _on_device_selection_succeeded(
+        self, simulation_id: str, device_id: str, device_name: str
+    ) -> None:
         """Handle the device selection succeeded.
         Show the milestone card and hide the connection card.
         """

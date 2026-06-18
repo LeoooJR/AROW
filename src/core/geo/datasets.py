@@ -9,10 +9,11 @@ import numpy as np
 import pandas as pd
 import pandera.geopandas as pg
 import pandera.pandas as pa
-from geo.exceptions import SchemaValidationError
 from loguru import logger
 from pandera.typing import INT64, Float, Int, Int32, Object, Series, String
 from pandera.typing.geopandas import GeoSeries
+
+from core.geo.exceptions import SchemaValidationError
 
 # --- Vectorized checks for object columns that hold nested GeoJSON dicts (lon/lat) ---
 
@@ -272,15 +273,15 @@ class ReferentielPkGpsSchema(pa.DataFrameModel):
 @dataclass(frozen=True)
 class DatasetDefinition:
 
-    id: Final[str]
-    name: Final[str]
-    lg: Final[str]
-    format: Final[Literal["csv", "json", "geojson", "shapefile", "parquet"]]
+    id: str
+    name: str
+    lg: str
+    format: Literal["csv", "json", "geojson", "shapefile", "parquet"]
     # Text encoding for the file (GeoJSON, CSV, etc.); fiona / pandas use this for strings.
-    encoding: Final[str]
-    last_update: Final[str]
-    hash: Final[str]  # sha256sum
-    schema: Final[pa.DataFrameSchema | pg.GeoDataFrameSchema]
+    encoding: str
+    last_update: str | None
+    hash: str  # sha256sum
+    schema: pa.DataFrameSchema | pg.GeoDataFrameSchema
 
     @property
     def full_path(self) -> Path:
