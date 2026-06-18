@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from PySide6.QtCore import Slot
+
 from controller.domains.app_sub_controller import AppSubController
 from gui.signals import signals
 
@@ -30,6 +32,7 @@ class MapSubController(AppSubController):
         """Subscribe to map-relevant :class:`CoreSignal` values when needed."""
         return
 
+    @Slot(str)
     def _on_render_map_requested(self, simulation_id: str) -> None:
         """Render the map."""
         self.model_entrypoint.render_map(simulation_id)

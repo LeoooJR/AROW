@@ -7,7 +7,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QTimer, Slot
 
 from controller.core_work_callbacks import (
     AdbAsyncJobCallbacks,
@@ -128,7 +128,10 @@ class AdbSubController(AppSubController):
             on_failed=callback.on_failed,
         )
 
+    ### Slots ###
+
     @validate_model_entrypoint
+    @Slot(str, str, str)
     def _on_authentification_confirmed(
         self, ip: str, port: str, association_code: str
     ) -> None:
@@ -157,6 +160,7 @@ class AdbSubController(AppSubController):
         )
 
     @validate_model_entrypoint
+    @Slot()
     def _on_refresh_device_list_requested(self) -> None:
         """ADB list query on a worker."""
         logger.debug("AdbSubController: refresh device list requested")
@@ -176,6 +180,7 @@ class AdbSubController(AppSubController):
             on_failed=callback.on_failed,
         )
 
+    @Slot(str)
     def _on_remove_device_requested(self, id: str) -> None:
         """Remove device from ADB on a worker."""
         pass  # TODO: Implement the thread job to remove device

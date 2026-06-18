@@ -6,6 +6,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from PySide6.QtCore import Slot
+
 from controller.domains.app_sub_controller import AppSubController
 from controller.helper import validate_model_entrypoint, validate_view
 from core.signals import CoreSignal, SimulationCreatedPayload
@@ -102,6 +104,7 @@ class SimulationSubController(AppSubController):
             return
 
     @validate_model_entrypoint
+    @Slot(str, str)
     def _on_device_selection_confirmed(self, device_id: str, device_name: str) -> None:
         """In-memory selection of the active device (UI thread)."""
         logger.debug(
@@ -119,6 +122,7 @@ class SimulationSubController(AppSubController):
             )
             self.view.forward_device_selection_failed(device_id, device_name)
 
+    @Slot(str)
     def _on_remove_device_requested(self, device_id: str) -> None:
         """Handle the remove device requested event."""
         try:

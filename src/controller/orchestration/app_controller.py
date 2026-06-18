@@ -9,7 +9,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import QEventLoop, QTimer
+from PySide6.QtCore import QEventLoop, QTimer, Slot
 from PySide6.QtWidgets import QApplication
 
 from controller.controller import Controller
@@ -94,6 +94,7 @@ class AppController(Controller):
         )
 
     @validate_model_entrypoint
+    @Slot(str)
     def _on_activity_log_file_update_requested(self, path: str) -> None:
         """Update the app-wide activity log file path."""
         logger.debug(
@@ -204,6 +205,7 @@ class AppController(Controller):
                 except (RuntimeError, TypeError):
                     pass
 
+    @Slot()
     def _on_application_about_to_quit(self) -> None:
         """Drain bootstrap async work, run close like other jobs, then tear down runners."""
 

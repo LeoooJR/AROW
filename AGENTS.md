@@ -243,6 +243,8 @@ GUI settings are split between **app-wide tokens** and **owner-local modules**, 
 - Use named handler methods instead of lambda slot targets.
 - Do not decorate direct `.emit` bridges (`clicked.connect(signals.DEVICE.AddDeviceRequested.emit)`) or Qt built-in methods (`close`, `setChecked`).
 
+In **`src/controller`**, apply the same rule to handlers wired in subcontroller `connect_view_signals()` and `AppController._connect_view_signals()`. Do **not** decorate `model_entrypoint.subscribe(...)` handlers (core bus, not Qt). Controllers remain plain Python classes; they do not need to inherit `QObject`.
+
 ### Stylesheets
 
 - Keep styling in `src/gui/stylesheet.py`.
