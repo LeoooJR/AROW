@@ -227,8 +227,12 @@ class AdbSubController(AppSubController):
             "AdbSubController: devices updated",
             device_count=len(descriptors),
             device_descriptors=descriptors,
+            device_id_rebindings=dict(payload.device_id_rebindings),
         )
-        self.view.forward_devices_updated(descriptors)
+        self.view.forward_devices_updated(
+            descriptors,
+            dict(payload.device_id_rebindings),
+        )
 
     @validate_view
     def _on_device_authentification_succeeded(

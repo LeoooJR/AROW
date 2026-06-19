@@ -51,10 +51,24 @@ def test_reconcile_adds_newly_discovered_device(tmp_path: Path) -> None:
     model_entrypoint, server = _model_with_server(tmp_path)
     discovered = Phone(id="fresh-device", state="device", model="Pixel")
 
-    changed = model_entrypoint.reconcile_paired_devices([discovered])
+    result = model_entrypoint.reconcile_paired_devices([discovered])
 
-    assert changed is True
+    assert result.changed is True
+    assert result.device_id_rebindings == {}
     assert server.paired_devices.get("fresh-device") is discovered
+
+
+def test_create_simulation_reuses_existing_device_simulation(tmp_path: Path) -> None:
+    """Repeat selection of the same device must not create duplicate simulations."""
+    model_entrypoint, server = _model_with_server(tmp_path)
+    phone = Phone(id="device-1", state="device", model="Pixel")
+    server.paired_devices.add(phone)
+
+    first_simulation_id = _create_simulation_id(model_entrypoint, "device-1")
+    second_simulation_id = _create_simulation_id(model_entrypoint, "device-1")
+
+    assert first_simulation_id == second_simulation_id
+    assert len(list(model_entrypoint._simulations)) == 1
 
 
 def test_reconcile_removes_stale_device_and_simulation(tmp_path: Path) -> None:
@@ -64,9 +78,10 @@ def test_reconcile_removes_stale_device_and_simulation(tmp_path: Path) -> None:
     server.paired_devices.add(stale_phone)
     simulation_id = _create_simulation_id(model_entrypoint, "stale-device")
 
-    changed = model_entrypoint.reconcile_paired_devices([])
+    result = model_entrypoint.reconcile_paired_devices([])
 
-    assert changed is True
+    assert result.changed is True
+    assert result.device_id_rebindings == {}
     assert server.paired_devices.get("stale-device") is None
     assert model_entrypoint.get_simulation(simulation_id) is None
 
@@ -78,9 +93,10 @@ def test_reconcile_updates_existing_device_in_place(tmp_path: Path) -> None:
     server.paired_devices.add(paired)
     discovered = Phone(id="device-1", state="offline", model="New model")
 
-    changed = model_entrypoint.reconcile_paired_devices([discovered])
+    result = model_entrypoint.reconcile_paired_devices([discovered])
 
-    assert changed is True
+    assert result.changed is True
+    assert result.device_id_rebindings == {}
     assert server.paired_devices.get("device-1") is paired
     assert paired.descriptor.model == "New model"
     assert paired.descriptor.state == "offline"
@@ -103,9 +119,12 @@ def test_reconcile_matches_by_stable_key_when_adb_id_changes(tmp_path: Path) -> 
         model="Updated model",
     )
 
-    changed = model_entrypoint.reconcile_paired_devices([discovered])
+    result = model_entrypoint.reconcile_paired_devices([discovered])
 
-    assert changed is True
+    assert result.changed is True
+    assert result.device_id_rebindings == {
+        "192.168.0.10:5555": "192.168.0.10:37849"
+    }
     assert server.paired_devices.get("192.168.0.10:5555") is None
     assert server.paired_devices.get("192.168.0.10:37849") is paired
     assert paired.descriptor.model == "Updated model"
@@ -118,9 +137,10 @@ def test_reconcile_noop_when_discovery_matches_paired(tmp_path: Path) -> None:
     server.paired_devices.add(paired)
     discovered = Phone(id="device-1", state="device", model="Pixel")
 
-    changed = model_entrypoint.reconcile_paired_devices([discovered])
+    result = model_entrypoint.reconcile_paired_devices([discovered])
 
-    assert changed is False
+    assert result.changed is False
+    assert result.device_id_rebindings == {}
     assert server.paired_devices.get("device-1") is paired
 
 
@@ -159,9 +179,10 @@ def test_reconcile_does_not_merge_devices_on_tier2_stable_key_collision(
     server.paired_devices.add(paired_a)
     server.paired_devices.add(paired_b)
 
-    changed = model_entrypoint.reconcile_paired_devices([discovered_a, discovered_b])
+    result = model_entrypoint.reconcile_paired_devices([discovered_a, discovered_b])
 
-    assert changed is True
+    assert result.changed is True
+    assert result.device_id_rebindings == {}
     assert server.paired_devices.get("10.0.0.1:5555") is None
     assert server.paired_devices.get("10.0.0.1:44444") is discovered_a
     assert server.paired_devices.get("10.0.0.2:5555") is paired_b

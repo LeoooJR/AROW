@@ -113,6 +113,50 @@ def test_refresh_known_devices_apply_replaces_devices_and_emits_update() -> None
     ]
 
 
+def test_refresh_known_devices_apply_emits_safe_device_id_rebindings() -> None:
+    """ADB id changes matched by Tier-1 serial are forwarded to the UI payload."""
+    state = MockAdbState(seed=204, initial_devices=0)
+    server = MockAdbServer(state=state)
+    client = MockAdbClient(state=state)
+    model_entrypoint = ModelEntrypoint()
+    model_entrypoint._adb_server = server
+    model_entrypoint._adb_client = client
+    paired_phone = Phone(
+        id="192.168.0.10:5555",
+        state="device",
+        hardware_serial="SER-REFRESH",
+        model="Pixel",
+    )
+    refreshed_phone = Phone(
+        id="192.168.0.10:37849",
+        state="device",
+        hardware_serial="SER-REFRESH",
+        model="Pixel",
+    )
+    server.paired_devices.add(paired_phone)
+    emitted: list[tuple[CoreSignal, object]] = []
+    model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
+        (signal, payload)
+    )
+
+    outcome = RefreshKnownDevicesOutcome(devices=[refreshed_phone])
+    RefreshKnownDevicesWork.apply_main_thread(model_entrypoint, outcome)
+
+    assert server.paired_devices.get("192.168.0.10:5555") is None
+    assert server.paired_devices.get("192.168.0.10:37849") is paired_phone
+    assert emitted == [
+        (
+            CoreSignal.DEVICES_UPDATED,
+            DevicesUpdatedPayload(
+                devices=[paired_phone],
+                device_id_rebindings={
+                    "192.168.0.10:5555": "192.168.0.10:37849"
+                },
+            ),
+        )
+    ]
+
+
 def test_refresh_known_devices_apply_skips_emit_when_devices_unchanged() -> None:
     """Unchanged discovery payloads avoid redundant DEVICES_UPDATED emissions."""
     state = MockAdbState(seed=203, initial_devices=0)

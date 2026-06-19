@@ -1,7 +1,8 @@
 from abc import ABC
+from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
-from typing import Any, Callable, Literal, overload
+from typing import Any, Callable, Literal, Mapping, overload
 
 from core.adb.client import AdbClient
 from core.adb.server import AdbServer
@@ -88,6 +89,14 @@ def register_core_runtime_result_applier(
 ) -> None:
     """Register or replace the main-thread applier for ``result_type`` outcomes."""
     _CORE_RUNTIME_RESULT_APPLIERS[result_type] = applier
+
+
+@dataclass(frozen=True, slots=True)
+class DeviceReconcileResult:
+    """Outcome of reconciling a fresh ADB discovery list with paired devices."""
+
+    changed: bool
+    device_id_rebindings: Mapping[str, str] = field(default_factory=dict)
 
 
 class Entrypoint(ABC):
@@ -491,7 +500,7 @@ class ModelEntrypoint(Entrypoint):
             return []
         return resolved.get_known_devices()
 
-    def reconcile_paired_devices(self, phones: list[Phone]) -> bool:
+    def reconcile_paired_devices(self, phones: list[Phone]) -> DeviceReconcileResult:
         """
         Reconcile paired devices with a freshly discovered handset list.
 
@@ -501,8 +510,9 @@ class ModelEntrypoint(Entrypoint):
         dropped best-effort.
 
         Returns:
-            True when the paired repository or simulations changed; False when
-            the outcome is already reflected (caller may skip UI refresh).
+            Result carrying whether the paired repository or simulations changed
+            and any safe old ADB id -> new ADB id rebindings detected during
+            collision-resistant identity reconciliation.
         """
         if self._adb_server is None:
             raise AttributeError(
@@ -516,6 +526,7 @@ class ModelEntrypoint(Entrypoint):
         matched_paired_ids: set[int] = (
             set()
         )  # Set of paired device ids that have been matched
+        device_id_rebindings: dict[str, str] = {}
         changed = False
 
         for discovered in discovered_phones:
@@ -545,6 +556,7 @@ class ModelEntrypoint(Entrypoint):
                     old_connection_id != discovered.id
                 ):  # If the ADB id changed, add the updated paired device back
                     paired_devices.add(paired)
+                    device_id_rebindings[old_connection_id] = discovered.id
                 changed = (
                     True  # At least one device was updated, UI needs to be refreshed
                 )
@@ -582,7 +594,10 @@ class ModelEntrypoint(Entrypoint):
                 discovered_count=len(discovered_phones),
                 paired_count=len(paired_devices),
             )
-        return changed
+        return DeviceReconcileResult(
+            changed=changed,
+            device_id_rebindings=device_id_rebindings,
+        )
 
     def create_simulation(self, device_id: str) -> None:
         """
@@ -602,8 +617,16 @@ class ModelEntrypoint(Entrypoint):
         device: Phone | None = self.get_device(device_id)
         if device is None:
             raise AttributeError(f"Device with id {device_id} not found")
-        simulation: Simulation = Simulation(device=device)
-        self._simulations.add(simulation)
+        simulation: Simulation | None = self._get_simulation_for_device(device_id)
+        if simulation is None:
+            simulation = Simulation(device=device)
+            self._simulations.add(simulation)
+        else:
+            logger.info(
+                "ModelEntrypoint: reusing existing simulation for device",
+                simulation_id=simulation.id,
+                device_id=device_id,
+            )
         self._signal_bus.emit(
             CoreSignal.SIMULATION_CREATED,
             SimulationCreatedPayload(simulation=simulation),
@@ -649,15 +672,22 @@ class ModelEntrypoint(Entrypoint):
         """
         return self._simulations.remove(simulation)
 
+    def _get_simulation_for_device(self, device_id: str) -> Simulation | None:
+        """Return the existing simulation for a device when one is already tracked."""
+        for simulation in self._simulations:
+            device = simulation.device
+            if device is not None and device.id == device_id:
+                return simulation
+        return None
+
     def delete_simulation_for_device(self, device_id: str) -> None:
         """
         Delete a simulation for a device by id.
         """
-        for simulation in self._simulations:
-            device = simulation.device
-            if device is not None and device.id == device_id:
-                self.delete_simulation(simulation)
-                return
+        simulation = self._get_simulation_for_device(device_id)
+        if simulation is not None:
+            self.delete_simulation(simulation)
+            return
         raise ValueError(f"Simulation for device with id {device_id} not found")
 
     def render_map(self, simulation_id: str) -> None:

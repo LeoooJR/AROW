@@ -176,7 +176,7 @@ class DeviceSelectionBlock(QFrame, Block):
         self._refresh_timer.start()
 
         self.ui.available_device_list.selectionModel().clear()  # Clear the selection model to avoid any residual selection when the list is empty.
-        self._has_active_device = False
+        self._active_device_id: str | None = None
         self._is_extended = False
 
         self._finalize_ui_hooks()
@@ -343,6 +343,13 @@ class DeviceSelectionBlock(QFrame, Block):
             if isinstance(item, self._device_item_type):
                 item._sync_size_hint()
 
+    def _find_available_device_item(self, device_id: str) -> DeviceItem | None:
+        """Return the list row matching ``device_id`` when present."""
+        for item in self.ui.available_device_list.iter_items():
+            if isinstance(item, self._device_item_type) and item.id == device_id:
+                return item
+        return None
+
     @Slot()
     def _on_left_panels_display_requested(self) -> None:
         """Resync device row presentation when the left panels are shown again."""
@@ -351,9 +358,6 @@ class DeviceSelectionBlock(QFrame, Block):
     @Slot(dict)
     def _on_authentification_succeeded(self, device: dict) -> None:
         """Add a newly authenticated device and mark it as the active selection."""
-        self._has_active_device = (
-            False  # Authentification does not mean the device is active.
-        )
         item = self._device_item_type.add_to_list(
             self.ui.available_device_list,
             id=device["id"],
@@ -374,6 +378,8 @@ class DeviceSelectionBlock(QFrame, Block):
         if item is None:
             return
         if isinstance(item, self._device_item_type):
+            if item.id == self._active_device_id:
+                return
             signals.DEVICE.DeviceSelectionRequested.emit(item.id, item.name)
         else:
             logger.warning(
@@ -385,34 +391,52 @@ class DeviceSelectionBlock(QFrame, Block):
         self, simulation_id: str, device_id: str, device_name: str
     ) -> None:
         """Mark the currently selected row active after selection succeeds."""
-        self._has_active_device = True
-        selected_item = self.ui.available_device_list.currentItem()
+        selected_item = self._find_available_device_item(device_id)
         if selected_item is None:
+            logger.warning(
+                "DeviceSelectionBlock: selected device row not found",
+                device_id=device_id,
+                device_name=device_name,
+            )
             return
+        self._active_device_id = device_id
         # Ensure that no other device is active.
         for list_item in self.ui.available_device_list.iter_items():
-            if list_item.badge == "active":
+            if (
+                isinstance(list_item, self._device_item_type)
+                and list_item.id != device_id
+                and list_item.badge == "active"
+            ):
                 list_item.badge = "trusted"
-                break
         # Mark the selected device as active.
         selected_item.badge = "active"
+        self.ui.available_device_list.setCurrentItem(selected_item)
         # Refresh the device list.
         self._on_available_device_list_model_changed()
 
     @Slot(str, str)
     def _on_device_selection_failed(self, device_id: str, device_name: str) -> None:
         """Clear the current row selection after selection failure."""
-        self._has_active_device = False
+        self._active_device_id = None
         self.ui.available_device_list.setCurrentItem(
             None, QItemSelectionModel.SelectionFlag.Clear
         )
         self.ui.available_device_list.sortItems()
         self._on_available_device_list_model_changed()
 
-    @Slot(object)
-    def _on_devices_updated(self, devices: list[dict]) -> None:
+    @Slot(object, object)
+    def _on_devices_updated(
+        self,
+        devices: list[dict],
+        device_id_rebindings: dict[str, str] | None = None,
+    ) -> None:
         """Replace the available-device list from controller-provided device data."""
-        self._has_active_device = False
+        previous_active_device_id = self._active_device_id
+        if previous_active_device_id is not None:
+            previous_active_device_id = (device_id_rebindings or {}).get(
+                previous_active_device_id,
+                previous_active_device_id,
+            )
         self.ui.available_device_list.clear()
         for device in devices:
             self._device_item_type.add_to_list(
@@ -427,6 +451,22 @@ class DeviceSelectionBlock(QFrame, Block):
                 last_communication=device["last_communication"],
             )
         self.ui.available_device_list.sortItems()
+        if previous_active_device_id is None:
+            self._active_device_id = None
+            self.ui.available_device_list.setCurrentItem(
+                None, QItemSelectionModel.SelectionFlag.Clear
+            )
+        else:
+            active_item = self._find_available_device_item(previous_active_device_id)
+            if active_item is None:
+                self._active_device_id = None
+                self.ui.available_device_list.setCurrentItem(
+                    None, QItemSelectionModel.SelectionFlag.Clear
+                )
+            else:
+                self._active_device_id = previous_active_device_id
+                active_item.badge = "active"
+                self.ui.available_device_list.setCurrentItem(active_item)
         self._on_available_device_list_model_changed()
 
     @Slot()
@@ -453,10 +493,11 @@ class DeviceSelectionBlock(QFrame, Block):
                     if (
                         removed_item == current_item_before_removal
                     ):  # The removed item was the current item
-                        self._has_active_device = False
                         self.ui.available_device_list.setCurrentItem(
                             None, QItemSelectionModel.SelectionFlag.Clear
                         )
+                    if removed_item.id == self._active_device_id:
+                        self._active_device_id = None
                     del removed_item
                     break
         self.ui.available_device_list.sortItems()
@@ -498,7 +539,7 @@ class DeviceSelectionBlock(QFrame, Block):
             return False
         if self.ui.available_device_list.currentItem() is not None:
             return False
-        if self._has_active_device:
+        if self._active_device_id is not None:
             return False
         return True
 

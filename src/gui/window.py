@@ -1102,14 +1102,18 @@ class MainWindow(QMainWindow):
             level="error",
         )
 
-    def forward_devices_updated(self, devices: list[dict]) -> None:
+    def forward_devices_updated(
+        self, devices: list[dict], device_id_rebindings: dict[str, str] | None = None
+    ) -> None:
         """Handle the devices updated."""
+        rebindings = device_id_rebindings or {}
         logger.info(
             "MainWindow: devices updated",
             device_count=len(devices),
             device_descriptors=devices,
+            device_id_rebindings=rebindings,
         )
-        signals.DEVICE.DevicesUpdated.emit(devices)
+        signals.DEVICE.DevicesUpdated.emit(devices, rebindings)
 
     def forward_remove_active_device_succeeded(self, device_id: str) -> None:
         """Handle the active device removed."""
