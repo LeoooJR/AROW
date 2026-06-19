@@ -602,8 +602,16 @@ class ModelEntrypoint(Entrypoint):
         device: Phone | None = self.get_device(device_id)
         if device is None:
             raise AttributeError(f"Device with id {device_id} not found")
-        simulation: Simulation = Simulation(device=device)
-        self._simulations.add(simulation)
+        simulation: Simulation | None = self._get_simulation_for_device(device_id)
+        if simulation is None:
+            simulation = Simulation(device=device)
+            self._simulations.add(simulation)
+        else:
+            logger.info(
+                "ModelEntrypoint: reusing existing simulation for device",
+                simulation_id=simulation.id,
+                device_id=device_id,
+            )
         self._signal_bus.emit(
             CoreSignal.SIMULATION_CREATED,
             SimulationCreatedPayload(simulation=simulation),
@@ -649,15 +657,22 @@ class ModelEntrypoint(Entrypoint):
         """
         return self._simulations.remove(simulation)
 
+    def _get_simulation_for_device(self, device_id: str) -> Simulation | None:
+        """Return the existing simulation for a device when one is already tracked."""
+        for simulation in self._simulations:
+            device = simulation.device
+            if device is not None and device.id == device_id:
+                return simulation
+        return None
+
     def delete_simulation_for_device(self, device_id: str) -> None:
         """
         Delete a simulation for a device by id.
         """
-        for simulation in self._simulations:
-            device = simulation.device
-            if device is not None and device.id == device_id:
-                self.delete_simulation(simulation)
-                return
+        simulation = self._get_simulation_for_device(device_id)
+        if simulation is not None:
+            self.delete_simulation(simulation)
+            return
         raise ValueError(f"Simulation for device with id {device_id} not found")
 
     def render_map(self, simulation_id: str) -> None:

@@ -57,6 +57,19 @@ def test_reconcile_adds_newly_discovered_device(tmp_path: Path) -> None:
     assert server.paired_devices.get("fresh-device") is discovered
 
 
+def test_create_simulation_reuses_existing_device_simulation(tmp_path: Path) -> None:
+    """Repeat selection of the same device must not create duplicate simulations."""
+    model_entrypoint, server = _model_with_server(tmp_path)
+    phone = Phone(id="device-1", state="device", model="Pixel")
+    server.paired_devices.add(phone)
+
+    first_simulation_id = _create_simulation_id(model_entrypoint, "device-1")
+    second_simulation_id = _create_simulation_id(model_entrypoint, "device-1")
+
+    assert first_simulation_id == second_simulation_id
+    assert len(list(model_entrypoint._simulations)) == 1
+
+
 def test_reconcile_removes_stale_device_and_simulation(tmp_path: Path) -> None:
     """Handsets missing from discovery are removed and their simulation is dropped."""
     model_entrypoint, server = _model_with_server(tmp_path)
