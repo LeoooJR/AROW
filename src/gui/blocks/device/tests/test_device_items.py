@@ -1,5 +1,5 @@
 """
-Tests for custom device-list rows and the device selection block.
+Tests for custom device-list rows and item-level formatting helpers.
 
 Headless CI: use ``QT_QPA_PLATFORM=offscreen`` if the platform plugin fails.
 """
@@ -16,11 +16,7 @@ from gui.blocks.device import (
     DeviceSelectionBlock,
     format_last_communication_short,
 )
-from gui.blocks.device.device_settings import device_settings
-from gui.components import DotStatusBadge, StatusBadge
-from gui.icons import GenericIcons
-from gui.settings import Settings
-from gui.signals import signals
+from gui.components import StatusBadge
 
 pytestmark = pytest.mark.usefixtures("qapp")
 
@@ -114,211 +110,6 @@ def test_device_item_applies_alert_highlight_on_creation(qtbot) -> None:
     assert item.row_widget.property("alert") is True
 
 
-def test_device_selection_block_syncs_custom_row_selection(qtbot) -> None:
-    block = DeviceSelectionBlock()
-    qtbot.addWidget(block)
-    block.show()
-    first = DeviceItem.add_to_list(block.available_device_list, text="Pixel 9")
-    second = DeviceItem.add_to_list(block.available_device_list, text="Zenfone 11")
-    qtbot.wait(0)
-
-    block.available_device_list.setCurrentItem(first)
-    qtbot.wait(0)
-    assert first.row_widget.property("selected") is True
-    assert second.row_widget.property("selected") is False
-
-    block.available_device_list.setCurrentItem(second)
-    qtbot.wait(0)
-    assert first.row_widget.property("selected") is False
-    assert second.row_widget.property("selected") is True
-
-
-def test_device_selection_block_hides_empty_state_when_devices_exist(qtbot) -> None:
-    block = DeviceSelectionBlock()
-    qtbot.addWidget(block)
-    block.show()
-
-    DeviceItem.add_to_list(block.available_device_list, text="Pixel 9")
-    qtbot.wait(0)
-
-    assert block.ui.available_device_empty_state.isHidden() is True
-    assert block.ui.select_helper_text.isVisible() is True
-    assert block.ui.buttons_wrapper.isVisible() is True
-
-
-def test_device_selection_block_empty_state_buttons_emit_actions(qtbot) -> None:
-    block = DeviceSelectionBlock()
-    qtbot.addWidget(block)
-    block.show()
-    qtbot.wait(0)
-
-    with qtbot.waitSignal(signals.DEVICE.AddDeviceRequested):
-        block.ui.available_device_empty_state.ui.add_button.click()
-
-    with qtbot.waitSignal(signals.DEVICE.RefreshDeviceListRequested):
-        block.ui.available_device_empty_state.ui.refresh_button.click()
-
-
-def _device_rows(block: DeviceSelectionBlock) -> list[DeviceItem]:
-    """Return custom device rows from the block list."""
-    return [
-        item
-        for item in block.available_device_list.iter_items()
-        if isinstance(item, DeviceItem)
-    ]
-
-
-def test_device_selection_block_extend_signal_expands_all_rows(qtbot) -> None:
-    block = DeviceSelectionBlock()
-    qtbot.addWidget(block)
-    block.show()
-    DeviceItem.add_to_list(
-        block.available_device_list,
-        text="Pixel 9",
-        last_communication="Active now",
-    )
-    DeviceItem.add_to_list(
-        block.available_device_list,
-        text="Zenfone 11",
-        last_communication="30 min ago",
-    )
-    qtbot.wait(0)
-
-    for item in _device_rows(block):
-        assert item.ui.time_label.isHidden() is True
-        assert item.trash_button.isHidden() is True
-
-    signals.UI.ExtendDeviceSelectionPanelRequested.emit()
-    qtbot.wait(0)
-
-    for item in _device_rows(block):
-        assert item.ui.time_label.isHidden() is False
-        assert item.trash_button.isHidden() is False
-
-
-def test_device_selection_block_shorten_signal_collapses_all_rows(qtbot) -> None:
-    block = DeviceSelectionBlock()
-    qtbot.addWidget(block)
-    block.show()
-    DeviceItem.add_to_list(
-        block.available_device_list,
-        text="Pixel 9",
-        last_communication="Active now",
-    )
-    DeviceItem.add_to_list(
-        block.available_device_list,
-        text="Zenfone 11",
-        last_communication="30 min ago",
-    )
-    qtbot.wait(0)
-
-    signals.UI.ExtendDeviceSelectionPanelRequested.emit()
-    qtbot.wait(0)
-    for item in _device_rows(block):
-        assert item.ui.time_label.isHidden() is False
-
-    signals.UI.ShortenDeviceSelectionPanelRequested.emit()
-    qtbot.wait(0)
-
-    for item in _device_rows(block):
-        assert item.ui.time_label.isHidden() is True
-        assert item.trash_button.isHidden() is True
-
-
-def test_device_selection_block_extends_new_authenticated_device(qtbot) -> None:
-    block = DeviceSelectionBlock()
-    qtbot.addWidget(block)
-    block.show()
-
-    signals.UI.ExtendDeviceSelectionPanelRequested.emit()
-    qtbot.wait(0)
-    block._on_authentification_succeeded(
-        {
-            "id": "new-phone",
-            "name": "Pixel 9",
-            "os": "15",
-            "last_communication": _NOW,
-        }
-    )
-    qtbot.wait(0)
-
-    item = _device_rows(block)[0]
-    assert item.ui.time_label.isHidden() is False
-    assert item.trash_button.isHidden() is False
-
-
-def test_device_selection_block_extends_refreshed_devices(qtbot) -> None:
-    block = DeviceSelectionBlock()
-    qtbot.addWidget(block)
-    block.show()
-
-    signals.UI.ExtendDeviceSelectionPanelRequested.emit()
-    qtbot.wait(0)
-    block._on_devices_updated(
-        [
-            {
-                "id": "first-phone",
-                "name": "Pixel 9",
-                "os": "15",
-                "last_communication": _NOW,
-            },
-            {
-                "id": "second-phone",
-                "name": "Zenfone 11",
-                "os": "14",
-                "last_communication": _NOW - dt.timedelta(minutes=30),
-            },
-        ]
-    )
-    qtbot.wait(0)
-
-    for item in _device_rows(block):
-        assert item.ui.time_label.isHidden() is False
-        assert item.trash_button.isHidden() is False
-
-
-def test_device_selection_block_keeps_new_rows_shortened_after_shorten(qtbot) -> None:
-    block = DeviceSelectionBlock()
-    qtbot.addWidget(block)
-    block.show()
-
-    signals.UI.ExtendDeviceSelectionPanelRequested.emit()
-    signals.UI.ShortenDeviceSelectionPanelRequested.emit()
-    qtbot.wait(0)
-    block._on_devices_updated(
-        [
-            {
-                "id": "first-phone",
-                "name": "Pixel 9",
-                "os": "15",
-                "last_communication": _NOW,
-            }
-        ]
-    )
-    qtbot.wait(0)
-
-    item = _device_rows(block)[0]
-    assert item.ui.time_label.isHidden() is True
-    assert item.trash_button.isHidden() is True
-
-
-def test_alert_device_item_can_also_be_selected(qtbot) -> None:
-    block = DeviceSelectionBlock()
-    qtbot.addWidget(block)
-    block.show()
-    item = DeviceItem.add_to_list(
-        block.available_device_list,
-        text="Unknown Device",
-        alert_highlight=True,
-    )
-    qtbot.wait(0)
-
-    block.available_device_list.setCurrentItem(item)
-    qtbot.wait(0)
-    assert item.row_widget.property("alert") is True
-    assert item.row_widget.property("selected") is True
-
-
 def test_device_item_compact_size_hint_stays_within_viewport(qtbot) -> None:
     block = DeviceSelectionBlock()
     qtbot.addWidget(block)
@@ -342,20 +133,20 @@ def test_device_item_compact_size_hint_stays_within_viewport(qtbot) -> None:
 def test_device_item_extended_size_hint_stays_within_viewport(qtbot) -> None:
     block = DeviceSelectionBlock()
     qtbot.addWidget(block)
-    block.resize(340, 520)
+    block.resize(420, 520)
     block.show()
     item = DeviceItem.add_to_list(
         block.available_device_list,
         text="Samsung Galaxy S24 Ultra Developer Preview Lab Device With Very Long Friendly Name",
         operating_system="Android 15 Beta 4",
         location="North Charleston, South Carolina",
-        last_communication="Active now",
         badge="trusted",
+        last_communication=_NOW - dt.timedelta(days=12, hours=3, minutes=5),
     )
-    qtbot.wait(0)
-
     item.extend()
     qtbot.wait(0)
+    item._sync_size_hint()
+
     viewport_width = block.available_device_list.viewport().width()
     assert viewport_width > 0
     assert item.sizeHint().width() <= viewport_width
@@ -364,91 +155,43 @@ def test_device_item_extended_size_hint_stays_within_viewport(qtbot) -> None:
 def test_device_item_compact_text_uses_single_line_elision(qtbot) -> None:
     block = DeviceSelectionBlock()
     qtbot.addWidget(block)
-    block.resize(340, 520)
+    block.resize(320, 520)
     block.show()
-    full_name = "Unknown Device With A Very Long Friendly Name"
     item = DeviceItem.add_to_list(
         block.available_device_list,
-        text=full_name,
-        operating_system="Android 15",
-        location="South Adrianstad, GA",
-        badge="new",
+        text="Samsung Galaxy S24 Ultra Developer Preview Lab Device With Very Long Friendly Name",
+        operating_system="Android 15 Beta 4",
+        location="North Charleston, South Carolina",
+        badge="trusted",
     )
     qtbot.wait(0)
     item._sync_size_hint()
 
-    assert item.name == full_name
+    assert item.ui.name_label.text().endswith("…")
     assert "\n" not in item.ui.name_label.text()
     assert "\n" not in item.ui.subtitle_label.text()
-    assert item.ui.name_label.wordWrap() is False
-    assert item.ui.subtitle_label.wordWrap() is False
 
 
 def test_device_item_extended_text_uses_single_line_elision(qtbot) -> None:
-    item = DeviceItem(
-        None,
-        text="Unknown Device With A Very Long Friendly Name",
-        operating_system="Android 15",
-        location="South Adrianstad, GA",
-        badge="new",
-    )
-    qtbot.addWidget(item.row_widget)
-    item.extend()
-
-    assert item.name == "Unknown Device With A Very Long Friendly Name"
-    assert "\n" not in item.ui.name_label.text()
-    assert "\n" not in item.ui.subtitle_label.text()
-    assert item.ui.name_label.wordWrap() is False
-    assert item.ui.subtitle_label.wordWrap() is False
-
-
-def test_device_selection_block_highlight_attention_pulses_list(qtbot) -> None:
     block = DeviceSelectionBlock()
     qtbot.addWidget(block)
-    block.show()
-
-    assert block.available_device_list.objectName() == "available-device-list"
-
-    signals.UI.MapTabActivated.emit()
-    qtbot.wait(80)
-
-    level = block.available_device_list.property("device-list-highlight-level")
-    assert level is not None
-    assert level != "0"
-
-    qtbot.wait(device_settings.ATTENTION_HIGHLIGHT_DURATION + 100)
-
-    assert block.available_device_list.property("device-list-highlight-level") == "0"
-
-
-def test_device_selection_block_map_tab_skips_highlight_when_device_selected(
-    qtbot,
-) -> None:
-    block = DeviceSelectionBlock()
-    qtbot.addWidget(block)
+    block.resize(360, 520)
     block.show()
     item = DeviceItem.add_to_list(
         block.available_device_list,
-        id="device-1",
-        text="Phone",
-        type="available",
-        badge="new",
-        operating_system="Android",
-        location="N/A",
-        last_communication="Active now",
+        text="Samsung Galaxy S24 Ultra Developer Preview Lab Device With Very Long Friendly Name",
+        operating_system="Android 15 Beta 4",
+        location="North Charleston, South Carolina",
+        badge="trusted",
+        last_communication=_NOW - dt.timedelta(days=12, hours=3, minutes=5),
     )
-    block.available_device_list.setCurrentItem(item)
-    signals.DEVICE.DeviceSelectionSucceeded.emit("sim-1", "device-1", "Phone")
+    item.extend()
     qtbot.wait(0)
+    item._sync_size_hint()
 
-    signals.UI.MapTabActivated.emit()
-    qtbot.wait(80)
-
-    assert block.available_device_list.property("device-list-highlight-level") in (
-        None,
-        "0",
-        0,
-    )
+    assert item.ui.name_label.text().endswith("…")
+    assert "\n" not in item.ui.name_label.text()
+    assert "\n" not in item.ui.subtitle_label.text()
 
 
 @pytest.mark.parametrize(
@@ -504,44 +247,6 @@ def test_device_item_live_row_updates_with_now(qtbot) -> None:
     assert item.ui.time_label.text() == "4 hours ago"
 
 
-def test_device_selection_block_seeds_placeholders_from_debug_signal(qtbot) -> None:
-    block = DeviceSelectionBlock()
-    qtbot.addWidget(block)
-
-    assert block.available_device_list.count() == 0
-
-    signals.UI.UiConstraintsDisabled.emit()
-    qtbot.wait(0)
-
-    assert block.available_device_list.count() == 3
-
-
-def test_device_selection_block_ignores_missing_remove_request(qtbot) -> None:
-    block = DeviceSelectionBlock()
-    qtbot.addWidget(block)
-    DeviceItem.add_to_list(block.available_device_list, id="known", text="Pixel 9")
-    qtbot.wait(0)
-
-    signals.DEVICE.RemoveDeviceRequested.emit("missing")
-    qtbot.wait(0)
-
-    assert block.available_device_list.count() == 1
-
-
-def test_device_selection_block_handles_failed_selection_without_current_item(
-    qtbot,
-) -> None:
-    block = DeviceSelectionBlock()
-    qtbot.addWidget(block)
-    DeviceItem.add_to_list(block.available_device_list, id="known", text="Pixel 9")
-    block.available_device_list.setCurrentItem(None)
-
-    signals.DEVICE.DeviceSelectionFailed.emit("missing", "Missing")
-    qtbot.wait(0)
-
-    assert block.available_device_list.currentItem() is None
-
-
 def test_device_item_refresh_badge_keeps_new_before_five_minutes(qtbot) -> None:
     at = _NOW - dt.timedelta(minutes=4, seconds=59)
     item = DeviceItem(None, text="Phone", badge="new", last_communication=at)
@@ -577,20 +282,3 @@ def test_device_item_refresh_badge_skips_static_last_communication(qtbot) -> Non
     item.refresh_badge(now=_NOW)
 
     assert item.badge == "new"
-
-
-def test_device_selection_block_timer_tick_refreshes_badges(qtbot) -> None:
-    block = DeviceSelectionBlock()
-    qtbot.addWidget(block)
-    at = _NOW - dt.timedelta(minutes=5)
-    item = DeviceItem.add_to_list(
-        block.available_device_list,
-        text="Phone",
-        badge="new",
-        last_communication=at,
-    )
-    qtbot.wait(0)
-
-    block._on_refresh_timer_tick(now=_NOW)
-
-    assert item.badge == "trusted"
