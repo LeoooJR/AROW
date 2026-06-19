@@ -170,6 +170,7 @@ def test_map_block_load_map_html_shows_canvas_and_loads_local_file(
     monkeypatch.setattr(block, "_map_html_path", lambda simulation_id: html_path)
 
     block._load_map_html("sim-1")
+    qtbot.waitUntil(lambda: load.call_count == 1, timeout=1000)
 
     show_map_canvas.assert_called_once_with()
     load.assert_called_once()
@@ -240,6 +241,7 @@ def test_map_block_map_rendered_slot_loads_html_from_path(
     monkeypatch.setattr(block, "show_map_canvas", show_map_canvas)
 
     block._on_map_rendered("sim-1", str(html_path))
+    qtbot.waitUntil(lambda: load.call_count == 1, timeout=1000)
 
     show_map_canvas.assert_called_once_with()
     load.assert_called_once()

@@ -13,6 +13,7 @@ from PySide6.QtCore import (
     QPropertyAnimation,
     QSequentialAnimationGroup,
     Qt,
+    QTimer,
     QUrl,
     Slot,
 )
@@ -102,15 +103,27 @@ class Canvas(QWebEngineView):
             True,
         )
         self.loadFinished.connect(self._on_load_finished)
+        self._leaflet_page_ready: bool = False
 
         self._finalize_ui_hooks()
+
+    def _invalidate_leaflet_size(self) -> None:
+        """Ask Leaflet to recalculate map dimensions for the current canvas size."""
+        self.page().runJavaScript(_INVALIDATE_LEAFLET_MAPS_JS)
 
     @Slot(bool)
     def _on_load_finished(self, ok: bool) -> None:
         """Refresh Leaflet map layout after local HTML loads in the canvas."""
         if not ok:
             return
-        self.page().runJavaScript(_INVALIDATE_LEAFLET_MAPS_JS)
+        self._leaflet_page_ready = True
+        self._invalidate_leaflet_size()
+
+    def resizeEvent(self, event) -> None:
+        """Re-sync Leaflet map dimensions when the canvas is resized after load."""
+        super().resizeEvent(event)
+        if self._leaflet_page_ready:
+            self._invalidate_leaflet_size()
 
     def _finalize_ui_hooks(self) -> None:
         """Run the final UI setup hooks for the canvas."""
@@ -738,7 +751,6 @@ class MapBlock(QWidget):
 
     def _set_alignment(self) -> None:
         """Centralize layout alignment for the map view."""
-        self.layout().setAlignment(self.ui.canvas, Qt.AlignmentFlag.AlignCenter)
         self.layout().setAlignment(self.ui.coordinates, Qt.AlignmentFlag.AlignCenter)
 
     def _set_size_policy(self) -> None:
@@ -807,6 +819,10 @@ class MapBlock(QWidget):
         """Hide placeholders and show the rendered map canvas."""
         self.ui.placeholder.setVisible(False)
         self.ui.canvas.setVisible(True)
+        self.ui.canvas.updateGeometry()
+        layout = self.layout()
+        if layout is not None:
+            layout.activate()
 
     def _map_html_path(self, simulation_id: str) -> Path:
         """Return the expected on-disk HTML path for a simulation map."""
@@ -833,12 +849,16 @@ class MapBlock(QWidget):
             return
         load_url = QUrl.fromLocalFile(str(html_path.resolve()))
         self.show_map_canvas()
-        self.ui.canvas.load(load_url)
-        logger.info(
-            "MapBlock: map HTML loaded into canvas",
-            simulation_id=simulation_id,
-            path=str(html_path),
-        )
+
+        def _load_after_layout() -> None:
+            self.ui.canvas.load(load_url)
+            logger.info(
+                "MapBlock: map HTML loaded into canvas",
+                simulation_id=simulation_id,
+                path=str(html_path),
+            )
+
+        QTimer.singleShot(0, _load_after_layout)
 
     def apply_theme_icons(self, theme: Theme) -> None:
         """Refresh theme-dependent icons for all map block children."""
