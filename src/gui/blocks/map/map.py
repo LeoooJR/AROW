@@ -766,6 +766,8 @@ class MapBlock(QWidget):
         signals.DEVICE.RemoveActiveDeviceSucceeded.connect(
             self._on_remove_active_device_succeeded
         )
+        signals.UI.MapRendered.connect(self._on_map_rendered)
+        signals.UI.MapRenderFailed.connect(self._on_map_render_failed)
 
     def is_canvas_visible(self) -> bool:
         """Return whether the concrete map canvas is currently visible."""
@@ -818,7 +820,10 @@ class MapBlock(QWidget):
 
     def _load_map_html(self, simulation_id: str) -> None:
         """Load the rendered map HTML into the canvas when available."""
-        html_path = self._map_html_path(simulation_id)
+        self._load_map_html_from_path(simulation_id, self._map_html_path(simulation_id))
+
+    def _load_map_html_from_path(self, simulation_id: str, html_path: Path) -> None:
+        """Load map HTML from a concrete on-disk path into the canvas."""
         if not html_path.is_file():
             logger.warning(
                 "MapBlock: rendered map HTML not found",
@@ -852,7 +857,24 @@ class MapBlock(QWidget):
         self.show_map_loading_placeholder()
         self._on_run_helper_animation()
         signals.UI.RenderMapRequested.emit(simulation_id)
-        self._load_map_html(simulation_id)
+
+    @Slot(str, str)
+    def _on_map_rendered(self, simulation_id: str, html_path: str) -> None:
+        """Load the map canvas after async rendering completes."""
+        self._load_map_html_from_path(simulation_id, Path(html_path))
+
+    @Slot(str, str)
+    def _on_map_render_failed(self, simulation_id: str, reason: str) -> None:
+        """Return to device-required placeholder when map rendering fails."""
+        logger.warning(
+            "MapBlock: map render failed",
+            simulation_id=simulation_id,
+            reason=reason,
+        )
+        self.show_device_required_placeholder()
+        self.ui.placeholder.setVisible(True)
+        self.ui.canvas.setVisible(False)
+        self._on_run_helper_animation()
 
     @Slot(str, str)
     def _on_device_selection_failed(self, device_id: str, device_name: str) -> None:

@@ -19,7 +19,6 @@ from core.devices import (
     paired_phone_matches_discovery,
     phone_stable_key_is_collision_resistant,
 )
-from core.geo.renderer import MapRenderer
 from core.signals import (
     ActivityLogFileUpdatedPayload,
     AdbServerStartedPayload,
@@ -33,6 +32,8 @@ from core.signals import (
     HostComputerIdentityPayload,
     InMemoryCoreSignalBus,
     LogMessagePayload,
+    MapRenderedPayload,
+    MapRenderFailedPayload,
     SignalHandler,
     SimulationCreatedPayload,
     SimulationPositionChangedPayload,
@@ -54,6 +55,7 @@ from core.work.refresh_known_devices_work import (
     RefreshKnownDevicesOutcome,
     RefreshKnownDevicesWork,
 )
+from core.work.render_map_work import RenderMapOutcome, RenderMapWork
 from core.work.startup_work import StartupCoreRuntimeWork, StartupOutcome
 from core.work.works_repository import CORE_RUNTIME_WORKS
 from logger import logger
@@ -205,6 +207,20 @@ class Entrypoint(ABC):
     ) -> None: ...
 
     @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.MAP_RENDERED],
+        handler: SignalHandler[MapRenderedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.MAP_RENDER_FAILED],
+        handler: SignalHandler[MapRenderFailedPayload],
+    ) -> None: ...
+
+    @overload
     def subscribe(self, signal: CoreSignal, handler: SignalHandler[object]) -> None: ...
 
     def subscribe(self, signal: CoreSignal, handler: SignalHandler[Any]) -> None:
@@ -299,6 +315,20 @@ class Entrypoint(ABC):
         self,
         signal: Literal[CoreSignal.ACTIVITY_LOG_FILE_UPDATED],
         handler: SignalHandler[ActivityLogFileUpdatedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.MAP_RENDERED],
+        handler: SignalHandler[MapRenderedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.MAP_RENDER_FAILED],
+        handler: SignalHandler[MapRenderFailedPayload],
     ) -> None: ...
 
     @overload
@@ -690,40 +720,32 @@ class ModelEntrypoint(Entrypoint):
             return
         raise ValueError(f"Simulation for device with id {device_id} not found")
 
-    def render_map(self, simulation_id: str) -> None:
+    @staticmethod
+    def render_map(simulation_id: str, application_dir: Path) -> RenderMapOutcome:
         """
         Render the map for a simulation and write HTML under the application dir.
 
+        Process-safe static API: accepts only picklable inputs so controllers can
+        submit it through AsyncRunner's ProcessPool without serializing the whole
+        ModelEntrypoint instance.
+
+        Blocking; intended for AsyncRunner / worker-process use only.
+        Apply on the main thread via :meth:`apply_result` after AsyncRunner completes.
+
         Args:
             simulation_id: The id of the simulation whose map should be rendered.
+            application_dir: Root application data directory.
+
+        Returns:
+            RenderMapOutcome: Written HTML path and simulation id.
 
         Raises:
-            ValueError: If the simulation id is unknown.
-            RuntimeError: If map rendering or HTML export fails.
+            RenderMapError: If map rendering or HTML export fails.
         """
-        simulation: Simulation | None = self._simulations.get(simulation_id)
-        if simulation is None:
-            raise ValueError(f"Simulation with id {simulation_id} not found")
-        output_dir = self.application_dir / "simulations" / simulation.id / "map"
-        try:
-            manager: MapRenderer = MapRenderer()
-            html_path = manager.to_html(path=output_dir, prefix=simulation.id)
-        except Exception as error:
-            logger.error(
-                "ModelEntrypoint: failed to render map",
-                simulation_id=simulation_id,
-                output_dir=str(output_dir),
-                error=str(error),
-                exc_info=True,
-            )
-            raise RuntimeError(
-                f"Failed to render map for simulation {simulation_id}"
-            ) from error
-        logger.info(
-            "ModelEntrypoint: map rendered",
+        return RenderMapWork(
             simulation_id=simulation_id,
-            html_path=str(html_path),
-        )
+            application_dir=application_dir,
+        ).run()
 
     def apply_result(self, result: CoreRuntimeWorkOutcome) -> None:
         """

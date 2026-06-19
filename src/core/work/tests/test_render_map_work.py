@@ -1,0 +1,134 @@
+"""Tests for render map core runtime work."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from core.entrypoint import ModelEntrypoint
+from core.signals import CoreSignal, MapRenderedPayload, MapRenderFailedPayload
+from core.work.render_map_work import (
+    RenderMapError,
+    RenderMapOutcome,
+    RenderMapWork,
+)
+
+
+def test_render_map_work_run_returns_outcome(monkeypatch: pytest.MonkeyPatch) -> None:
+    html_path = Path("/tmp/sim-1.html")
+
+    class FakeRenderer:
+        def to_html(self, path: Path, prefix: str = "") -> Path:
+            assert prefix == "sim-1"
+            return html_path
+
+    monkeypatch.setattr(
+        "core.work.render_map_work.MapRenderer",
+        lambda: FakeRenderer(),
+    )
+
+    outcome = RenderMapWork(
+        simulation_id="sim-1",
+        application_dir=Path("/app"),
+    ).run()
+
+    assert outcome == RenderMapOutcome(simulation_id="sim-1", html_path=html_path)
+
+
+def test_render_map_work_run_raises_render_map_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class BrokenRenderer:
+        def to_html(self, path: Path, prefix: str = "") -> Path:
+            raise RuntimeError("boom")
+
+    monkeypatch.setattr(
+        "core.work.render_map_work.MapRenderer",
+        lambda: BrokenRenderer(),
+    )
+
+    with pytest.raises(RenderMapError) as exc_info:
+        RenderMapWork(
+            simulation_id="sim-1",
+            application_dir=Path("/app"),
+        ).run()
+
+    assert exc_info.value.simulation_id == "sim-1"
+
+
+def test_model_entrypoint_render_map_delegates_to_work(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    expected = RenderMapOutcome(
+        simulation_id="sim-1", html_path=Path("/tmp/sim-1.html")
+    )
+    calls: list[tuple[str, Path]] = []
+
+    class FakeWork:
+        def __init__(self, *, simulation_id: str, application_dir: Path) -> None:
+            calls.append((simulation_id, application_dir))
+
+        def run(self) -> RenderMapOutcome:
+            return expected
+
+    monkeypatch.setattr("core.entrypoint.RenderMapWork", FakeWork)
+
+    result = ModelEntrypoint.render_map("sim-1", Path("/app"))
+
+    assert result == expected
+    assert calls == [("sim-1", Path("/app"))]
+
+
+def test_apply_main_thread_emits_map_rendered() -> None:
+    model_entrypoint = ModelEntrypoint()
+    emitted: list[tuple[CoreSignal, object]] = []
+    model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
+        (signal, payload)
+    )
+    html_path = Path("/tmp/sim-1.html")
+
+    RenderMapWork.apply_main_thread(
+        model_entrypoint,
+        RenderMapOutcome(simulation_id="sim-1", html_path=html_path),
+    )
+
+    assert emitted == [
+        (
+            CoreSignal.MAP_RENDERED,
+            MapRenderedPayload(simulation_id="sim-1", html_path=html_path),
+        )
+    ]
+
+
+def test_apply_failure_main_thread_emits_map_render_failed() -> None:
+    model_entrypoint = ModelEntrypoint()
+    emitted: list[tuple[CoreSignal, object]] = []
+    model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
+        (signal, payload)
+    )
+
+    RenderMapWork.apply_failure_main_thread(
+        model_entrypoint,
+        RenderMapError(simulation_id="sim-1", reason="failed"),
+    )
+
+    assert emitted == [
+        (
+            CoreSignal.MAP_RENDER_FAILED,
+            MapRenderFailedPayload(simulation_id="sim-1", reason="failed"),
+        )
+    ]
+
+
+def test_apply_failure_main_thread_falls_back_to_generic_error() -> None:
+    model_entrypoint = ModelEntrypoint()
+    emitted: list[tuple[CoreSignal, object]] = []
+    model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
+        (signal, payload)
+    )
+
+    RenderMapWork.apply_failure_main_thread(model_entrypoint, RuntimeError("boom"))
+
+    assert len(emitted) == 1
+    assert emitted[0][0] == CoreSignal.ERROR_RAISED

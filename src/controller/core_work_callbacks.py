@@ -16,11 +16,13 @@ from core.work.authentificate_device_work import AuthentificateDeviceOutcome
 from core.work.close_work import CloseOutcome
 from core.work.host_install_identity_work import HostInstallIdentityOutcome
 from core.work.refresh_known_devices_work import RefreshKnownDevicesOutcome
+from core.work.render_map_work import RenderMapOutcome
 from core.work.startup_work import StartupOutcome
 from logger import logger
 
 if TYPE_CHECKING:
     from controller.domains.adb_sub_controller import AdbSubController
+    from controller.domains.map_sub_controller import MapSubController
 
 
 def log_startup_job_failure(error: JobError) -> None:
@@ -230,6 +232,46 @@ class CloseCoreRuntimeCallback:
         self._consume_pending_after_close_apply()
 
 
+def log_render_map_job_failure(error: JobError) -> None:
+    """Log a failed render-map async job."""
+    logger.error(
+        "MapSubController: render_map job failed",
+        message=error.message,
+        return_code=error.return_code,
+        traceback=error.traceback or None,
+    )
+
+
+class RenderMapCallback:
+    """Callback for the render map job (CPU-heavy Folium / geo work)."""
+
+    __slots__ = ("_subcontroller", "__weakref__")
+
+    def __init__(self, subcontroller: MapSubController) -> None:
+        self._subcontroller = subcontroller
+
+    @validate_model_entrypoint
+    def on_completed(self, result: object) -> None:
+        model_entrypoint = self._subcontroller.model_entrypoint
+        if not isinstance(result, RenderMapOutcome):
+            logger.error(
+                "MapSubController: unexpected render_map result type",
+                result_type=type(result).__name__,
+            )
+            return
+        model_entrypoint.apply_result(result)
+        logger.success(
+            "MapSubController: render_map completed",
+            simulation_id=result.simulation_id,
+            html_path=str(result.html_path),
+        )
+
+    @validate_model_entrypoint
+    def on_failed(self, error: JobError) -> None:
+        log_render_map_job_failure(error)
+        self._subcontroller.model_entrypoint.apply_failure(error)
+
+
 # AdbSubController method (async entry) -> attribute on :class:`AdbAsyncJobCallbacks`.
 ADB_SUBCONTROLLER_METHOD_TO_CALLBACK_ATTR: dict[str, str] = {
     "_startup_core_runtime": "startup",
@@ -264,3 +306,14 @@ class AdbAsyncJobCallbacks:
             host_install_identity=HostInstallIdentityCallback(subcontroller),
             close=CloseCoreRuntimeCallback(subcontroller),
         )
+
+
+@dataclass(frozen=True, slots=True)
+class MapAsyncJobCallbacks:
+    """AsyncRunner outcome callbacks on :class:`MapSubController`."""
+
+    render_map: RenderMapCallback
+
+    @classmethod
+    def for_subcontroller(cls, subcontroller: MapSubController) -> MapAsyncJobCallbacks:
+        return cls(render_map=RenderMapCallback(subcontroller))

@@ -37,6 +37,8 @@ class UISignals(QObject):
     RunHelperAnimationRequested = Signal()
     MapTabActivated = Signal()
     RenderMapRequested = Signal(str)
+    MapRendered = Signal(str, str)
+    MapRenderFailed = Signal(str, str)
 
 
 class ADBServerSignals(QObject):

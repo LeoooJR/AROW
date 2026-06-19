@@ -28,9 +28,7 @@ def test_canvas_configures_local_folium_support_and_refreshes_leaflet_on_load(
     page = MagicMock()
     monkeypatch.setattr(canvas, "page", lambda: page)
 
-    assert web_settings.testAttribute(
-        QWebEngineSettings.WebAttribute.JavascriptEnabled
-    )
+    assert web_settings.testAttribute(QWebEngineSettings.WebAttribute.JavascriptEnabled)
     assert web_settings.testAttribute(
         QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls
     )
@@ -199,19 +197,20 @@ def test_map_block_load_map_html_noops_when_rendered_file_is_missing(
     load.assert_not_called()
 
 
-def test_map_block_device_selection_success_requests_render_then_loads_html(
+def test_map_block_device_selection_success_requests_render_only(
     monkeypatch, qtbot
 ) -> None:
     block = MapBlock()
     qtbot.addWidget(block)
     block.show()
     events: list[tuple[str, str]] = []
+    load_calls: list[str] = []
 
     def capture_render(simulation_id: str) -> None:
         events.append(("render", simulation_id))
 
     def capture_load(simulation_id: str) -> None:
-        events.append(("load", simulation_id))
+        load_calls.append(simulation_id)
 
     monkeypatch.setattr(block, "_load_map_html", capture_load)
 
@@ -222,7 +221,46 @@ def test_map_block_device_selection_success_requests_render_then_loads_html(
         signals.UI.RenderMapRequested.disconnect(capture_render)
 
     assert block.placeholder.currentWidget() is block.ui.map_loading_placeholder
-    assert events == [("render", "sim-1"), ("load", "sim-1")]
+    assert events == [("render", "sim-1")]
+    assert load_calls == []
+
+
+def test_map_block_map_rendered_slot_loads_html_from_path(
+    monkeypatch, qtbot, tmp_path: Path
+) -> None:
+    block = MapBlock()
+    qtbot.addWidget(block)
+    block.show()
+
+    html_path = tmp_path / "sim-1.html"
+    html_path.write_text("<html></html>", encoding="utf-8")
+    load = MagicMock()
+    monkeypatch.setattr(block.ui.canvas, "load", load)
+    show_map_canvas = MagicMock()
+    monkeypatch.setattr(block, "show_map_canvas", show_map_canvas)
+
+    block._on_map_rendered("sim-1", str(html_path))
+
+    show_map_canvas.assert_called_once_with()
+    load.assert_called_once()
+    loaded_url = load.call_args.args[0]
+    assert loaded_url.toLocalFile() == str(html_path.resolve())
+
+
+def test_map_block_map_render_failed_resets_placeholder(monkeypatch, qtbot) -> None:
+    block = MapBlock()
+    qtbot.addWidget(block)
+    block.show()
+    block.show_map_loading_placeholder()
+    load = MagicMock()
+    monkeypatch.setattr(block.ui.canvas, "load", load)
+
+    block._on_map_render_failed("sim-1", "render failed")
+
+    assert block.placeholder.currentWidget() is block.ui.device_required_placeholder
+    assert block.ui.placeholder.isVisible()
+    assert not block.ui.canvas.isVisible()
+    load.assert_not_called()
 
 
 def test_map_block_device_selection_failed_starts_helper_animation(qtbot) -> None:
