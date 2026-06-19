@@ -388,6 +388,40 @@ def test_device_selection_block_preserves_active_device_on_refresh(qtbot) -> Non
     assert active_item.badge == "active"
 
 
+def test_device_selection_block_preserves_active_device_after_adb_id_rebind(
+    qtbot,
+) -> None:
+    block = DeviceSelectionBlock()
+    qtbot.addWidget(block)
+    block._on_devices_updated(
+        [
+            _device_payload("192.168.0.10:5555", "Pixel 9"),
+            _device_payload("device-2", "Zenfone 11", minutes_ago=30),
+        ]
+    )
+    signals.DEVICE.DeviceSelectionSucceeded.emit(
+        "sim-1", "192.168.0.10:5555", "Pixel 9"
+    )
+    qtbot.wait(0)
+
+    block._on_devices_updated(
+        [
+            _device_payload("192.168.0.10:37849", "Pixel 9"),
+            _device_payload("device-2", "Zenfone 11", minutes_ago=10),
+        ],
+        {"192.168.0.10:5555": "192.168.0.10:37849"},
+    )
+    qtbot.wait(0)
+
+    active_item = block.available_device_list.currentItem()
+
+    assert block._active_device_id == "192.168.0.10:37849"
+    assert active_item is not None
+    assert isinstance(active_item, DeviceItem)
+    assert active_item.id == "192.168.0.10:37849"
+    assert active_item.badge == "active"
+
+
 def test_device_selection_block_clears_active_device_when_refresh_drops_it(
     qtbot,
 ) -> None:

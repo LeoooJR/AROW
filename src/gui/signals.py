@@ -61,7 +61,7 @@ class DeviceSignals(QObject):
     DeviceSelectionSucceeded = Signal(str, str, str)
     DeviceSelectionFailed = Signal(str, str)
     RefreshDeviceListRequested = Signal()
-    DevicesUpdated = Signal(object)
+    DevicesUpdated = Signal(object, object)
     RemoveDeviceRequested = Signal(str)
     RemoveDeviceSucceeded = Signal(str)
     RemoveDeviceFailed = Signal(str)

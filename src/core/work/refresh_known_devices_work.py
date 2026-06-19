@@ -208,12 +208,15 @@ class RefreshKnownDevicesWork(CoreRuntimeWork[RefreshKnownDevicesOutcome]):
             raise AttributeError(
                 "ADB server must be initialized before applying refresh outcome"
             )
-        changed = model_entrypoint.reconcile_paired_devices(outcome.devices)
-        if not changed:
+        reconcile_result = model_entrypoint.reconcile_paired_devices(outcome.devices)
+        if not reconcile_result.changed:
             return
         model_entrypoint._signal_bus.emit(
             CoreSignal.DEVICES_UPDATED,
-            DevicesUpdatedPayload(devices=list(adb_server.paired_devices)),
+            DevicesUpdatedPayload(
+                devices=list(adb_server.paired_devices),
+                device_id_rebindings=reconcile_result.device_id_rebindings,
+            ),
         )
 
     @staticmethod

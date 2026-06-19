@@ -424,10 +424,19 @@ class DeviceSelectionBlock(QFrame, Block):
         self.ui.available_device_list.sortItems()
         self._on_available_device_list_model_changed()
 
-    @Slot(object)
-    def _on_devices_updated(self, devices: list[dict]) -> None:
+    @Slot(object, object)
+    def _on_devices_updated(
+        self,
+        devices: list[dict],
+        device_id_rebindings: dict[str, str] | None = None,
+    ) -> None:
         """Replace the available-device list from controller-provided device data."""
         previous_active_device_id = self._active_device_id
+        if previous_active_device_id is not None:
+            previous_active_device_id = (device_id_rebindings or {}).get(
+                previous_active_device_id,
+                previous_active_device_id,
+            )
         self.ui.available_device_list.clear()
         for device in devices:
             self._device_item_type.add_to_list(
