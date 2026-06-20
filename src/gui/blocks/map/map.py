@@ -34,6 +34,7 @@ from PySide6.QtWidgets import (
 from core.application_paths import get_or_create_application_dir
 from gui.blocks.map.device_required_placeholder import DeviceRequiredMapPlaceholder
 from gui.blocks.map.map_loading_placeholder import MapLoadingPlaceholder
+from gui.blocks.map.map_render_failed_placeholder import MapRenderFailedPlaceholder
 from gui.blocks.map.map_settings import map_settings
 from gui.colors import Theme
 from gui.components import SVG, LeadingIconLabel, ToolButton
@@ -107,6 +108,11 @@ class Canvas(QWebEngineView):
 
         self._finalize_ui_hooks()
 
+    def load(self, url: QUrl) -> None:
+        """Reset Leaflet readiness before loading a new page."""
+        self._leaflet_page_ready = False
+        super().load(url)
+
     def _invalidate_leaflet_size(self) -> None:
         """Ask Leaflet to recalculate map dimensions for the current canvas size."""
         self.page().runJavaScript(_INVALIDATE_LEAFLET_MAPS_JS)
@@ -115,6 +121,7 @@ class Canvas(QWebEngineView):
     def _on_load_finished(self, ok: bool) -> None:
         """Refresh Leaflet map layout after local HTML loads in the canvas."""
         if not ok:
+            self._leaflet_page_ready = False
             return
         self._leaflet_page_ready = True
         self._invalidate_leaflet_size()
@@ -683,6 +690,7 @@ class MapBlock(QWidget):
         placeholder: QStackedWidget
         device_required_placeholder: DeviceRequiredMapPlaceholder
         map_loading_placeholder: MapLoadingPlaceholder
+        map_render_failed_placeholder: MapRenderFailedPlaceholder
 
     def __init__(self, parent=None):
         """Lay out placeholder, hidden canvas, and coordinates bar.
@@ -722,8 +730,10 @@ class MapBlock(QWidget):
 
         device_required_placeholder = DeviceRequiredMapPlaceholder(placeholder)
         map_loading_placeholder = MapLoadingPlaceholder(placeholder)
+        map_render_failed_placeholder = MapRenderFailedPlaceholder(placeholder)
         placeholder.addWidget(device_required_placeholder)
         placeholder.addWidget(map_loading_placeholder)
+        placeholder.addWidget(map_render_failed_placeholder)
         layout.addWidget(placeholder, 1)
 
         coordinates = Coordinates(self)
@@ -738,8 +748,10 @@ class MapBlock(QWidget):
             placeholder=placeholder,
             device_required_placeholder=device_required_placeholder,
             map_loading_placeholder=map_loading_placeholder,
+            map_render_failed_placeholder=map_render_failed_placeholder,
         )
         self._placeholder_helper_anim: QSequentialAnimationGroup | None = None
+        self._pending_render_simulation_id: str | None = None
 
         self._finalize_ui_hooks()
 
@@ -815,6 +827,12 @@ class MapBlock(QWidget):
         self.ui.placeholder.setVisible(True)
         self.ui.canvas.setVisible(False)
 
+    def show_map_render_failed_placeholder(self) -> None:
+        """Show the placeholder used when map generation fails."""
+        self.ui.placeholder.setCurrentWidget(self.ui.map_render_failed_placeholder)
+        self.ui.placeholder.setVisible(True)
+        self.ui.canvas.setVisible(False)
+
     def show_map_canvas(self) -> None:
         """Hide placeholders and show the rendered map canvas."""
         self.ui.placeholder.setVisible(False)
@@ -865,6 +883,7 @@ class MapBlock(QWidget):
         self.ui.legend.apply_theme_icons(theme)
         self.ui.device_required_placeholder.apply_theme_icons(theme)
         self.ui.map_loading_placeholder.apply_theme_icons(theme)
+        self.ui.map_render_failed_placeholder.apply_theme_icons(theme)
         self.ui.coordinates.apply_theme_icons(theme)
 
     ### Slots ###
@@ -874,26 +893,46 @@ class MapBlock(QWidget):
         self, simulation_id: str, device_id: str, device_name: str
     ) -> None:
         """Update placeholder after auth or device selection succeeds."""
+        self._pending_render_simulation_id = simulation_id
         self.show_map_loading_placeholder()
         self._on_run_helper_animation()
         signals.UI.RenderMapRequested.emit(simulation_id)
 
+    def _is_stale_render_update(self, simulation_id: str) -> bool:
+        """Return True when an async render completion no longer matches active state."""
+        return self._pending_render_simulation_id != simulation_id
+
     @Slot(str, str)
     def _on_map_rendered(self, simulation_id: str, html_path: str) -> None:
         """Load the map canvas after async rendering completes."""
+        if self._is_stale_render_update(simulation_id):
+            logger.debug(
+                "MapBlock: ignoring stale map render completion",
+                simulation_id=simulation_id,
+                pending_simulation_id=self._pending_render_simulation_id,
+            )
+            return
+        self._pending_render_simulation_id = None
         self._load_map_html_from_path(simulation_id, Path(html_path))
 
     @Slot(str, str)
     def _on_map_render_failed(self, simulation_id: str, reason: str) -> None:
-        """Return to device-required placeholder when map rendering fails."""
+        """Show the render-failure placeholder when map generation fails."""
+        if self._is_stale_render_update(simulation_id):
+            logger.debug(
+                "MapBlock: ignoring stale map render failure",
+                simulation_id=simulation_id,
+                pending_simulation_id=self._pending_render_simulation_id,
+                reason=reason,
+            )
+            return
+        self._pending_render_simulation_id = None
         logger.warning(
             "MapBlock: map render failed",
             simulation_id=simulation_id,
             reason=reason,
         )
-        self.show_device_required_placeholder()
-        self.ui.placeholder.setVisible(True)
-        self.ui.canvas.setVisible(False)
+        self.show_map_render_failed_placeholder()
         self._on_run_helper_animation()
 
     @Slot(str, str)
@@ -909,6 +948,7 @@ class MapBlock(QWidget):
     @Slot(str)
     def _on_remove_active_device_succeeded(self, device_id: str) -> None:
         """Reset placeholder when the active device is removed."""
+        self._pending_render_simulation_id = None
         self.show_device_required_placeholder()
         self.ui.placeholder.setVisible(True)
         self.ui.canvas.setVisible(False)
@@ -926,7 +966,9 @@ class MapBlock(QWidget):
         Run a one-shot opacity pulse on the canvas placeholder. Help to draw attention of the user to the placeholder.
         """
         current = cast(
-            DeviceRequiredMapPlaceholder | MapLoadingPlaceholder,
+            DeviceRequiredMapPlaceholder
+            | MapLoadingPlaceholder
+            | MapRenderFailedPlaceholder,
             self.ui.placeholder.currentWidget(),
         )
         self._placeholder_helper_anim = current.play_helper_animation(

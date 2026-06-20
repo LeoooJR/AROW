@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
-from PySide6.QtCore import QAbstractAnimation
+from PySide6.QtCore import QAbstractAnimation, QUrl
 from PySide6.QtWebEngineCore import QWebEngineSettings
 
 from gui.blocks.map.map import (
@@ -41,6 +41,20 @@ def test_canvas_configures_local_folium_support_and_refreshes_leaflet_on_load(
 
     canvas._on_load_finished(False)
     page.runJavaScript.assert_called_once()
+    assert not canvas._leaflet_page_ready
+
+
+def test_canvas_load_resets_leaflet_ready_flag(monkeypatch, qtbot) -> None:
+    canvas = Canvas()
+    qtbot.addWidget(canvas)
+    canvas._leaflet_page_ready = True
+
+    def super_load(_self, _url: QUrl) -> None:
+        assert not canvas._leaflet_page_ready
+
+    monkeypatch.setattr("gui.blocks.map.map.QWebEngineView.load", super_load)
+
+    canvas.load(QUrl.fromLocalFile("/tmp/map.html"))
 
 
 def test_map_block_shows_loading_placeholder(qtbot) -> None:
@@ -150,6 +164,7 @@ def test_map_block_connection_succeeded_updates_placeholder_and_animates(
     qtbot.wait(0)
 
     assert block.placeholder.currentWidget() is block.ui.map_loading_placeholder
+    assert block._pending_render_simulation_id == "sim-1"
     assert block._placeholder_helper_anim is not None
     assert block._placeholder_helper_anim.state() == QAbstractAnimation.State.Running
 
@@ -222,6 +237,7 @@ def test_map_block_device_selection_success_requests_render_only(
         signals.UI.RenderMapRequested.disconnect(capture_render)
 
     assert block.placeholder.currentWidget() is block.ui.map_loading_placeholder
+    assert block._pending_render_simulation_id == "sim-1"
     assert events == [("render", "sim-1")]
     assert load_calls == []
 
@@ -239,6 +255,7 @@ def test_map_block_map_rendered_slot_loads_html_from_path(
     monkeypatch.setattr(block.ui.canvas, "load", load)
     show_map_canvas = MagicMock()
     monkeypatch.setattr(block, "show_map_canvas", show_map_canvas)
+    block._pending_render_simulation_id = "sim-1"
 
     block._on_map_rendered("sim-1", str(html_path))
     qtbot.waitUntil(lambda: load.call_count == 1, timeout=1000)
@@ -249,20 +266,62 @@ def test_map_block_map_rendered_slot_loads_html_from_path(
     assert loaded_url.toLocalFile() == str(html_path.resolve())
 
 
-def test_map_block_map_render_failed_resets_placeholder(monkeypatch, qtbot) -> None:
+def test_map_block_map_render_failed_shows_failure_placeholder(
+    monkeypatch, qtbot
+) -> None:
     block = MapBlock()
     qtbot.addWidget(block)
     block.show()
     block.show_map_loading_placeholder()
+    block._pending_render_simulation_id = "sim-1"
     load = MagicMock()
     monkeypatch.setattr(block.ui.canvas, "load", load)
 
     block._on_map_render_failed("sim-1", "render failed")
 
-    assert block.placeholder.currentWidget() is block.ui.device_required_placeholder
+    assert block.placeholder.currentWidget() is block.ui.map_render_failed_placeholder
     assert block.ui.placeholder.isVisible()
     assert not block.ui.canvas.isVisible()
+    assert block._pending_render_simulation_id is None
     load.assert_not_called()
+
+
+def test_map_block_stale_map_rendered_completion_is_ignored(
+    monkeypatch, qtbot, tmp_path: Path
+) -> None:
+    block = MapBlock()
+    qtbot.addWidget(block)
+    block.show()
+    block.show_map_loading_placeholder()
+    block._pending_render_simulation_id = "sim-2"
+
+    html_path = tmp_path / "sim-1.html"
+    html_path.write_text("<html></html>", encoding="utf-8")
+    load = MagicMock()
+    monkeypatch.setattr(block.ui.canvas, "load", load)
+    show_map_canvas = MagicMock()
+    monkeypatch.setattr(block, "show_map_canvas", show_map_canvas)
+
+    block._on_map_rendered("sim-1", str(html_path))
+    qtbot.wait(50)
+
+    show_map_canvas.assert_not_called()
+    load.assert_not_called()
+    assert block.placeholder.currentWidget() is block.ui.map_loading_placeholder
+    assert block._pending_render_simulation_id == "sim-2"
+
+
+def test_map_block_stale_map_render_failed_completion_is_ignored(qtbot) -> None:
+    block = MapBlock()
+    qtbot.addWidget(block)
+    block.show()
+    block.show_map_loading_placeholder()
+    block._pending_render_simulation_id = "sim-2"
+
+    block._on_map_render_failed("sim-1", "render failed")
+
+    assert block.placeholder.currentWidget() is block.ui.map_loading_placeholder
+    assert block._pending_render_simulation_id == "sim-2"
 
 
 def test_map_block_device_selection_failed_starts_helper_animation(qtbot) -> None:
@@ -290,6 +349,7 @@ def test_map_block_active_device_removed_resets_placeholder_and_animates(
     qtbot.wait(0)
 
     assert block.placeholder.currentWidget() is block.ui.device_required_placeholder
+    assert block._pending_render_simulation_id is None
     assert block._placeholder_helper_anim is not None
     assert block._placeholder_helper_anim.state() == QAbstractAnimation.State.Running
 
