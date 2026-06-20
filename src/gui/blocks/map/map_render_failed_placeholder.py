@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Final
 
@@ -9,11 +10,12 @@ from PySide6.QtCore import (
     QAbstractAnimation,
     QEasingCurve,
     QPropertyAnimation,
+    QRectF,
     QSequentialAnimationGroup,
     QSize,
     Qt,
 )
-from PySide6.QtGui import QIcon, QPainter
+from PySide6.QtGui import QIcon, QPainter, QPen
 from PySide6.QtWidgets import (
     QFrame,
     QGraphicsOpacityEffect,
@@ -63,6 +65,27 @@ class MapRenderFailedGlyph(QFrame):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         center = self.rect().center()
+        orbit_rect = QRectF(-56, -34, 112, 68)
+
+        painter.save()
+        painter.translate(center)
+        painter.rotate(-14)
+
+        orbit_pen = QPen(qcolor_from_css(palette.PRIMARY), 1.8)
+        orbit_pen.setStyle(Qt.PenStyle.DashLine)
+        orbit_pen.setDashPattern([4, 5])
+        orbit_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        painter.setPen(orbit_pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawEllipse(orbit_rect)
+
+        angle = math.radians(24)
+        dot_x = (orbit_rect.width() / 2) * math.cos(angle)
+        dot_y = (orbit_rect.height() / 2) * math.sin(angle)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(qcolor_from_css(palette.PRIMARY))
+        painter.drawEllipse(QRectF(dot_x - 5, dot_y - 5, 10, 10))
+        painter.restore()
 
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(qcolor_from_css(palette.PRIMARY_SOFT))
