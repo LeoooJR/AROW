@@ -13,6 +13,8 @@ from typing import Any, Callable, Literal, Optional
 from loguru import logger
 from PySide6.QtCore import QObject, Qt, Signal
 
+from logger import setup_logger
+
 jobtype = Literal["auto", "thread", "process"]
 jobstatus = Literal["pending", "running", "completed", "cancelled", "failed"]
 jobpriority = Literal["low", "medium", "high"]
@@ -184,7 +186,8 @@ class ProcessPool:
         try:
             self._max_workers: int | None = max_workers
             self._executor: ProcessPoolExecutor = ProcessPoolExecutor(
-                max_workers=max_workers
+                max_workers=max_workers,
+                initializer=setup_logger,  # Initialize logger before the process is started
             )
         except (NotImplementedError, OSError, PermissionError) as e:
             logger.error(
@@ -442,8 +445,8 @@ class AsyncRunner(QObject):
             self._process_pool = ThreadPool()
         logger.debug(
             "Async runner: initialized",
-            process_pool=self._process_pool,
-            thread_pool=self._thread_pool,
+            process_pool=type(self._process_pool).__name__,
+            thread_pool=type(self._thread_pool).__name__,
         )
         self.history: dict[str, tuple[JobHandler, JobHandlerSignals]] = {}
         self._coalesce_latest: dict[str, str] = {}

@@ -4,12 +4,22 @@ Application loguru setup: sinks and a format that prints all bound keyword / ext
 
 from __future__ import annotations
 
+import os
 import re
 from enum import Enum
 from pathlib import Path
 from typing import Any
 
 from loguru import logger
+
+from core.application_paths import (
+    default_application_log_file_path,
+    get_or_create_application_dir,
+)
+
+AROW_LOG_FILE_ENV = (
+    "AROW_LOG_FILE"  # Environment variable for the application log file path
+)
 
 
 class LogOrigin(str, Enum):
@@ -202,7 +212,23 @@ def _loguru_format(record: dict[str, Any]) -> str:
     )
 
 
-def setup_logger() -> None:
+def resolve_application_log_file_path() -> Path:
+    """
+    Return the shared low-level application log file for this process tree.
+
+    The main process resolves a concrete path under ``<application_dir>/logs`` and stores
+    it in :data:`AROW_LOG_FILE_ENV`. Worker processes spawned later reuse that exact path.
+    """
+    env_path = os.environ.get(AROW_LOG_FILE_ENV, "").strip()
+    if env_path:
+        return Path(env_path)
+    application_dir = get_or_create_application_dir()
+    log_path = default_application_log_file_path(application_dir)
+    os.environ[AROW_LOG_FILE_ENV] = str(log_path)
+    return log_path
+
+
+def setup_logger() -> Path:
     """
     Configure Loguru sinks and the project format string.
 
@@ -210,13 +236,20 @@ def setup_logger() -> None:
     ``core.entrypoint`` imports ``CORE_RUNTIME_WORKS``, which constructs
     :class:`~collection.Repository` subclasses that log snapshot lines from ``add`` / ``add_all``.
     If this runs too late, those lines go through Loguru's default handler instead of the file sink.
+
+    Returns:
+        Path: The concrete application log file used by this process tree.
     """
+    log_path = resolve_application_log_file_path()
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+
     logger.remove()
 
     logger.add(
-        "arow_{time}.log",
+        str(log_path),
         format=_loguru_format,
         colorize=False,
         encoding="utf-8",
         watch=True,
     )
+    return log_path

@@ -552,3 +552,34 @@ class TestAsyncRunnerProcessAndCoalesce:
         assert "refresh_device_list" not in runner._coalesce_latest
 
         runner.shutdown()
+
+
+class TestProcessPoolLogging:
+    def test_process_pool_uses_setup_logger_initializer(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        captured: dict[str, object] = {}
+
+        class FakeExecutor:
+            def __init__(
+                self,
+                *,
+                max_workers: int | None = None,
+                initializer: object | None = None,
+            ) -> None:
+                captured["max_workers"] = max_workers
+                captured["initializer"] = initializer
+
+            def submit(self, *_args: object, **_kwargs: object) -> None:
+                return None
+
+            def shutdown(self, **_kwargs: object) -> None:
+                return None
+
+        monkeypatch.setattr(runner_mod, "ProcessPoolExecutor", FakeExecutor)
+
+        runner_mod.ProcessPool(max_workers=2)
+
+        assert captured["max_workers"] == 2
+        assert captured["initializer"] is runner_mod.setup_logger
