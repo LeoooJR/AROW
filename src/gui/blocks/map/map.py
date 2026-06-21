@@ -902,8 +902,8 @@ class MapBlock(QWidget):
         """Return True when an async render completion no longer matches active state."""
         return self._pending_render_simulation_id != simulation_id
 
-    @Slot(str, str)
-    def _on_map_rendered(self, simulation_id: str, html_path: str) -> None:
+    @Slot(str, object)
+    def _on_map_rendered(self, simulation_id: str, html_path: Path) -> None:
         """Load the map canvas after async rendering completes."""
         if self._is_stale_render_update(simulation_id):
             logger.debug(
@@ -913,7 +913,7 @@ class MapBlock(QWidget):
             )
             return
         self._pending_render_simulation_id = None
-        self._load_map_html_from_path(simulation_id, Path(html_path))
+        self._load_map_html_from_path(simulation_id, html_path)
 
     @Slot(str, str)
     def _on_map_render_failed(self, simulation_id: str, reason: str) -> None:
