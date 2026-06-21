@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import builtins
 from collections.abc import Callable
 from typing import Any, cast
 from unittest.mock import MagicMock
@@ -19,6 +20,7 @@ from controller.orchestration.app_controller import AppController
 from controller.runner import JobError
 from core.devices import Phone
 from core.entrypoint import ModelEntrypoint
+from core.signals import DevicesUpdatedPayload
 from core.work.refresh_known_devices_work import RefreshKnownDevicesOutcome
 
 pytestmark = [pytest.mark.async_jobs]
@@ -47,6 +49,20 @@ class _AppStub:
 
 def _make_adb_sub_controller(app: _AppStub) -> AdbSubController:
     return AdbSubController(cast(AppController, app))
+
+
+def _patch_controller_type_checks(monkeypatch: pytest.MonkeyPatch, probe: _AppStub) -> None:
+    real_isinstance = builtins.isinstance
+
+    def _isinstance(obj: object, cls: object) -> bool:
+        cls_name = getattr(cls, "__name__", "")
+        if cls_name == "MainWindow" and obj is probe.view:
+            return True
+        if cls_name == "ModelEntrypoint" and obj is probe.model_entrypoint:
+            return True
+        return real_isinstance(obj, cls)
+
+    monkeypatch.setattr(builtins, "isinstance", _isinstance)
 
 
 @pytest.fixture
@@ -139,3 +155,23 @@ def test_refresh_callback_on_failed_applies_failure(
     callback.on_failed(error)
 
     assert failure_calls == [error]
+
+
+def test_on_devices_updated_forwards_device_id_rebindings_to_view(
+    monkeypatch: pytest.MonkeyPatch,
+    patch_repeat_timer: dict[str, Any],
+) -> None:
+    app = _AppStub()
+    adb = _make_adb_sub_controller(app)
+    _patch_controller_type_checks(monkeypatch, app)
+    payload = DevicesUpdatedPayload(
+        devices=[Phone(id="device-1", state="device", model="Pixel")],
+        device_id_rebindings={"old-device-1": "device-1"},
+    )
+
+    adb._on_devices_updated(payload)
+
+    app.view.forward_devices_updated.assert_called_once_with(
+        [vars(payload.devices[0].descriptor)],
+        {"old-device-1": "device-1"},
+    )
