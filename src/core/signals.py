@@ -48,6 +48,8 @@ class CoreSignal(StrEnum):
     LOG_MESSAGE = "log.message"
     HOST_COMPUTER_IDENTITY_UPDATED = "host.computer.identity.updated"
     ACTIVITY_LOG_FILE_UPDATED = "activity.log.file.updated"
+    MAP_RENDERED = "map.rendered"
+    MAP_RENDER_FAILED = "map.render.failed"
 
 
 @dataclass(frozen=True, slots=True)
@@ -149,6 +151,22 @@ class ActivityLogFileUpdatedPayload:
     path: Path
 
 
+@dataclass(frozen=True, slots=True)
+class MapRenderedPayload:
+    """Payload emitted when map HTML has been written for a simulation."""
+
+    simulation_id: str
+    html_path: Path
+
+
+@dataclass(frozen=True, slots=True)
+class MapRenderFailedPayload:
+    """Payload emitted when map rendering fails for a simulation."""
+
+    simulation_id: str
+    reason: str
+
+
 CORE_SIGNAL_PAYLOAD_TYPES: Mapping[CoreSignal, type[object]] = {
     CoreSignal.ADB_SERVER_STARTED: AdbServerStartedPayload,
     CoreSignal.ADB_SERVER_STOPPED: AdbServerStoppedPayload,
@@ -163,6 +181,8 @@ CORE_SIGNAL_PAYLOAD_TYPES: Mapping[CoreSignal, type[object]] = {
     CoreSignal.LOG_MESSAGE: LogMessagePayload,
     CoreSignal.HOST_COMPUTER_IDENTITY_UPDATED: HostComputerIdentityPayload,
     CoreSignal.ACTIVITY_LOG_FILE_UPDATED: ActivityLogFileUpdatedPayload,
+    CoreSignal.MAP_RENDERED: MapRenderedPayload,
+    CoreSignal.MAP_RENDER_FAILED: MapRenderFailedPayload,
 }
 
 
@@ -286,6 +306,20 @@ class CoreSignalBus(ABC):
     ) -> None: ...
 
     @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.MAP_RENDERED],
+        handler: SignalHandler[MapRenderedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.MAP_RENDER_FAILED],
+        handler: SignalHandler[MapRenderFailedPayload],
+    ) -> None: ...
+
+    @overload
     def subscribe(self, signal: CoreSignal, handler: SignalHandler[object]) -> None: ...
 
     @abstractmethod
@@ -391,6 +425,20 @@ class CoreSignalBus(ABC):
 
     @overload
     def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.MAP_RENDERED],
+        handler: SignalHandler[MapRenderedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.MAP_RENDER_FAILED],
+        handler: SignalHandler[MapRenderFailedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
         self, signal: CoreSignal, handler: SignalHandler[object]
     ) -> None: ...
 
@@ -492,6 +540,20 @@ class CoreSignalBus(ABC):
         self,
         signal: Literal[CoreSignal.ACTIVITY_LOG_FILE_UPDATED],
         payload: ActivityLogFileUpdatedPayload,
+    ) -> None: ...
+
+    @overload
+    def emit(
+        self,
+        signal: Literal[CoreSignal.MAP_RENDERED],
+        payload: MapRenderedPayload,
+    ) -> None: ...
+
+    @overload
+    def emit(
+        self,
+        signal: Literal[CoreSignal.MAP_RENDER_FAILED],
+        payload: MapRenderFailedPayload,
     ) -> None: ...
 
     @overload
@@ -616,6 +678,20 @@ class InMemoryCoreSignalBus(CoreSignalBus):
     ) -> None: ...
 
     @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.MAP_RENDERED],
+        handler: SignalHandler[MapRenderedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.MAP_RENDER_FAILED],
+        handler: SignalHandler[MapRenderFailedPayload],
+    ) -> None: ...
+
+    @overload
     def subscribe(self, signal: CoreSignal, handler: SignalHandler[object]) -> None: ...
 
     def subscribe(self, signal: CoreSignal, handler: SignalHandler[Any]) -> None:
@@ -727,6 +803,20 @@ class InMemoryCoreSignalBus(CoreSignalBus):
         self,
         signal: Literal[CoreSignal.ACTIVITY_LOG_FILE_UPDATED],
         handler: SignalHandler[ActivityLogFileUpdatedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.MAP_RENDERED],
+        handler: SignalHandler[MapRenderedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.MAP_RENDER_FAILED],
+        handler: SignalHandler[MapRenderFailedPayload],
     ) -> None: ...
 
     @overload
@@ -844,6 +934,20 @@ class InMemoryCoreSignalBus(CoreSignalBus):
         self,
         signal: Literal[CoreSignal.ACTIVITY_LOG_FILE_UPDATED],
         payload: ActivityLogFileUpdatedPayload,
+    ) -> None: ...
+
+    @overload
+    def emit(
+        self,
+        signal: Literal[CoreSignal.MAP_RENDERED],
+        payload: MapRenderedPayload,
+    ) -> None: ...
+
+    @overload
+    def emit(
+        self,
+        signal: Literal[CoreSignal.MAP_RENDER_FAILED],
+        payload: MapRenderFailedPayload,
     ) -> None: ...
 
     @overload

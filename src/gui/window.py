@@ -830,6 +830,9 @@ class MainWindow(QMainWindow):
         active_device_removed_error_toast: str = (
             "Failed to remove active device: {device}. Please try again."
         )
+        map_render_failed_toast: str = (
+            "Failed to render map for simulation {simulation_id}: {reason}."
+        )
 
     @dataclass
     class UI:
@@ -1072,6 +1075,31 @@ class MainWindow(QMainWindow):
         self.ui.container.post_toast(
             self.texts.device_selection_success_toast.format(device=device_name),
             level="success",
+        )
+
+    def forward_map_rendered(self, simulation_id: str, html_path: str) -> None:
+        """Forward map render completion to the map block."""
+        logger.info(
+            "MainWindow: map rendered",
+            simulation_id=simulation_id,
+            html_path=html_path,
+        )
+        signals.UI.MapRendered.emit(simulation_id, html_path)
+
+    def forward_map_render_failed(self, simulation_id: str, reason: str) -> None:
+        """Forward map render failure to the map block and notify the user."""
+        logger.warning(
+            "MainWindow: map render failed",
+            simulation_id=simulation_id,
+            reason=reason,
+        )
+        signals.UI.MapRenderFailed.emit(simulation_id, reason)
+        self.ui.container.post_toast(
+            self.texts.map_render_failed_toast.format(
+                simulation_id=simulation_id,
+                reason=reason,
+            ),
+            level="error",
         )
 
     def forward_device_selection_failed(self, device_id: str, device_name: str) -> None:

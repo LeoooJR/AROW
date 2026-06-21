@@ -27,6 +27,7 @@ from core.work.refresh_known_devices_work import (
     RefreshKnownDevicesOutcome,
     RefreshKnownDevicesWork,
 )
+from core.work.render_map_work import RenderMapOutcome, RenderMapWork
 from core.work.startup_work import StartupCoreRuntimeWork, StartupOutcome
 
 
@@ -81,6 +82,13 @@ class CoreRuntimeWorksRepository(Repository[CoreRuntimeWorkCatalogEntry]):
                 outcome_cls=CloseOutcome,
                 job_origin="close_core_runtime",
                 entrypoint_methods=("ModelEntrypoint.close_core_runtime",),
+            ),
+            CoreRuntimeWorkCatalogEntry(
+                id="core-runtime.render-map",
+                work_cls=RenderMapWork,
+                outcome_cls=RenderMapOutcome,
+                job_origin="render_map",
+                entrypoint_methods=("ModelEntrypoint.render_map",),
             ),
         )
         self.add_all(list(entries))
