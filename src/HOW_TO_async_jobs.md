@@ -1,6 +1,6 @@
 # How async core jobs work
 
-This guide describes the current async job path in AROW: how controllers submit blocking core work, what a `CoreRuntimeWork` must return, how results and failures are applied on the Qt main thread, and how device refresh now reconciles paired phones safely.
+This guide describes the current async job path in AROW: how controllers submit blocking core work, what a `CoreRuntimeWork` must return, how results and failures are applied on the Qt main thread, how process-backed map rendering fits into the same pipeline, and how worker threads/processes share one application log file.
 
 It matches the implementation in `src/controller/runner.py`, `src/controller/core_work_callbacks.py`, `src/controller/domains/adb_sub_controller.py`, `src/core/entrypoint.py`, and `src/core/work/`.
 
@@ -52,6 +52,7 @@ flowchart LR
 | `host_install_identity` | `ModelEntrypoint.run_host_install_identity()` | `HostInstallIdentityWork` | `HostInstallIdentityOutcome` |
 | `refresh_device_list` | `ModelEntrypoint.refresh_known_devices()` | `RefreshKnownDevicesWork` | `RefreshKnownDevicesOutcome` |
 | `close_core_runtime` | `ModelEntrypoint.close_core_runtime()` | `CloseCoreRuntimeWork` | `CloseOutcome` |
+| `render_map` | `ModelEntrypoint.render_map(simulation_id, application_dir)` | `RenderMapWork` | `RenderMapOutcome` |
 
 When you add a new core runtime job, keep this catalog in sync so result/failure dispatch stays auditable.
 
@@ -157,6 +158,60 @@ Routing order is:
 
 This origin-first rule matters because a generic `RuntimeError` raised inside one job should still reach that job’s failure handler instead of a generic fallback.
 
+## Map rendering flow
+
+Map rendering follows the same AsyncRunner contract as the ADB-facing jobs, but there are two design constraints worth calling out:
+
+1. `MapSubController` submits `ModelEntrypoint.render_map(...)` with `job_type="process"` because Folium + geo dataset preparation is CPU-heavy enough to justify leaving the GUI thread and the thread pool alone.
+2. `ModelEntrypoint.render_map(...)` is a `@staticmethod` that accepts only picklable inputs (`simulation_id`, `application_dir`) so `ProcessPoolExecutor` can execute it without serializing the whole `ModelEntrypoint` object graph.
+
+### Request path
+
+`signals.UI.RenderMapRequested` lands in `MapSubController._on_render_map_requested(simulation_id)`.
+
+- The controller first checks `<application_dir>/simulations/<simulation_id>/map/<simulation_id>.html`.
+- If that HTML file already exists, the controller skips AsyncRunner entirely and forwards the path to the view immediately.
+- Otherwise it submits `name="render_map"` with `coalesce_key=f"render_map:{simulation_id}"` and `job_type="process"`.
+
+This means "render map" is lazy and cache-aware from the controller side: once the HTML artifact exists for a simulation, future UI opens reuse it until something else deletes or replaces that file.
+
+### Worker-side behavior
+
+`RenderMapWork.run()`:
+
+1. Computes `output_dir = <application_dir>/simulations/<simulation_id>/map`.
+2. Instantiates `MapRenderer()`.
+3. Calls `MapRenderer.to_html(path=output_dir, prefix=simulation_id)`.
+4. Returns `RenderMapOutcome(simulation_id=..., html_path=...)`.
+
+If Folium or dataset rendering fails, the worker raises `RenderMapError(simulation_id=..., reason=...)`, which preserves the simulation id for main-thread reporting.
+
+### Main-thread apply behavior
+
+- `RenderMapWork.apply_main_thread(...)` emits `CoreSignal.MAP_RENDERED` with `MapRenderedPayload(simulation_id, html_path)`.
+- `RenderMapWork.apply_failure_main_thread(...)` emits `CoreSignal.MAP_RENDER_FAILED` when the failure is a `RenderMapError`.
+- `MapSubController` subscribes to both signals and forwards them to the view with `forward_map_rendered(...)` / `forward_map_render_failed(...)`.
+
+Tests covering this path live in:
+
+- `src/controller/domains/tests/test_map_sub_controller.py`
+- `src/core/work/tests/test_render_map_work.py`
+
+## Shared application logging across workers
+
+AsyncRunner's process pool uses `setup_logger` as its executor `initializer`. That detail matters operationally:
+
+- The main process resolves one concrete low-level log file under `<application_dir>/logs/application_YYYYMMDD_HHMMSS.log`.
+- `setup_logger()` stores that path in `AROW_LOG_FILE`.
+- Worker processes spawned later reuse the exact same path from that environment variable instead of creating their own per-process log files.
+
+Result: controller, GUI, core, worker-thread, and worker-process log lines from one app run land in the same application log file, which makes debugging async map rendering and other background work much easier.
+
+Do not confuse this with the user-facing activity log:
+
+- `application_*.log`: low-level diagnostic loguru sink shared by the process tree.
+- `activity_YYYYMMDD.log`: app activity log surfaced in the GUI and managed through `activity_log_file`.
+
 ## Lower-level API: `JobSpecification` + `submit` + `bind_handle_signals`
 
 You can submit directly on the runner when you do not need the controller helper:
@@ -204,6 +259,9 @@ Current built-in keys include:
 - `authentification`
 - `refresh_device_list`
 - `close`
+- `render_map:<simulation_id>`
+
+Map rendering uses a per-simulation coalesce key so repeated requests for the same simulation collapse to "latest wins" without discarding other simulations' work.
 
 ## Cancellation
 
@@ -293,3 +351,5 @@ Tests with a fake runner live under **`src/core/tests/test_async_runner.py`** fo
 | A work fails before its body runs | Check `@preflight(...)` conditions and the work’s `error_to_raise=` mapping. |
 | `apply_result(...)` logs “unsupported result type” | The returned outcome type is not registered in the built-in work catalog and has no custom applier. |
 | A reconnect creates a second device row instead of updating the existing one | The handset probably lacks a Tier-1 `hw:v1:` stable key, so reconciliation intentionally avoids merging on Tier-2 fingerprint keys. |
+| Map opens the failure placeholder after a background render | Check the shared `application_*.log` for `RenderMapWork` errors and confirm the process job returned `RenderMapOutcome` rather than `RenderMapError`. |
+| Map reopens instantly without starting a new job | Confirm the cached HTML file already exists under `<application_dir>/simulations/<simulation_id>/map/`; this is expected lazy-load behavior. |
