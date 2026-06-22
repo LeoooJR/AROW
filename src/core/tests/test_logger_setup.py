@@ -57,3 +57,31 @@ def test_resolve_application_log_file_path_reuses_env_without_setup(
     monkeypatch.setenv(AROW_LOG_FILE_ENV, str(shared))
 
     assert resolve_application_log_file_path() == shared
+
+
+def test_setup_logger_falls_back_when_primary_log_path_is_unwritable(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    primary = tmp_path / "primary" / "application_20260621_123045.log"
+    fallback_dir = tmp_path / "fallback"
+    calls: list[Path] = []
+
+    def fake_add(sink: str, **_kwargs: object) -> int:
+        path = Path(sink)
+        calls.append(path)
+        if path == primary:
+            raise PermissionError("primary path is not writable")
+        return 1
+
+    monkeypatch.setenv(AROW_LOG_FILE_ENV, str(primary))
+    monkeypatch.setenv("AROW_LOG_FALLBACK_DIR", str(fallback_dir))
+    monkeypatch.setattr("logger.logger.remove", lambda: None)
+    monkeypatch.setattr("logger.logger.add", fake_add)
+
+    log_path = setup_logger()
+
+    expected_fallback = fallback_dir / primary.name
+    assert calls == [primary, expected_fallback]
+    assert log_path == expected_fallback
+    assert os.environ[AROW_LOG_FILE_ENV] == str(expected_fallback)

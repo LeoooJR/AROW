@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import os
 import re
+import tempfile
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -20,6 +21,7 @@ from core.application_paths import (
 AROW_LOG_FILE_ENV = (
     "AROW_LOG_FILE"  # Environment variable for the application log file path
 )
+AROW_LOG_FALLBACK_DIR_ENV = "AROW_LOG_FALLBACK_DIR"
 
 
 class LogOrigin(str, Enum):
@@ -228,6 +230,22 @@ def resolve_application_log_file_path() -> Path:
     return log_path
 
 
+def _fallback_application_log_file_path(original_path: Path) -> Path:
+    """
+    Return a writable fallback path when the app data directory is unavailable.
+
+    This keeps logging alive in restricted environments such as sandboxes and test
+    runners where ``~/.arow`` cannot be created or opened.
+    """
+    fallback_root = os.environ.get(AROW_LOG_FALLBACK_DIR_ENV, "").strip()
+    base_dir = (
+        Path(fallback_root).expanduser()
+        if fallback_root
+        else Path(tempfile.gettempdir()) / "arow-logs"
+    )
+    return base_dir / original_path.name
+
+
 def setup_logger() -> Path:
     """
     Configure Loguru sinks and the project format string.
@@ -241,15 +259,26 @@ def setup_logger() -> Path:
         Path: The concrete application log file used by this process tree.
     """
     log_path = resolve_application_log_file_path()
-    log_path.parent.mkdir(parents=True, exist_ok=True)
+    candidate_paths = (log_path, _fallback_application_log_file_path(log_path))
 
     logger.remove()
 
-    logger.add(
-        str(log_path),
-        format=_loguru_format,
-        colorize=False,
-        encoding="utf-8",
-        watch=True,
-    )
+    last_error: OSError | None = None
+    for candidate_path in candidate_paths:
+        try:
+            candidate_path.parent.mkdir(parents=True, exist_ok=True)
+            logger.add(
+                str(candidate_path),
+                format=_loguru_format,
+                colorize=False,
+                encoding="utf-8",
+                watch=True,
+            )
+            os.environ[AROW_LOG_FILE_ENV] = str(candidate_path)
+            return candidate_path
+        except OSError as exc:
+            last_error = exc
+
+    if last_error is not None:
+        raise last_error
     return log_path

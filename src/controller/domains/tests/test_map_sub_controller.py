@@ -124,7 +124,7 @@ def test_on_map_rendered_forwards_to_view(monkeypatch: pytest.MonkeyPatch) -> No
 
     app.view.forward_map_rendered.assert_called_once_with(
         "sim-1",
-        str(payload.html_path),
+        payload.html_path,
     )
 
 
