@@ -82,6 +82,27 @@ def test_on_render_map_requested_submits_process_job() -> None:
     )
 
 
+def test_on_render_map_requested_reuses_existing_html_without_submitting(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app = _AppStub()
+    map_controller = _make_map_sub_controller(app)
+    simulation_id = "sim-1"
+    html_path = (
+        app.model_entrypoint.application_dir
+        / "simulations"
+        / simulation_id
+        / "map"
+        / f"{simulation_id}.html"
+    )
+    monkeypatch.setattr(Path, "exists", lambda self: self == html_path)
+
+    map_controller._on_render_map_requested(simulation_id)
+
+    assert app.submitted == []
+    app.view.forward_map_rendered.assert_called_once_with(simulation_id, html_path)
+
+
 def test_render_callback_on_completed_applies_result() -> None:
     app = _AppStub()
     map_controller = _make_map_sub_controller(app)
