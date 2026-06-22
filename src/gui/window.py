@@ -5,6 +5,7 @@ This file contains the main window of the application.
 import os
 from collections import deque
 from dataclasses import dataclass, field
+from pathlib import Path
 from time import monotonic
 from typing import Deque, Final, Optional
 
@@ -1077,12 +1078,12 @@ class MainWindow(QMainWindow):
             level="success",
         )
 
-    def forward_map_rendered(self, simulation_id: str, html_path: str) -> None:
+    def forward_map_rendered(self, simulation_id: str, html_path: Path) -> None:
         """Forward map render completion to the map block."""
         logger.info(
             "MainWindow: map rendered",
             simulation_id=simulation_id,
-            html_path=html_path,
+            html_path=str(html_path),
         )
         signals.UI.MapRendered.emit(simulation_id, html_path)
 

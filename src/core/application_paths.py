@@ -82,3 +82,22 @@ def default_activity_log_file_path(
     return (
         get_or_create_activity_logs_dir(application_dir) / f"activity_{day_stamp}.log"
     )
+
+
+def default_application_log_file_path(
+    application_dir: Path,
+    *,
+    now: datetime | None = None,
+) -> Path:
+    """
+    Return the low-level application log file path for one process run.
+
+    Distinct from :func:`default_activity_log_file_path` (user-facing GUI activity).
+    One file per application start under
+    ``<application_dir>/logs/application_YYYYMMDD_HHMMSS.log``.
+    """
+    run_stamp = (now or datetime.now()).strftime("%Y%m%d_%H%M%S")
+    return (
+        get_or_create_activity_logs_dir(application_dir)
+        / f"application_{run_stamp}.log"
+    )

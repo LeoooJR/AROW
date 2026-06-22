@@ -4,12 +4,24 @@ Application loguru setup: sinks and a format that prints all bound keyword / ext
 
 from __future__ import annotations
 
+import os
 import re
+import tempfile
 from enum import Enum
 from pathlib import Path
 from typing import Any
 
 from loguru import logger
+
+from core.application_paths import (
+    default_application_log_file_path,
+    get_or_create_application_dir,
+)
+
+AROW_LOG_FILE_ENV = (
+    "AROW_LOG_FILE"  # Environment variable for the application log file path
+)
+AROW_LOG_FALLBACK_DIR_ENV = "AROW_LOG_FALLBACK_DIR"
 
 
 class LogOrigin(str, Enum):
@@ -202,7 +214,39 @@ def _loguru_format(record: dict[str, Any]) -> str:
     )
 
 
-def setup_logger() -> None:
+def resolve_application_log_file_path() -> Path:
+    """
+    Return the shared low-level application log file for this process tree.
+
+    The main process resolves a concrete path under ``<application_dir>/logs`` and stores
+    it in :data:`AROW_LOG_FILE_ENV`. Worker processes spawned later reuse that exact path.
+    """
+    env_path = os.environ.get(AROW_LOG_FILE_ENV, "").strip()
+    if env_path:
+        return Path(env_path)
+    application_dir = get_or_create_application_dir()
+    log_path = default_application_log_file_path(application_dir)
+    os.environ[AROW_LOG_FILE_ENV] = str(log_path)
+    return log_path
+
+
+def _fallback_application_log_file_path(original_path: Path) -> Path:
+    """
+    Return a writable fallback path when the app data directory is unavailable.
+
+    This keeps logging alive in restricted environments such as sandboxes and test
+    runners where ``~/.arow`` cannot be created or opened.
+    """
+    fallback_root = os.environ.get(AROW_LOG_FALLBACK_DIR_ENV, "").strip()
+    base_dir = (
+        Path(fallback_root).expanduser()
+        if fallback_root
+        else Path(tempfile.gettempdir()) / "arow-logs"
+    )
+    return base_dir / original_path.name
+
+
+def setup_logger() -> Path:
     """
     Configure Loguru sinks and the project format string.
 
@@ -210,13 +254,31 @@ def setup_logger() -> None:
     ``core.entrypoint`` imports ``CORE_RUNTIME_WORKS``, which constructs
     :class:`~collection.Repository` subclasses that log snapshot lines from ``add`` / ``add_all``.
     If this runs too late, those lines go through Loguru's default handler instead of the file sink.
+
+    Returns:
+        Path: The concrete application log file used by this process tree.
     """
+    log_path = resolve_application_log_file_path()
+    candidate_paths = (log_path, _fallback_application_log_file_path(log_path))
+
     logger.remove()
 
-    logger.add(
-        "arow_{time}.log",
-        format=_loguru_format,
-        colorize=False,
-        encoding="utf-8",
-        watch=True,
-    )
+    last_error: OSError | None = None
+    for candidate_path in candidate_paths:
+        try:
+            candidate_path.parent.mkdir(parents=True, exist_ok=True)
+            logger.add(
+                str(candidate_path),
+                format=_loguru_format,
+                colorize=False,
+                encoding="utf-8",
+                watch=True,
+            )
+            os.environ[AROW_LOG_FILE_ENV] = str(candidate_path)
+            return candidate_path
+        except OSError as exc:
+            last_error = exc
+
+    if last_error is not None:
+        raise last_error
+    return log_path

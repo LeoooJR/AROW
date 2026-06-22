@@ -7,6 +7,7 @@ applied on the main thread and forwarded to the view.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Slot
@@ -59,16 +60,38 @@ class MapSubController(AppSubController):
         )
         callback: RenderMapCallback = self._async_job_callbacks.render_map
         application_dir = self.model_entrypoint.application_dir
-        self._submit_model_entrypoint_async_call(
-            name="render_map",
-            fn=self.model_entrypoint.render_map,
-            args=(simulation_id, application_dir),
-            description="Render Folium map HTML for simulation",
-            job_type="process",
-            coalesce_key=f"render_map:{simulation_id}",
-            on_completed=callback.on_completed,
-            on_failed=callback.on_failed,
+        # Check if map already exists, if so, lazy load it
+        html_path = (
+            application_dir
+            / "simulations"
+            / simulation_id
+            / "map"
+            / f"{simulation_id}.html"
         )
+        if html_path.exists():
+            logger.debug(
+                "MapSubController: map already rendered",
+                simulation_id=simulation_id,
+            )
+            self.view.forward_map_rendered(
+                simulation_id,
+                application_dir
+                / "simulations"
+                / simulation_id
+                / "map"
+                / f"{simulation_id}.html",
+            )
+        else:
+            self._submit_model_entrypoint_async_call(
+                name="render_map",
+                fn=self.model_entrypoint.render_map,
+                args=(simulation_id, application_dir),
+                description="Render Folium map HTML for simulation",
+                job_type="process",
+                coalesce_key=f"render_map:{simulation_id}",
+                on_completed=callback.on_completed,
+                on_failed=callback.on_failed,
+            )
 
     @validate_view
     def _on_map_rendered(self, payload: MapRenderedPayload) -> None:
@@ -79,7 +102,7 @@ class MapSubController(AppSubController):
         )
         self.view.forward_map_rendered(
             payload.simulation_id,
-            str(payload.html_path),
+            payload.html_path,
         )
 
     @validate_view

@@ -37,8 +37,8 @@ class UISignals(QObject):
     RunHelperAnimationRequested = Signal()
     MapTabActivated = Signal()
     RenderMapRequested = Signal(str)
-    MapRendered = Signal(str, str)
-    MapRenderFailed = Signal(str, str)
+    MapRendered = Signal(str, object)  # simulation_id, html_path
+    MapRenderFailed = Signal(str, str)  # simulation_id, reason
 
 
 class ADBServerSignals(QObject):
