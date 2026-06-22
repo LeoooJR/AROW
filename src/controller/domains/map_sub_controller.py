@@ -7,7 +7,6 @@ applied on the main thread and forwarded to the view.
 
 from __future__ import annotations
 
-from functools import partial
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Slot
@@ -15,7 +14,7 @@ from PySide6.QtCore import Slot
 from controller.core_work_callbacks import MapAsyncJobCallbacks
 from controller.domains.app_sub_controller import AppSubController
 from controller.helper import validate_model_entrypoint, validate_view
-from controller.runner import JobError, JobHandler
+from controller.runner import JobHandler
 from core.signals import (
     CoreSignal,
     MapRenderedPayload,
@@ -85,6 +84,9 @@ class MapSubController(AppSubController):
                 html_path,
             )
         else:
+            render_callbacks = self._async_job_callbacks.render_map_for_simulation(
+                simulation_id
+            )
             handle = self._submit_model_entrypoint_async_call(
                 name="render_map",
                 fn=self.model_entrypoint.render_map,
@@ -92,9 +94,9 @@ class MapSubController(AppSubController):
                 description="Render Folium map HTML for simulation",
                 job_type="process",
                 coalesce_key=f"render_map:{simulation_id}",
-                on_completed=partial(self._on_render_job_completed, simulation_id),
-                on_failed=partial(self._on_render_job_failed, simulation_id),
-                on_cancelled=partial(self._on_render_job_cancelled, simulation_id),
+                on_completed=render_callbacks.on_completed,
+                on_failed=render_callbacks.on_failed,
+                on_cancelled=render_callbacks.on_cancelled,
             )
             if handle is not None:
                 self._render_jobs_by_simulation_id[simulation_id] = handle
@@ -102,20 +104,6 @@ class MapSubController(AppSubController):
     def _clear_render_job(self, simulation_id: str) -> None:
         """Remove a tracked render job handle when it finishes or is cancelled."""
         self._render_jobs_by_simulation_id.pop(simulation_id, None)
-
-    def _on_render_job_completed(self, simulation_id: str, result: object) -> None:
-        """Apply render success and drop the tracked job handle."""
-        self._clear_render_job(simulation_id)
-        self._async_job_callbacks.render_map.on_completed(result)
-
-    def _on_render_job_failed(self, simulation_id: str, error: JobError) -> None:
-        """Apply render failure and drop the tracked job handle."""
-        self._clear_render_job(simulation_id)
-        self._async_job_callbacks.render_map.on_failed(error)
-
-    def _on_render_job_cancelled(self, simulation_id: str) -> None:
-        """Drop the tracked job handle when AsyncRunner discards a cancelled job."""
-        self._clear_render_job(simulation_id)
 
     @validate_view
     def _on_map_rendered(self, payload: MapRenderedPayload) -> None:

@@ -10,6 +10,10 @@ from unittest.mock import MagicMock
 import pytest
 from PySide6.QtWidgets import QApplication
 
+from controller.core_work_callbacks import (
+    RenderMapCallback,
+    RenderMapSimulationCallback,
+)
 from controller.domains.map_sub_controller import MapSubController
 from controller.orchestration.app_controller import AppController
 from controller.runner import JobError, JobHandler
@@ -98,12 +102,13 @@ def test_on_render_map_requested_submits_process_job(tmp_path: Path) -> None:
     on_completed = submit_kwargs["on_completed"]
     on_failed = submit_kwargs["on_failed"]
     on_cancelled = submit_kwargs["on_cancelled"]
-    assert on_completed.func == map_controller._on_render_job_completed
-    assert on_completed.args == ("sim-1",)
-    assert on_failed.func == map_controller._on_render_job_failed
-    assert on_failed.args == ("sim-1",)
-    assert on_cancelled.func == map_controller._on_render_job_cancelled
-    assert on_cancelled.args == ("sim-1",)
+    assert isinstance(on_completed.__self__, RenderMapSimulationCallback)
+    assert issubclass(RenderMapSimulationCallback, RenderMapCallback)
+    assert on_completed.__self__._simulation_id == "sim-1"
+    assert isinstance(on_failed.__self__, RenderMapSimulationCallback)
+    assert on_failed.__self__._simulation_id == "sim-1"
+    assert isinstance(on_cancelled.__self__, RenderMapSimulationCallback)
+    assert on_cancelled.__self__._simulation_id == "sim-1"
 
 
 def test_on_render_map_requested_reuses_existing_html_without_submitting(
@@ -139,7 +144,7 @@ def test_render_callback_on_completed_applies_result() -> None:
     map_controller = _make_map_sub_controller(app)
     apply_calls: list[object] = []
     app.model_entrypoint.apply_result = lambda result: apply_calls.append(result)  # type: ignore[method-assign]
-    callback = map_controller._async_job_callbacks.render_map
+    callback = RenderMapCallback(map_controller)
     outcome = RenderMapOutcome(simulation_id="sim-1", html_path=Path("/tmp/sim-1.html"))
 
     callback.on_completed(outcome)
@@ -152,7 +157,7 @@ def test_render_callback_on_failed_delegates_to_apply_failure() -> None:
     map_controller = _make_map_sub_controller(app)
     apply_calls: list[object] = []
     app.model_entrypoint.apply_failure = lambda error: apply_calls.append(error)  # type: ignore[method-assign]
-    callback = map_controller._async_job_callbacks.render_map
+    callback = RenderMapCallback(map_controller)
     error = JobError(
         message="Job failed: render_map: boom",
         traceback="",
@@ -201,8 +206,11 @@ def test_render_job_callbacks_clear_tracked_handle(tmp_path: Path) -> None:
     outcome = RenderMapOutcome(simulation_id="sim-1", html_path=Path("/tmp/sim-1.html"))
     apply_calls: list[object] = []
     app.model_entrypoint.apply_result = lambda result: apply_calls.append(result)  # type: ignore[method-assign]
+    job_callbacks = map_controller._async_job_callbacks.render_map_for_simulation(
+        "sim-1"
+    )
 
-    map_controller._on_render_job_completed("sim-1", outcome)
+    job_callbacks.on_completed(outcome)
 
     assert apply_calls == [outcome]
     assert "sim-1" not in map_controller._render_jobs_by_simulation_id
@@ -217,8 +225,11 @@ def test_render_job_failed_callback_clears_tracked_handle(tmp_path: Path) -> Non
     error = JobError(message="boom", traceback="", origin="render_map")
     apply_calls: list[object] = []
     app.model_entrypoint.apply_failure = lambda error: apply_calls.append(error)  # type: ignore[method-assign]
+    job_callbacks = map_controller._async_job_callbacks.render_map_for_simulation(
+        "sim-1"
+    )
 
-    map_controller._on_render_job_failed("sim-1", error)
+    job_callbacks.on_failed(error)
 
     assert apply_calls == [error]
     assert "sim-1" not in map_controller._render_jobs_by_simulation_id
@@ -230,8 +241,11 @@ def test_render_job_cancelled_callback_clears_tracked_handle() -> None:
     map_controller._render_jobs_by_simulation_id["sim-1"] = JobHandler(
         job_id="job-1", name="render_map"
     )
+    job_callbacks = map_controller._async_job_callbacks.render_map_for_simulation(
+        "sim-1"
+    )
 
-    map_controller._on_render_job_cancelled("sim-1")
+    job_callbacks.on_cancelled()
 
     assert "sim-1" not in map_controller._render_jobs_by_simulation_id
 

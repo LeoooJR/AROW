@@ -7,6 +7,7 @@ Keep AsyncRunner callbacks out of the subcontroller so each job is easy to read.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -272,6 +273,38 @@ class RenderMapCallback:
         self._subcontroller.model_entrypoint.apply_failure(error)
 
 
+class RenderMapSimulationCallback(RenderMapCallback):
+    """Per-simulation render_map AsyncRunner callbacks."""
+
+    __slots__ = ("_simulation_id",)
+
+    def __init__(self, subcontroller: MapSubController, simulation_id: str) -> None:
+        super().__init__(subcontroller)
+        self._simulation_id = simulation_id
+
+    def _clear_render_job(self) -> None:
+        """Drop the tracked render job handle for this simulation."""
+        self._subcontroller._clear_render_job(self._simulation_id)
+
+    def on_completed(self, result: object) -> None:
+        self._clear_render_job()
+        super().on_completed(result)
+
+    def on_failed(self, error: JobError) -> None:
+        self._clear_render_job()
+        super().on_failed(error)
+
+    def on_cancelled(self) -> None:
+        self._clear_render_job()
+
+
+def _render_map_for_simulation(
+    subcontroller: MapSubController, simulation_id: str
+) -> RenderMapSimulationCallback:
+    """Build simulation-scoped render_map callbacks for AsyncRunner wiring."""
+    return RenderMapSimulationCallback(subcontroller, simulation_id)
+
+
 # AdbSubController method (async entry) -> attribute on :class:`AdbAsyncJobCallbacks`.
 ADB_SUBCONTROLLER_METHOD_TO_CALLBACK_ATTR: dict[str, str] = {
     "_startup_core_runtime": "startup",
@@ -312,8 +345,13 @@ class AdbAsyncJobCallbacks:
 class MapAsyncJobCallbacks:
     """AsyncRunner outcome callbacks on :class:`MapSubController`."""
 
-    render_map: RenderMapCallback
+    render_map_for_simulation: Callable[[str], RenderMapSimulationCallback]
 
     @classmethod
     def for_subcontroller(cls, subcontroller: MapSubController) -> MapAsyncJobCallbacks:
-        return cls(render_map=RenderMapCallback(subcontroller))
+        return cls(
+            render_map_for_simulation=lambda simulation_id: _render_map_for_simulation(
+                subcontroller,
+                simulation_id,
+            ),
+        )
