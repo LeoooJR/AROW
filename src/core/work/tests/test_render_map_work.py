@@ -8,11 +8,26 @@ import pytest
 
 from core.entrypoint import ModelEntrypoint
 from core.signals import CoreSignal, MapRenderedPayload, MapRenderFailedPayload
+from core.simulation import Simulation, SimulationRepository
 from core.work.render_map_work import (
     RenderMapError,
     RenderMapOutcome,
     RenderMapWork,
 )
+
+
+def _model_entrypoint_with_sims(tmp_path: Path) -> ModelEntrypoint:
+    model_entrypoint = ModelEntrypoint()
+    model_entrypoint._simulations = SimulationRepository(tmp_path / "simulations")
+    return model_entrypoint
+
+
+def _add_simulation(
+    model_entrypoint: ModelEntrypoint, simulation_id: str
+) -> Simulation:
+    simulation = Simulation(id=simulation_id)
+    model_entrypoint._simulations.add(simulation)
+    return simulation
 
 
 def test_render_map_work_run_returns_outcome(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -80,7 +95,30 @@ def test_model_entrypoint_render_map_delegates_to_work(
     assert calls == [("sim-1", Path("/app"))]
 
 
-def test_apply_main_thread_emits_map_rendered() -> None:
+def test_apply_main_thread_emits_map_rendered(tmp_path: Path) -> None:
+    model_entrypoint = _model_entrypoint_with_sims(tmp_path)
+    simulation = _add_simulation(model_entrypoint, "sim-1")
+    emitted: list[tuple[CoreSignal, object]] = []
+    model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
+        (signal, payload)
+    )
+    html_path = Path("/tmp/sim-1.html")
+
+    RenderMapWork.apply_main_thread(
+        model_entrypoint,
+        RenderMapOutcome(simulation_id="sim-1", html_path=html_path),
+    )
+
+    assert simulation.map_file == html_path
+    assert emitted == [
+        (
+            CoreSignal.MAP_RENDERED,
+            MapRenderedPayload(simulation_id="sim-1", html_path=html_path),
+        )
+    ]
+
+
+def test_apply_main_thread_skips_emit_when_simulation_missing() -> None:
     model_entrypoint = ModelEntrypoint()
     emitted: list[tuple[CoreSignal, object]] = []
     model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
@@ -93,15 +131,33 @@ def test_apply_main_thread_emits_map_rendered() -> None:
         RenderMapOutcome(simulation_id="sim-1", html_path=html_path),
     )
 
+    assert emitted == []
+
+
+def test_apply_failure_main_thread_emits_map_render_failed(tmp_path: Path) -> None:
+    model_entrypoint = _model_entrypoint_with_sims(tmp_path)
+    simulation = _add_simulation(model_entrypoint, "sim-1")
+    simulation.map_file = Path("/tmp/sim-1.html")
+    emitted: list[tuple[CoreSignal, object]] = []
+    model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
+        (signal, payload)
+    )
+
+    RenderMapWork.apply_failure_main_thread(
+        model_entrypoint,
+        RenderMapError(simulation_id="sim-1", reason="failed"),
+    )
+
+    assert simulation.map_file is None
     assert emitted == [
         (
-            CoreSignal.MAP_RENDERED,
-            MapRenderedPayload(simulation_id="sim-1", html_path=html_path),
+            CoreSignal.MAP_RENDER_FAILED,
+            MapRenderFailedPayload(simulation_id="sim-1", reason="failed"),
         )
     ]
 
 
-def test_apply_failure_main_thread_emits_map_render_failed() -> None:
+def test_apply_failure_main_thread_skips_emit_when_simulation_missing() -> None:
     model_entrypoint = ModelEntrypoint()
     emitted: list[tuple[CoreSignal, object]] = []
     model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
@@ -113,12 +169,7 @@ def test_apply_failure_main_thread_emits_map_render_failed() -> None:
         RenderMapError(simulation_id="sim-1", reason="failed"),
     )
 
-    assert emitted == [
-        (
-            CoreSignal.MAP_RENDER_FAILED,
-            MapRenderFailedPayload(simulation_id="sim-1", reason="failed"),
-        )
-    ]
+    assert emitted == []
 
 
 def test_apply_failure_main_thread_falls_back_to_generic_error() -> None:

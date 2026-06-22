@@ -36,6 +36,7 @@ from core.signals import (
     MapRenderFailedPayload,
     SignalHandler,
     SimulationCreatedPayload,
+    SimulationDeletedPayload,
     SimulationPositionChangedPayload,
     SimulationStateChangedPayload,
 )
@@ -167,6 +168,13 @@ class Entrypoint(ABC):
     @overload
     def subscribe(
         self,
+        signal: Literal[CoreSignal.SIMULATION_DELETED],
+        handler: SignalHandler[SimulationDeletedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
         signal: Literal[CoreSignal.SIMULATION_STATE_CHANGED],
         handler: SignalHandler[SimulationStateChangedPayload],
     ) -> None: ...
@@ -273,6 +281,13 @@ class Entrypoint(ABC):
         self,
         signal: Literal[CoreSignal.SIMULATION_CREATED],
         handler: SignalHandler[SimulationCreatedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_DELETED],
+        handler: SignalHandler[SimulationDeletedPayload],
     ) -> None: ...
 
     @overload
@@ -716,7 +731,14 @@ class ModelEntrypoint(Entrypoint):
         """
         simulation = self._get_simulation_for_device(device_id)
         if simulation is not None:
+            if simulation.map_file is not None:
+                simulation.map_file.unlink(missing_ok=True)
+                simulation.map_file = None
             self.delete_simulation(simulation)
+            self._signal_bus.emit(
+                CoreSignal.SIMULATION_DELETED,
+                SimulationDeletedPayload(simulation=simulation),
+            )
             return
         raise ValueError(f"Simulation for device with id {device_id} not found")
 

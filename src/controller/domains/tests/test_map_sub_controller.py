@@ -15,6 +15,7 @@ from controller.orchestration.app_controller import AppController
 from controller.runner import JobError
 from core.entrypoint import ModelEntrypoint
 from core.signals import MapRenderedPayload, MapRenderFailedPayload
+from core.simulation import Simulation, SimulationRepository
 from core.work.render_map_work import RenderMapOutcome
 
 pytestmark = [pytest.mark.async_jobs]
@@ -30,8 +31,12 @@ def _qt_core_app() -> None:
 class _AppStub:
     """Minimal AppController stand-in for MapSubController unit tests."""
 
-    def __init__(self) -> None:
+    def __init__(self, tmp_path: Path | None = None) -> None:
         self.model_entrypoint = ModelEntrypoint()
+        if tmp_path is not None:
+            self.model_entrypoint._simulations = SimulationRepository(
+                tmp_path / "simulations"
+            )
         self.view = MagicMock()
         self.submitted: list[dict[str, Any]] = []
 
@@ -59,9 +64,18 @@ def _make_map_sub_controller(app: _AppStub) -> MapSubController:
     return MapSubController(cast(AppController, app))
 
 
-def test_on_render_map_requested_submits_process_job() -> None:
-    app = _AppStub()
+def _add_simulation(
+    model_entrypoint: ModelEntrypoint, simulation_id: str
+) -> Simulation:
+    simulation = Simulation(id=simulation_id)
+    model_entrypoint._simulations.add(simulation)
+    return simulation
+
+
+def test_on_render_map_requested_submits_process_job(tmp_path: Path) -> None:
+    app = _AppStub(tmp_path)
     map_controller = _make_map_sub_controller(app)
+    _add_simulation(app.model_entrypoint, "sim-1")
 
     map_controller._on_render_map_requested("sim-1")
 
@@ -84,23 +98,30 @@ def test_on_render_map_requested_submits_process_job() -> None:
 
 def test_on_render_map_requested_reuses_existing_html_without_submitting(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
-    app = _AppStub()
+    app = _AppStub(tmp_path)
     map_controller = _make_map_sub_controller(app)
     simulation_id = "sim-1"
-    html_path = (
-        app.model_entrypoint.application_dir
-        / "simulations"
-        / simulation_id
-        / "map"
-        / f"{simulation_id}.html"
-    )
+    html_path = Path("/tmp/sim-1.html")
+    simulation = _add_simulation(app.model_entrypoint, simulation_id)
+    simulation.map_file = html_path
     monkeypatch.setattr(Path, "exists", lambda self: self == html_path)
 
     map_controller._on_render_map_requested(simulation_id)
 
     assert app.submitted == []
     app.view.forward_map_rendered.assert_called_once_with(simulation_id, html_path)
+
+
+def test_on_render_map_requested_skips_when_simulation_missing() -> None:
+    app = _AppStub()
+    map_controller = _make_map_sub_controller(app)
+
+    map_controller._on_render_map_requested("sim-1")
+
+    assert app.submitted == []
+    app.view.forward_map_rendered.assert_not_called()
 
 
 def test_render_callback_on_completed_applies_result() -> None:

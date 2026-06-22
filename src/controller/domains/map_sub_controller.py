@@ -60,26 +60,23 @@ class MapSubController(AppSubController):
         )
         callback: RenderMapCallback = self._async_job_callbacks.render_map
         application_dir = self.model_entrypoint.application_dir
+        simulation = self.model_entrypoint.get_simulation(simulation_id)
+        if simulation is None:
+            logger.warning(
+                "MapSubController: simulation not found",
+                simulation_id=simulation_id,
+            )
+            return
         # Check if map already exists, if so, lazy load it
-        html_path = (
-            application_dir
-            / "simulations"
-            / simulation_id
-            / "map"
-            / f"{simulation_id}.html"
-        )
-        if html_path.exists():
+        html_path = simulation.map_file
+        if html_path is not None and html_path.exists():
             logger.debug(
                 "MapSubController: map already rendered",
                 simulation_id=simulation_id,
             )
             self.view.forward_map_rendered(
                 simulation_id,
-                application_dir
-                / "simulations"
-                / simulation_id
-                / "map"
-                / f"{simulation_id}.html",
+                html_path,
             )
         else:
             self._submit_model_entrypoint_async_call(

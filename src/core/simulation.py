@@ -32,6 +32,9 @@ class Simulation:
     device: Phone | None = field(
         default=None, metadata={"description": "The device of the simulation"}
     )
+    map_file: Path | None = field(
+        default=None, metadata={"description": "The map file of the simulation"}
+    )
     log_file: Path | None = field(
         default=None, metadata={"description": "The log file of the simulation"}
     )
