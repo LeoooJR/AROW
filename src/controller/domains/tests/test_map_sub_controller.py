@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import builtins
+import tempfile
 from pathlib import Path
 from typing import Any, cast
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from PySide6.QtWidgets import QApplication
@@ -23,7 +24,7 @@ from core.signals import (
     MapRenderFailedPayload,
     SimulationDeletedPayload,
 )
-from core.simulation import Simulation, SimulationRepository
+from core.simulation import Simulation
 from core.work.render_map_work import RenderMapOutcome
 
 pytestmark = [pytest.mark.async_jobs]
@@ -40,11 +41,12 @@ class _AppStub:
     """Minimal AppController stand-in for MapSubController unit tests."""
 
     def __init__(self, tmp_path: Path | None = None) -> None:
-        self.model_entrypoint = ModelEntrypoint()
-        if tmp_path is not None:
-            self.model_entrypoint._simulations = SimulationRepository(
-                tmp_path / "simulations"
-            )
+        self._tmp_path = tmp_path if tmp_path is not None else Path(tempfile.mkdtemp())
+        with patch(
+            "core.entrypoint.get_or_create_application_dir",
+            return_value=self._tmp_path,
+        ):
+            self.model_entrypoint = ModelEntrypoint()
         self.view = MagicMock()
         self.submitted: list[dict[str, Any]] = []
         self.cancelled_job_ids: list[str] = []
@@ -269,3 +271,16 @@ def test_on_simulation_deleted_cancels_render_job_and_forwards(
     assert app.cancelled_job_ids == ["job-1"]
     assert "sim-1" not in map_controller._render_jobs_by_simulation_id
     app.view.forward_simulation_deleted.assert_called_once_with("sim-1")
+
+
+def test_persist_simulation_repository_delegates_to_model_entrypoint(
+    tmp_path: Path,
+) -> None:
+    app = _AppStub(tmp_path)
+    map_controller = _make_map_sub_controller(app)
+    _add_simulation(app.model_entrypoint, "sim-1")
+
+    map_controller.persist_simulation_repository()
+
+    metadata_path = app.model_entrypoint._simulations.simulation_metadata_file("sim-1")
+    assert metadata_path.is_file()

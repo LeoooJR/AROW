@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -15,7 +16,6 @@ from core.devices import (
 )
 from core.entrypoint import ModelEntrypoint
 from core.signals import CoreSignal, SimulationCreatedPayload
-from core.simulation import SimulationRepository
 
 pytestmark = [pytest.mark.devices]
 
@@ -39,10 +39,13 @@ def _model_with_server(
     state = MockAdbState(seed=303, initial_devices=0)
     server = MockAdbServer(state=state)
     client = MockAdbClient(state=state)
-    model_entrypoint = ModelEntrypoint()
+    with patch(
+        "core.entrypoint.get_or_create_application_dir",
+        return_value=tmp_path,
+    ):
+        model_entrypoint = ModelEntrypoint()
     model_entrypoint._adb_server = server
     model_entrypoint._adb_client = client
-    model_entrypoint._simulations = SimulationRepository(tmp_path / "simulations")
     return model_entrypoint, server
 
 
@@ -122,9 +125,7 @@ def test_reconcile_matches_by_stable_key_when_adb_id_changes(tmp_path: Path) -> 
     result = model_entrypoint.reconcile_paired_devices([discovered])
 
     assert result.changed is True
-    assert result.device_id_rebindings == {
-        "192.168.0.10:5555": "192.168.0.10:37849"
-    }
+    assert result.device_id_rebindings == {"192.168.0.10:5555": "192.168.0.10:37849"}
     assert server.paired_devices.get("192.168.0.10:5555") is None
     assert server.paired_devices.get("192.168.0.10:37849") is paired
     assert paired.descriptor.model == "Updated model"

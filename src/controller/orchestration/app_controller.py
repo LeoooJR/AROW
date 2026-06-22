@@ -240,4 +240,8 @@ class AppController(Controller):
         finally:
             if shutdown_watchdog.isActive():
                 shutdown_watchdog.stop()
+        try:
+            self._map.persist_simulation_repository()
+        except Exception:
+            logger.exception("AppController: failed to persist simulation repository")
         self.runner.shutdown()

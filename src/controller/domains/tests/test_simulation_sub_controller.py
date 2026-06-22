@@ -5,7 +5,7 @@ from __future__ import annotations
 import builtins
 from pathlib import Path
 from typing import cast
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from controller.domains.simulation_sub_controller import SimulationSubController
 from controller.orchestration.app_controller import AppController
@@ -13,7 +13,7 @@ from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
 from core.devices import Phone
 from core.entrypoint import ModelEntrypoint
 from core.signals import CoreSignal, SimulationCreatedPayload
-from core.simulation import Simulation, SimulationRepository
+from core.simulation import Simulation
 
 
 class _AppProbe:
@@ -42,10 +42,13 @@ def _make_model(tmp_path: Path, *, device: Phone | None = None) -> ModelEntrypoi
     state = MockAdbState(seed=404, initial_devices=0)
     server = MockAdbServer(state=state)
     client = MockAdbClient(state=state)
-    model_entrypoint = ModelEntrypoint()
+    with patch(
+        "core.entrypoint.get_or_create_application_dir",
+        return_value=tmp_path,
+    ):
+        model_entrypoint = ModelEntrypoint()
     model_entrypoint._adb_server = server
     model_entrypoint._adb_client = client
-    model_entrypoint._simulations = SimulationRepository(tmp_path / "simulations")
     if device is not None:
         server.paired_devices.add(device)
     return model_entrypoint

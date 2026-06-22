@@ -717,6 +717,10 @@ class ModelEntrypoint(Entrypoint):
         """
         return self._simulations.remove(simulation)
 
+    def persist_simulations(self) -> None:
+        """Persist every simulation and the repository index to disk."""
+        self._simulations.write_all()
+
     def _get_simulation_for_device(self, device_id: str) -> Simulation | None:
         """Return the existing simulation for a device when one is already tracked."""
         for simulation in self._simulations:
@@ -731,9 +735,6 @@ class ModelEntrypoint(Entrypoint):
         """
         simulation = self._get_simulation_for_device(device_id)
         if simulation is not None:
-            if simulation.map_file is not None:
-                simulation.map_file.unlink(missing_ok=True)
-                simulation.map_file = None
             self.delete_simulation(simulation)
             self._signal_bus.emit(
                 CoreSignal.SIMULATION_DELETED,
