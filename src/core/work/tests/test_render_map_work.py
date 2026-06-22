@@ -118,13 +118,39 @@ def test_apply_main_thread_emits_map_rendered(tmp_path: Path) -> None:
     ]
 
 
-def test_apply_main_thread_skips_emit_when_simulation_missing() -> None:
+def test_apply_main_thread_skips_emit_when_simulation_missing(tmp_path: Path) -> None:
     model_entrypoint = ModelEntrypoint()
     emitted: list[tuple[CoreSignal, object]] = []
     model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
         (signal, payload)
     )
-    html_path = Path("/tmp/sim-1.html")
+    html_path = tmp_path / "sim-1.html"
+    html_path.write_text("<html></html>", encoding="utf-8")
+
+    RenderMapWork.apply_main_thread(
+        model_entrypoint,
+        RenderMapOutcome(simulation_id="sim-1", html_path=html_path),
+    )
+
+    assert emitted == []
+    assert not html_path.exists()
+
+
+def test_apply_main_thread_orphan_cleanup_swallows_oserror(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    model_entrypoint = ModelEntrypoint()
+    emitted: list[tuple[CoreSignal, object]] = []
+    model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
+        (signal, payload)
+    )
+    html_path = tmp_path / "sim-1.html"
+
+    def _unlink_raises(self, missing_ok=False) -> None:  # type: ignore[no-untyped-def]
+        raise OSError("permission denied")
+
+    monkeypatch.setattr(Path, "unlink", _unlink_raises)
 
     RenderMapWork.apply_main_thread(
         model_entrypoint,

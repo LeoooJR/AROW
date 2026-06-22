@@ -12,9 +12,13 @@ from PySide6.QtWidgets import QApplication
 
 from controller.domains.map_sub_controller import MapSubController
 from controller.orchestration.app_controller import AppController
-from controller.runner import JobError
+from controller.runner import JobError, JobHandler
 from core.entrypoint import ModelEntrypoint
-from core.signals import MapRenderedPayload, MapRenderFailedPayload
+from core.signals import (
+    MapRenderedPayload,
+    MapRenderFailedPayload,
+    SimulationDeletedPayload,
+)
 from core.simulation import Simulation, SimulationRepository
 from core.work.render_map_work import RenderMapOutcome
 
@@ -39,9 +43,13 @@ class _AppStub:
             )
         self.view = MagicMock()
         self.submitted: list[dict[str, Any]] = []
+        self.cancelled_job_ids: list[str] = []
+        self.runner = MagicMock()
+        self.runner.cancel = lambda job_id: self.cancelled_job_ids.append(job_id)
 
-    def _submit_model_entrypoint_async_call(self, **kwargs: Any) -> None:
+    def _submit_model_entrypoint_async_call(self, **kwargs: Any) -> JobHandler:
         self.submitted.append(kwargs)
+        return JobHandler(job_id="job-1", name=kwargs.get("name", ""))
 
 
 def _patch_controller_type_checks(
@@ -86,14 +94,16 @@ def test_on_render_map_requested_submits_process_job(tmp_path: Path) -> None:
     assert submit_kwargs["coalesce_key"] == "render_map:sim-1"
     assert submit_kwargs["fn"] == app.model_entrypoint.render_map
     assert submit_kwargs["args"] == ("sim-1", app.model_entrypoint.application_dir)
-    assert (
-        submit_kwargs["on_completed"]
-        == map_controller._async_job_callbacks.render_map.on_completed
-    )
-    assert (
-        submit_kwargs["on_failed"]
-        == map_controller._async_job_callbacks.render_map.on_failed
-    )
+    assert map_controller._render_jobs_by_simulation_id["sim-1"].job_id == "job-1"
+    on_completed = submit_kwargs["on_completed"]
+    on_failed = submit_kwargs["on_failed"]
+    on_cancelled = submit_kwargs["on_cancelled"]
+    assert on_completed.func == map_controller._on_render_job_completed
+    assert on_completed.args == ("sim-1",)
+    assert on_failed.func == map_controller._on_render_job_failed
+    assert on_failed.args == ("sim-1",)
+    assert on_cancelled.func == map_controller._on_render_job_cancelled
+    assert on_cancelled.args == ("sim-1",)
 
 
 def test_on_render_map_requested_reuses_existing_html_without_submitting(
@@ -179,3 +189,69 @@ def test_on_map_render_failed_forwards_to_view(monkeypatch: pytest.MonkeyPatch) 
     map_controller._on_map_render_failed(payload)
 
     app.view.forward_map_render_failed.assert_called_once_with("sim-1", "failed")
+
+
+def test_render_job_callbacks_clear_tracked_handle(tmp_path: Path) -> None:
+    app = _AppStub(tmp_path)
+    map_controller = _make_map_sub_controller(app)
+    _add_simulation(app.model_entrypoint, "sim-1")
+    map_controller._render_jobs_by_simulation_id["sim-1"] = JobHandler(
+        job_id="job-1", name="render_map"
+    )
+    outcome = RenderMapOutcome(simulation_id="sim-1", html_path=Path("/tmp/sim-1.html"))
+    apply_calls: list[object] = []
+    app.model_entrypoint.apply_result = lambda result: apply_calls.append(result)  # type: ignore[method-assign]
+
+    map_controller._on_render_job_completed("sim-1", outcome)
+
+    assert apply_calls == [outcome]
+    assert "sim-1" not in map_controller._render_jobs_by_simulation_id
+
+
+def test_render_job_failed_callback_clears_tracked_handle(tmp_path: Path) -> None:
+    app = _AppStub(tmp_path)
+    map_controller = _make_map_sub_controller(app)
+    map_controller._render_jobs_by_simulation_id["sim-1"] = JobHandler(
+        job_id="job-1", name="render_map"
+    )
+    error = JobError(message="boom", traceback="", origin="render_map")
+    apply_calls: list[object] = []
+    app.model_entrypoint.apply_failure = lambda error: apply_calls.append(error)  # type: ignore[method-assign]
+
+    map_controller._on_render_job_failed("sim-1", error)
+
+    assert apply_calls == [error]
+    assert "sim-1" not in map_controller._render_jobs_by_simulation_id
+
+
+def test_render_job_cancelled_callback_clears_tracked_handle() -> None:
+    app = _AppStub()
+    map_controller = _make_map_sub_controller(app)
+    map_controller._render_jobs_by_simulation_id["sim-1"] = JobHandler(
+        job_id="job-1", name="render_map"
+    )
+
+    map_controller._on_render_job_cancelled("sim-1")
+
+    assert "sim-1" not in map_controller._render_jobs_by_simulation_id
+
+
+def test_on_simulation_deleted_cancels_render_job_and_forwards(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    app = _AppStub(tmp_path)
+    _patch_controller_type_checks(monkeypatch, app)
+    map_controller = _make_map_sub_controller(app)
+    simulation = _add_simulation(app.model_entrypoint, "sim-1")
+    map_controller._render_jobs_by_simulation_id["sim-1"] = JobHandler(
+        job_id="job-1", name="render_map"
+    )
+
+    map_controller._on_simulation_deleted(
+        SimulationDeletedPayload(simulation=simulation)
+    )
+
+    assert app.cancelled_job_ids == ["job-1"]
+    assert "sim-1" not in map_controller._render_jobs_by_simulation_id
+    app.view.forward_simulation_deleted.assert_called_once_with("sim-1")

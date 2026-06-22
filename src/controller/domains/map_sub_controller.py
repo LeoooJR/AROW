@@ -7,18 +7,20 @@ applied on the main thread and forwarded to the view.
 
 from __future__ import annotations
 
-from pathlib import Path
+from functools import partial
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Slot
 
-from controller.core_work_callbacks import MapAsyncJobCallbacks, RenderMapCallback
+from controller.core_work_callbacks import MapAsyncJobCallbacks
 from controller.domains.app_sub_controller import AppSubController
 from controller.helper import validate_model_entrypoint, validate_view
+from controller.runner import JobError, JobHandler
 from core.signals import (
     CoreSignal,
     MapRenderedPayload,
     MapRenderFailedPayload,
+    SimulationDeletedPayload,
 )
 from gui.signals import signals
 from logger import logger
@@ -35,6 +37,7 @@ class MapSubController(AppSubController):
         self._async_job_callbacks: MapAsyncJobCallbacks = (
             MapAsyncJobCallbacks.for_subcontroller(self)
         )
+        self._render_jobs_by_simulation_id: dict[str, JobHandler] = {}
 
     def _submit_model_entrypoint_async_call(self, *args, **kwargs):
         return self._app._submit_model_entrypoint_async_call(*args, **kwargs)
@@ -49,6 +52,10 @@ class MapSubController(AppSubController):
         self.model_entrypoint.subscribe(
             CoreSignal.MAP_RENDER_FAILED, self._on_map_render_failed
         )
+        self.model_entrypoint.subscribe(
+            CoreSignal.SIMULATION_DELETED,
+            self._on_simulation_deleted,
+        )
 
     @validate_model_entrypoint
     @Slot(str)
@@ -58,7 +65,6 @@ class MapSubController(AppSubController):
             "MapSubController: render map requested",
             simulation_id=simulation_id,
         )
-        callback: RenderMapCallback = self._async_job_callbacks.render_map
         application_dir = self.model_entrypoint.application_dir
         simulation = self.model_entrypoint.get_simulation(simulation_id)
         if simulation is None:
@@ -79,16 +85,37 @@ class MapSubController(AppSubController):
                 html_path,
             )
         else:
-            self._submit_model_entrypoint_async_call(
+            handle = self._submit_model_entrypoint_async_call(
                 name="render_map",
                 fn=self.model_entrypoint.render_map,
                 args=(simulation_id, application_dir),
                 description="Render Folium map HTML for simulation",
                 job_type="process",
                 coalesce_key=f"render_map:{simulation_id}",
-                on_completed=callback.on_completed,
-                on_failed=callback.on_failed,
+                on_completed=partial(self._on_render_job_completed, simulation_id),
+                on_failed=partial(self._on_render_job_failed, simulation_id),
+                on_cancelled=partial(self._on_render_job_cancelled, simulation_id),
             )
+            if handle is not None:
+                self._render_jobs_by_simulation_id[simulation_id] = handle
+
+    def _clear_render_job(self, simulation_id: str) -> None:
+        """Remove a tracked render job handle when it finishes or is cancelled."""
+        self._render_jobs_by_simulation_id.pop(simulation_id, None)
+
+    def _on_render_job_completed(self, simulation_id: str, result: object) -> None:
+        """Apply render success and drop the tracked job handle."""
+        self._clear_render_job(simulation_id)
+        self._async_job_callbacks.render_map.on_completed(result)
+
+    def _on_render_job_failed(self, simulation_id: str, error: JobError) -> None:
+        """Apply render failure and drop the tracked job handle."""
+        self._clear_render_job(simulation_id)
+        self._async_job_callbacks.render_map.on_failed(error)
+
+    def _on_render_job_cancelled(self, simulation_id: str) -> None:
+        """Drop the tracked job handle when AsyncRunner discards a cancelled job."""
+        self._clear_render_job(simulation_id)
 
     @validate_view
     def _on_map_rendered(self, payload: MapRenderedPayload) -> None:
@@ -110,3 +137,16 @@ class MapSubController(AppSubController):
             reason=payload.reason,
         )
         self.view.forward_map_render_failed(payload.simulation_id, payload.reason)
+
+    @validate_view
+    def _on_simulation_deleted(self, payload: SimulationDeletedPayload) -> None:
+        simulation_id = payload.simulation.id
+        handle = self._render_jobs_by_simulation_id.pop(simulation_id, None)
+        if handle is not None:
+            logger.debug(
+                "MapSubController: cancelling in-flight render map job",
+                simulation_id=simulation_id,
+                job_id=handle.job_id,
+            )
+            self._app.runner.cancel(handle.job_id)
+        self.view.forward_simulation_deleted(simulation_id)

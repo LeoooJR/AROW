@@ -95,6 +95,15 @@ class RenderMapWork(CoreRuntimeWork[RenderMapOutcome]):
             raise TypeError("apply_main_thread() requires ModelEntrypoint")
         simulation = model_entrypoint.get_simulation(outcome.simulation_id)
         if simulation is None:
+            try:
+                outcome.html_path.unlink(missing_ok=True)
+            except OSError as error:
+                logger.warning(
+                    "RenderMapWork: failed to remove orphan map file",
+                    simulation_id=outcome.simulation_id,
+                    html_path=str(outcome.html_path),
+                    error=str(error),
+                )
             logger.warning(
                 "RenderMapWork: simulation missing on render success",
                 simulation_id=outcome.simulation_id,

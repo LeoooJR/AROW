@@ -752,6 +752,7 @@ class MapBlock(QWidget):
         )
         self._placeholder_helper_anim: QSequentialAnimationGroup | None = None
         self._pending_render_simulation_id: str | None = None
+        self._active_simulation_id: str | None = None
 
         self._finalize_ui_hooks()
 
@@ -792,6 +793,7 @@ class MapBlock(QWidget):
         )
         signals.UI.MapRendered.connect(self._on_map_rendered)
         signals.UI.MapRenderFailed.connect(self._on_map_render_failed)
+        signals.SIMULATION.SimulationDeleted.connect(self._on_simulation_deleted)
 
     def is_canvas_visible(self) -> bool:
         """Return whether the concrete map canvas is currently visible."""
@@ -820,6 +822,8 @@ class MapBlock(QWidget):
     def show_device_required_placeholder(self) -> None:
         """Show the placeholder that asks the user to open the device list."""
         self.ui.placeholder.setCurrentWidget(self.ui.device_required_placeholder)
+        self.ui.placeholder.setVisible(True)
+        self.ui.canvas.setVisible(False)
 
     def show_map_loading_placeholder(self) -> None:
         """Show the placeholder used while the map is being generated."""
@@ -841,6 +845,13 @@ class MapBlock(QWidget):
         layout = self.layout()
         if layout is not None:
             layout.activate()
+
+    def _reset_to_device_required_placeholder(self) -> None:
+        """Clear simulation tracking and show the device-selection placeholder."""
+        self._pending_render_simulation_id = None
+        self._active_simulation_id = None
+        self.show_device_required_placeholder()
+        self._on_run_helper_animation()
 
     def _map_html_path(self, simulation_id: str) -> Path:
         """Return the expected on-disk HTML path for a simulation map."""
@@ -893,6 +904,7 @@ class MapBlock(QWidget):
         self, simulation_id: str, device_id: str, device_name: str
     ) -> None:
         """Update placeholder after auth or device selection succeeds."""
+        self._active_simulation_id = simulation_id
         self._pending_render_simulation_id = simulation_id
         self.show_map_loading_placeholder()
         self._on_run_helper_animation()
@@ -913,6 +925,7 @@ class MapBlock(QWidget):
             )
             return
         self._pending_render_simulation_id = None
+        self._active_simulation_id = simulation_id
         self._load_map_html_from_path(simulation_id, html_path)
 
     @Slot(str, str)
@@ -948,11 +961,17 @@ class MapBlock(QWidget):
     @Slot(str)
     def _on_remove_active_device_succeeded(self, device_id: str) -> None:
         """Reset placeholder when the active device is removed."""
-        self._pending_render_simulation_id = None
-        self.show_device_required_placeholder()
-        self.ui.placeholder.setVisible(True)
-        self.ui.canvas.setVisible(False)
-        self._on_run_helper_animation()
+        self._reset_to_device_required_placeholder()
+
+    @Slot(str)
+    def _on_simulation_deleted(self, simulation_id: str) -> None:
+        """Reset placeholder when the active or pending simulation is deleted."""
+        if (
+            simulation_id != self._active_simulation_id
+            and simulation_id != self._pending_render_simulation_id
+        ):
+            return
+        self._reset_to_device_required_placeholder()
 
     @Slot()
     def _on_run_helper_animation(self) -> None:
