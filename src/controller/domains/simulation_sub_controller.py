@@ -114,9 +114,12 @@ class SimulationSubController(AppSubController):
         )
         try:
             self.model_entrypoint.create_simulation(device_id=device_id)
-        except AttributeError as e:
+        except (
+            AttributeError,
+            ValueError,
+        ) as e:  # AttributeError: Device not found, ValueError: Device not in ADB server paired devices repository
             logger.error(
-                "SimulationSubController: failed to get device",
+                "SimulationSubController: failed to create simulation",
                 error=str(e),
                 device_id=device_id,
             )

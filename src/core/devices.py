@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import datetime
 import hashlib
 import platform
@@ -461,6 +463,39 @@ class Phone(Device[PhoneDescriptor]):
     def hardware_serial(self) -> str:
         return self._descriptor.hardware_serial
 
+    @property
+    def manufacturer(self) -> str:
+        return self._descriptor.manufacturer
+
+    @property
+    def android_api_level(self) -> int | None:
+        return self._descriptor.android_api_level
+
+    @property
+    def shell_device_name(self) -> str:
+        return self._descriptor.shell_device_name
+
+    def to_payload(self) -> dict[str, object]:
+        """
+        Convert the phone to a payload.
+        """
+        return {
+            "id": self.id,
+            "name": self.name,
+            "os": self.os,
+            "ip": self.ip,
+            "port": self.port,
+            "state": self.state,
+            "stable_key": self.stable_key,
+        }
+
+    @staticmethod
+    def from_payload(payload: dict[str, object]) -> Phone:
+        """
+        Create a phone from a payload.
+        """
+        raise NotImplementedError("Not implemented")
+
 
 # Descriptor fields refreshed from a newly listed Phone during paired-device reconcile.
 # ``last_communication`` is applied on updates but ignored for no-op detection.
@@ -725,13 +760,6 @@ class Computer(Device[ComputerDescriptor]):
         return "127.0.0.1", False
 
 
-def connect_to_device(ip: str, port: int, association_code: str) -> Phone:
-    """
-    Connect to a device
-    """
-    return Phone(id="", name="", os="", ip=ip, port=port, state="")
-
-
 class PhoneRepository(Repository[Phone]):
     """
     Phone repository. Tracks a working device: the first added phone is selected until cleared.
@@ -740,17 +768,25 @@ class PhoneRepository(Repository[Phone]):
     def __init__(self) -> None:
         super().__init__()
         self._working_device: Phone | None = None
-        # TO DO: add a reference to the simulation repository, so both repositories are synchronized
 
     @property
     def working_device(self) -> Phone | None:
         return self.__dict__.get("_working_device", None)
 
     @working_device.setter
-    def working_device(self, device: Phone) -> None:
-        self._working_device = device
+    def working_device(self, device: Phone | None) -> None:
+        if device is None:
+            self._working_device = None
+            return
+        if device.id in self._repository:  # Ensure the device is in the repository
+            self._working_device = device
+        else:
+            raise ValueError(f"Device with id {device.id} is not in the repository")
 
     def add(self, item: Phone) -> None:
+        """
+        Add a phone to the repository.
+        """
         try:
             super().add(item)
         except ValueError as e:
@@ -763,6 +799,9 @@ class PhoneRepository(Repository[Phone]):
             self._working_device = item
 
     def remove(self, item: Phone) -> None:
+        """
+        Remove a phone from the repository.
+        """
         try:
             super().remove(item)
         except ValueError as e:
@@ -775,6 +814,9 @@ class PhoneRepository(Repository[Phone]):
             self._working_device = None
 
     def clear(self) -> None:
+        """
+        Clear the repository.
+        """
         super().clear()
         self._working_device = None
 
@@ -797,6 +839,9 @@ class ComputerRepository(Repository[Computer]):
         self._working_device = device
 
     def add(self, item: Computer) -> None:
+        """
+        Add a computer to the repository.
+        """
         try:
             super().add(item)
         except ValueError as e:
@@ -809,6 +854,9 @@ class ComputerRepository(Repository[Computer]):
             self._working_device = item
 
     def remove(self, item: Computer) -> None:
+        """
+        Remove a computer from the repository.
+        """
         try:
             super().remove(item)
         except ValueError as e:

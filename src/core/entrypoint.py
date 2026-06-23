@@ -658,10 +658,16 @@ class ModelEntrypoint(Entrypoint):
 
         Raises:
             AttributeError: If the device is not found.
+            ValueError: If the device is not in the repository.
         """
         device: Phone | None = self.get_device(device_id)
         if device is None:
             raise AttributeError(f"Device with id {device_id} not found")
+        if self._adb_server is None:
+            raise AttributeError(
+                "ADB server must be initialized before creating a simulation"
+            )
+        self._adb_server.set_working_device(device)
         simulation: Simulation | None = self._get_simulation_for_device(device_id)
         if simulation is None:
             simulation = Simulation(device=device)
@@ -740,8 +746,14 @@ class ModelEntrypoint(Entrypoint):
                 CoreSignal.SIMULATION_DELETED,
                 SimulationDeletedPayload(simulation=simulation),
             )
+            if self._adb_server is not None:
+                working_device = self._adb_server.get_working_device()
+                if working_device is not None and working_device.id == device_id:
+                    self._adb_server.clear_working_device()
             return
-        raise ValueError(f"Simulation for device with id {device_id} not found")
+        raise ValueError(
+            f"Simulation for device with id {device_id} not found or working device not cleared"
+        )
 
     @staticmethod
     def render_map(simulation_id: str, application_dir: Path) -> RenderMapOutcome:

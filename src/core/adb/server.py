@@ -120,6 +120,26 @@ class AdbServer:
         """Delete the paired devices."""
         self._paired_devices.clear()
 
+    def set_working_device(self, device: Phone) -> None:
+        """Set the working device."""
+        try:
+            self._paired_devices.working_device = device
+        except ValueError as e:
+            logger.error(
+                "AdbServer: failed to set working device",
+                error=str(e),
+                device_id=device.id,
+            )
+            raise e
+
+    def get_working_device(self) -> Phone | None:
+        """Get the working device."""
+        return self._paired_devices.working_device
+
+    def clear_working_device(self) -> None:
+        """Clear the working device."""
+        self._paired_devices.working_device = None
+
     @property
     def mdns_available(self) -> bool:
         """Get whether ADB reports mDNS discovery as available."""

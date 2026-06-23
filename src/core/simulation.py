@@ -54,6 +54,28 @@ class Simulation:
     # When True, ``__setattr__`` logs changes to the public simulation fields.
     _fields_ready: bool = field(init=False, repr=False, compare=False, default=False)
 
+    def to_payload(self, simulation_dir: Path) -> dict[str, object]:
+        """
+        Convert the simulation to a payload.
+        """
+        return {
+            "schema_version": SIMULATION_REPOSITORY_SCHEMA_VERSION,
+            "id": self.id,
+            "device": self.device.to_payload() if self.device is not None else None,
+            "real_location": self.real_location.to_payload(),
+            "fake_location": self.fake_location.to_payload(),
+            "map_file": _relative_to_simulation_dir(self.map_file, simulation_dir),
+            "log_file": _relative_to_simulation_dir(self.log_file, simulation_dir),
+            "active": self.active,
+        }
+
+    @staticmethod
+    def from_payload(payload: dict[str, object]) -> Simulation:
+        """
+        Create a simulation from a payload.
+        """
+        raise NotImplementedError("Not implemented")
+
     # Setting _fields_ready to True to allow __setattr__ to log changes to the public simulation fields
     # This is done in __post_init__ to avoid logging the initial values of the public simulation fields
     def __post_init__(self) -> None:
@@ -74,29 +96,10 @@ class Simulation:
         object.__setattr__(self, name, value)
 
 
-def _location_to_payload(location: Location) -> dict[str, object]:
-    return {
-        "lat": location.lat,
-        "lon": location.lon,
-        "label": location.label,
-    }
-
-
-def _device_to_payload(device: Phone | None) -> dict[str, object] | None:
-    if device is None:
-        return None
-    return {
-        "id": device.id,
-        "name": device.name,
-        "os": device.os,
-        "ip": device.ip,
-        "port": device.port,
-        "state": device.state,
-        "stable_key": device.stable_key,
-    }
-
-
 def _relative_to_simulation_dir(path: Path | None, simulation_dir: Path) -> str | None:
+    """
+    Convert a path to a relative path to the simulation directory.
+    """
     if path is None:
         return None
     try:
@@ -110,22 +113,10 @@ def _relative_to_simulation_dir(path: Path | None, simulation_dir: Path) -> str 
         return str(path)
 
 
-def _simulation_to_payload(
-    simulation: Simulation, simulation_dir: Path
-) -> dict[str, object]:
-    return {
-        "schema_version": SIMULATION_REPOSITORY_SCHEMA_VERSION,
-        "id": simulation.id,
-        "device": _device_to_payload(simulation.device),
-        "real_location": _location_to_payload(simulation.real_location),
-        "fake_location": _location_to_payload(simulation.fake_location),
-        "map_file": _relative_to_simulation_dir(simulation.map_file, simulation_dir),
-        "log_file": _relative_to_simulation_dir(simulation.log_file, simulation_dir),
-        "active": simulation.active,
-    }
-
-
 def _write_json_atomic(path: Path, payload: dict[str, object]) -> None:
+    """
+    Write a JSON file atomically.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = path.with_suffix(path.suffix + ".tmp")
     tmp_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
@@ -143,19 +134,34 @@ class SimulationRepository(Repository[Simulation]):
 
     @property
     def save_dir(self) -> Path:
+        """
+        Get the save directory.
+        """
         return self._save_dir
 
     @property
     def index_file(self) -> Path:
+        """
+        Get the index file.
+        """
         return self._save_dir / INDEX_FILENAME
 
     def simulation_dir(self, simulation_id: str) -> Path:
+        """
+        Get the simulation directory.
+        """
         return self._save_dir / simulation_id
 
     def simulation_metadata_file(self, simulation_id: str) -> Path:
+        """
+        Get the simulation metadata file.
+        """
         return self.simulation_dir(simulation_id) / SIMULATION_FILENAME
 
     def write_index(self) -> Path:
+        """
+        Write the index file.
+        """
         payload: dict[str, object] = {
             "schema_version": SIMULATION_REPOSITORY_SCHEMA_VERSION,
             "simulations": [simulation.id for simulation in self],
@@ -164,19 +170,28 @@ class SimulationRepository(Repository[Simulation]):
         return self.index_file
 
     def write_simulation(self, simulation: Simulation) -> Path:
+        """
+        Write the simulation metadata file.
+        """
         simulation_dir = self.simulation_dir(simulation.id)
         simulation_dir.mkdir(parents=True, exist_ok=True)
         metadata_path = self.simulation_metadata_file(simulation.id)
-        payload = _simulation_to_payload(simulation, simulation_dir)
+        payload = simulation.to_payload(simulation_dir)
         _write_json_atomic(metadata_path, payload)
         return metadata_path
 
     def write_all(self) -> None:
+        """
+        Write all the simulations.
+        """
         for simulation in self:
             self.write_simulation(simulation)
         self.write_index()
 
     def add(self, item: Simulation) -> None:
+        """
+        Add a simulation to the repository.
+        """
         super().add(item)
         simulation_dir = self.simulation_dir(item.id)
         simulation_dir.mkdir(parents=True, exist_ok=True)
@@ -186,6 +201,9 @@ class SimulationRepository(Repository[Simulation]):
         self.write_index()
 
     def remove(self, item: Simulation) -> None:
+        """
+        Remove a simulation from the repository.
+        """
         super().remove(item)
         simulation_dir = self.simulation_dir(item.id)
         if simulation_dir.is_dir():
