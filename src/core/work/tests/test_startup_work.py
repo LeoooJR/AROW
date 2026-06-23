@@ -11,6 +11,7 @@ from core.adb.binary import AdbBinary
 from core.devices import Phone
 from core.entrypoint import ModelEntrypoint
 from core.signals import AdbServerStartedPayload, CoreSignal, DevicesUpdatedPayload
+from core.simulation import Simulation, SimulationRepository
 from core.work import startup_work
 from core.work.startup_work import StartupCoreRuntimeWork, StartupOutcome
 
@@ -25,6 +26,20 @@ class KnownDevicesCountingMockAdbServer(MockAdbServer):
     def get_known_devices(self) -> list[Phone]:
         self.get_known_devices_calls += 1
         return super().get_known_devices()
+
+
+@pytest.fixture(autouse=True)
+def _patch_application_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep startup and entrypoint simulation persistence inside pytest tmp_path."""
+    monkeypatch.setattr(
+        startup_work,
+        "get_or_create_application_dir",
+        lambda: tmp_path,
+    )
+    monkeypatch.setattr(
+        "core.entrypoint.get_or_create_application_dir",
+        lambda: tmp_path,
+    )
 
 
 def test_ensure_adb_binary_executable_passes_for_executable_file(
@@ -150,6 +165,34 @@ def test_startup_reuses_server_paired_devices_after_start(
     assert all(phone.descriptor.manufacturer.strip() for phone in outcome.devices)
 
 
+def test_startup_run_loads_persisted_simulations_for_paired_devices(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(startup_work, "mock_adb_seed_from_env", lambda: 111)
+    first_outcome = StartupCoreRuntimeWork(use_mock_adb=True).run()
+    phone = first_outcome.devices[0]
+    repository = SimulationRepository(
+        startup_work.get_or_create_application_dir() / "simulations"
+    )
+    simulation = Simulation(id="sim-1", device=phone, active=True)
+    repository.add(simulation)
+    repository.write_all()
+
+    second_outcome = StartupCoreRuntimeWork(use_mock_adb=True).run()
+
+    assert len(second_outcome.simulations) == 1
+    assert second_outcome.simulations[0].id == "sim-1"
+    loaded_phone = second_outcome.simulations[0].device
+    assert loaded_phone is not None
+    assert loaded_phone.id == phone.id
+    assert second_outcome.adb_server is not None
+    paired_from_outcome = {
+        paired_phone.id: paired_phone
+        for paired_phone in second_outcome.adb_server.paired_devices
+    }
+    assert loaded_phone is paired_from_outcome[phone.id]
+
+
 def test_startup_apply_binds_mock_runtime_and_emits_startup_signals() -> None:
     state = MockAdbState(seed=111, initial_devices=1)
     server = MockAdbServer(state=state)
@@ -175,3 +218,29 @@ def test_startup_apply_binds_mock_runtime_and_emits_startup_signals() -> None:
         ),
         (CoreSignal.DEVICES_UPDATED, DevicesUpdatedPayload(devices=devices)),
     ]
+
+
+def test_startup_apply_restores_persisted_simulations() -> None:
+    phone = Phone(id="device-1", state="device", model="Pixel")
+    simulation = Simulation(id="sim-1", device=phone, active=True)
+    state = MockAdbState(seed=111, initial_devices=1)
+    server = MockAdbServer(state=state)
+    client = MockAdbClient(state=state)
+    devices = server.get_known_devices()
+    model_entrypoint = ModelEntrypoint()
+
+    StartupCoreRuntimeWork.apply_main_thread(
+        model_entrypoint,
+        StartupOutcome(
+            adb_server=server,
+            adb_client=client,
+            devices=devices,
+            simulations=[simulation],
+        ),
+    )
+
+    restored = model_entrypoint._simulations.get("sim-1")
+    assert restored is simulation
+    assert restored is not None
+    assert restored.device is phone
+    assert restored.active is True

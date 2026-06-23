@@ -492,9 +492,30 @@ class Phone(Device[PhoneDescriptor]):
     @staticmethod
     def from_payload(payload: dict[str, object]) -> Phone:
         """
-        Create a phone from a payload.
+        Create a phone from a persisted payload written by :meth:`to_payload`.
         """
-        raise NotImplementedError("Not implemented")
+        port_raw = payload.get("port")
+        port: int | None = None
+        if isinstance(port_raw, int):
+            port = port_raw
+        elif isinstance(port_raw, str) and port_raw.strip():
+            port = int(port_raw)
+        name_raw = payload.get("name")
+        os_raw = payload.get("os")
+        ip_raw = payload.get("ip")
+        state_raw = payload.get("state")
+        stable_key_raw = payload.get("stable_key")
+        phone = Phone(
+            id=str(payload["id"]),
+            name=str(name_raw) if name_raw is not None else None,
+            os=str(os_raw) if os_raw is not None else None,
+            ip=str(ip_raw) if ip_raw is not None else None,
+            port=port,
+            state=str(state_raw) if state_raw is not None else None,
+        )
+        if stable_key_raw is not None:
+            phone.descriptor.stable_key = str(stable_key_raw)
+        return phone
 
 
 # Descriptor fields refreshed from a newly listed Phone during paired-device reconcile.

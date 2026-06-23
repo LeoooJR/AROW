@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Final
 
 from core.collection import Repository
-from core.devices import Phone
+from core.devices import Phone, PhoneRepository
 from core.location import Location
 from logger import logger
 
@@ -70,11 +70,47 @@ class Simulation:
         }
 
     @staticmethod
-    def from_payload(payload: dict[str, object]) -> Simulation:
+    def from_payload(payload: dict[str, object], simulation_dir: Path) -> Simulation:
         """
-        Create a simulation from a payload.
+        Create a simulation from a persisted metadata payload.
         """
-        raise NotImplementedError("Not implemented")
+        schema_version = payload.get("schema_version")
+        if schema_version != SIMULATION_REPOSITORY_SCHEMA_VERSION:
+            raise ValueError(
+                f"Unsupported simulation schema version: {schema_version!r}"
+            )
+        simulation_id = str(payload["id"])
+        device_payload = payload.get("device")
+        device: Phone | None = None
+        if isinstance(device_payload, dict):
+            device = Phone.from_payload(device_payload)
+        real_location_payload = payload.get("real_location")
+        fake_location_payload = payload.get("fake_location")
+        if not isinstance(real_location_payload, dict):
+            raise ValueError("Simulation payload missing real_location")
+        if not isinstance(fake_location_payload, dict):
+            raise ValueError("Simulation payload missing fake_location")
+        map_file_raw = payload.get("map_file")
+        log_file_raw = payload.get("log_file")
+        map_file = _absolute_in_simulation_dir(
+            None if map_file_raw is None else str(map_file_raw),
+            simulation_dir,
+        )
+        log_file = _absolute_in_simulation_dir(
+            None if log_file_raw is None else str(log_file_raw),
+            simulation_dir,
+        )
+        active_raw = payload.get("active", False)
+        active = active_raw if isinstance(active_raw, bool) else bool(active_raw)
+        return Simulation(
+            id=simulation_id,
+            device=device,
+            real_location=Location.from_payload(real_location_payload),
+            fake_location=Location.from_payload(fake_location_payload),
+            map_file=map_file,
+            log_file=log_file,
+            active=active,
+        )
 
     # Setting _fields_ready to True to allow __setattr__ to log changes to the public simulation fields
     # This is done in __post_init__ to avoid logging the initial values of the public simulation fields
@@ -113,6 +149,18 @@ def _relative_to_simulation_dir(path: Path | None, simulation_dir: Path) -> str 
         return str(path)
 
 
+def _absolute_in_simulation_dir(
+    path_value: str | None, simulation_dir: Path
+) -> Path | None:
+    """Resolve a persisted relative artifact path against a simulation directory."""
+    if path_value is None:
+        return None
+    path = Path(path_value)
+    if path.is_absolute():
+        return path
+    return simulation_dir / path
+
+
 def _write_json_atomic(path: Path, payload: dict[str, object]) -> None:
     """
     Write a JSON file atomically.
@@ -130,7 +178,139 @@ class SimulationRepository(Repository[Simulation]):
         super().__init__()
         self._save_dir: Path = save_dir
         self._save_dir.mkdir(parents=True, exist_ok=True)
+        if not self.index_file.is_file():
+            self.write_index()
+
+    def restore(self, simulation: Simulation) -> None:
+        """Load a simulation into memory without creating new on-disk artifacts."""
+        if simulation.id in self._repository:
+            raise ValueError(f"Simulation with id {simulation.id} already exists")
+        self._repository[simulation.id] = simulation
+        logger.debug(
+            "SimulationRepository.restore: repository snapshot ({} item(s))",
+            len(self._repository),
+        )
+
+    def _read_index_simulation_ids(self) -> list[str]:
+        """Read simulation ids listed in the persisted index file."""
+        if not self.index_file.is_file():
+            return []
+        try:
+            payload = json.loads(self.index_file.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as error:
+            logger.warning(
+                "SimulationRepository: failed to parse index file",
+                path=str(self.index_file),
+                error=str(error),
+            )
+            return []
+        schema_version = payload.get("schema_version")
+        if schema_version != SIMULATION_REPOSITORY_SCHEMA_VERSION:
+            logger.warning(
+                "SimulationRepository: unsupported index schema version",
+                schema_version=schema_version,
+            )
+            return []
+        simulation_ids = payload.get("simulations", [])
+        if not isinstance(simulation_ids, list):
+            logger.warning(
+                "SimulationRepository: index simulations entry is not a list",
+                path=str(self.index_file),
+            )
+            return []
+        return [str(simulation_id) for simulation_id in simulation_ids]
+
+    def _load_simulation_from_disk(self, simulation_id: str) -> Simulation | None:
+        """Read one simulation metadata file from disk."""
+        metadata_path = self.simulation_metadata_file(simulation_id)
+        if not metadata_path.is_file():
+            logger.warning(
+                "SimulationRepository: simulation metadata file missing",
+                simulation_id=simulation_id,
+                path=str(metadata_path),
+            )
+            return None
+        try:
+            payload = json.loads(metadata_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as error:
+            logger.warning(
+                "SimulationRepository: failed to parse simulation metadata",
+                simulation_id=simulation_id,
+                path=str(metadata_path),
+                error=str(error),
+            )
+            return None
+        if not isinstance(payload, dict):
+            logger.warning(
+                "SimulationRepository: simulation metadata is not a JSON object",
+                simulation_id=simulation_id,
+                path=str(metadata_path),
+            )
+            return None
+        simulation_dir = self.simulation_dir(simulation_id)
+        return Simulation.from_payload(payload, simulation_dir)
+
+    def _delete_persisted_simulation_dir(self, simulation_id: str) -> None:
+        """Delete a simulation directory from disk without touching in-memory state."""
+        simulation_dir = self.simulation_dir(simulation_id)
+        if simulation_dir.is_dir():
+            shutil.rmtree(simulation_dir)
+            logger.info(
+                "SimulationRepository: deleted stale persisted simulation directory",
+                simulation_id=simulation_id,
+                path=str(simulation_dir),
+            )
+
+    def load_all_for_devices(self, devices: PhoneRepository) -> list[Simulation]:
+        """
+        Load persisted simulations and bind each to a paired device instance.
+
+        Simulations whose device id is not in ``devices`` are deleted from disk.
+        """
+        loaded: list[Simulation] = []
+        for simulation_id in self._read_index_simulation_ids():
+            try:
+                simulation = self._load_simulation_from_disk(simulation_id)
+            except (TypeError, ValueError) as error:
+                logger.warning(
+                    "SimulationRepository: failed to deserialize simulation",
+                    simulation_id=simulation_id,
+                    error=str(error),
+                )
+                self._delete_persisted_simulation_dir(simulation_id)
+                continue
+            if simulation is None:
+                self._delete_persisted_simulation_dir(simulation_id)
+                continue
+            if simulation.device is None:
+                logger.warning(
+                    "SimulationRepository: persisted simulation has no device",
+                    simulation_id=simulation_id,
+                )
+                self._delete_persisted_simulation_dir(simulation_id)
+                continue
+            paired_device = devices.get(simulation.device.id)
+            if paired_device is None:
+                logger.info(
+                    "SimulationRepository: deleting simulation for unavailable device",
+                    simulation_id=simulation_id,
+                    device_id=simulation.device.id,
+                )
+                self._delete_persisted_simulation_dir(simulation_id)
+                continue
+            simulation.device = paired_device
+            try:
+                self.restore(simulation)
+            except ValueError as error:
+                logger.warning(
+                    "SimulationRepository: failed to restore simulation",
+                    simulation_id=simulation_id,
+                    error=str(error),
+                )
+                continue
+            loaded.append(simulation)
         self.write_index()
+        return loaded
 
     @property
     def save_dir(self) -> Path:

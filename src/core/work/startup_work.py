@@ -23,6 +23,7 @@ from core.adb.adb_mock import (
 from core.adb.binary import AdbBinary
 from core.adb.client import AdbClient
 from core.adb.server import AdbServer
+from core.application_paths import get_or_create_application_dir
 from core.devices import Phone
 from core.exceptions import CoreException
 from core.signals import (
@@ -30,6 +31,7 @@ from core.signals import (
     CoreSignal,
     DevicesUpdatedPayload,
 )
+from core.simulation import Simulation, SimulationRepository
 from core.work.core_runtime_work import CoreRuntimeWork, CoreRuntimeWorkOutcome
 from core.work.helper import preflight
 from core.work.refresh_known_devices_work import enrich_phones_with_adb_shell_properties
@@ -175,6 +177,10 @@ class StartupOutcome(CoreRuntimeWorkOutcome):
     devices: list[Phone] = field(
         default_factory=list, metadata={"description": "The known devices"}
     )
+    simulations: list[Simulation] = field(
+        default_factory=list,
+        metadata={"description": "Persisted simulations bound to paired devices"},
+    )
 
 
 class StartupCoreRuntimeWork(CoreRuntimeWork[StartupOutcome]):
@@ -240,10 +246,15 @@ class StartupCoreRuntimeWork(CoreRuntimeWork[StartupOutcome]):
             adb_client = _create_adb_client()
         devices = list(adb_server.paired_devices)
         enrich_phones_with_adb_shell_properties(adb_client, devices)
+        simulations_save_dir = get_or_create_application_dir() / "simulations"
+        simulations = SimulationRepository(simulations_save_dir).load_all_for_devices(
+            adb_server.paired_devices
+        )
         return StartupOutcome(
             adb_server=adb_server,
             adb_client=adb_client,
             devices=devices,
+            simulations=simulations,
         )
 
     @staticmethod
@@ -262,6 +273,15 @@ class StartupCoreRuntimeWork(CoreRuntimeWork[StartupOutcome]):
             model_entrypoint._adb_server = result.adb_server
         if result.adb_client is not None:
             model_entrypoint._adb_client = result.adb_client
+        for simulation in result.simulations:
+            try:
+                model_entrypoint._simulations.restore(simulation)
+            except ValueError as error:
+                logger.warning(
+                    "startup_work: failed to restore persisted simulation",
+                    simulation_id=simulation.id,
+                    error=str(error),
+                )
         if result.adb_server is not None:
             model_entrypoint._signal_bus.emit(
                 CoreSignal.ADB_SERVER_STARTED,
