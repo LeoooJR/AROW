@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from controller.helper import validate_model_entrypoint
-from controller.runner import JobError
+from controller.runner import JobError, JobHandler
 from core.work.authentificate_device_work import AuthentificateDeviceOutcome
 from core.work.close_work import CloseOutcome
 from core.work.host_install_identity_work import HostInstallIdentityOutcome
@@ -276,15 +276,22 @@ class RenderMapCallback:
 class RenderMapSimulationCallback(RenderMapCallback):
     """Per-simulation render_map AsyncRunner callbacks."""
 
-    __slots__ = ("_simulation_id",)
+    __slots__ = ("_simulation_id", "_job_id")
 
     def __init__(self, subcontroller: MapSubController, simulation_id: str) -> None:
         super().__init__(subcontroller)
         self._simulation_id = simulation_id
+        self._job_id: str | None = None
+
+    def bind_job(self, handle: JobHandler) -> None:
+        """Associate this callback instance with the submitted job handle."""
+        self._job_id = handle.job_id
 
     def _clear_render_job(self) -> None:
-        """Drop the tracked render job handle for this simulation."""
-        self._subcontroller._clear_render_job(self._simulation_id)
+        """Drop the tracked render job handle when it is still the current one."""
+        self._subcontroller._clear_render_job_if_current(
+            self._simulation_id, self._job_id
+        )
 
     def on_completed(self, result: object) -> None:
         self._clear_render_job()

@@ -36,7 +36,9 @@ class MapSubController(AppSubController):
         self._async_job_callbacks: MapAsyncJobCallbacks = (
             MapAsyncJobCallbacks.for_subcontroller(self)
         )
-        self._render_jobs_by_simulation_id: dict[str, JobHandler] = {}
+        self._render_jobs_by_simulation_id: dict[str, JobHandler] = (
+            {}
+        )  # Mapping of simulation to job handler
 
     def _submit_model_entrypoint_async_call(self, *args, **kwargs):
         return self._app._submit_model_entrypoint_async_call(*args, **kwargs)
@@ -103,10 +105,16 @@ class MapSubController(AppSubController):
                 on_cancelled=render_callbacks.on_cancelled,
             )
             if handle is not None:
+                render_callbacks.bind_job(handle)
                 self._render_jobs_by_simulation_id[simulation_id] = handle
 
-    def _clear_render_job(self, simulation_id: str) -> None:
-        """Remove a tracked render job handle when it finishes or is cancelled."""
+    def _clear_render_job_if_current(
+        self, simulation_id: str, job_id: str | None
+    ) -> None:
+        """Remove a tracked render job only when it still matches the given job id."""
+        handle = self._render_jobs_by_simulation_id.get(simulation_id)
+        if handle is None or job_id is None or handle.job_id != job_id:
+            return
         self._render_jobs_by_simulation_id.pop(simulation_id, None)
 
     @validate_view

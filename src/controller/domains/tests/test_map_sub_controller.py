@@ -211,6 +211,7 @@ def test_render_job_callbacks_clear_tracked_handle(tmp_path: Path) -> None:
     job_callbacks = map_controller._async_job_callbacks.render_map_for_simulation(
         "sim-1"
     )
+    job_callbacks.bind_job(JobHandler(job_id="job-1", name="render_map"))
 
     job_callbacks.on_completed(outcome)
 
@@ -230,6 +231,7 @@ def test_render_job_failed_callback_clears_tracked_handle(tmp_path: Path) -> Non
     job_callbacks = map_controller._async_job_callbacks.render_map_for_simulation(
         "sim-1"
     )
+    job_callbacks.bind_job(JobHandler(job_id="job-1", name="render_map"))
 
     job_callbacks.on_failed(error)
 
@@ -246,10 +248,50 @@ def test_render_job_cancelled_callback_clears_tracked_handle() -> None:
     job_callbacks = map_controller._async_job_callbacks.render_map_for_simulation(
         "sim-1"
     )
+    job_callbacks.bind_job(JobHandler(job_id="job-1", name="render_map"))
 
     job_callbacks.on_cancelled()
 
     assert "sim-1" not in map_controller._render_jobs_by_simulation_id
+
+
+def test_render_job_cancelled_from_superseded_job_keeps_current_handle() -> None:
+    app = _AppStub()
+    map_controller = _make_map_sub_controller(app)
+    superseded_callbacks = (
+        map_controller._async_job_callbacks.render_map_for_simulation("sim-1")
+    )
+    superseded_callbacks.bind_job(JobHandler(job_id="job-1", name="render_map"))
+    map_controller._render_jobs_by_simulation_id["sim-1"] = JobHandler(
+        job_id="job-2", name="render_map"
+    )
+
+    superseded_callbacks.on_cancelled()
+
+    assert map_controller._render_jobs_by_simulation_id["sim-1"].job_id == "job-2"
+
+
+def test_render_job_completed_from_superseded_job_keeps_current_handle(
+    tmp_path: Path,
+) -> None:
+    app = _AppStub(tmp_path)
+    map_controller = _make_map_sub_controller(app)
+    _add_simulation(app.model_entrypoint, "sim-1")
+    superseded_callbacks = (
+        map_controller._async_job_callbacks.render_map_for_simulation("sim-1")
+    )
+    superseded_callbacks.bind_job(JobHandler(job_id="job-1", name="render_map"))
+    map_controller._render_jobs_by_simulation_id["sim-1"] = JobHandler(
+        job_id="job-2", name="render_map"
+    )
+    outcome = RenderMapOutcome(simulation_id="sim-1", html_path=Path("/tmp/sim-1.html"))
+    apply_calls: list[object] = []
+    app.model_entrypoint.apply_result = lambda result: apply_calls.append(result)  # type: ignore[method-assign]
+
+    superseded_callbacks.on_completed(outcome)
+
+    assert apply_calls == [outcome]
+    assert map_controller._render_jobs_by_simulation_id["sim-1"].job_id == "job-2"
 
 
 def test_on_simulation_deleted_cancels_render_job_and_forwards(
