@@ -10,7 +10,12 @@ from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
 from core.adb.binary import AdbBinary
 from core.devices import Phone
 from core.entrypoint import ModelEntrypoint
-from core.signals import AdbServerStartedPayload, CoreSignal, DevicesUpdatedPayload
+from core.signals import (
+    AdbServerStartedPayload,
+    CoreSignal,
+    DevicesUpdatedPayload,
+    SimulationCreatedPayload,
+)
 from core.simulation import Simulation, SimulationRepository
 from core.work import startup_work
 from core.work.startup_work import StartupCoreRuntimeWork, StartupOutcome
@@ -191,6 +196,101 @@ def test_startup_run_loads_persisted_simulations_for_paired_devices(
         for paired_phone in second_outcome.adb_server.paired_devices
     }
     assert loaded_phone is paired_from_outcome[phone.id]
+
+
+def test_startup_run_includes_last_active_device_id_in_outcome(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(startup_work, "mock_adb_seed_from_env", lambda: 111)
+    first_outcome = StartupCoreRuntimeWork(use_mock_adb=True).run()
+    phone = first_outcome.devices[0]
+    repository = SimulationRepository(
+        startup_work.get_or_create_application_dir() / "simulations"
+    )
+    simulation = Simulation(id="sim-1", device=phone, active=True)
+    repository.add(simulation)
+    repository.last_active_device_id = phone.id
+    repository.write_all()
+
+    second_outcome = StartupCoreRuntimeWork(use_mock_adb=True).run()
+
+    assert second_outcome.last_active_device_id == phone.id
+
+
+def test_startup_apply_restores_last_active_device_when_online(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(startup_work, "mock_adb_seed_from_env", lambda: 111)
+    first_outcome = StartupCoreRuntimeWork(use_mock_adb=True).run()
+    phone = first_outcome.devices[0]
+    repository = SimulationRepository(
+        startup_work.get_or_create_application_dir() / "simulations"
+    )
+    simulation = Simulation(id="sim-1", device=phone, active=True)
+    repository.add(simulation)
+    repository.last_active_device_id = phone.id
+    repository.write_all()
+
+    second_outcome = StartupCoreRuntimeWork(use_mock_adb=True).run()
+    model_entrypoint = ModelEntrypoint()
+    simulation_created: list[str] = []
+
+    def capture(payload: SimulationCreatedPayload) -> None:
+        simulation_created.append(payload.simulation.id)
+
+    model_entrypoint._signal_bus.subscribe(
+        CoreSignal.SIMULATION_CREATED,
+        capture,
+    )
+
+    StartupCoreRuntimeWork.apply_main_thread(model_entrypoint, second_outcome)
+
+    assert model_entrypoint.adb_server is second_outcome.adb_server
+    assert model_entrypoint._simulations.get("sim-1") is not None
+    assert model_entrypoint._simulations.last_active_device_id == phone.id
+    assert simulation_created == ["sim-1"]
+    assert second_outcome.adb_server is not None
+    working_device = second_outcome.adb_server.get_working_device()
+    assert working_device is not None
+    assert working_device.id == phone.id
+
+
+def test_startup_apply_skips_last_active_device_when_offline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(startup_work, "mock_adb_seed_from_env", lambda: 111)
+    first_outcome = StartupCoreRuntimeWork(use_mock_adb=True).run()
+    phone = first_outcome.devices[0]
+    phone.state = "offline"
+    repository = SimulationRepository(
+        startup_work.get_or_create_application_dir() / "simulations"
+    )
+    simulation = Simulation(id="sim-1", device=phone, active=True)
+    repository.add(simulation)
+    repository.last_active_device_id = phone.id
+    repository.write_all()
+
+    second_outcome = StartupCoreRuntimeWork(use_mock_adb=True).run()
+    assert second_outcome.adb_server is not None
+    paired_phone = second_outcome.adb_server.paired_devices.get(phone.id)
+    assert paired_phone is not None
+    paired_phone.state = "offline"
+
+    model_entrypoint = ModelEntrypoint()
+    simulation_created: list[str] = []
+
+    def capture(payload: SimulationCreatedPayload) -> None:
+        simulation_created.append(payload.simulation.id)
+
+    model_entrypoint._signal_bus.subscribe(
+        CoreSignal.SIMULATION_CREATED,
+        capture,
+    )
+
+    StartupCoreRuntimeWork.apply_main_thread(model_entrypoint, second_outcome)
+
+    assert simulation_created == []
+    assert model_entrypoint._simulations.last_active_device_id == phone.id
 
 
 def test_startup_apply_binds_mock_runtime_and_emits_startup_signals() -> None:

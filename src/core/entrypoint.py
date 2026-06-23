@@ -682,6 +682,7 @@ class ModelEntrypoint(Entrypoint):
             CoreSignal.SIMULATION_CREATED,
             SimulationCreatedPayload(simulation=simulation),
         )
+        self._simulations.last_active_device_id = device_id
 
     def get_simulation(self, id: str) -> Simulation | None:
         """
@@ -750,6 +751,8 @@ class ModelEntrypoint(Entrypoint):
                 working_device = self._adb_server.get_working_device()
                 if working_device is not None and working_device.id == device_id:
                     self._adb_server.clear_working_device()
+            if self._simulations.last_active_device_id == device_id:
+                self._simulations.last_active_device_id = None
             return
         raise ValueError(
             f"Simulation for device with id {device_id} not found or working device not cleared"

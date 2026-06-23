@@ -27,7 +27,53 @@ def test_init_writes_empty_index(tmp_path: Path) -> None:
     assert payload == {
         "schema_version": SIMULATION_REPOSITORY_SCHEMA_VERSION,
         "simulations": [],
+        "last_active_device_id": None,
     }
+
+
+def test_init_loads_last_active_device_id_from_index(tmp_path: Path) -> None:
+    save_dir = tmp_path / "simulations"
+    save_dir.mkdir(parents=True)
+    index_path = save_dir / INDEX_FILENAME
+    index_path.write_text(
+        json.dumps(
+            {
+                "schema_version": SIMULATION_REPOSITORY_SCHEMA_VERSION,
+                "simulations": [],
+                "last_active_device_id": "device-1",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    repository = SimulationRepository(save_dir)
+
+    assert repository.last_active_device_id == "device-1"
+
+
+def test_set_last_active_device_id_persists_to_index(tmp_path: Path) -> None:
+    repository = SimulationRepository(tmp_path / "simulations")
+
+    repository.last_active_device_id = "device-1"
+
+    payload = json.loads(repository.index_file.read_text(encoding="utf-8"))
+    assert payload["last_active_device_id"] == "device-1"
+    assert repository.last_active_device_id == "device-1"
+
+
+def test_load_all_for_devices_clears_last_active_when_device_missing(
+    tmp_path: Path,
+) -> None:
+    repository = SimulationRepository(tmp_path / "simulations")
+    repository.last_active_device_id = "missing-device"
+
+    loaded_repository = SimulationRepository(tmp_path / "simulations")
+    loaded_repository.load_all_for_devices(PhoneRepository())
+
+    assert loaded_repository.last_active_device_id is None
+    index_payload = json.loads(loaded_repository.index_file.read_text(encoding="utf-8"))
+    assert index_payload["last_active_device_id"] is None
 
 
 def test_init_preserves_existing_index(tmp_path: Path) -> None:
@@ -45,13 +91,14 @@ def test_init_preserves_existing_index(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    SimulationRepository(save_dir)
+    repository = SimulationRepository(save_dir)
 
     payload = json.loads(index_path.read_text(encoding="utf-8"))
     assert payload == {
         "schema_version": SIMULATION_REPOSITORY_SCHEMA_VERSION,
         "simulations": ["sim-1"],
     }
+    assert repository.last_active_device_id is None
 
 
 def test_add_updates_index(tmp_path: Path) -> None:
@@ -63,6 +110,7 @@ def test_add_updates_index(tmp_path: Path) -> None:
     assert payload == {
         "schema_version": SIMULATION_REPOSITORY_SCHEMA_VERSION,
         "simulations": ["sim-1"],
+        "last_active_device_id": None,
     }
 
 
@@ -195,6 +243,7 @@ def test_write_all_writes_simulation_json_and_index_last(tmp_path: Path) -> None
     assert index_payload == {
         "schema_version": SIMULATION_REPOSITORY_SCHEMA_VERSION,
         "simulations": ["sim-1", "sim-2"],
+        "last_active_device_id": None,
     }
     assert repository.simulation_metadata_file("sim-2").is_file()
 
@@ -209,6 +258,7 @@ def test_remove_updates_index(tmp_path: Path) -> None:
     assert payload == {
         "schema_version": SIMULATION_REPOSITORY_SCHEMA_VERSION,
         "simulations": [],
+        "last_active_device_id": None,
     }
 
 

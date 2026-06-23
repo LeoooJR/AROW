@@ -177,9 +177,86 @@ class SimulationRepository(Repository[Simulation]):
     def __init__(self, save_dir: Path) -> None:
         super().__init__()
         self._save_dir: Path = save_dir
+        self._last_active_device_id: str | None = None
+        self._index_simulation_ids: list[str] = []
         self._save_dir.mkdir(parents=True, exist_ok=True)
         if not self.index_file.is_file():
             self.write_index()
+        else:
+            self._load_index_from_disk()
+
+    @property
+    def last_active_device_id(self) -> str | None:
+        """Return the persisted last selected device id, if any."""
+        return self._last_active_device_id
+
+    @last_active_device_id.setter
+    def last_active_device_id(self, device_id: str | None) -> None:
+        """Persist the last selected device id in the repository index."""
+        normalized = (device_id or "").strip() or None
+        self._last_active_device_id = normalized
+        self.write_index()
+
+    def sync_last_active_device_id(self, device_id: str | None) -> None:
+        """Update the in-memory last active device id without writing the index."""
+        self._last_active_device_id = (device_id or "").strip() or None
+
+    def _read_index_file(self) -> dict[str, object] | None:
+        """Read and parse the persisted index JSON file."""
+        if not self.index_file.is_file():
+            return None
+        try:
+            payload = json.loads(self.index_file.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as error:
+            logger.warning(
+                "SimulationRepository: failed to parse index file",
+                path=str(self.index_file),
+                error=str(error),
+            )
+            return None
+        if not isinstance(payload, dict):
+            logger.warning(
+                "SimulationRepository: index file is not a JSON object",
+                path=str(self.index_file),
+            )
+            return None
+        return payload
+
+    def _parse_index_payload(
+        self, payload: dict[str, object]
+    ) -> tuple[list[str], str | None] | None:
+        """Extract simulation ids and last active device id from a parsed index payload."""
+        schema_version = payload.get("schema_version")
+        if schema_version != SIMULATION_REPOSITORY_SCHEMA_VERSION:
+            logger.warning(
+                "SimulationRepository: unsupported index schema version",
+                schema_version=schema_version,
+            )
+            return None
+        simulation_ids_raw = payload.get("simulations", [])
+        if not isinstance(simulation_ids_raw, list):
+            logger.warning(
+                "SimulationRepository: index simulations entry is not a list",
+                path=str(self.index_file),
+            )
+            return None
+        simulation_ids = [str(simulation_id) for simulation_id in simulation_ids_raw]
+        last_active_raw = payload.get("last_active_device_id")
+        if last_active_raw is None:
+            last_active_device_id: str | None = None
+        else:
+            last_active_device_id = str(last_active_raw).strip() or None
+        return simulation_ids, last_active_device_id
+
+    def _load_index_from_disk(self) -> None:
+        """Load index metadata and simulation ids from disk in a single read."""
+        payload = self._read_index_file()
+        if payload is None:
+            return
+        parsed = self._parse_index_payload(payload)
+        if parsed is None:
+            return
+        self._index_simulation_ids, self._last_active_device_id = parsed
 
     def restore(self, simulation: Simulation) -> None:
         """Load a simulation into memory without creating new on-disk artifacts."""
@@ -190,35 +267,6 @@ class SimulationRepository(Repository[Simulation]):
             "SimulationRepository.restore: repository snapshot ({} item(s))",
             len(self._repository),
         )
-
-    def _read_index_simulation_ids(self) -> list[str]:
-        """Read simulation ids listed in the persisted index file."""
-        if not self.index_file.is_file():
-            return []
-        try:
-            payload = json.loads(self.index_file.read_text(encoding="utf-8"))
-        except json.JSONDecodeError as error:
-            logger.warning(
-                "SimulationRepository: failed to parse index file",
-                path=str(self.index_file),
-                error=str(error),
-            )
-            return []
-        schema_version = payload.get("schema_version")
-        if schema_version != SIMULATION_REPOSITORY_SCHEMA_VERSION:
-            logger.warning(
-                "SimulationRepository: unsupported index schema version",
-                schema_version=schema_version,
-            )
-            return []
-        simulation_ids = payload.get("simulations", [])
-        if not isinstance(simulation_ids, list):
-            logger.warning(
-                "SimulationRepository: index simulations entry is not a list",
-                path=str(self.index_file),
-            )
-            return []
-        return [str(simulation_id) for simulation_id in simulation_ids]
 
     def _load_simulation_from_disk(self, simulation_id: str) -> Simulation | None:
         """Read one simulation metadata file from disk."""
@@ -268,7 +316,7 @@ class SimulationRepository(Repository[Simulation]):
         Simulations whose device id is not in ``devices`` are deleted from disk.
         """
         loaded: list[Simulation] = []
-        for simulation_id in self._read_index_simulation_ids():
+        for simulation_id in self._index_simulation_ids:
             try:
                 simulation = self._load_simulation_from_disk(simulation_id)
             except (TypeError, ValueError) as error:
@@ -309,7 +357,17 @@ class SimulationRepository(Repository[Simulation]):
                 )
                 continue
             loaded.append(simulation)
-        self.write_index()
+        if (
+            self._last_active_device_id is not None
+            and devices.get(self._last_active_device_id) is None
+        ):
+            logger.info(
+                "SimulationRepository: clearing last active device (not paired)",
+                device_id=self._last_active_device_id,
+            )
+            self.last_active_device_id = None
+        else:
+            self.write_index()
         return loaded
 
     @property
@@ -342,9 +400,11 @@ class SimulationRepository(Repository[Simulation]):
         """
         Write the index file.
         """
+        self._index_simulation_ids = [simulation.id for simulation in self]
         payload: dict[str, object] = {
             "schema_version": SIMULATION_REPOSITORY_SCHEMA_VERSION,
-            "simulations": [simulation.id for simulation in self],
+            "simulations": self._index_simulation_ids,
+            "last_active_device_id": self._last_active_device_id,
         }
         _write_json_atomic(self.index_file, payload)
         return self.index_file

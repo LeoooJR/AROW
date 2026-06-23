@@ -181,6 +181,10 @@ class StartupOutcome(CoreRuntimeWorkOutcome):
         default_factory=list,
         metadata={"description": "Persisted simulations bound to paired devices"},
     )
+    last_active_device_id: str | None = field(
+        default=None,
+        metadata={"description": "Persisted last selected device id from index"},
+    )
 
 
 class StartupCoreRuntimeWork(CoreRuntimeWork[StartupOutcome]):
@@ -247,7 +251,8 @@ class StartupCoreRuntimeWork(CoreRuntimeWork[StartupOutcome]):
         devices = list(adb_server.paired_devices)
         enrich_phones_with_adb_shell_properties(adb_client, devices)
         simulations_save_dir = get_or_create_application_dir() / "simulations"
-        simulations = SimulationRepository(simulations_save_dir).load_all_for_devices(
+        simulations_repository = SimulationRepository(simulations_save_dir)
+        simulations = simulations_repository.load_all_for_devices(
             adb_server.paired_devices
         )
         return StartupOutcome(
@@ -255,6 +260,7 @@ class StartupCoreRuntimeWork(CoreRuntimeWork[StartupOutcome]):
             adb_client=adb_client,
             devices=devices,
             simulations=simulations,
+            last_active_device_id=simulations_repository.last_active_device_id,
         )
 
     @staticmethod
@@ -291,6 +297,24 @@ class StartupCoreRuntimeWork(CoreRuntimeWork[StartupOutcome]):
                 CoreSignal.DEVICES_UPDATED,
                 DevicesUpdatedPayload(devices=result.devices),
             )
+        model_entrypoint._simulations.sync_last_active_device_id(
+            result.last_active_device_id
+        )
+        if result.last_active_device_id is not None:
+            paired_device = (
+                result.adb_server.paired_devices.get(result.last_active_device_id)
+                if result.adb_server is not None
+                else None
+            )
+            if paired_device is not None and paired_device.state == "device":
+                try:
+                    model_entrypoint.create_simulation(result.last_active_device_id)
+                except (AttributeError, ValueError) as error:
+                    logger.warning(
+                        "startup_work: failed to restore last active device",
+                        device_id=result.last_active_device_id,
+                        error=str(error),
+                    )
 
     @staticmethod
     def apply_failure_main_thread(

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from unittest.mock import patch
 
@@ -72,6 +73,21 @@ def test_create_simulation_reuses_existing_device_simulation(tmp_path: Path) -> 
 
     assert first_simulation_id == second_simulation_id
     assert len(list(model_entrypoint._simulations)) == 1
+
+
+def test_create_simulation_persists_last_active_device_id(tmp_path: Path) -> None:
+    """Selected device id is written to the simulation repository index."""
+    model_entrypoint, server = _model_with_server(tmp_path)
+    phone = Phone(id="device-1", state="device", model="Pixel")
+    server.paired_devices.add(phone)
+
+    _create_simulation_id(model_entrypoint, "device-1")
+
+    index_payload = json.loads(
+        model_entrypoint._simulations.index_file.read_text(encoding="utf-8")
+    )
+    assert index_payload["last_active_device_id"] == "device-1"
+    assert model_entrypoint._simulations.last_active_device_id == "device-1"
 
 
 def test_reconcile_removes_stale_device_and_simulation(tmp_path: Path) -> None:
