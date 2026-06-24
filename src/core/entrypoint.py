@@ -19,6 +19,7 @@ from core.devices import (
     paired_phone_matches_discovery,
     phone_stable_key_is_collision_resistant,
 )
+from core.location import Location
 from core.signals import (
     ActivityLogFileUpdatedPayload,
     AdbServerStartedPayload,
@@ -706,7 +707,16 @@ class ModelEntrypoint(Entrypoint):
         simulation: Simulation | None = self._simulations.get(id)
         if simulation is None:
             raise ValueError(f"Simulation with id {id} not found")
+        if simulation.active == active:
+            return
         simulation.active = active
+        self._signal_bus.emit(
+            CoreSignal.SIMULATION_STATE_CHANGED,
+            SimulationStateChangedPayload(
+                simulation_id=simulation.id,
+                active=simulation.active,
+            ),
+        )
 
     def update_simulation(self, id: str, **kwargs: Any) -> None:
         """
@@ -716,7 +726,42 @@ class ModelEntrypoint(Entrypoint):
         if simulation is None:
             raise ValueError(f"Simulation with id {id} not found")
         for key, value in kwargs.items():
+            if key not in simulation.__class__.__dataclass_fields__:
+                raise ValueError(f"Unknown simulation field: {key}")
+            current = getattr(simulation, key)
+            if current == value:
+                continue
             setattr(simulation, key, value)
+            if key == "active":
+                self._signal_bus.emit(
+                    CoreSignal.SIMULATION_STATE_CHANGED,
+                    SimulationStateChangedPayload(
+                        simulation_id=simulation.id,
+                        active=simulation.active,
+                    ),
+                )
+            elif key in ("real_location", "fake_location"):
+                if isinstance(value, Location):
+                    self._signal_bus.emit(
+                        CoreSignal.SIMULATION_POSITION_CHANGED,
+                        SimulationPositionChangedPayload(
+                            simulation_id=simulation.id,
+                            location=value,
+                        ),
+                    )
+                else:
+                    raise ValueError(f"Invalid location: {value}")
+
+    def persist_simulation(self, simulation_id: str) -> None:
+        """Write one simulation metadata file to disk."""
+        simulation = self._simulations.get(simulation_id)
+        if simulation is None:
+            logger.warning(
+                "ModelEntrypoint: persist_simulation skipped (simulation not found)",
+                simulation_id=simulation_id,
+            )
+            return
+        self._simulations.write_simulation(simulation)
 
     def delete_simulation(self, simulation: Simulation) -> None:
         """

@@ -513,6 +513,7 @@ class SimulationRepository(Repository[Simulation]):
         item.log_file = simulation_dir / f"{item.id}.log"
         with open(item.log_file, "w") as f:
             f.write(f"Simulation {item.id} created at {datetime.now().isoformat()}\n")
+        self.write_simulation(item)
         self.write_index()
 
     def remove(self, item: Simulation) -> None:

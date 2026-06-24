@@ -102,7 +102,7 @@ def test_init_preserves_existing_index(tmp_path: Path) -> None:
     assert repository.last_active_device_id is None
 
 
-def test_add_updates_index(tmp_path: Path) -> None:
+def test_add_updates_index_and_writes_metadata(tmp_path: Path) -> None:
     repository = SimulationRepository(tmp_path / "simulations")
     simulation = Simulation(id="sim-1")
     repository.add(simulation)
@@ -113,6 +113,24 @@ def test_add_updates_index(tmp_path: Path) -> None:
         "simulations": ["sim-1"],
         "last_active_device_id": None,
     }
+    assert repository.simulation_metadata_file("sim-1").is_file()
+
+
+def test_add_only_survives_reload_without_write_all(tmp_path: Path) -> None:
+    repository = SimulationRepository(tmp_path / "simulations")
+    paired_phone = Phone(id="device-1", name="Pixel", state="device")
+    simulation = Simulation(id="sim-1", device=paired_phone, active=False)
+    repository.add(simulation)
+
+    paired_devices = PhoneRepository()
+    paired_devices.add(paired_phone)
+    state = SimulationDiskStore(tmp_path / "simulations").load_for_devices(
+        paired_devices
+    )
+
+    assert len(state.simulations) == 1
+    assert state.simulations[0].id == "sim-1"
+    assert state.simulations[0].device is paired_phone
 
 
 def test_phone_from_payload_rebuilds_persisted_fields() -> None:
@@ -295,7 +313,6 @@ def test_json_files_use_atomic_suffix_pattern(
     if filename == SIMULATION_FILENAME:
         simulation = Simulation(id="sim-1")
         repository.add(simulation)
-        repository.write_simulation(simulation)
 
     target = repository.save_dir / relative_path
     assert target.is_file()

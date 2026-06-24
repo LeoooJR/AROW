@@ -117,14 +117,15 @@ class SimulationDeletedPayload:
 class SimulationStateChangedPayload:
     """Payload emitted when simulation execution state changes."""
 
+    simulation_id: str
     active: bool
-    paused: bool
 
 
 @dataclass(frozen=True, slots=True)
 class SimulationPositionChangedPayload:
     """Payload emitted when the effective simulation position changes."""
 
+    simulation_id: str
     location: Location
 
 

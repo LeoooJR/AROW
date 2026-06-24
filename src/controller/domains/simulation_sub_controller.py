@@ -10,7 +10,12 @@ from PySide6.QtCore import Slot
 
 from controller.domains.app_sub_controller import AppSubController
 from controller.helper import validate_model_entrypoint, validate_view
-from core.signals import CoreSignal, SimulationCreatedPayload
+from core.signals import (
+    CoreSignal,
+    SimulationCreatedPayload,
+    SimulationPositionChangedPayload,
+    SimulationStateChangedPayload,
+)
 from gui.signals import signals
 from logger import logger
 
@@ -33,11 +38,32 @@ class SimulationSubController(AppSubController):
         )  # Ensuring no simulation is running before device is removed by adb subcontroller
 
     def connect_model_signals(self) -> None:
-        # Simulation-specific model subscriptions (none yet) — extension point.
         self.model_entrypoint.subscribe(
             CoreSignal.SIMULATION_CREATED,
             self._on_simulation_created,
         )
+        self.model_entrypoint.subscribe(
+            CoreSignal.SIMULATION_STATE_CHANGED,
+            self._on_simulation_state_changed,
+        )
+        self.model_entrypoint.subscribe(
+            CoreSignal.SIMULATION_POSITION_CHANGED,
+            self._on_simulation_position_changed,
+        )
+
+    @validate_model_entrypoint
+    def _on_simulation_state_changed(
+        self, payload: SimulationStateChangedPayload
+    ) -> None:
+        """Refresh persisted metadata when simulation execution state changes."""
+        self.model_entrypoint.persist_simulation(payload.simulation_id)
+
+    @validate_model_entrypoint
+    def _on_simulation_position_changed(
+        self, payload: SimulationPositionChangedPayload
+    ) -> None:
+        """Refresh persisted metadata when simulation location changes."""
+        self.model_entrypoint.persist_simulation(payload.simulation_id)
 
     def is_simulation_active(self, id: str) -> bool:
         """Check if the simulation is active."""
