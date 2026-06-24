@@ -294,6 +294,12 @@ class RenderMapSimulationCallback(RenderMapCallback):
         )
 
     def on_completed(self, result: object) -> None:
+        if not isinstance(result, RenderMapOutcome):
+            logger.error(
+                "MapSubController: unexpected render_map result type",
+                result_type=type(result).__name__,
+            )
+            return
         self._clear_render_job()
         super().on_completed(result)
 

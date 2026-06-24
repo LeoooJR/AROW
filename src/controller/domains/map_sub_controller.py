@@ -11,7 +11,10 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Slot
 
-from controller.core_work_callbacks import MapAsyncJobCallbacks
+from controller.core_work_callbacks import (
+    MapAsyncJobCallbacks,
+    RenderMapSimulationCallback,
+)
 from controller.domains.app_sub_controller import AppSubController
 from controller.helper import validate_model_entrypoint, validate_view
 from controller.runner import JobHandler
@@ -39,6 +42,10 @@ class MapSubController(AppSubController):
         self._render_jobs_by_simulation_id: dict[str, JobHandler] = (
             {}
         )  # Mapping of simulation to job handler
+        # Keep per-job callback objects alive until AsyncRunner emits completion.
+        self._render_callbacks_by_simulation_id: dict[
+            str, RenderMapSimulationCallback
+        ] = {}
 
     def _submit_model_entrypoint_async_call(self, *args, **kwargs):
         return self._app._submit_model_entrypoint_async_call(*args, **kwargs)
@@ -93,6 +100,13 @@ class MapSubController(AppSubController):
             render_callbacks = self._async_job_callbacks.render_map_for_simulation(
                 simulation_id
             )
+            self._render_callbacks_by_simulation_id[simulation_id] = render_callbacks
+            if render_callbacks is None:
+                logger.error(
+                    "MapSubController: render_map_for_simulation is not set",
+                    simulation_id=simulation_id,
+                )
+                return
             handle = self._submit_model_entrypoint_async_call(
                 name="render_map",
                 fn=self.model_entrypoint.render_map,
@@ -116,6 +130,7 @@ class MapSubController(AppSubController):
         if handle is None or job_id is None or handle.job_id != job_id:
             return
         self._render_jobs_by_simulation_id.pop(simulation_id, None)
+        self._render_callbacks_by_simulation_id.pop(simulation_id, None)
 
     @validate_view
     def _on_map_rendered(self, payload: MapRenderedPayload) -> None:
@@ -142,6 +157,7 @@ class MapSubController(AppSubController):
     def _on_simulation_deleted(self, payload: SimulationDeletedPayload) -> None:
         simulation_id = payload.simulation.id
         handle = self._render_jobs_by_simulation_id.pop(simulation_id, None)
+        self._render_callbacks_by_simulation_id.pop(simulation_id, None)
         if handle is not None:
             logger.debug(
                 "MapSubController: cancelling in-flight render map job",
