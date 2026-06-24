@@ -14,6 +14,7 @@ from core.simulation import (
     SIMULATION_FILENAME,
     SIMULATION_REPOSITORY_SCHEMA_VERSION,
     Simulation,
+    SimulationDiskStore,
     SimulationRepository,
 )
 
@@ -156,6 +157,24 @@ def test_simulation_from_payload_rebuilds_fields(tmp_path: Path) -> None:
     assert restored.map_file == map_file
     assert restored.log_file == log_file
     assert restored.active is True
+
+
+def test_disk_store_load_for_devices_binds_paired_phone(tmp_path: Path) -> None:
+    repository = SimulationRepository(tmp_path / "simulations")
+    paired_phone = Phone(id="device-1", name="Pixel", state="device")
+    simulation = Simulation(id="sim-1", device=paired_phone, active=False)
+    repository.add(simulation)
+    repository.write_all()
+
+    paired_devices = PhoneRepository()
+    paired_devices.add(paired_phone)
+    state = SimulationDiskStore(tmp_path / "simulations").load_for_devices(
+        paired_devices
+    )
+
+    assert len(state.simulations) == 1
+    assert state.simulations[0].device is paired_phone
+    assert state.last_active_device_id is None
 
 
 def test_load_all_for_devices_binds_existing_phone_instance(tmp_path: Path) -> None:

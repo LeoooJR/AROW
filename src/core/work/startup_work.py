@@ -31,7 +31,7 @@ from core.signals import (
     CoreSignal,
     DevicesUpdatedPayload,
 )
-from core.simulation import Simulation, SimulationRepository
+from core.simulation import PersistedSimulationState, Simulation, SimulationDiskStore
 from core.work.core_runtime_work import CoreRuntimeWork, CoreRuntimeWorkOutcome
 from core.work.helper import preflight
 from core.work.refresh_known_devices_work import enrich_phones_with_adb_shell_properties
@@ -251,16 +251,15 @@ class StartupCoreRuntimeWork(CoreRuntimeWork[StartupOutcome]):
         devices = list(adb_server.paired_devices)
         enrich_phones_with_adb_shell_properties(adb_client, devices)
         simulations_save_dir = get_or_create_application_dir() / "simulations"
-        simulations_repository = SimulationRepository(simulations_save_dir)
-        simulations = simulations_repository.load_all_for_devices(
-            adb_server.paired_devices
-        )
+        persisted_state: PersistedSimulationState = SimulationDiskStore(
+            simulations_save_dir
+        ).load_for_devices(adb_server.paired_devices)
         return StartupOutcome(
             adb_server=adb_server,
             adb_client=adb_client,
             devices=devices,
-            simulations=simulations,
-            last_active_device_id=simulations_repository.last_active_device_id,
+            simulations=persisted_state.simulations,
+            last_active_device_id=persisted_state.last_active_device_id,
         )
 
     @staticmethod

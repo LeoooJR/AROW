@@ -6,7 +6,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Final
+from typing import Final, Iterable
 
 from core.collection import Repository
 from core.devices import Phone, PhoneRepository
@@ -132,6 +132,14 @@ class Simulation:
         object.__setattr__(self, name, value)
 
 
+@dataclass(frozen=True, slots=True)
+class PersistedSimulationState:
+    """Persisted simulation metadata loaded from disk for startup apply."""
+
+    simulations: list[Simulation] = field(default_factory=list)
+    last_active_device_id: str | None = None
+
+
 def _relative_to_simulation_dir(path: Path | None, simulation_dir: Path) -> str | None:
     """
     Convert a path to a relative path to the simulation directory.
@@ -142,7 +150,7 @@ def _relative_to_simulation_dir(path: Path | None, simulation_dir: Path) -> str 
         return str(path.relative_to(simulation_dir))
     except ValueError:
         logger.warning(
-            "SimulationRepository: artifact path is outside simulation directory",
+            "SimulationDiskStore: artifact path is outside simulation directory",
             path=str(path),
             simulation_dir=str(simulation_dir),
         )
@@ -171,35 +179,41 @@ def _write_json_atomic(path: Path, payload: dict[str, object]) -> None:
     tmp_path.replace(path)
 
 
-class SimulationRepository(Repository[Simulation]):
-    """Repository for the simulations."""
+class SimulationDiskStore:
+    """Disk I/O for simulation metadata, index, and on-disk simulation directories."""
 
     def __init__(self, save_dir: Path) -> None:
-        super().__init__()
         self._save_dir: Path = save_dir
-        self._last_active_device_id: str | None = None
         self._index_simulation_ids: list[str] = []
+        self._last_active_device_id: str | None = None
         self._save_dir.mkdir(parents=True, exist_ok=True)
         if not self.index_file.is_file():
-            self.write_index()
+            self.write_index([], None)
         else:
             self._load_index_from_disk()
 
     @property
+    def save_dir(self) -> Path:
+        """Root directory for persisted simulation data."""
+        return self._save_dir
+
+    @property
+    def index_file(self) -> Path:
+        """Path to the persisted simulation index file."""
+        return self._save_dir / INDEX_FILENAME
+
+    @property
     def last_active_device_id(self) -> str | None:
-        """Return the persisted last selected device id, if any."""
+        """Last active device id read from or written to the index."""
         return self._last_active_device_id
 
-    @last_active_device_id.setter
-    def last_active_device_id(self, device_id: str | None) -> None:
-        """Persist the last selected device id in the repository index."""
-        normalized = (device_id or "").strip() or None
-        self._last_active_device_id = normalized
-        self.write_index()
+    def simulation_dir(self, simulation_id: str) -> Path:
+        """Directory for one simulation's on-disk artifacts."""
+        return self._save_dir / simulation_id
 
-    def sync_last_active_device_id(self, device_id: str | None) -> None:
-        """Update the in-memory last active device id without writing the index."""
-        self._last_active_device_id = (device_id or "").strip() or None
+    def simulation_metadata_file(self, simulation_id: str) -> Path:
+        """Path to one simulation's metadata JSON file."""
+        return self.simulation_dir(simulation_id) / SIMULATION_FILENAME
 
     def _read_index_file(self) -> dict[str, object] | None:
         """Read and parse the persisted index JSON file."""
@@ -209,14 +223,14 @@ class SimulationRepository(Repository[Simulation]):
             payload = json.loads(self.index_file.read_text(encoding="utf-8"))
         except json.JSONDecodeError as error:
             logger.warning(
-                "SimulationRepository: failed to parse index file",
+                "SimulationDiskStore: failed to parse index file",
                 path=str(self.index_file),
                 error=str(error),
             )
             return None
         if not isinstance(payload, dict):
             logger.warning(
-                "SimulationRepository: index file is not a JSON object",
+                "SimulationDiskStore: index file is not a JSON object",
                 path=str(self.index_file),
             )
             return None
@@ -229,14 +243,14 @@ class SimulationRepository(Repository[Simulation]):
         schema_version = payload.get("schema_version")
         if schema_version != SIMULATION_REPOSITORY_SCHEMA_VERSION:
             logger.warning(
-                "SimulationRepository: unsupported index schema version",
+                "SimulationDiskStore: unsupported index schema version",
                 schema_version=schema_version,
             )
             return None
         simulation_ids_raw = payload.get("simulations", [])
         if not isinstance(simulation_ids_raw, list):
             logger.warning(
-                "SimulationRepository: index simulations entry is not a list",
+                "SimulationDiskStore: index simulations entry is not a list",
                 path=str(self.index_file),
             )
             return None
@@ -258,22 +272,12 @@ class SimulationRepository(Repository[Simulation]):
             return
         self._index_simulation_ids, self._last_active_device_id = parsed
 
-    def restore(self, simulation: Simulation) -> None:
-        """Load a simulation into memory without creating new on-disk artifacts."""
-        if simulation.id in self._repository:
-            raise ValueError(f"Simulation with id {simulation.id} already exists")
-        self._repository[simulation.id] = simulation
-        logger.debug(
-            "SimulationRepository.restore: repository snapshot ({} item(s))",
-            len(self._repository),
-        )
-
     def _load_simulation_from_disk(self, simulation_id: str) -> Simulation | None:
         """Read one simulation metadata file from disk."""
         metadata_path = self.simulation_metadata_file(simulation_id)
         if not metadata_path.is_file():
             logger.warning(
-                "SimulationRepository: simulation metadata file missing",
+                "SimulationDiskStore: simulation metadata file missing",
                 simulation_id=simulation_id,
                 path=str(metadata_path),
             )
@@ -282,7 +286,7 @@ class SimulationRepository(Repository[Simulation]):
             payload = json.loads(metadata_path.read_text(encoding="utf-8"))
         except json.JSONDecodeError as error:
             logger.warning(
-                "SimulationRepository: failed to parse simulation metadata",
+                "SimulationDiskStore: failed to parse simulation metadata",
                 simulation_id=simulation_id,
                 path=str(metadata_path),
                 error=str(error),
@@ -290,7 +294,7 @@ class SimulationRepository(Repository[Simulation]):
             return None
         if not isinstance(payload, dict):
             logger.warning(
-                "SimulationRepository: simulation metadata is not a JSON object",
+                "SimulationDiskStore: simulation metadata is not a JSON object",
                 simulation_id=simulation_id,
                 path=str(metadata_path),
             )
@@ -299,19 +303,19 @@ class SimulationRepository(Repository[Simulation]):
         return Simulation.from_payload(payload, simulation_dir)
 
     def _delete_persisted_simulation_dir(self, simulation_id: str) -> None:
-        """Delete a simulation directory from disk without touching in-memory state."""
+        """Delete a simulation directory from disk."""
         simulation_dir = self.simulation_dir(simulation_id)
         if simulation_dir.is_dir():
             shutil.rmtree(simulation_dir)
             logger.info(
-                "SimulationRepository: deleted stale persisted simulation directory",
+                "SimulationDiskStore: deleted stale persisted simulation directory",
                 simulation_id=simulation_id,
                 path=str(simulation_dir),
             )
 
-    def load_all_for_devices(self, devices: PhoneRepository) -> list[Simulation]:
+    def load_for_devices(self, devices: PhoneRepository) -> PersistedSimulationState:
         """
-        Load persisted simulations and bind each to a paired device instance.
+        Load persisted simulations from disk and bind each to a paired device instance.
 
         Simulations whose device id is not in ``devices`` are deleted from disk.
         """
@@ -321,7 +325,7 @@ class SimulationRepository(Repository[Simulation]):
                 simulation = self._load_simulation_from_disk(simulation_id)
             except (TypeError, ValueError) as error:
                 logger.warning(
-                    "SimulationRepository: failed to deserialize simulation",
+                    "SimulationDiskStore: failed to deserialize simulation",
                     simulation_id=simulation_id,
                     error=str(error),
                 )
@@ -332,7 +336,7 @@ class SimulationRepository(Repository[Simulation]):
                 continue
             if simulation.device is None:
                 logger.warning(
-                    "SimulationRepository: persisted simulation has no device",
+                    "SimulationDiskStore: persisted simulation has no device",
                     simulation_id=simulation_id,
                 )
                 self._delete_persisted_simulation_dir(simulation_id)
@@ -340,67 +344,45 @@ class SimulationRepository(Repository[Simulation]):
             paired_device = devices.get(simulation.device.id)
             if paired_device is None:
                 logger.info(
-                    "SimulationRepository: deleting simulation for unavailable device",
+                    "SimulationDiskStore: deleting simulation for unavailable device",
                     simulation_id=simulation_id,
                     device_id=simulation.device.id,
                 )
                 self._delete_persisted_simulation_dir(simulation_id)
                 continue
             simulation.device = paired_device
-            try:
-                self.restore(simulation)
-            except ValueError as error:
-                logger.warning(
-                    "SimulationRepository: failed to restore simulation",
-                    simulation_id=simulation_id,
-                    error=str(error),
-                )
-                continue
             loaded.append(simulation)
         if (
             self._last_active_device_id is not None
             and devices.get(self._last_active_device_id) is None
         ):
             logger.info(
-                "SimulationRepository: clearing last active device (not paired)",
+                "SimulationDiskStore: clearing last active device (not paired)",
                 device_id=self._last_active_device_id,
             )
-            self.last_active_device_id = None
+            self._last_active_device_id = None
+            self.write_index(
+                [simulation.id for simulation in loaded],
+                self._last_active_device_id,
+            )
         else:
-            self.write_index()
-        return loaded
+            self.write_index(
+                [simulation.id for simulation in loaded],
+                self._last_active_device_id,
+            )
+        return PersistedSimulationState(
+            simulations=loaded,
+            last_active_device_id=self._last_active_device_id,
+        )
 
-    @property
-    def save_dir(self) -> Path:
-        """
-        Get the save directory.
-        """
-        return self._save_dir
-
-    @property
-    def index_file(self) -> Path:
-        """
-        Get the index file.
-        """
-        return self._save_dir / INDEX_FILENAME
-
-    def simulation_dir(self, simulation_id: str) -> Path:
-        """
-        Get the simulation directory.
-        """
-        return self._save_dir / simulation_id
-
-    def simulation_metadata_file(self, simulation_id: str) -> Path:
-        """
-        Get the simulation metadata file.
-        """
-        return self.simulation_dir(simulation_id) / SIMULATION_FILENAME
-
-    def write_index(self) -> Path:
-        """
-        Write the index file.
-        """
-        self._index_simulation_ids = [simulation.id for simulation in self]
+    def write_index(
+        self,
+        simulation_ids: Iterable[str],
+        last_active_device_id: str | None,
+    ) -> Path:
+        """Write the index file from explicit simulation ids and last active device id."""
+        self._index_simulation_ids = list(simulation_ids)
+        self._last_active_device_id = last_active_device_id
         payload: dict[str, object] = {
             "schema_version": SIMULATION_REPOSITORY_SCHEMA_VERSION,
             "simulations": self._index_simulation_ids,
@@ -410,9 +392,7 @@ class SimulationRepository(Repository[Simulation]):
         return self.index_file
 
     def write_simulation(self, simulation: Simulation) -> Path:
-        """
-        Write the simulation metadata file.
-        """
+        """Write one simulation metadata file."""
         simulation_dir = self.simulation_dir(simulation.id)
         simulation_dir.mkdir(parents=True, exist_ok=True)
         metadata_path = self.simulation_metadata_file(simulation.id)
@@ -420,18 +400,113 @@ class SimulationRepository(Repository[Simulation]):
         _write_json_atomic(metadata_path, payload)
         return metadata_path
 
-    def write_all(self) -> None:
-        """
-        Write all the simulations.
-        """
-        for simulation in self:
+    def write_all(
+        self,
+        simulations: Iterable[Simulation],
+        last_active_device_id: str | None,
+    ) -> None:
+        """Write every simulation metadata file and the index."""
+        for simulation in simulations:
             self.write_simulation(simulation)
+        self.write_index(
+            [simulation.id for simulation in simulations], last_active_device_id
+        )
+
+    def delete_simulation_dir(self, simulation_id: str) -> None:
+        """Remove a simulation directory from disk."""
+        simulation_dir = self.simulation_dir(simulation_id)
+        if simulation_dir.is_dir():
+            shutil.rmtree(simulation_dir)
+
+
+class SimulationRepository(Repository[Simulation]):
+    """In-memory repository for simulations; persistence delegated to SimulationDiskStore."""
+
+    def __init__(self, save_dir: Path) -> None:
+        super().__init__()
+        self._store = SimulationDiskStore(save_dir)
+        self._last_active_device_id: str | None = self._store.last_active_device_id
+
+    @property
+    def last_active_device_id(self) -> str | None:
+        """Return the persisted last selected device id, if any."""
+        return self._last_active_device_id
+
+    @last_active_device_id.setter
+    def last_active_device_id(self, device_id: str | None) -> None:
+        """Persist the last selected device id in the repository index."""
+        normalized = (device_id or "").strip() or None
+        self._last_active_device_id = normalized
         self.write_index()
 
+    def sync_last_active_device_id(self, device_id: str | None) -> None:
+        """Update the in-memory last active device id without writing the index."""
+        self._last_active_device_id = (device_id or "").strip() or None
+
+    def restore(self, simulation: Simulation) -> None:
+        """Load a simulation into memory without creating new on-disk artifacts."""
+        if simulation.id in self._repository:
+            raise ValueError(f"Simulation with id {simulation.id} already exists")
+        self._repository[simulation.id] = simulation
+        logger.debug(
+            "SimulationRepository.restore: repository snapshot ({} item(s))",
+            len(self._repository),
+        )
+
+    def load_all_for_devices(self, devices: PhoneRepository) -> list[Simulation]:
+        """
+        Load persisted simulations from disk into this repository.
+
+        Simulations whose device id is not in ``devices`` are deleted from disk.
+        """
+        state = self._store.load_for_devices(devices)
+        for simulation in state.simulations:
+            try:
+                self.restore(simulation)
+            except ValueError as error:
+                logger.warning(
+                    "SimulationRepository: failed to restore simulation",
+                    simulation_id=simulation.id,
+                    error=str(error),
+                )
+        self.sync_last_active_device_id(state.last_active_device_id)
+        return list(state.simulations)
+
+    @property
+    def save_dir(self) -> Path:
+        """Get the save directory."""
+        return self._store.save_dir
+
+    @property
+    def index_file(self) -> Path:
+        """Get the index file."""
+        return self._store.index_file
+
+    def simulation_dir(self, simulation_id: str) -> Path:
+        """Get the simulation directory."""
+        return self._store.simulation_dir(simulation_id)
+
+    def simulation_metadata_file(self, simulation_id: str) -> Path:
+        """Get the simulation metadata file."""
+        return self._store.simulation_metadata_file(simulation_id)
+
+    def write_index(self) -> Path:
+        """Write the index file from in-memory repository state."""
+        return self._store.write_index(
+            [simulation.id for simulation in self],
+            self._last_active_device_id,
+        )
+
+    def write_simulation(self, simulation: Simulation) -> Path:
+        """Write the simulation metadata file."""
+        return self._store.write_simulation(simulation)
+
+    def write_all(self) -> None:
+        """Write all simulations and the index."""
+        self._store.write_all(self, self._last_active_device_id)
+
     def add(self, item: Simulation) -> None:
-        """
-        Add a simulation to the repository.
-        """
+        """Add a simulation to the repository."""
         super().add(item)
         simulation_dir = self.simulation_dir(item.id)
         simulation_dir.mkdir(parents=True, exist_ok=True)
@@ -441,11 +516,7 @@ class SimulationRepository(Repository[Simulation]):
         self.write_index()
 
     def remove(self, item: Simulation) -> None:
-        """
-        Remove a simulation from the repository.
-        """
+        """Remove a simulation from the repository."""
         super().remove(item)
-        simulation_dir = self.simulation_dir(item.id)
-        if simulation_dir.is_dir():
-            shutil.rmtree(simulation_dir)
+        self._store.delete_simulation_dir(item.id)
         self.write_index()
