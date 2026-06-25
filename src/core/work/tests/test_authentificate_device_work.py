@@ -275,7 +275,8 @@ def test_authenticate_apply_failure_emits_error_raised_for_generic_exception() -
     assert signal == CoreSignal.ERROR_RAISED
     assert isinstance(payload, ErrorRaisedPayload)
     assert payload.source == "AuthenticateDeviceWork"
-    assert payload.error is error
+    assert payload.error_type == "RuntimeError"
+    assert payload.error_message == "unexpected"
 
 
 def test_authenticate_apply_success_adds_phone_and_emits_signal() -> None:
@@ -297,6 +298,8 @@ def test_authenticate_apply_success_adds_phone_and_emits_signal() -> None:
     assert emitted == [
         (
             CoreSignal.DEVICE_AUTHENTIFICATION_SUCCEEDED,
-            DeviceAuthentificationSucceededPayload(phone=phone),
+            DeviceAuthentificationSucceededPayload(
+                device=phone.to_payload(),
+            ),
         )
     ]

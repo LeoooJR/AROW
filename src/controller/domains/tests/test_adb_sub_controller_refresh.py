@@ -51,10 +51,12 @@ def _make_adb_sub_controller(app: _AppStub) -> AdbSubController:
     return AdbSubController(cast(AppController, app))
 
 
-def _patch_controller_type_checks(monkeypatch: pytest.MonkeyPatch, probe: _AppStub) -> None:
+def _patch_controller_type_checks(
+    monkeypatch: pytest.MonkeyPatch, probe: _AppStub
+) -> None:
     real_isinstance = builtins.isinstance
 
-    def _isinstance(obj: object, cls: object) -> bool:
+    def _isinstance(obj: object, cls: Any) -> bool:
         cls_name = getattr(cls, "__name__", "")
         if cls_name == "MainWindow" and obj is probe.view:
             return True
@@ -164,14 +166,15 @@ def test_on_devices_updated_forwards_device_id_rebindings_to_view(
     app = _AppStub()
     adb = _make_adb_sub_controller(app)
     _patch_controller_type_checks(monkeypatch, app)
+    phone = Phone(id="device-1", state="device", model="Pixel")
     payload = DevicesUpdatedPayload(
-        devices=[Phone(id="device-1", state="device", model="Pixel")],
+        devices=[phone.to_payload()],
         device_id_rebindings={"old-device-1": "device-1"},
     )
 
     adb._on_devices_updated(payload)
 
     app.view.forward_devices_updated.assert_called_once_with(
-        [vars(payload.devices[0].descriptor)],
+        payload.devices,
         {"old-device-1": "device-1"},
     )

@@ -176,21 +176,20 @@ class SimulationSubController(AppSubController):
 
     def _on_simulation_created(self, payload: SimulationCreatedPayload) -> None:
         """Handle the simulation created event."""
-        device = payload.simulation.device
-        if device is None:
+        if not payload.device_id:
             logger.error(
                 "SimulationSubController: simulation created without device",
-                simulation_id=payload.simulation.id,
+                simulation_id=payload.simulation_id,
             )
             return
         logger.success(
             "SimulationSubController: simulation created",
-            simulation_id=payload.simulation.id,
-            device_id=device.id,
-            device_name=device.name,
+            simulation_id=payload.simulation_id,
+            device_id=payload.device_id,
+            device_name=payload.device_name,
         )
         self.view.forward_device_selection_succeeded(
-            payload.simulation.id,
-            device.id,
-            device.name,
+            payload.simulation_id,
+            payload.device_id,
+            payload.device_name,
         )

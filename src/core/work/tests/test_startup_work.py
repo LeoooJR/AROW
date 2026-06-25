@@ -8,7 +8,7 @@ import pytest
 from core import ADB_BINARY_BUILD_NUMBER, ADB_BINARY_BUILD_VERSION, ADB_BINARY_VERSION
 from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
 from core.adb.binary import AdbBinary
-from core.devices import Phone
+from core.devices import Phone, serialize_phone_collection
 from core.entrypoint import ModelEntrypoint
 from core.signals import (
     AdbServerStartedPayload,
@@ -236,7 +236,7 @@ def test_startup_apply_restores_last_active_device_when_online(
     simulation_created: list[str] = []
 
     def capture(payload: SimulationCreatedPayload) -> None:
-        simulation_created.append(payload.simulation.id)
+        simulation_created.append(payload.simulation_id)
 
     model_entrypoint._signal_bus.subscribe(
         CoreSignal.SIMULATION_CREATED,
@@ -280,7 +280,7 @@ def test_startup_apply_skips_last_active_device_when_offline(
     simulation_created: list[str] = []
 
     def capture(payload: SimulationCreatedPayload) -> None:
-        simulation_created.append(payload.simulation.id)
+        simulation_created.append(payload.simulation_id)
 
     model_entrypoint._signal_bus.subscribe(
         CoreSignal.SIMULATION_CREATED,
@@ -314,9 +314,14 @@ def test_startup_apply_binds_mock_runtime_and_emits_startup_signals() -> None:
     assert emitted == [
         (
             CoreSignal.ADB_SERVER_STARTED,
-            AdbServerStartedPayload(adb_binary=server.binary),
+            AdbServerStartedPayload(adb_binary_path=str(server.binary.path)),
         ),
-        (CoreSignal.DEVICES_UPDATED, DevicesUpdatedPayload(devices=devices)),
+        (
+            CoreSignal.DEVICES_UPDATED,
+            DevicesUpdatedPayload(
+                devices=serialize_phone_collection(devices),
+            ),
+        ),
     ]
 
 

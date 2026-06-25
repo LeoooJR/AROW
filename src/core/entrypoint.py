@@ -18,6 +18,7 @@ from core.devices import (
     apply_discovered_phone_state,
     paired_phone_matches_discovery,
     phone_stable_key_is_collision_resistant,
+    serialize_phone_collection,
 )
 from core.location import Location
 from core.signals import (
@@ -504,7 +505,9 @@ class ModelEntrypoint(Entrypoint):
         if self._adb_server is not None:
             self._signal_bus.emit(
                 CoreSignal.ADB_SERVER_STOPPED,
-                AdbServerStoppedPayload(adb_binary=self._adb_server.binary),
+                AdbServerStoppedPayload(
+                    adb_binary_path=str(self._adb_server.binary.path),
+                ),
             )
             self._adb_server.restart()
             logger.info(
@@ -513,11 +516,15 @@ class ModelEntrypoint(Entrypoint):
             )
             self._signal_bus.emit(
                 CoreSignal.ADB_SERVER_STARTED,
-                AdbServerStartedPayload(adb_binary=self._adb_server.binary),
+                AdbServerStartedPayload(
+                    adb_binary_path=str(self._adb_server.binary.path),
+                ),
             )
             self._signal_bus.emit(
                 CoreSignal.DEVICES_UPDATED,
-                DevicesUpdatedPayload(devices=self.get_known_devices()),
+                DevicesUpdatedPayload(
+                    devices=serialize_phone_collection(self.get_known_devices()),
+                ),
             )
         else:
             logger.warning(
@@ -681,7 +688,11 @@ class ModelEntrypoint(Entrypoint):
             )
         self._signal_bus.emit(
             CoreSignal.SIMULATION_CREATED,
-            SimulationCreatedPayload(simulation=simulation),
+            SimulationCreatedPayload(
+                simulation_id=simulation.id,
+                device_id=device.id,
+                device_name=device.name,
+            ),
         )
         self._simulations.last_active_device_id = device_id
 
@@ -746,7 +757,9 @@ class ModelEntrypoint(Entrypoint):
                         CoreSignal.SIMULATION_POSITION_CHANGED,
                         SimulationPositionChangedPayload(
                             simulation_id=simulation.id,
-                            location=value,
+                            lat=value.lat,
+                            lon=value.lon,
+                            label=value.label,
                         ),
                     )
                 else:
@@ -787,10 +800,11 @@ class ModelEntrypoint(Entrypoint):
         """
         simulation = self._get_simulation_for_device(device_id)
         if simulation is not None:
+            simulation_id = simulation.id
             self.delete_simulation(simulation)
             self._signal_bus.emit(
                 CoreSignal.SIMULATION_DELETED,
-                SimulationDeletedPayload(simulation=simulation),
+                SimulationDeletedPayload(simulation_id=simulation_id),
             )
             if self._adb_server is not None:
                 working_device = self._adb_server.get_working_device()

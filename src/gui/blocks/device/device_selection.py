@@ -358,6 +358,7 @@ class DeviceSelectionBlock(QFrame, Block):
     @Slot(dict)
     def _on_authentification_succeeded(self, device: dict) -> None:
         """Add a newly authenticated device and mark it as the active selection."""
+        last_communication = device.get("last_communication", dt.datetime.now())
         item = self._device_item_type.add_to_list(
             self.ui.available_device_list,
             id=device["id"],
@@ -366,7 +367,7 @@ class DeviceSelectionBlock(QFrame, Block):
             badge="new",
             operating_system=device["os"],
             location="N/A",
-            last_communication=device["last_communication"],
+            last_communication=last_communication,
             alert_highlight=True,
         )
         self.ui.available_device_list.sortItems()
@@ -439,6 +440,7 @@ class DeviceSelectionBlock(QFrame, Block):
             )
         self.ui.available_device_list.clear()
         for device in devices:
+            last_communication = device.get("last_communication", dt.datetime.now())
             self._device_item_type.add_to_list(
                 self.ui.available_device_list,
                 id=device["id"],
@@ -448,7 +450,7 @@ class DeviceSelectionBlock(QFrame, Block):
                 badge="new",
                 operating_system=device["os"],
                 location="N/A",
-                last_communication=device["last_communication"],
+                last_communication=last_communication,
             )
         self.ui.available_device_list.sortItems()
         if previous_active_device_id is None:

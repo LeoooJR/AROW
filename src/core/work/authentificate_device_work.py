@@ -220,7 +220,9 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
             model_entrypoint._adb_server.paired_devices.add(outcome.success_phone)
         model_entrypoint._signal_bus.emit(
             CoreSignal.DEVICE_AUTHENTIFICATION_SUCCEEDED,
-            DeviceAuthentificationSucceededPayload(phone=outcome.success_phone),
+            DeviceAuthentificationSucceededPayload(
+                device=outcome.success_phone.to_payload(),
+            ),
         )
 
     @staticmethod

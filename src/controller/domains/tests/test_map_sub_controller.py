@@ -307,7 +307,7 @@ def test_on_simulation_deleted_cancels_render_job_and_forwards(
     )
 
     map_controller._on_simulation_deleted(
-        SimulationDeletedPayload(simulation=simulation)
+        SimulationDeletedPayload(simulation_id="sim-1")
     )
 
     assert app.cancelled_job_ids == ["job-1"]

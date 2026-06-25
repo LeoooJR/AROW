@@ -73,7 +73,8 @@ def test_apply_failure_routes_generic_exception_by_origin() -> None:
     assert isinstance(payload, ErrorRaisedPayload)
     assert payload.source == "AuthenticateDeviceWork"
     assert payload.message == "unexpected auth bug"
-    assert payload.error is generic
+    assert payload.error_type == "RuntimeError"
+    assert payload.error_message == "unexpected auth bug"
 
 
 @pytest.mark.parametrize(
@@ -109,7 +110,8 @@ def test_apply_failure_routes_generic_exception_for_each_work_origin(
     assert signal == CoreSignal.ERROR_RAISED
     assert isinstance(payload, ErrorRaisedPayload)
     assert payload.source == expected_source
-    assert payload.error is generic
+    assert payload.error_type == "RuntimeError"
+    assert payload.error_message == "worker blew up"
 
 
 def test_apply_failure_falls_back_to_exception_type_without_origin() -> None:
@@ -161,7 +163,8 @@ def test_emit_generic_error_emits_error_raised_payload() -> None:
     assert isinstance(payload, ErrorRaisedPayload)
     assert payload.source == "TestSource"
     assert payload.message == "direct helper test"
-    assert payload.error is error
+    assert payload.error_type == "RuntimeError"
+    assert payload.error_message == "direct helper test"
 
 
 def test_apply_failure_uses_generic_handler_for_unknown_job_error() -> None:

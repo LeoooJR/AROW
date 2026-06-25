@@ -208,7 +208,7 @@ class AdbSubController(AppSubController):
     def _on_adb_server_started(self, payload: AdbServerStartedPayload) -> None:
         logger.info(
             "AdbSubController: ADB server started",
-            adb_binary=str(payload.adb_binary),
+            adb_binary_path=payload.adb_binary_path,
         )
         self.view.forward_adb_server_started()
 
@@ -216,21 +216,20 @@ class AdbSubController(AppSubController):
     def _on_adb_server_stopped(self, payload: AdbServerStoppedPayload) -> None:
         logger.info(
             "AdbSubController: ADB server stopped",
-            adb_binary=str(payload.adb_binary),
+            adb_binary_path=payload.adb_binary_path,
         )
         self.view.forward_adb_server_stopped()
 
     @validate_view
     def _on_devices_updated(self, payload: DevicesUpdatedPayload) -> None:
-        descriptors = [vars(d.descriptor) for d in payload.devices]
         logger.info(
             "AdbSubController: devices updated",
-            device_count=len(descriptors),
-            device_descriptors=descriptors,
+            device_count=len(payload.devices),
+            device_descriptors=payload.devices,
             device_id_rebindings=dict(payload.device_id_rebindings),
         )
         self.view.forward_devices_updated(
-            descriptors,
+            payload.devices,
             dict(payload.device_id_rebindings),
         )
 
@@ -238,13 +237,15 @@ class AdbSubController(AppSubController):
     def _on_device_authentification_succeeded(
         self, payload: DeviceAuthentificationSucceededPayload
     ) -> None:
-        desc = payload.phone.descriptor
+        descriptor = payload.device
+        device_id = str(descriptor.get("id", ""))
+        device_name = str(descriptor.get("name", ""))
         logger.success(
             "AdbSubController: device authentification succeeded",
-            device_id=desc.id,
-            device_name=desc.name,
+            device_id=device_id,
+            device_name=device_name,
         )
-        self.view.forward_device_authentification_succeeded(vars(desc))
+        self.view.forward_device_authentification_succeeded(descriptor)
 
     @validate_view
     def _on_device_authentification_failed(

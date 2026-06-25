@@ -7,6 +7,16 @@ When adding a new core signal:
 3. Register the pair in ``CORE_SIGNAL_PAYLOAD_TYPES``.
 4. Add matching ``@overload`` entries for ``subscribe``, ``unsubscribe``, and ``emit``
    on ``CoreSignalBus`` / ``InMemoryCoreSignalBus`` and ``Entrypoint``.
+
+Payload design rules (controllers must not depend on live core domain objects):
+- Prefer the smallest set of primitive fields (``str``, ``int``, ``float``, ``bool``).
+- ``pathlib.Path`` is allowed for filesystem resources; it is not a custom core domain type.
+- When a custom core object must be represented, serialize it (for example via
+  ``to_payload()``) into a ``dict`` and carry only that dict in the payload.
+- Do not place live core domain instances (``Phone``, ``Simulation``, ``Location``,
+  ``AdbBinary``, ``Exception``, etc.) on core signal payloads.
+- When a signal payload changes, update every emitter, subscriber, controller bridge,
+  GUI consumer, and test on the full pathway for that signal.
 """
 
 from __future__ import annotations
@@ -18,10 +28,6 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, Literal, Protocol, TypeVar, overload
 
-from core.adb.binary import AdbBinary
-from core.devices import Phone
-from core.location import Location
-from core.simulation import Simulation
 from logger import logger
 
 
@@ -64,21 +70,21 @@ class HostComputerIdentityPayload:
 class AdbServerStartedPayload:
     """Payload emitted when the ADB server starts."""
 
-    adb_binary: AdbBinary
+    adb_binary_path: str
 
 
 @dataclass(frozen=True, slots=True)
 class AdbServerStoppedPayload:
     """Payload emitted when the ADB server stops."""
 
-    adb_binary: AdbBinary
+    adb_binary_path: str
 
 
 @dataclass(frozen=True, slots=True)
 class DevicesUpdatedPayload:
     """Payload emitted when the known/connected devices list changes."""
 
-    devices: list[Phone]
+    devices: list[dict[str, object]]
     device_id_rebindings: Mapping[str, str] = field(default_factory=dict)
 
 
@@ -86,7 +92,7 @@ class DevicesUpdatedPayload:
 class DeviceAuthentificationSucceededPayload:
     """Payload emitted when a device is connected successfully."""
 
-    phone: Phone
+    device: dict[str, object]
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,14 +109,16 @@ class DeviceAuthentificationFailedPayload:
 class SimulationCreatedPayload:
     """Payload emitted when a simulation is created."""
 
-    simulation: Simulation
+    simulation_id: str
+    device_id: str
+    device_name: str
 
 
 @dataclass(frozen=True, slots=True)
 class SimulationDeletedPayload:
     """Payload emitted when a simulation is deleted."""
 
-    simulation: Simulation
+    simulation_id: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -126,7 +134,9 @@ class SimulationPositionChangedPayload:
     """Payload emitted when the effective simulation position changes."""
 
     simulation_id: str
-    location: Location
+    lat: float
+    lon: float
+    label: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -142,7 +152,8 @@ class ErrorRaisedPayload:
 
     source: str
     message: str
-    error: Exception | None = None
+    error_type: str | None = None
+    error_message: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

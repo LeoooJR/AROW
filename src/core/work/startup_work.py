@@ -24,7 +24,7 @@ from core.adb.binary import AdbBinary
 from core.adb.client import AdbClient
 from core.adb.server import AdbServer
 from core.application_paths import get_or_create_application_dir
-from core.devices import Phone
+from core.devices import Phone, serialize_phone_collection
 from core.exceptions import CoreException
 from core.signals import (
     AdbServerStartedPayload,
@@ -290,11 +290,15 @@ class StartupCoreRuntimeWork(CoreRuntimeWork[StartupOutcome]):
         if result.adb_server is not None:
             model_entrypoint._signal_bus.emit(
                 CoreSignal.ADB_SERVER_STARTED,
-                AdbServerStartedPayload(adb_binary=result.adb_server.binary),
+                AdbServerStartedPayload(
+                    adb_binary_path=str(result.adb_server.binary.path),
+                ),
             )
             model_entrypoint._signal_bus.emit(
                 CoreSignal.DEVICES_UPDATED,
-                DevicesUpdatedPayload(devices=result.devices),
+                DevicesUpdatedPayload(
+                    devices=serialize_phone_collection(result.devices),
+                ),
             )
         model_entrypoint._simulations.sync_last_active_device_id(
             result.last_active_device_id

@@ -155,7 +155,7 @@ class MapSubController(AppSubController):
 
     @validate_view
     def _on_simulation_deleted(self, payload: SimulationDeletedPayload) -> None:
-        simulation_id = payload.simulation.id
+        simulation_id = payload.simulation_id
         handle = self._render_jobs_by_simulation_id.pop(simulation_id, None)
         self._render_callbacks_by_simulation_id.pop(simulation_id, None)
         if handle is not None:

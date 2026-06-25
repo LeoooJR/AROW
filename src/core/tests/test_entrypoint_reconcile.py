@@ -26,7 +26,7 @@ def _create_simulation_id(model_entrypoint: ModelEntrypoint, device_id: str) -> 
     captured: list[str] = []
 
     def capture(payload: SimulationCreatedPayload) -> None:
-        captured.append(payload.simulation.id)
+        captured.append(payload.simulation_id)
 
     model_entrypoint.subscribe(CoreSignal.SIMULATION_CREATED, capture)
     model_entrypoint.create_simulation(device_id)

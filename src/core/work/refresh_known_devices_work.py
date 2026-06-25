@@ -23,6 +23,7 @@ from core.devices import (
     apply_phone_manufacturer_enrichment,
     apply_phone_product_model_enrichment,
     apply_phone_ro_serial_enrichment,
+    serialize_phone_collection,
 )
 from core.exceptions import CoreException
 from core.signals import CoreSignal, DevicesUpdatedPayload
@@ -214,7 +215,7 @@ class RefreshKnownDevicesWork(CoreRuntimeWork[RefreshKnownDevicesOutcome]):
         model_entrypoint._signal_bus.emit(
             CoreSignal.DEVICES_UPDATED,
             DevicesUpdatedPayload(
-                devices=list(adb_server.paired_devices),
+                devices=serialize_phone_collection(adb_server.paired_devices),
                 device_id_rebindings=reconcile_result.device_id_rebindings,
             ),
         )

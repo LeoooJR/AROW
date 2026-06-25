@@ -6,7 +6,7 @@ import platform
 import socket
 from abc import ABC
 from dataclasses import dataclass, field
-from typing import Any, Generic, Optional, TypeVar
+from typing import Any, Generic, Iterable, Optional, TypeVar
 
 from loguru import logger
 
@@ -487,6 +487,7 @@ class Phone(Device[PhoneDescriptor]):
             "port": self.port,
             "state": self.state,
             "stable_key": self.stable_key,
+            "last_communication": self.last_communication.isoformat(),
         }
 
     @staticmethod
@@ -505,6 +506,10 @@ class Phone(Device[PhoneDescriptor]):
         ip_raw = payload.get("ip")
         state_raw = payload.get("state")
         stable_key_raw = payload.get("stable_key")
+        last_communication_raw = payload.get("last_communication")
+        last_communication: datetime.datetime | None = None
+        if isinstance(last_communication_raw, str) and last_communication_raw.strip():
+            last_communication = datetime.datetime.fromisoformat(last_communication_raw)
         phone = Phone(
             id=str(payload["id"]),
             name=str(name_raw) if name_raw is not None else None,
@@ -515,7 +520,14 @@ class Phone(Device[PhoneDescriptor]):
         )
         if stable_key_raw is not None:
             phone.descriptor.stable_key = str(stable_key_raw)
+        if last_communication is not None:
+            phone.descriptor.last_communication = last_communication
         return phone
+
+
+def serialize_phone_collection(phones: Iterable[Phone]) -> list[dict[str, object]]:
+    """Serialize handsets for lightweight core signal payloads."""
+    return [phone.to_payload() for phone in phones]
 
 
 # Descriptor fields refreshed from a newly listed Phone during paired-device reconcile.

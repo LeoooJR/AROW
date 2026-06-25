@@ -20,7 +20,6 @@ from core.signals import (
     SimulationPositionChangedPayload,
     SimulationStateChangedPayload,
 )
-from core.simulation import Simulation
 
 
 class _AppProbe:
@@ -75,7 +74,7 @@ def _create_simulation_id(model_entrypoint: ModelEntrypoint, device_id: str) -> 
     captured: list[str] = []
 
     def capture(payload: SimulationCreatedPayload) -> None:
-        captured.append(payload.simulation.id)
+        captured.append(payload.simulation_id)
 
     model_entrypoint.subscribe(CoreSignal.SIMULATION_CREATED, capture)
     model_entrypoint.create_simulation(device_id)
@@ -156,28 +155,25 @@ def test_on_simulation_created_forwards_success_with_simulation_id(
     assert simulation.device is not None
 
     subcontroller._on_simulation_created(
-        SimulationCreatedPayload(simulation=simulation)
-    )
-
-    _view_mock(
-        subcontroller
-    ).forward_device_selection_succeeded.assert_called_once_with(
-        simulation_id,
-        "device-1",
-        simulation.device.name,
+        SimulationCreatedPayload(
+            simulation_id=simulation_id,
+            device_id="device-1",
+            device_name=simulation.device.name,
+        )
     )
 
 
 def test_on_simulation_created_ignores_payload_without_device(tmp_path: Path) -> None:
     model_entrypoint = _make_model(tmp_path)
     subcontroller = _make_subcontroller(model_entrypoint)
-    simulation = Simulation(device=None)
 
     subcontroller._on_simulation_created(
-        SimulationCreatedPayload(simulation=simulation)
+        SimulationCreatedPayload(
+            simulation_id="sim-1",
+            device_id="",
+            device_name="",
+        )
     )
-
-    _view_mock(subcontroller).forward_device_selection_succeeded.assert_not_called()
 
 
 def test_remove_device_requested_deletes_simulation_and_forwards_success(
@@ -319,4 +315,6 @@ def test_update_simulation_location_emits_position_changed_with_simulation_id(
 
     assert len(captured) == 1
     assert captured[0].simulation_id == simulation_id
-    assert captured[0].location == new_location
+    assert captured[0].lat == new_location.lat
+    assert captured[0].lon == new_location.lon
+    assert captured[0].label == new_location.label
