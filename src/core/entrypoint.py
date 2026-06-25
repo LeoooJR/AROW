@@ -39,6 +39,7 @@ from core.signals import (
     SignalHandler,
     SimulationCreatedPayload,
     SimulationDeletedPayload,
+    SimulationMapFileChangedPayload,
     SimulationPositionChangedPayload,
     SimulationStateChangedPayload,
 )
@@ -191,6 +192,13 @@ class Entrypoint(ABC):
     @overload
     def subscribe(
         self,
+        signal: Literal[CoreSignal.SIMULATION_MAP_FILE_CHANGED],
+        handler: SignalHandler[SimulationMapFileChangedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
         signal: Literal[CoreSignal.ERROR_RAISED],
         handler: SignalHandler[ErrorRaisedPayload],
     ) -> None: ...
@@ -304,6 +312,13 @@ class Entrypoint(ABC):
         self,
         signal: Literal[CoreSignal.SIMULATION_POSITION_CHANGED],
         handler: SignalHandler[SimulationPositionChangedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_MAP_FILE_CHANGED],
+        handler: SignalHandler[SimulationMapFileChangedPayload],
     ) -> None: ...
 
     @overload
@@ -764,6 +779,17 @@ class ModelEntrypoint(Entrypoint):
                     )
                 else:
                     raise ValueError(f"Invalid location: {value}")
+            elif key == "map_file":
+                if isinstance(value, Path):
+                    self._signal_bus.emit(
+                        CoreSignal.SIMULATION_MAP_FILE_CHANGED,
+                        SimulationMapFileChangedPayload(
+                            simulation_id=simulation.id,
+                            map_file_path=value,
+                        ),
+                    )
+                else:
+                    raise ValueError(f"Invalid map file: {value}")
 
     def persist_simulation(self, simulation_id: str) -> None:
         """Write one simulation metadata file to disk."""

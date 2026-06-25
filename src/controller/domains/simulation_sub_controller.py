@@ -12,7 +12,9 @@ from controller.domains.app_sub_controller import AppSubController
 from controller.helper import validate_model_entrypoint, validate_view
 from core.signals import (
     CoreSignal,
+    MapRenderedPayload,
     SimulationCreatedPayload,
+    SimulationMapFileChangedPayload,
     SimulationPositionChangedPayload,
     SimulationStateChangedPayload,
 )
@@ -43,6 +45,10 @@ class SimulationSubController(AppSubController):
             self._on_simulation_created,
         )
         self.model_entrypoint.subscribe(
+            CoreSignal.MAP_RENDERED,
+            self._on_map_rendered,
+        )
+        self.model_entrypoint.subscribe(
             CoreSignal.SIMULATION_STATE_CHANGED,
             self._on_simulation_state_changed,
         )
@@ -50,6 +56,15 @@ class SimulationSubController(AppSubController):
             CoreSignal.SIMULATION_POSITION_CHANGED,
             self._on_simulation_position_changed,
         )
+        self.model_entrypoint.subscribe(
+            CoreSignal.SIMULATION_MAP_FILE_CHANGED,
+            self._on_simulation_map_file_changed,
+        )
+
+    @validate_model_entrypoint
+    def _on_map_rendered(self, payload: MapRenderedPayload) -> None:
+        """Refresh persisted metadata when simulation map file changes."""
+        self.model_entrypoint.persist_simulation(payload.simulation_id)
 
     @validate_model_entrypoint
     def _on_simulation_state_changed(
@@ -63,6 +78,13 @@ class SimulationSubController(AppSubController):
         self, payload: SimulationPositionChangedPayload
     ) -> None:
         """Refresh persisted metadata when simulation location changes."""
+        self.model_entrypoint.persist_simulation(payload.simulation_id)
+
+    @validate_model_entrypoint
+    def _on_simulation_map_file_changed(
+        self, payload: SimulationMapFileChangedPayload
+    ) -> None:
+        """Refresh persisted metadata when simulation map file changes."""
         self.model_entrypoint.persist_simulation(payload.simulation_id)
 
     def is_simulation_active(self, id: str) -> bool:
