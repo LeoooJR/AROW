@@ -7,6 +7,16 @@ When adding a new core signal:
 3. Register the pair in ``CORE_SIGNAL_PAYLOAD_TYPES``.
 4. Add matching ``@overload`` entries for ``subscribe``, ``unsubscribe``, and ``emit``
    on ``CoreSignalBus`` / ``InMemoryCoreSignalBus`` and ``Entrypoint``.
+
+Payload design rules (controllers must not depend on live core domain objects):
+- Prefer the smallest set of primitive fields (``str``, ``int``, ``float``, ``bool``).
+- ``pathlib.Path`` is allowed for filesystem resources; it is not a custom core domain type.
+- When a custom core object must be represented, serialize it (for example via
+  ``to_payload()``) into a ``dict`` and carry only that dict in the payload.
+- Do not place live core domain instances (``Phone``, ``Simulation``, ``Location``,
+  ``AdbBinary``, ``Exception``, etc.) on core signal payloads.
+- When a signal payload changes, update every emitter, subscriber, controller bridge,
+  GUI consumer, and test on the full pathway for that signal.
 """
 
 from __future__ import annotations
@@ -18,10 +28,6 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, Literal, Protocol, TypeVar, overload
 
-from core.adb.binary import AdbBinary
-from core.devices import Phone
-from core.location import Location
-from core.simulation import Simulation
 from logger import logger
 
 
@@ -42,8 +48,10 @@ class CoreSignal(StrEnum):
     DEVICE_AUTHENTIFICATION_FAILED = "device.authentification.failed"
     DEVICES_UPDATED = "devices.updated"
     SIMULATION_CREATED = "simulation.created"
+    SIMULATION_DELETED = "simulation.deleted"
     SIMULATION_STATE_CHANGED = "simulation.state.changed"
     SIMULATION_POSITION_CHANGED = "simulation.position.changed"
+    SIMULATION_MAP_FILE_CHANGED = "simulation.map.file.changed"
     ERROR_RAISED = "error.raised"
     LOG_MESSAGE = "log.message"
     HOST_COMPUTER_IDENTITY_UPDATED = "host.computer.identity.updated"
@@ -63,21 +71,21 @@ class HostComputerIdentityPayload:
 class AdbServerStartedPayload:
     """Payload emitted when the ADB server starts."""
 
-    adb_binary: AdbBinary
+    adb_binary_path: str
 
 
 @dataclass(frozen=True, slots=True)
 class AdbServerStoppedPayload:
     """Payload emitted when the ADB server stops."""
 
-    adb_binary: AdbBinary
+    adb_binary_path: str
 
 
 @dataclass(frozen=True, slots=True)
 class DevicesUpdatedPayload:
     """Payload emitted when the known/connected devices list changes."""
 
-    devices: list[Phone]
+    devices: list[dict[str, object]]
     device_id_rebindings: Mapping[str, str] = field(default_factory=dict)
 
 
@@ -85,7 +93,7 @@ class DevicesUpdatedPayload:
 class DeviceAuthentificationSucceededPayload:
     """Payload emitted when a device is connected successfully."""
 
-    phone: Phone
+    device: dict[str, object]
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,22 +110,42 @@ class DeviceAuthentificationFailedPayload:
 class SimulationCreatedPayload:
     """Payload emitted when a simulation is created."""
 
-    simulation: Simulation
+    simulation_id: str
+    device_id: str
+    device_name: str
+
+
+@dataclass(frozen=True, slots=True)
+class SimulationDeletedPayload:
+    """Payload emitted when a simulation is deleted."""
+
+    simulation_id: str
 
 
 @dataclass(frozen=True, slots=True)
 class SimulationStateChangedPayload:
     """Payload emitted when simulation execution state changes."""
 
+    simulation_id: str
     active: bool
-    paused: bool
 
 
 @dataclass(frozen=True, slots=True)
 class SimulationPositionChangedPayload:
     """Payload emitted when the effective simulation position changes."""
 
-    location: Location
+    simulation_id: str
+    lat: float
+    lon: float
+    label: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class SimulationMapFileChangedPayload:
+    """Payload emitted when the simulation map file changes."""
+
+    simulation_id: str
+    map_file_path: Path
 
 
 @dataclass(frozen=True, slots=True)
@@ -133,7 +161,8 @@ class ErrorRaisedPayload:
 
     source: str
     message: str
-    error: Exception | None = None
+    error_type: str | None = None
+    error_message: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -175,8 +204,10 @@ CORE_SIGNAL_PAYLOAD_TYPES: Mapping[CoreSignal, type[object]] = {
     CoreSignal.DEVICE_AUTHENTIFICATION_FAILED: DeviceAuthentificationFailedPayload,
     CoreSignal.DEVICES_UPDATED: DevicesUpdatedPayload,
     CoreSignal.SIMULATION_CREATED: SimulationCreatedPayload,
+    CoreSignal.SIMULATION_DELETED: SimulationDeletedPayload,
     CoreSignal.SIMULATION_STATE_CHANGED: SimulationStateChangedPayload,
     CoreSignal.SIMULATION_POSITION_CHANGED: SimulationPositionChangedPayload,
+    CoreSignal.SIMULATION_MAP_FILE_CHANGED: SimulationMapFileChangedPayload,
     CoreSignal.ERROR_RAISED: ErrorRaisedPayload,
     CoreSignal.LOG_MESSAGE: LogMessagePayload,
     CoreSignal.HOST_COMPUTER_IDENTITY_UPDATED: HostComputerIdentityPayload,
@@ -266,6 +297,13 @@ class CoreSignalBus(ABC):
     @overload
     def subscribe(
         self,
+        signal: Literal[CoreSignal.SIMULATION_DELETED],
+        handler: SignalHandler[SimulationDeletedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
         signal: Literal[CoreSignal.SIMULATION_STATE_CHANGED],
         handler: SignalHandler[SimulationStateChangedPayload],
     ) -> None: ...
@@ -275,6 +313,13 @@ class CoreSignalBus(ABC):
         self,
         signal: Literal[CoreSignal.SIMULATION_POSITION_CHANGED],
         handler: SignalHandler[SimulationPositionChangedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_MAP_FILE_CHANGED],
+        handler: SignalHandler[SimulationMapFileChangedPayload],
     ) -> None: ...
 
     @overload
@@ -384,6 +429,13 @@ class CoreSignalBus(ABC):
     @overload
     def unsubscribe(
         self,
+        signal: Literal[CoreSignal.SIMULATION_DELETED],
+        handler: SignalHandler[SimulationDeletedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
         signal: Literal[CoreSignal.SIMULATION_STATE_CHANGED],
         handler: SignalHandler[SimulationStateChangedPayload],
     ) -> None: ...
@@ -393,6 +445,13 @@ class CoreSignalBus(ABC):
         self,
         signal: Literal[CoreSignal.SIMULATION_POSITION_CHANGED],
         handler: SignalHandler[SimulationPositionChangedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_MAP_FILE_CHANGED],
+        handler: SignalHandler[SimulationMapFileChangedPayload],
     ) -> None: ...
 
     @overload
@@ -503,6 +562,13 @@ class CoreSignalBus(ABC):
     @overload
     def emit(
         self,
+        signal: Literal[CoreSignal.SIMULATION_DELETED],
+        payload: SimulationDeletedPayload,
+    ) -> None: ...
+
+    @overload
+    def emit(
+        self,
         signal: Literal[CoreSignal.SIMULATION_STATE_CHANGED],
         payload: SimulationStateChangedPayload,
     ) -> None: ...
@@ -512,6 +578,13 @@ class CoreSignalBus(ABC):
         self,
         signal: Literal[CoreSignal.SIMULATION_POSITION_CHANGED],
         payload: SimulationPositionChangedPayload,
+    ) -> None: ...
+
+    @overload
+    def emit(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_MAP_FILE_CHANGED],
+        payload: SimulationMapFileChangedPayload,
     ) -> None: ...
 
     @overload
@@ -638,6 +711,13 @@ class InMemoryCoreSignalBus(CoreSignalBus):
     @overload
     def subscribe(
         self,
+        signal: Literal[CoreSignal.SIMULATION_DELETED],
+        handler: SignalHandler[SimulationDeletedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
         signal: Literal[CoreSignal.SIMULATION_STATE_CHANGED],
         handler: SignalHandler[SimulationStateChangedPayload],
     ) -> None: ...
@@ -647,6 +727,13 @@ class InMemoryCoreSignalBus(CoreSignalBus):
         self,
         signal: Literal[CoreSignal.SIMULATION_POSITION_CHANGED],
         handler: SignalHandler[SimulationPositionChangedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_MAP_FILE_CHANGED],
+        handler: SignalHandler[SimulationMapFileChangedPayload],
     ) -> None: ...
 
     @overload
@@ -766,6 +853,13 @@ class InMemoryCoreSignalBus(CoreSignalBus):
     @overload
     def unsubscribe(
         self,
+        signal: Literal[CoreSignal.SIMULATION_DELETED],
+        handler: SignalHandler[SimulationDeletedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
         signal: Literal[CoreSignal.SIMULATION_STATE_CHANGED],
         handler: SignalHandler[SimulationStateChangedPayload],
     ) -> None: ...
@@ -775,6 +869,13 @@ class InMemoryCoreSignalBus(CoreSignalBus):
         self,
         signal: Literal[CoreSignal.SIMULATION_POSITION_CHANGED],
         handler: SignalHandler[SimulationPositionChangedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_MAP_FILE_CHANGED],
+        handler: SignalHandler[SimulationMapFileChangedPayload],
     ) -> None: ...
 
     @overload
@@ -897,6 +998,13 @@ class InMemoryCoreSignalBus(CoreSignalBus):
     @overload
     def emit(
         self,
+        signal: Literal[CoreSignal.SIMULATION_DELETED],
+        payload: SimulationDeletedPayload,
+    ) -> None: ...
+
+    @overload
+    def emit(
+        self,
         signal: Literal[CoreSignal.SIMULATION_STATE_CHANGED],
         payload: SimulationStateChangedPayload,
     ) -> None: ...
@@ -906,6 +1014,13 @@ class InMemoryCoreSignalBus(CoreSignalBus):
         self,
         signal: Literal[CoreSignal.SIMULATION_POSITION_CHANGED],
         payload: SimulationPositionChangedPayload,
+    ) -> None: ...
+
+    @overload
+    def emit(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_MAP_FILE_CHANGED],
+        payload: SimulationMapFileChangedPayload,
     ) -> None: ...
 
     @overload

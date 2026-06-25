@@ -344,14 +344,67 @@ def test_map_block_active_device_removed_resets_placeholder_and_animates(
     block.show()
 
     block.show_map_loading_placeholder()
+    block._active_simulation_id = "sim-1"
+    block._pending_render_simulation_id = "sim-1"
 
     signals.DEVICE.RemoveActiveDeviceSucceeded.emit("d1")
     qtbot.wait(0)
 
     assert block.placeholder.currentWidget() is block.ui.device_required_placeholder
     assert block._pending_render_simulation_id is None
+    assert block._active_simulation_id is None
     assert block._placeholder_helper_anim is not None
     assert block._placeholder_helper_anim.state() == QAbstractAnimation.State.Running
+
+
+def test_map_block_simulation_deleted_resets_active_simulation(qtbot) -> None:
+    block = MapBlock()
+    qtbot.addWidget(block)
+    block.show()
+    block.show_map_canvas()
+    block._active_simulation_id = "sim-1"
+    block._pending_render_simulation_id = None
+
+    signals.SIMULATION.SimulationDeleted.emit("sim-1")
+    qtbot.wait(0)
+
+    assert block.placeholder.currentWidget() is block.ui.device_required_placeholder
+    assert block.ui.placeholder.isVisible()
+    assert not block.ui.canvas.isVisible()
+    assert block._active_simulation_id is None
+    assert block._pending_render_simulation_id is None
+
+
+def test_map_block_simulation_deleted_resets_pending_render(qtbot) -> None:
+    block = MapBlock()
+    qtbot.addWidget(block)
+    block.show()
+    block.show_map_loading_placeholder()
+    block._active_simulation_id = "sim-1"
+    block._pending_render_simulation_id = "sim-1"
+
+    signals.SIMULATION.SimulationDeleted.emit("sim-1")
+    qtbot.wait(0)
+
+    assert block.placeholder.currentWidget() is block.ui.device_required_placeholder
+    assert block._active_simulation_id is None
+    assert block._pending_render_simulation_id is None
+
+
+def test_map_block_simulation_deleted_ignores_other_simulation(qtbot) -> None:
+    block = MapBlock()
+    qtbot.addWidget(block)
+    block.show()
+    block.show_map_loading_placeholder()
+    block._active_simulation_id = "sim-2"
+    block._pending_render_simulation_id = "sim-2"
+
+    signals.SIMULATION.SimulationDeleted.emit("sim-1")
+    qtbot.wait(0)
+
+    assert block.placeholder.currentWidget() is block.ui.map_loading_placeholder
+    assert block._active_simulation_id == "sim-2"
+    assert block._pending_render_simulation_id == "sim-2"
 
 
 def test_map_block_authentification_failed_starts_helper_animation(qtbot) -> None:

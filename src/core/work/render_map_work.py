@@ -93,6 +93,23 @@ class RenderMapWork(CoreRuntimeWork[RenderMapOutcome]):
 
         if not isinstance(model_entrypoint, _ModelEntrypoint):
             raise TypeError("apply_main_thread() requires ModelEntrypoint")
+        simulation = model_entrypoint.get_simulation(outcome.simulation_id)
+        if simulation is None:
+            try:
+                outcome.html_path.unlink(missing_ok=True)
+            except OSError as error:
+                logger.warning(
+                    "RenderMapWork: failed to remove orphan map file",
+                    simulation_id=outcome.simulation_id,
+                    html_path=str(outcome.html_path),
+                    error=str(error),
+                )
+            logger.warning(
+                "RenderMapWork: simulation missing on render success",
+                simulation_id=outcome.simulation_id,
+            )
+            return
+        simulation.map_file = outcome.html_path
         model_entrypoint._signal_bus.emit(
             CoreSignal.MAP_RENDERED,
             MapRenderedPayload(
@@ -110,13 +127,21 @@ class RenderMapWork(CoreRuntimeWork[RenderMapOutcome]):
         if not isinstance(model_entrypoint, _ModelEntrypoint):
             raise TypeError("apply_failure_main_thread() requires ModelEntrypoint")
         if isinstance(error, RenderMapError):
-            model_entrypoint._signal_bus.emit(
-                CoreSignal.MAP_RENDER_FAILED,
-                MapRenderFailedPayload(
+            simulation = model_entrypoint.get_simulation(error.simulation_id)
+            if simulation is not None:
+                simulation.map_file = None
+                model_entrypoint._signal_bus.emit(
+                    CoreSignal.MAP_RENDER_FAILED,
+                    MapRenderFailedPayload(
+                        simulation_id=error.simulation_id,
+                        reason=error.reason,
+                    ),
+                )
+            else:
+                logger.warning(
+                    "RenderMapWork: simulation missing on render failure",
                     simulation_id=error.simulation_id,
-                    reason=error.reason,
-                ),
-            )
+                )
             return
         RenderMapWork.emit_generic_error(
             model_entrypoint,

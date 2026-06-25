@@ -23,13 +23,15 @@ from core.adb.adb_mock import (
 from core.adb.binary import AdbBinary
 from core.adb.client import AdbClient
 from core.adb.server import AdbServer
-from core.devices import Phone
+from core.application_paths import get_or_create_application_dir
+from core.devices import Phone, serialize_phone_collection
 from core.exceptions import CoreException
 from core.signals import (
     AdbServerStartedPayload,
     CoreSignal,
     DevicesUpdatedPayload,
 )
+from core.simulation import PersistedSimulationState, Simulation, SimulationDiskStore
 from core.work.core_runtime_work import CoreRuntimeWork, CoreRuntimeWorkOutcome
 from core.work.helper import preflight
 from core.work.refresh_known_devices_work import enrich_phones_with_adb_shell_properties
@@ -175,6 +177,14 @@ class StartupOutcome(CoreRuntimeWorkOutcome):
     devices: list[Phone] = field(
         default_factory=list, metadata={"description": "The known devices"}
     )
+    simulations: list[Simulation] = field(
+        default_factory=list,
+        metadata={"description": "Persisted simulations bound to paired devices"},
+    )
+    last_active_device_id: str | None = field(
+        default=None,
+        metadata={"description": "Persisted last selected device id from index"},
+    )
 
 
 class StartupCoreRuntimeWork(CoreRuntimeWork[StartupOutcome]):
@@ -240,10 +250,16 @@ class StartupCoreRuntimeWork(CoreRuntimeWork[StartupOutcome]):
             adb_client = _create_adb_client()
         devices = list(adb_server.paired_devices)
         enrich_phones_with_adb_shell_properties(adb_client, devices)
+        simulations_save_dir = get_or_create_application_dir() / "simulations"
+        persisted_state: PersistedSimulationState = SimulationDiskStore(
+            simulations_save_dir
+        ).load_for_devices(adb_server.paired_devices)
         return StartupOutcome(
             adb_server=adb_server,
             adb_client=adb_client,
             devices=devices,
+            simulations=persisted_state.simulations,
+            last_active_device_id=persisted_state.last_active_device_id,
         )
 
     @staticmethod
@@ -262,15 +278,46 @@ class StartupCoreRuntimeWork(CoreRuntimeWork[StartupOutcome]):
             model_entrypoint._adb_server = result.adb_server
         if result.adb_client is not None:
             model_entrypoint._adb_client = result.adb_client
+        for simulation in result.simulations:
+            try:
+                model_entrypoint._simulations.restore(simulation)
+            except ValueError as error:
+                logger.warning(
+                    "startup_work: failed to restore persisted simulation",
+                    simulation_id=simulation.id,
+                    error=str(error),
+                )
         if result.adb_server is not None:
             model_entrypoint._signal_bus.emit(
                 CoreSignal.ADB_SERVER_STARTED,
-                AdbServerStartedPayload(adb_binary=result.adb_server.binary),
+                AdbServerStartedPayload(
+                    adb_binary_path=str(result.adb_server.binary.path),
+                ),
             )
             model_entrypoint._signal_bus.emit(
                 CoreSignal.DEVICES_UPDATED,
-                DevicesUpdatedPayload(devices=result.devices),
+                DevicesUpdatedPayload(
+                    devices=serialize_phone_collection(result.devices),
+                ),
             )
+        model_entrypoint._simulations.sync_last_active_device_id(
+            result.last_active_device_id
+        )
+        if result.last_active_device_id is not None:
+            paired_device = (
+                result.adb_server.paired_devices.get(result.last_active_device_id)
+                if result.adb_server is not None
+                else None
+            )
+            if paired_device is not None and paired_device.state == "device":
+                try:
+                    model_entrypoint.create_simulation(result.last_active_device_id)
+                except (AttributeError, ValueError) as error:
+                    logger.warning(
+                        "startup_work: failed to restore last active device",
+                        device_id=result.last_active_device_id,
+                        error=str(error),
+                    )
 
     @staticmethod
     def apply_failure_main_thread(

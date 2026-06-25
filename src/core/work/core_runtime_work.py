@@ -84,5 +84,16 @@ class CoreRuntimeWork(ABC, Generic[TOutcome]):
         payload_error = error if isinstance(error, Exception) else None
         model_entrypoint._signal_bus.emit(
             CoreSignal.ERROR_RAISED,
-            ErrorRaisedPayload(source=source, message=message, error=payload_error),
+            ErrorRaisedPayload(
+                source=source,
+                message=message,
+                error_type=(
+                    type(payload_error).__qualname__
+                    if payload_error is not None
+                    else None
+                ),
+                error_message=(
+                    str(payload_error) if payload_error is not None else None
+                ),
+            ),
         )

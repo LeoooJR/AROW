@@ -88,6 +88,7 @@ class SimulationSignals(QObject):
 
     StartSimulationRequested = Signal()
     StopSimulationRequested = Signal()
+    SimulationDeleted = Signal(str)
     SimulationContextChanged = Signal(str, int)
     SimulationPositionChanged = Signal(float, float)
 

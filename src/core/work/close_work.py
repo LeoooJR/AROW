@@ -87,7 +87,9 @@ class CloseCoreRuntimeWork(CoreRuntimeWork[CloseOutcome]):
         model_entrypoint._adb_server = None
         model_entrypoint._signal_bus.emit(
             CoreSignal.ADB_SERVER_STOPPED,
-            AdbServerStoppedPayload(adb_binary=result.adb_server.binary),
+            AdbServerStoppedPayload(
+                adb_binary_path=str(result.adb_server.binary.path),
+            ),
         )
 
     @staticmethod

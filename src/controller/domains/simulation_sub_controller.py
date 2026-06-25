@@ -10,7 +10,14 @@ from PySide6.QtCore import Slot
 
 from controller.domains.app_sub_controller import AppSubController
 from controller.helper import validate_model_entrypoint, validate_view
-from core.signals import CoreSignal, SimulationCreatedPayload
+from core.signals import (
+    CoreSignal,
+    MapRenderedPayload,
+    SimulationCreatedPayload,
+    SimulationMapFileChangedPayload,
+    SimulationPositionChangedPayload,
+    SimulationStateChangedPayload,
+)
 from gui.signals import signals
 from logger import logger
 
@@ -33,11 +40,52 @@ class SimulationSubController(AppSubController):
         )  # Ensuring no simulation is running before device is removed by adb subcontroller
 
     def connect_model_signals(self) -> None:
-        # Simulation-specific model subscriptions (none yet) — extension point.
         self.model_entrypoint.subscribe(
             CoreSignal.SIMULATION_CREATED,
             self._on_simulation_created,
         )
+        self.model_entrypoint.subscribe(
+            CoreSignal.MAP_RENDERED,
+            self._on_map_rendered,
+        )
+        self.model_entrypoint.subscribe(
+            CoreSignal.SIMULATION_STATE_CHANGED,
+            self._on_simulation_state_changed,
+        )
+        self.model_entrypoint.subscribe(
+            CoreSignal.SIMULATION_POSITION_CHANGED,
+            self._on_simulation_position_changed,
+        )
+        self.model_entrypoint.subscribe(
+            CoreSignal.SIMULATION_MAP_FILE_CHANGED,
+            self._on_simulation_map_file_changed,
+        )
+
+    @validate_model_entrypoint
+    def _on_map_rendered(self, payload: MapRenderedPayload) -> None:
+        """Refresh persisted metadata when simulation map file changes."""
+        self.model_entrypoint.persist_simulation(payload.simulation_id)
+
+    @validate_model_entrypoint
+    def _on_simulation_state_changed(
+        self, payload: SimulationStateChangedPayload
+    ) -> None:
+        """Refresh persisted metadata when simulation execution state changes."""
+        self.model_entrypoint.persist_simulation(payload.simulation_id)
+
+    @validate_model_entrypoint
+    def _on_simulation_position_changed(
+        self, payload: SimulationPositionChangedPayload
+    ) -> None:
+        """Refresh persisted metadata when simulation location changes."""
+        self.model_entrypoint.persist_simulation(payload.simulation_id)
+
+    @validate_model_entrypoint
+    def _on_simulation_map_file_changed(
+        self, payload: SimulationMapFileChangedPayload
+    ) -> None:
+        """Refresh persisted metadata when simulation map file changes."""
+        self.model_entrypoint.persist_simulation(payload.simulation_id)
 
     def is_simulation_active(self, id: str) -> bool:
         """Check if the simulation is active."""
@@ -114,9 +162,12 @@ class SimulationSubController(AppSubController):
         )
         try:
             self.model_entrypoint.create_simulation(device_id=device_id)
-        except AttributeError as e:
+        except (
+            AttributeError,
+            ValueError,
+        ) as e:  # AttributeError: Device not found, ValueError: Device not in ADB server paired devices repository
             logger.error(
-                "SimulationSubController: failed to get device",
+                "SimulationSubController: failed to create simulation",
                 error=str(e),
                 device_id=device_id,
             )
@@ -147,21 +198,20 @@ class SimulationSubController(AppSubController):
 
     def _on_simulation_created(self, payload: SimulationCreatedPayload) -> None:
         """Handle the simulation created event."""
-        device = payload.simulation.device
-        if device is None:
+        if not payload.device_id:
             logger.error(
                 "SimulationSubController: simulation created without device",
-                simulation_id=payload.simulation.id,
+                simulation_id=payload.simulation_id,
             )
             return
         logger.success(
             "SimulationSubController: simulation created",
-            simulation_id=payload.simulation.id,
-            device_id=device.id,
-            device_name=device.name,
+            simulation_id=payload.simulation_id,
+            device_id=payload.device_id,
+            device_name=payload.device_name,
         )
         self.view.forward_device_selection_succeeded(
-            payload.simulation.id,
-            device.id,
-            device.name,
+            payload.simulation_id,
+            payload.device_id,
+            payload.device_name,
         )

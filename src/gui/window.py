@@ -1144,6 +1144,14 @@ class MainWindow(QMainWindow):
         )
         signals.DEVICE.DevicesUpdated.emit(devices, rebindings)
 
+    def forward_simulation_deleted(self, simulation_id: str) -> None:
+        """Forward simulation deletion to map and simulation UI consumers."""
+        logger.info(
+            "MainWindow: simulation deleted",
+            simulation_id=simulation_id,
+        )
+        signals.SIMULATION.SimulationDeleted.emit(simulation_id)
+
     def forward_remove_active_device_succeeded(self, device_id: str) -> None:
         """Handle the active device removed."""
         logger.info("MainWindow: active device removed")

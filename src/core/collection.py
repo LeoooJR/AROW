@@ -18,7 +18,7 @@ RepositoryObject = TypeVar("RepositoryObject", bound=Identifiable)
 class Repository(ABC, Generic[RepositoryObject]):
     """Repository for the collection."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._repository: dict[str, RepositoryObject] = dict()
 
     def get(self, id: str) -> RepositoryObject | None:

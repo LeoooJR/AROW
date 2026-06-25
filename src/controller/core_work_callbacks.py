@@ -7,11 +7,12 @@ Keep AsyncRunner callbacks out of the subcontroller so each job is easy to read.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from controller.helper import validate_model_entrypoint
-from controller.runner import JobError
+from controller.runner import JobError, JobHandler
 from core.work.authentificate_device_work import AuthentificateDeviceOutcome
 from core.work.close_work import CloseOutcome
 from core.work.host_install_identity_work import HostInstallIdentityOutcome
@@ -272,6 +273,51 @@ class RenderMapCallback:
         self._subcontroller.model_entrypoint.apply_failure(error)
 
 
+class RenderMapSimulationCallback(RenderMapCallback):
+    """Per-simulation render_map AsyncRunner callbacks."""
+
+    __slots__ = ("_simulation_id", "_job_id")
+
+    def __init__(self, subcontroller: MapSubController, simulation_id: str) -> None:
+        super().__init__(subcontroller)
+        self._simulation_id = simulation_id
+        self._job_id: str | None = None
+
+    def bind_job(self, handle: JobHandler) -> None:
+        """Associate this callback instance with the submitted job handle."""
+        self._job_id = handle.job_id
+
+    def _clear_render_job(self) -> None:
+        """Drop the tracked render job handle when it is still the current one."""
+        self._subcontroller._clear_render_job_if_current(
+            self._simulation_id, self._job_id
+        )
+
+    def on_completed(self, result: object) -> None:
+        if not isinstance(result, RenderMapOutcome):
+            logger.error(
+                "MapSubController: unexpected render_map result type",
+                result_type=type(result).__name__,
+            )
+            return
+        self._clear_render_job()
+        super().on_completed(result)
+
+    def on_failed(self, error: JobError) -> None:
+        self._clear_render_job()
+        super().on_failed(error)
+
+    def on_cancelled(self) -> None:
+        self._clear_render_job()
+
+
+def _render_map_for_simulation(
+    subcontroller: MapSubController, simulation_id: str
+) -> RenderMapSimulationCallback:
+    """Build simulation-scoped render_map callbacks for AsyncRunner wiring."""
+    return RenderMapSimulationCallback(subcontroller, simulation_id)
+
+
 # AdbSubController method (async entry) -> attribute on :class:`AdbAsyncJobCallbacks`.
 ADB_SUBCONTROLLER_METHOD_TO_CALLBACK_ATTR: dict[str, str] = {
     "_startup_core_runtime": "startup",
@@ -312,8 +358,13 @@ class AdbAsyncJobCallbacks:
 class MapAsyncJobCallbacks:
     """AsyncRunner outcome callbacks on :class:`MapSubController`."""
 
-    render_map: RenderMapCallback
+    render_map_for_simulation: Callable[[str], RenderMapSimulationCallback]
 
     @classmethod
     def for_subcontroller(cls, subcontroller: MapSubController) -> MapAsyncJobCallbacks:
-        return cls(render_map=RenderMapCallback(subcontroller))
+        return cls(
+            render_map_for_simulation=lambda simulation_id: _render_map_for_simulation(
+                subcontroller,
+                simulation_id,
+            ),
+        )

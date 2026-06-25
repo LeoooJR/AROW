@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import datetime
 import hashlib
 import platform
 import socket
 from abc import ABC
 from dataclasses import dataclass, field
-from typing import Any, Generic, Optional, TypeVar
+from typing import Any, Generic, Iterable, Optional, TypeVar
 
 from loguru import logger
 
@@ -461,6 +463,78 @@ class Phone(Device[PhoneDescriptor]):
     def hardware_serial(self) -> str:
         return self._descriptor.hardware_serial
 
+    @property
+    def manufacturer(self) -> str:
+        return self._descriptor.manufacturer
+
+    @property
+    def android_api_level(self) -> int | None:
+        return self._descriptor.android_api_level
+
+    @property
+    def shell_device_name(self) -> str:
+        return self._descriptor.shell_device_name
+
+    def to_payload(self, json_compatible: bool = False) -> dict[str, object]:
+        """
+        Convert the phone to a payload.
+        """
+        return {
+            "id": self.id,
+            "name": self.name,
+            "os": self.os,
+            "ip": self.ip,
+            "port": self.port,
+            "state": self.state,
+            "stable_key": self.stable_key,
+            "last_communication": (
+                self.last_communication.isoformat()
+                if json_compatible
+                else self.last_communication
+            ),
+        }
+
+    @staticmethod
+    def from_payload(payload: dict[str, object]) -> Phone:
+        """
+        Create a phone from a persisted payload written by :meth:`to_payload`.
+        """
+        port_raw = payload.get("port")
+        port: int | None = None
+        if isinstance(port_raw, int):
+            port = port_raw
+        elif isinstance(port_raw, str) and port_raw.strip():
+            port = int(port_raw)
+        name_raw = payload.get("name")
+        os_raw = payload.get("os")
+        ip_raw = payload.get("ip")
+        state_raw = payload.get("state")
+        stable_key_raw = payload.get("stable_key")
+        last_communication_raw = payload.get("last_communication")
+        last_communication: datetime.datetime | None = None
+        if isinstance(last_communication_raw, str) and last_communication_raw.strip():
+            last_communication = datetime.datetime.fromisoformat(last_communication_raw)
+        elif isinstance(last_communication_raw, datetime.datetime):
+            last_communication = last_communication_raw
+        phone = Phone(
+            id=str(payload["id"]),
+            name=str(name_raw) if name_raw is not None else None,
+            os=str(os_raw) if os_raw is not None else None,
+            ip=str(ip_raw) if ip_raw is not None else None,
+            port=port,
+            state=str(state_raw) if state_raw is not None else None,
+        )
+        if stable_key_raw is not None:
+            phone.descriptor.stable_key = str(stable_key_raw)
+        if last_communication is not None:
+            phone.descriptor.last_communication = last_communication
+        return phone
+
+
+def serialize_phone_collection(phones: Iterable[Phone]) -> list[dict[str, object]]:
+    """Serialize handsets for lightweight core signal payloads."""
+    return [phone.to_payload(json_compatible=False) for phone in phones]
+
 
 # Descriptor fields refreshed from a newly listed Phone during paired-device reconcile.
 # ``last_communication`` is applied on updates but ignored for no-op detection.
@@ -725,13 +799,6 @@ class Computer(Device[ComputerDescriptor]):
         return "127.0.0.1", False
 
 
-def connect_to_device(ip: str, port: int, association_code: str) -> Phone:
-    """
-    Connect to a device
-    """
-    return Phone(id="", name="", os="", ip=ip, port=port, state="")
-
-
 class PhoneRepository(Repository[Phone]):
     """
     Phone repository. Tracks a working device: the first added phone is selected until cleared.
@@ -740,17 +807,25 @@ class PhoneRepository(Repository[Phone]):
     def __init__(self) -> None:
         super().__init__()
         self._working_device: Phone | None = None
-        # TO DO: add a reference to the simulation repository, so both repositories are synchronized
 
     @property
     def working_device(self) -> Phone | None:
         return self.__dict__.get("_working_device", None)
 
     @working_device.setter
-    def working_device(self, device: Phone) -> None:
-        self._working_device = device
+    def working_device(self, device: Phone | None) -> None:
+        if device is None:
+            self._working_device = None
+            return
+        if device.id in self._repository:  # Ensure the device is in the repository
+            self._working_device = device
+        else:
+            raise ValueError(f"Device with id {device.id} is not in the repository")
 
     def add(self, item: Phone) -> None:
+        """
+        Add a phone to the repository.
+        """
         try:
             super().add(item)
         except ValueError as e:
@@ -763,6 +838,9 @@ class PhoneRepository(Repository[Phone]):
             self._working_device = item
 
     def remove(self, item: Phone) -> None:
+        """
+        Remove a phone from the repository.
+        """
         try:
             super().remove(item)
         except ValueError as e:
@@ -775,6 +853,9 @@ class PhoneRepository(Repository[Phone]):
             self._working_device = None
 
     def clear(self) -> None:
+        """
+        Clear the repository.
+        """
         super().clear()
         self._working_device = None
 
@@ -797,6 +878,9 @@ class ComputerRepository(Repository[Computer]):
         self._working_device = device
 
     def add(self, item: Computer) -> None:
+        """
+        Add a computer to the repository.
+        """
         try:
             super().add(item)
         except ValueError as e:
@@ -809,6 +893,9 @@ class ComputerRepository(Repository[Computer]):
             self._working_device = item
 
     def remove(self, item: Computer) -> None:
+        """
+        Remove a computer from the repository.
+        """
         try:
             super().remove(item)
         except ValueError as e:

@@ -3,17 +3,23 @@
 from __future__ import annotations
 
 import builtins
+import json
 from pathlib import Path
 from typing import cast
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from controller.domains.simulation_sub_controller import SimulationSubController
 from controller.orchestration.app_controller import AppController
 from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
 from core.devices import Phone
 from core.entrypoint import ModelEntrypoint
-from core.signals import CoreSignal, SimulationCreatedPayload
-from core.simulation import Simulation, SimulationRepository
+from core.location import Location
+from core.signals import (
+    CoreSignal,
+    SimulationCreatedPayload,
+    SimulationPositionChangedPayload,
+    SimulationStateChangedPayload,
+)
 
 
 class _AppProbe:
@@ -42,10 +48,13 @@ def _make_model(tmp_path: Path, *, device: Phone | None = None) -> ModelEntrypoi
     state = MockAdbState(seed=404, initial_devices=0)
     server = MockAdbServer(state=state)
     client = MockAdbClient(state=state)
-    model_entrypoint = ModelEntrypoint()
+    with patch(
+        "core.entrypoint.get_or_create_application_dir",
+        return_value=tmp_path,
+    ):
+        model_entrypoint = ModelEntrypoint()
     model_entrypoint._adb_server = server
     model_entrypoint._adb_client = client
-    model_entrypoint._simulations = SimulationRepository(tmp_path / "simulations")
     if device is not None:
         server.paired_devices.add(device)
     return model_entrypoint
@@ -65,7 +74,7 @@ def _create_simulation_id(model_entrypoint: ModelEntrypoint, device_id: str) -> 
     captured: list[str] = []
 
     def capture(payload: SimulationCreatedPayload) -> None:
-        captured.append(payload.simulation.id)
+        captured.append(payload.simulation_id)
 
     model_entrypoint.subscribe(CoreSignal.SIMULATION_CREATED, capture)
     model_entrypoint.create_simulation(device_id)
@@ -73,7 +82,7 @@ def _create_simulation_id(model_entrypoint: ModelEntrypoint, device_id: str) -> 
     return captured[0]
 
 
-def test_connect_model_signals_subscribes_to_simulation_created(tmp_path: Path) -> None:
+def test_connect_model_signals_subscribes_to_simulation_events(tmp_path: Path) -> None:
     model_entrypoint = _make_model(tmp_path)
     subcontroller = _make_subcontroller(model_entrypoint)
     subscribe = MagicMock()
@@ -81,9 +90,18 @@ def test_connect_model_signals_subscribes_to_simulation_created(tmp_path: Path) 
 
     subcontroller.connect_model_signals()
 
-    subscribe.assert_called_once_with(
+    assert subscribe.call_count == 3
+    subscribe.assert_any_call(
         CoreSignal.SIMULATION_CREATED,
         subcontroller._on_simulation_created,
+    )
+    subscribe.assert_any_call(
+        CoreSignal.SIMULATION_STATE_CHANGED,
+        subcontroller._on_simulation_state_changed,
+    )
+    subscribe.assert_any_call(
+        CoreSignal.SIMULATION_POSITION_CHANGED,
+        subcontroller._on_simulation_position_changed,
     )
 
 
@@ -137,28 +155,25 @@ def test_on_simulation_created_forwards_success_with_simulation_id(
     assert simulation.device is not None
 
     subcontroller._on_simulation_created(
-        SimulationCreatedPayload(simulation=simulation)
-    )
-
-    _view_mock(
-        subcontroller
-    ).forward_device_selection_succeeded.assert_called_once_with(
-        simulation_id,
-        "device-1",
-        simulation.device.name,
+        SimulationCreatedPayload(
+            simulation_id=simulation_id,
+            device_id="device-1",
+            device_name=simulation.device.name,
+        )
     )
 
 
 def test_on_simulation_created_ignores_payload_without_device(tmp_path: Path) -> None:
     model_entrypoint = _make_model(tmp_path)
     subcontroller = _make_subcontroller(model_entrypoint)
-    simulation = Simulation(device=None)
 
     subcontroller._on_simulation_created(
-        SimulationCreatedPayload(simulation=simulation)
+        SimulationCreatedPayload(
+            simulation_id="sim-1",
+            device_id="",
+            device_name="",
+        )
     )
-
-    _view_mock(subcontroller).forward_device_selection_succeeded.assert_not_called()
 
 
 def test_remove_device_requested_deletes_simulation_and_forwards_success(
@@ -214,3 +229,92 @@ def test_run_stop_pause_and_resume_update_simulation_active_state(
 
     subcontroller.stop(simulation_id)
     assert model_entrypoint.is_simulation_active(simulation_id) is False
+
+
+def test_run_persists_active_state_to_metadata(tmp_path: Path) -> None:
+    model_entrypoint = _make_model(
+        tmp_path, device=Phone(id="device-1", state="device", model="Pixel")
+    )
+    subcontroller = _make_subcontroller(model_entrypoint)
+    subcontroller.connect_model_signals()
+    simulation_id = _create_simulation_id(model_entrypoint, "device-1")
+
+    subcontroller.run(simulation_id)
+
+    metadata_path = model_entrypoint._simulations.simulation_metadata_file(
+        simulation_id
+    )
+    payload = json.loads(metadata_path.read_text(encoding="utf-8"))
+    assert payload["active"] is True
+
+
+def test_update_simulation_location_persists_metadata(tmp_path: Path) -> None:
+    model_entrypoint = _make_model(
+        tmp_path, device=Phone(id="device-1", state="device", model="Pixel")
+    )
+    subcontroller = _make_subcontroller(model_entrypoint)
+    subcontroller.connect_model_signals()
+    simulation_id = _create_simulation_id(model_entrypoint, "device-1")
+    new_fake_location = Location(lat=48.85, lon=2.35, label="Paris")
+
+    model_entrypoint.update_simulation(
+        simulation_id,
+        fake_location=new_fake_location,
+    )
+
+    metadata_path = model_entrypoint._simulations.simulation_metadata_file(
+        simulation_id
+    )
+    payload = json.loads(metadata_path.read_text(encoding="utf-8"))
+    assert payload["fake_location"] == new_fake_location.to_payload()
+
+
+def test_set_simulation_active_emits_state_changed_with_simulation_id(
+    tmp_path: Path,
+) -> None:
+    model_entrypoint = _make_model(
+        tmp_path, device=Phone(id="device-1", state="device", model="Pixel")
+    )
+    simulation_id = _create_simulation_id(model_entrypoint, "device-1")
+    captured: list[SimulationStateChangedPayload] = []
+
+    def capture_state(payload: SimulationStateChangedPayload) -> None:
+        captured.append(payload)
+
+    model_entrypoint.subscribe(
+        CoreSignal.SIMULATION_STATE_CHANGED,
+        capture_state,
+    )
+
+    model_entrypoint.set_simulation_active(simulation_id, True)
+
+    assert len(captured) == 1
+    assert captured[0].simulation_id == simulation_id
+    assert captured[0].active is True
+
+
+def test_update_simulation_location_emits_position_changed_with_simulation_id(
+    tmp_path: Path,
+) -> None:
+    model_entrypoint = _make_model(
+        tmp_path, device=Phone(id="device-1", state="device", model="Pixel")
+    )
+    simulation_id = _create_simulation_id(model_entrypoint, "device-1")
+    new_location = Location(lat=1.0, lon=2.0, label="updated")
+    captured: list[SimulationPositionChangedPayload] = []
+
+    def capture_position(payload: SimulationPositionChangedPayload) -> None:
+        captured.append(payload)
+
+    model_entrypoint.subscribe(
+        CoreSignal.SIMULATION_POSITION_CHANGED,
+        capture_position,
+    )
+
+    model_entrypoint.update_simulation(simulation_id, real_location=new_location)
+
+    assert len(captured) == 1
+    assert captured[0].simulation_id == simulation_id
+    assert captured[0].lat == new_location.lat
+    assert captured[0].lon == new_location.lon
+    assert captured[0].label == new_location.label

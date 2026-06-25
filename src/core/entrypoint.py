@@ -18,7 +18,9 @@ from core.devices import (
     apply_discovered_phone_state,
     paired_phone_matches_discovery,
     phone_stable_key_is_collision_resistant,
+    serialize_phone_collection,
 )
+from core.location import Location
 from core.signals import (
     ActivityLogFileUpdatedPayload,
     AdbServerStartedPayload,
@@ -36,6 +38,8 @@ from core.signals import (
     MapRenderFailedPayload,
     SignalHandler,
     SimulationCreatedPayload,
+    SimulationDeletedPayload,
+    SimulationMapFileChangedPayload,
     SimulationPositionChangedPayload,
     SimulationStateChangedPayload,
 )
@@ -167,6 +171,13 @@ class Entrypoint(ABC):
     @overload
     def subscribe(
         self,
+        signal: Literal[CoreSignal.SIMULATION_DELETED],
+        handler: SignalHandler[SimulationDeletedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
         signal: Literal[CoreSignal.SIMULATION_STATE_CHANGED],
         handler: SignalHandler[SimulationStateChangedPayload],
     ) -> None: ...
@@ -176,6 +187,13 @@ class Entrypoint(ABC):
         self,
         signal: Literal[CoreSignal.SIMULATION_POSITION_CHANGED],
         handler: SignalHandler[SimulationPositionChangedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_MAP_FILE_CHANGED],
+        handler: SignalHandler[SimulationMapFileChangedPayload],
     ) -> None: ...
 
     @overload
@@ -278,6 +296,13 @@ class Entrypoint(ABC):
     @overload
     def unsubscribe(
         self,
+        signal: Literal[CoreSignal.SIMULATION_DELETED],
+        handler: SignalHandler[SimulationDeletedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
         signal: Literal[CoreSignal.SIMULATION_STATE_CHANGED],
         handler: SignalHandler[SimulationStateChangedPayload],
     ) -> None: ...
@@ -287,6 +312,13 @@ class Entrypoint(ABC):
         self,
         signal: Literal[CoreSignal.SIMULATION_POSITION_CHANGED],
         handler: SignalHandler[SimulationPositionChangedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_MAP_FILE_CHANGED],
+        handler: SignalHandler[SimulationMapFileChangedPayload],
     ) -> None: ...
 
     @overload
@@ -488,7 +520,9 @@ class ModelEntrypoint(Entrypoint):
         if self._adb_server is not None:
             self._signal_bus.emit(
                 CoreSignal.ADB_SERVER_STOPPED,
-                AdbServerStoppedPayload(adb_binary=self._adb_server.binary),
+                AdbServerStoppedPayload(
+                    adb_binary_path=str(self._adb_server.binary.path),
+                ),
             )
             self._adb_server.restart()
             logger.info(
@@ -497,11 +531,15 @@ class ModelEntrypoint(Entrypoint):
             )
             self._signal_bus.emit(
                 CoreSignal.ADB_SERVER_STARTED,
-                AdbServerStartedPayload(adb_binary=self._adb_server.binary),
+                AdbServerStartedPayload(
+                    adb_binary_path=str(self._adb_server.binary.path),
+                ),
             )
             self._signal_bus.emit(
                 CoreSignal.DEVICES_UPDATED,
-                DevicesUpdatedPayload(devices=self.get_known_devices()),
+                DevicesUpdatedPayload(
+                    devices=serialize_phone_collection(self.get_known_devices()),
+                ),
             )
         else:
             logger.warning(
@@ -643,10 +681,16 @@ class ModelEntrypoint(Entrypoint):
 
         Raises:
             AttributeError: If the device is not found.
+            ValueError: If the device is not in the repository.
         """
         device: Phone | None = self.get_device(device_id)
         if device is None:
             raise AttributeError(f"Device with id {device_id} not found")
+        if self._adb_server is None:
+            raise AttributeError(
+                "ADB server must be initialized before creating a simulation"
+            )
+        self._adb_server.set_working_device(device)
         simulation: Simulation | None = self._get_simulation_for_device(device_id)
         if simulation is None:
             simulation = Simulation(device=device)
@@ -659,8 +703,13 @@ class ModelEntrypoint(Entrypoint):
             )
         self._signal_bus.emit(
             CoreSignal.SIMULATION_CREATED,
-            SimulationCreatedPayload(simulation=simulation),
+            SimulationCreatedPayload(
+                simulation_id=simulation.id,
+                device_id=device.id,
+                device_name=device.name,
+            ),
         )
+        self._simulations.last_active_device_id = device_id
 
     def get_simulation(self, id: str) -> Simulation | None:
         """
@@ -684,7 +733,16 @@ class ModelEntrypoint(Entrypoint):
         simulation: Simulation | None = self._simulations.get(id)
         if simulation is None:
             raise ValueError(f"Simulation with id {id} not found")
+        if simulation.active == active:
+            return
         simulation.active = active
+        self._signal_bus.emit(
+            CoreSignal.SIMULATION_STATE_CHANGED,
+            SimulationStateChangedPayload(
+                simulation_id=simulation.id,
+                active=simulation.active,
+            ),
+        )
 
     def update_simulation(self, id: str, **kwargs: Any) -> None:
         """
@@ -694,13 +752,65 @@ class ModelEntrypoint(Entrypoint):
         if simulation is None:
             raise ValueError(f"Simulation with id {id} not found")
         for key, value in kwargs.items():
+            if key not in simulation.__class__.__dataclass_fields__:
+                raise ValueError(f"Unknown simulation field: {key}")
+            current = getattr(simulation, key)
+            if current == value:
+                continue
             setattr(simulation, key, value)
+            if key == "active":
+                self._signal_bus.emit(
+                    CoreSignal.SIMULATION_STATE_CHANGED,
+                    SimulationStateChangedPayload(
+                        simulation_id=simulation.id,
+                        active=simulation.active,
+                    ),
+                )
+            elif key in ("real_location", "fake_location"):
+                if isinstance(value, Location):
+                    self._signal_bus.emit(
+                        CoreSignal.SIMULATION_POSITION_CHANGED,
+                        SimulationPositionChangedPayload(
+                            simulation_id=simulation.id,
+                            lat=value.lat,
+                            lon=value.lon,
+                            label=value.label,
+                        ),
+                    )
+                else:
+                    raise ValueError(f"Invalid location: {value}")
+            elif key == "map_file":
+                if isinstance(value, Path):
+                    self._signal_bus.emit(
+                        CoreSignal.SIMULATION_MAP_FILE_CHANGED,
+                        SimulationMapFileChangedPayload(
+                            simulation_id=simulation.id,
+                            map_file_path=value,
+                        ),
+                    )
+                else:
+                    raise ValueError(f"Invalid map file: {value}")
+
+    def persist_simulation(self, simulation_id: str) -> None:
+        """Write one simulation metadata file to disk."""
+        simulation = self._simulations.get(simulation_id)
+        if simulation is None:
+            logger.warning(
+                "ModelEntrypoint: persist_simulation skipped (simulation not found)",
+                simulation_id=simulation_id,
+            )
+            return
+        self._simulations.write_simulation(simulation)
 
     def delete_simulation(self, simulation: Simulation) -> None:
         """
         Delete a simulation by id.
         """
         return self._simulations.remove(simulation)
+
+    def persist_simulations(self) -> None:
+        """Persist every simulation and the repository index to disk."""
+        self._simulations.write_all()
 
     def _get_simulation_for_device(self, device_id: str) -> Simulation | None:
         """Return the existing simulation for a device when one is already tracked."""
@@ -716,9 +826,22 @@ class ModelEntrypoint(Entrypoint):
         """
         simulation = self._get_simulation_for_device(device_id)
         if simulation is not None:
+            simulation_id = simulation.id
             self.delete_simulation(simulation)
+            self._signal_bus.emit(
+                CoreSignal.SIMULATION_DELETED,
+                SimulationDeletedPayload(simulation_id=simulation_id),
+            )
+            if self._adb_server is not None:
+                working_device = self._adb_server.get_working_device()
+                if working_device is not None and working_device.id == device_id:
+                    self._adb_server.clear_working_device()
+            if self._simulations.last_active_device_id == device_id:
+                self._simulations.last_active_device_id = None
             return
-        raise ValueError(f"Simulation for device with id {device_id} not found")
+        raise ValueError(
+            f"Simulation for device with id {device_id} not found or working device not cleared"
+        )
 
     @staticmethod
     def render_map(simulation_id: str, application_dir: Path) -> RenderMapOutcome:

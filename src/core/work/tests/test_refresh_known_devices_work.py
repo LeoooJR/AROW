@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
-from core.devices import Phone
+from core.devices import Phone, serialize_phone_collection
 from core.entrypoint import ModelEntrypoint
 from core.signals import CoreSignal, DevicesUpdatedPayload
 from core.work.refresh_known_devices_work import (
@@ -109,7 +109,12 @@ def test_refresh_known_devices_apply_replaces_devices_and_emits_update() -> None
     assert server.paired_devices.get("stale-device") is None
     assert server.paired_devices.get("fresh-device") is refreshed_phone
     assert emitted == [
-        (CoreSignal.DEVICES_UPDATED, DevicesUpdatedPayload(devices=[refreshed_phone]))
+        (
+            CoreSignal.DEVICES_UPDATED,
+            DevicesUpdatedPayload(
+                devices=serialize_phone_collection([refreshed_phone]),
+            ),
+        )
     ]
 
 
@@ -148,10 +153,8 @@ def test_refresh_known_devices_apply_emits_safe_device_id_rebindings() -> None:
         (
             CoreSignal.DEVICES_UPDATED,
             DevicesUpdatedPayload(
-                devices=[paired_phone],
-                device_id_rebindings={
-                    "192.168.0.10:5555": "192.168.0.10:37849"
-                },
+                devices=serialize_phone_collection([paired_phone]),
+                device_id_rebindings={"192.168.0.10:5555": "192.168.0.10:37849"},
             ),
         )
     ]

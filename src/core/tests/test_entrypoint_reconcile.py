@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -15,7 +17,6 @@ from core.devices import (
 )
 from core.entrypoint import ModelEntrypoint
 from core.signals import CoreSignal, SimulationCreatedPayload
-from core.simulation import SimulationRepository
 
 pytestmark = [pytest.mark.devices]
 
@@ -25,7 +26,7 @@ def _create_simulation_id(model_entrypoint: ModelEntrypoint, device_id: str) -> 
     captured: list[str] = []
 
     def capture(payload: SimulationCreatedPayload) -> None:
-        captured.append(payload.simulation.id)
+        captured.append(payload.simulation_id)
 
     model_entrypoint.subscribe(CoreSignal.SIMULATION_CREATED, capture)
     model_entrypoint.create_simulation(device_id)
@@ -39,10 +40,13 @@ def _model_with_server(
     state = MockAdbState(seed=303, initial_devices=0)
     server = MockAdbServer(state=state)
     client = MockAdbClient(state=state)
-    model_entrypoint = ModelEntrypoint()
+    with patch(
+        "core.entrypoint.get_or_create_application_dir",
+        return_value=tmp_path,
+    ):
+        model_entrypoint = ModelEntrypoint()
     model_entrypoint._adb_server = server
     model_entrypoint._adb_client = client
-    model_entrypoint._simulations = SimulationRepository(tmp_path / "simulations")
     return model_entrypoint, server
 
 
@@ -69,6 +73,21 @@ def test_create_simulation_reuses_existing_device_simulation(tmp_path: Path) -> 
 
     assert first_simulation_id == second_simulation_id
     assert len(list(model_entrypoint._simulations)) == 1
+
+
+def test_create_simulation_persists_last_active_device_id(tmp_path: Path) -> None:
+    """Selected device id is written to the simulation repository index."""
+    model_entrypoint, server = _model_with_server(tmp_path)
+    phone = Phone(id="device-1", state="device", model="Pixel")
+    server.paired_devices.add(phone)
+
+    _create_simulation_id(model_entrypoint, "device-1")
+
+    index_payload = json.loads(
+        model_entrypoint._simulations.index_file.read_text(encoding="utf-8")
+    )
+    assert index_payload["last_active_device_id"] == "device-1"
+    assert model_entrypoint._simulations.last_active_device_id == "device-1"
 
 
 def test_reconcile_removes_stale_device_and_simulation(tmp_path: Path) -> None:
@@ -122,9 +141,7 @@ def test_reconcile_matches_by_stable_key_when_adb_id_changes(tmp_path: Path) -> 
     result = model_entrypoint.reconcile_paired_devices([discovered])
 
     assert result.changed is True
-    assert result.device_id_rebindings == {
-        "192.168.0.10:5555": "192.168.0.10:37849"
-    }
+    assert result.device_id_rebindings == {"192.168.0.10:5555": "192.168.0.10:37849"}
     assert server.paired_devices.get("192.168.0.10:5555") is None
     assert server.paired_devices.get("192.168.0.10:37849") is paired
     assert paired.descriptor.model == "Updated model"

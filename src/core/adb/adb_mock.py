@@ -29,6 +29,8 @@ from logger import logger
 
 DEFAULT_MOCK_ADB_BINARY_PATH: Final[Path] = Path("/mock/adb")
 
+AROW_MOCK_ADB_SEED_ENV_VAR: Final[str] = "AROW_MOCK_ADB_SEED"
+
 MOCK_ANDROID_DEVICE_MODEL_ELEMENTS: Final[tuple[str, ...]] = (
     "Pixel 7",
     "Pixel 8 Pro",
@@ -201,7 +203,7 @@ class MockAdbState:
 
 def mock_adb_seed_from_env() -> int | None:
     """Parse ``AROW_MOCK_ADB_SEED`` for deterministic mocks; invalid values yield ``None``."""
-    raw = (os.environ.get("AROW_MOCK_ADB_SEED") or "").strip()
+    raw = (os.environ.get(AROW_MOCK_ADB_SEED_ENV_VAR) or "").strip()
     if not raw:
         return None
     try:

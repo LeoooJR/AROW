@@ -24,7 +24,6 @@ from core.devices import (
     apply_phone_ro_serial_enrichment,
     compute_computer_stable_key,
     compute_phone_stable_key,
-    connect_to_device,
     phone_stable_key_is_collision_resistant,
 )
 
@@ -88,14 +87,6 @@ class TestPhone:
         assert phone.descriptor.name == "updated"
         assert phone.descriptor.port == 9999
         assert phone.descriptor.id == "a"
-
-    def test_connect_to_device_returns_phone_with_requested_endpoint(self) -> None:
-        """connect_to_device returns a Phone configured with the requested ip/port."""
-        phone = connect_to_device("192.168.1.20", 5555, "123456")
-        assert phone.descriptor.ip == "192.168.1.20"
-        assert phone.descriptor.port == 5555
-        assert phone.descriptor.state == ""
-        assert phone.stable_key == ""
 
     def test_phone_hardware_serial_derives_stable_key_tier_one(self) -> None:
         """Explicit hardware_serial produces hw:v1: Tier-1 stable_key."""
@@ -193,10 +184,6 @@ class TestPhone:
         apply_phone_device_name_enrichment(phone, "Living Room Phone")
         assert phone.descriptor.name == "Living Room Phone"
         assert phone.descriptor.shell_device_name == "Living Room Phone"
-
-    def test_connect_to_device_default_display(self) -> None:
-        phone = connect_to_device("192.168.1.20", 5555, "123456")
-        assert phone.descriptor.name == DEFAULT_PHONE_DISPLAY_NAME
 
     def test_sync_phone_display_name_long_id_suffix(self) -> None:
         pid = "adb-X9ZZ99000012345678-aBc1dE"
