@@ -54,14 +54,20 @@ class Simulation:
     # When True, ``__setattr__`` logs changes to the public simulation fields.
     _fields_ready: bool = field(init=False, repr=False, compare=False, default=False)
 
-    def to_payload(self, simulation_dir: Path) -> dict[str, object]:
+    def to_payload(
+        self, simulation_dir: Path, json_compatible: bool = False
+    ) -> dict[str, object]:
         """
         Convert the simulation to a payload.
         """
         return {
             "schema_version": SIMULATION_REPOSITORY_SCHEMA_VERSION,
             "id": self.id,
-            "device": self.device.to_payload() if self.device is not None else None,
+            "device": (
+                self.device.to_payload(json_compatible)
+                if self.device is not None
+                else None
+            ),
             "real_location": self.real_location.to_payload(),
             "fake_location": self.fake_location.to_payload(),
             "map_file": _relative_to_simulation_dir(self.map_file, simulation_dir),
@@ -396,7 +402,7 @@ class SimulationDiskStore:
         simulation_dir = self.simulation_dir(simulation.id)
         simulation_dir.mkdir(parents=True, exist_ok=True)
         metadata_path = self.simulation_metadata_file(simulation.id)
-        payload = simulation.to_payload(simulation_dir)
+        payload = simulation.to_payload(simulation_dir, json_compatible=True)
         _write_json_atomic(metadata_path, payload)
         return metadata_path
 

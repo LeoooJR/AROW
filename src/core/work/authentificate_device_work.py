@@ -221,7 +221,7 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
         model_entrypoint._signal_bus.emit(
             CoreSignal.DEVICE_AUTHENTIFICATION_SUCCEEDED,
             DeviceAuthentificationSucceededPayload(
-                device=outcome.success_phone.to_payload(),
+                device=outcome.success_phone.to_payload(json_compatible=False),
             ),
         )
 

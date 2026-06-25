@@ -135,7 +135,7 @@ def test_add_only_survives_reload_without_write_all(tmp_path: Path) -> None:
 
 def test_phone_from_payload_rebuilds_persisted_fields() -> None:
     phone = Phone(id="device-1", name="Pixel", state="device", ip="10.0.0.5", port=5555)
-    payload = phone.to_payload()
+    payload = phone.to_payload(json_compatible=False)
     restored = Phone.from_payload(payload)
 
     assert restored.id == phone.id
@@ -145,6 +145,7 @@ def test_phone_from_payload_rebuilds_persisted_fields() -> None:
     assert restored.port == phone.port
     assert restored.state == phone.state
     assert restored.stable_key == phone.stable_key
+    assert restored.last_communication == phone.last_communication
 
 
 def test_simulation_from_payload_rebuilds_fields(tmp_path: Path) -> None:
@@ -164,7 +165,7 @@ def test_simulation_from_payload_rebuilds_fields(tmp_path: Path) -> None:
         log_file=log_file,
         active=True,
     )
-    payload = simulation.to_payload(simulation_dir)
+    payload = simulation.to_payload(simulation_dir, json_compatible=True)
     restored = Simulation.from_payload(payload, simulation_dir)
 
     assert restored.id == "sim-1"
@@ -175,6 +176,7 @@ def test_simulation_from_payload_rebuilds_fields(tmp_path: Path) -> None:
     assert restored.map_file == map_file
     assert restored.log_file == log_file
     assert restored.active is True
+    assert restored.device.last_communication == device.last_communication
 
 
 def test_disk_store_load_for_devices_binds_paired_phone(tmp_path: Path) -> None:

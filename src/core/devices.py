@@ -475,7 +475,7 @@ class Phone(Device[PhoneDescriptor]):
     def shell_device_name(self) -> str:
         return self._descriptor.shell_device_name
 
-    def to_payload(self) -> dict[str, object]:
+    def to_payload(self, json_compatible: bool = False) -> dict[str, object]:
         """
         Convert the phone to a payload.
         """
@@ -487,7 +487,11 @@ class Phone(Device[PhoneDescriptor]):
             "port": self.port,
             "state": self.state,
             "stable_key": self.stable_key,
-            "last_communication": self.last_communication.isoformat(),
+            "last_communication": (
+                self.last_communication.isoformat()
+                if json_compatible
+                else self.last_communication
+            ),
         }
 
     @staticmethod
@@ -510,6 +514,8 @@ class Phone(Device[PhoneDescriptor]):
         last_communication: datetime.datetime | None = None
         if isinstance(last_communication_raw, str) and last_communication_raw.strip():
             last_communication = datetime.datetime.fromisoformat(last_communication_raw)
+        elif isinstance(last_communication_raw, datetime.datetime):
+            last_communication = last_communication_raw
         phone = Phone(
             id=str(payload["id"]),
             name=str(name_raw) if name_raw is not None else None,
@@ -527,7 +533,7 @@ class Phone(Device[PhoneDescriptor]):
 
 def serialize_phone_collection(phones: Iterable[Phone]) -> list[dict[str, object]]:
     """Serialize handsets for lightweight core signal payloads."""
-    return [phone.to_payload() for phone in phones]
+    return [phone.to_payload(json_compatible=False) for phone in phones]
 
 
 # Descriptor fields refreshed from a newly listed Phone during paired-device reconcile.
