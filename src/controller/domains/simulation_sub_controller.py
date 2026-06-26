@@ -10,10 +10,12 @@ from PySide6.QtCore import Slot
 
 from controller.domains.app_sub_controller import AppSubController
 from controller.helper import validate_model_entrypoint, validate_view
+from core.geo.location import Location
 from core.signals import (
     CoreSignal,
     MapRenderedPayload,
     SimulationCreatedPayload,
+    SimulationLocationValidatedPayload,
     SimulationMapFileChangedPayload,
     SimulationPositionChangedPayload,
     SimulationStateChangedPayload,
@@ -60,6 +62,10 @@ class SimulationSubController(AppSubController):
             CoreSignal.SIMULATION_MAP_FILE_CHANGED,
             self._on_simulation_map_file_changed,
         )
+        self.model_entrypoint.subscribe(
+            CoreSignal.SIMULATION_LOCATION_VALIDATED,
+            self._on_simulation_location_validated,
+        )
 
     @validate_model_entrypoint
     def _on_map_rendered(self, payload: MapRenderedPayload) -> None:
@@ -86,6 +92,21 @@ class SimulationSubController(AppSubController):
     ) -> None:
         """Refresh persisted metadata when simulation map file changes."""
         self.model_entrypoint.persist_simulation(payload.simulation_id)
+
+    @validate_model_entrypoint
+    def _on_simulation_location_validated(
+        self, payload: SimulationLocationValidatedPayload
+    ) -> None:
+        """Apply validated map milestone selection to simulation fake location."""
+        location = Location(
+            lat=payload.lat,
+            lon=payload.lon,
+            label=payload.label,
+        )
+        self.model_entrypoint.update_simulation(
+            payload.simulation_id,
+            fake_location=location,
+        )
 
     def is_simulation_active(self, id: str) -> bool:
         """Check if the simulation is active."""

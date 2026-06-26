@@ -432,3 +432,59 @@ def test_map_block_placeholder_helper_animation_noops_when_canvas_visible(
     qtbot.wait(0)
 
     assert block._placeholder_helper_anim is None
+
+
+def test_location_set_coordinates_preserves_title_labels(qtbot) -> None:
+    block = MapBlock()
+    qtbot.addWidget(block)
+    location = block.ui.coordinates.simulated_location_widget
+    latitude_title = location.ui.latitude_label.text()
+    longitude_title = location.ui.longitude_label.text()
+
+    location.set_coordinates(48.885333, 2.363530)
+    location.clear_coordinates()
+
+    assert location.ui.latitude_label.text() == latitude_title
+    assert location.ui.longitude_label.text() == longitude_title
+    assert location.ui.latitude_value_label.text() == location.texts.empty_value
+    assert location.ui.longitude_value_label.text() == location.texts.empty_value
+
+
+def test_map_block_simulation_location_validated_updates_simulated_row(qtbot) -> None:
+    block = MapBlock()
+    qtbot.addWidget(block)
+    block._active_simulation_id = "sim-1"
+
+    signals.SIMULATION.SimulationLocationValidated.emit(
+        "sim-1",
+        "001+000",
+        48.88533318609319,
+        2.363530409238113,
+        "001+000 / 001000-1",
+    )
+    qtbot.wait(0)
+
+    simulated = block.ui.coordinates.simulated_location_widget
+    assert simulated.ui.latitude_value_label.text() == str(48.88533318609319)
+    assert simulated.ui.longitude_value_label.text() == str(2.363530409238113)
+
+
+def test_map_block_simulation_location_validated_ignores_stale_simulation_id(
+    qtbot,
+) -> None:
+    block = MapBlock()
+    qtbot.addWidget(block)
+    block._active_simulation_id = "sim-1"
+    simulated = block.ui.coordinates.simulated_location_widget
+
+    signals.SIMULATION.SimulationLocationValidated.emit(
+        "sim-2",
+        "001+000",
+        48.88533318609319,
+        2.363530409238113,
+        "001+000 / 001000-1",
+    )
+    qtbot.wait(0)
+
+    assert simulated.ui.latitude_value_label.text() == simulated.texts.empty_value
+    assert simulated.ui.longitude_value_label.text() == simulated.texts.empty_value

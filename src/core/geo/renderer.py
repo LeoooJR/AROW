@@ -9,6 +9,11 @@ from folium.plugins import Fullscreen, MarkerCluster, MousePosition, Search
 from folium.utilities import JsCode
 from loguru import logger
 
+from core.geo.bridge import (
+    WEB_CHANNEL_INIT_JS,
+    WEB_CHANNEL_SCRIPT_SRC,
+    marker_clicked_js_code,
+)
 from core.geo.datasets import DatasetManager
 from core.geo.icons import Icons
 
@@ -241,6 +246,13 @@ class MapRenderer:
             l.bindPopup(html, { maxWidth: 250 });
         }
         """)
+
+        self.map.get_root().header.add_child(
+            WEB_CHANNEL_SCRIPT_SRC, name="web_channel_script"
+        )
+        self.map.get_root().script.add_child(
+            WEB_CHANNEL_INIT_JS, name="web_channel_init"
+        )
 
         stations_cluster = MarkerCluster(name="Train Stations").add_to(self.map)
 
@@ -512,6 +524,13 @@ class MapRenderer:
         ).add_to(self.map)
 
         folium.LayerControl().add_to(self.map)
+
+        self.map.get_root().script.add_child(
+            marker_clicked_js_code(milestones_low_zoom_layer.get_name())
+        )
+        self.map.get_root().script.add_child(
+            marker_clicked_js_code(milestones_medium_zoom_layer.get_name())
+        )
 
     def to_html(self, path: Path, prefix: str = "") -> Path:
         """Write the Folium map to disk and return the HTML file path."""

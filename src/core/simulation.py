@@ -10,7 +10,7 @@ from typing import Final, Iterable
 
 from core.collection import Repository
 from core.devices import Phone, PhoneRepository
-from core.location import Location
+from core.geo.location import Location
 from logger import logger
 
 SIMULATION_REPOSITORY_SCHEMA_VERSION: Final[int] = 1  # JSON file schema version

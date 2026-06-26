@@ -51,6 +51,7 @@ class CoreSignal(StrEnum):
     SIMULATION_DELETED = "simulation.deleted"
     SIMULATION_STATE_CHANGED = "simulation.state.changed"
     SIMULATION_POSITION_CHANGED = "simulation.position.changed"
+    SIMULATION_LOCATION_VALIDATED = "simulation.location.validated"
     SIMULATION_MAP_FILE_CHANGED = "simulation.map.file.changed"
     ERROR_RAISED = "error.raised"
     LOG_MESSAGE = "log.message"
@@ -141,6 +142,19 @@ class SimulationPositionChangedPayload:
 
 
 @dataclass(frozen=True, slots=True)
+class SimulationLocationValidatedPayload:
+    """Payload emitted when a map milestone location passes referentiel validation."""
+
+    simulation_id: str
+    marker_id: str
+    lat: float
+    lon: float
+    label: str | None
+    line: str | None = None
+    type_reper: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class SimulationMapFileChangedPayload:
     """Payload emitted when the simulation map file changes."""
 
@@ -207,6 +221,7 @@ CORE_SIGNAL_PAYLOAD_TYPES: Mapping[CoreSignal, type[object]] = {
     CoreSignal.SIMULATION_DELETED: SimulationDeletedPayload,
     CoreSignal.SIMULATION_STATE_CHANGED: SimulationStateChangedPayload,
     CoreSignal.SIMULATION_POSITION_CHANGED: SimulationPositionChangedPayload,
+    CoreSignal.SIMULATION_LOCATION_VALIDATED: SimulationLocationValidatedPayload,
     CoreSignal.SIMULATION_MAP_FILE_CHANGED: SimulationMapFileChangedPayload,
     CoreSignal.ERROR_RAISED: ErrorRaisedPayload,
     CoreSignal.LOG_MESSAGE: LogMessagePayload,
@@ -313,6 +328,13 @@ class CoreSignalBus(ABC):
         self,
         signal: Literal[CoreSignal.SIMULATION_POSITION_CHANGED],
         handler: SignalHandler[SimulationPositionChangedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_LOCATION_VALIDATED],
+        handler: SignalHandler[SimulationLocationValidatedPayload],
     ) -> None: ...
 
     @overload
@@ -450,6 +472,13 @@ class CoreSignalBus(ABC):
     @overload
     def unsubscribe(
         self,
+        signal: Literal[CoreSignal.SIMULATION_LOCATION_VALIDATED],
+        handler: SignalHandler[SimulationLocationValidatedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
         signal: Literal[CoreSignal.SIMULATION_MAP_FILE_CHANGED],
         handler: SignalHandler[SimulationMapFileChangedPayload],
     ) -> None: ...
@@ -578,6 +607,13 @@ class CoreSignalBus(ABC):
         self,
         signal: Literal[CoreSignal.SIMULATION_POSITION_CHANGED],
         payload: SimulationPositionChangedPayload,
+    ) -> None: ...
+
+    @overload
+    def emit(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_LOCATION_VALIDATED],
+        payload: SimulationLocationValidatedPayload,
     ) -> None: ...
 
     @overload
@@ -732,6 +768,13 @@ class InMemoryCoreSignalBus(CoreSignalBus):
     @overload
     def subscribe(
         self,
+        signal: Literal[CoreSignal.SIMULATION_LOCATION_VALIDATED],
+        handler: SignalHandler[SimulationLocationValidatedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
         signal: Literal[CoreSignal.SIMULATION_MAP_FILE_CHANGED],
         handler: SignalHandler[SimulationMapFileChangedPayload],
     ) -> None: ...
@@ -869,6 +912,13 @@ class InMemoryCoreSignalBus(CoreSignalBus):
         self,
         signal: Literal[CoreSignal.SIMULATION_POSITION_CHANGED],
         handler: SignalHandler[SimulationPositionChangedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_LOCATION_VALIDATED],
+        handler: SignalHandler[SimulationLocationValidatedPayload],
     ) -> None: ...
 
     @overload
@@ -1014,6 +1064,13 @@ class InMemoryCoreSignalBus(CoreSignalBus):
         self,
         signal: Literal[CoreSignal.SIMULATION_POSITION_CHANGED],
         payload: SimulationPositionChangedPayload,
+    ) -> None: ...
+
+    @overload
+    def emit(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_LOCATION_VALIDATED],
+        payload: SimulationLocationValidatedPayload,
     ) -> None: ...
 
     @overload

@@ -20,7 +20,7 @@ from core.devices import (
     phone_stable_key_is_collision_resistant,
     serialize_phone_collection,
 )
-from core.location import Location
+from core.geo.location import Location, validate_marker_location
 from core.signals import (
     ActivityLogFileUpdatedPayload,
     AdbServerStartedPayload,
@@ -39,6 +39,7 @@ from core.signals import (
     SignalHandler,
     SimulationCreatedPayload,
     SimulationDeletedPayload,
+    SimulationLocationValidatedPayload,
     SimulationMapFileChangedPayload,
     SimulationPositionChangedPayload,
     SimulationStateChangedPayload,
@@ -192,6 +193,13 @@ class Entrypoint(ABC):
     @overload
     def subscribe(
         self,
+        signal: Literal[CoreSignal.SIMULATION_LOCATION_VALIDATED],
+        handler: SignalHandler[SimulationLocationValidatedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
         signal: Literal[CoreSignal.SIMULATION_MAP_FILE_CHANGED],
         handler: SignalHandler[SimulationMapFileChangedPayload],
     ) -> None: ...
@@ -312,6 +320,13 @@ class Entrypoint(ABC):
         self,
         signal: Literal[CoreSignal.SIMULATION_POSITION_CHANGED],
         handler: SignalHandler[SimulationPositionChangedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_LOCATION_VALIDATED],
+        handler: SignalHandler[SimulationLocationValidatedPayload],
     ) -> None: ...
 
     @overload
@@ -790,6 +805,33 @@ class ModelEntrypoint(Entrypoint):
                     )
                 else:
                     raise ValueError(f"Invalid map file: {value}")
+
+    def validate_simulation_marker_location(
+        self,
+        simulation_id: str,
+        marker_id: str,
+        line: str,
+        latitude: float,
+        longitude: float,
+    ) -> None:
+        """Validate a map milestone and emit ``SIMULATION_LOCATION_VALIDATED`` on success."""
+        simulation = self.get_simulation(simulation_id)
+        if simulation is None:
+            raise ValueError(f"Simulation with id {simulation_id} not found")
+
+        validated = validate_marker_location(marker_id, line, latitude, longitude)
+        self._signal_bus.emit(
+            CoreSignal.SIMULATION_LOCATION_VALIDATED,
+            SimulationLocationValidatedPayload(
+                simulation_id=simulation_id,
+                marker_id=validated.marker_id,
+                lat=validated.lat,
+                lon=validated.lon,
+                label=validated.label,
+                line=validated.line,
+                type_reper=validated.type_reper,
+            ),
+        )
 
     def persist_simulation(self, simulation_id: str) -> None:
         """Write one simulation metadata file to disk."""

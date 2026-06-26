@@ -23,6 +23,7 @@ from core.signals import (
     MapRenderedPayload,
     MapRenderFailedPayload,
     SimulationDeletedPayload,
+    SimulationLocationValidatedPayload,
 )
 from gui.signals import signals
 from logger import logger
@@ -53,6 +54,9 @@ class MapSubController(AppSubController):
     def connect_view_signals(self) -> None:
         """Connect map-relevant :data:`gui.signals.signals` when map UI is ready."""
         signals.UI.RenderMapRequested.connect(self._on_render_map_requested)
+        signals.SIMULATION.SimulationLocationRequested.connect(
+            self._on_simulation_location_requested
+        )
 
     def persist_simulation_repository(self) -> None:
         """Persist map-aware simulation metadata at shutdown."""
@@ -67,6 +71,10 @@ class MapSubController(AppSubController):
         self.model_entrypoint.subscribe(
             CoreSignal.SIMULATION_DELETED,
             self._on_simulation_deleted,
+        )
+        self.model_entrypoint.subscribe(
+            CoreSignal.SIMULATION_LOCATION_VALIDATED,
+            self._on_simulation_location_validated,
         )
 
     @validate_model_entrypoint
@@ -121,6 +129,59 @@ class MapSubController(AppSubController):
             if handle is not None:
                 render_callbacks.bind_job(handle)
                 self._render_jobs_by_simulation_id[simulation_id] = handle
+
+    @validate_model_entrypoint
+    @Slot(str, str, str, float, float)
+    def _on_simulation_location_requested(
+        self,
+        simulation_id: str,
+        marker_id: str,
+        line: str,
+        latitude: float,
+        longitude: float,
+    ) -> None:
+        """Validate a map milestone selection for the given simulation."""
+        logger.debug(
+            "MapSubController: simulation location requested",
+            simulation_id=simulation_id,
+            marker_id=marker_id,
+            latitude=latitude,
+            longitude=longitude,
+        )
+        try:
+            self.model_entrypoint.validate_simulation_marker_location(
+                simulation_id,
+                marker_id,
+                line,
+                latitude,
+                longitude,
+            )
+        except ValueError as error:
+            logger.warning(
+                "MapSubController: simulation location validation failed",
+                simulation_id=simulation_id,
+                marker_id=marker_id,
+                error=str(error),
+            )
+            self.view.forward_simulation_location_failed(
+                simulation_id,
+                marker_id,
+                str(error),
+            )
+
+    @validate_view
+    def _on_simulation_location_validated(
+        self, payload: SimulationLocationValidatedPayload
+    ) -> None:
+        """Forward validated simulation location to the map view."""
+        logger.debug(
+            "MapSubController: simulation location validated",
+            simulation_id=payload.simulation_id,
+            marker_id=payload.marker_id,
+            lat=payload.lat,
+            lon=payload.lon,
+        )
+        self.view.forward_simulation_location_validated(payload)
 
     def _clear_render_job_if_current(
         self, simulation_id: str, job_id: str | None

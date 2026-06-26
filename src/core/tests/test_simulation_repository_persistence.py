@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from core.devices import Phone, PhoneRepository
-from core.location import Location
+from core.geo.location import Location
 from core.simulation import (
     INDEX_FILENAME,
     SIMULATION_FILENAME,
@@ -262,15 +262,7 @@ def test_write_all_writes_simulation_json_and_index_last(tmp_path: Path) -> None
     assert simulation_payload == {
         "schema_version": SIMULATION_REPOSITORY_SCHEMA_VERSION,
         "id": "sim-1",
-        "device": {
-            "id": "device-1",
-            "name": "Pixel",
-            "os": "",
-            "ip": "",
-            "port": None,
-            "state": "device",
-            "stable_key": device.stable_key,
-        },
+        "device": device.to_payload(json_compatible=True),
         "real_location": {"lat": 1.0, "lon": 2.0, "label": "real"},
         "fake_location": {"lat": 3.0, "lon": 4.0, "label": "fake"},
         "map_file": "map/sim-1.html",

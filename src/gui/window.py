@@ -25,6 +25,7 @@ from shiboken6 import isValid
 
 import gui.faker as ui_faker
 import gui.ressources_rc  # noqa: F401
+from core.signals import SimulationLocationValidatedPayload
 from gui import __application__
 from gui.animation import animate_widget_visibility
 from gui.blocks.top_bar import TopBar
@@ -834,6 +835,9 @@ class MainWindow(QMainWindow):
         map_render_failed_toast: str = (
             "Failed to render map for simulation {simulation_id}: {reason}."
         )
+        simulation_location_failed_toast: str = (
+            "Invalid map location for marker {marker_id}: {reason}."
+        )
 
     @dataclass
     class UI:
@@ -1086,6 +1090,48 @@ class MainWindow(QMainWindow):
             html_path=str(html_path),
         )
         signals.UI.MapRendered.emit(simulation_id, html_path)
+
+    def forward_simulation_location_validated(
+        self, payload: SimulationLocationValidatedPayload
+    ) -> None:
+        """Forward validated simulation location to map consumers."""
+        logger.info(
+            "MainWindow: simulation location validated",
+            simulation_id=payload.simulation_id,
+            marker_id=payload.marker_id,
+            lat=payload.lat,
+            lon=payload.lon,
+        )
+        signals.SIMULATION.SimulationLocationValidated.emit(
+            payload.simulation_id,
+            payload.marker_id,
+            payload.lat,
+            payload.lon,
+            payload.label,
+        )
+
+    def forward_simulation_location_failed(
+        self, simulation_id: str, marker_id: str, reason: str
+    ) -> None:
+        """Notify the user when map milestone validation fails."""
+        logger.warning(
+            "MainWindow: simulation location validation failed",
+            simulation_id=simulation_id,
+            marker_id=marker_id,
+            reason=reason,
+        )
+        signals.SIMULATION.SimulationLocationFailed.emit(
+            simulation_id,
+            marker_id,
+            reason,
+        )
+        self.ui.container.post_toast(
+            self.texts.simulation_location_failed_toast.format(
+                marker_id=marker_id,
+                reason=reason,
+            ),
+            level="error",
+        )
 
     def forward_map_render_failed(self, simulation_id: str, reason: str) -> None:
         """Forward map render failure to the map block and notify the user."""
