@@ -402,4 +402,11 @@ def test_on_simulation_location_validated_forwards_to_view(
 
     map_controller._on_simulation_location_validated(payload)
 
-    app.view.forward_simulation_location_validated.assert_called_once_with(payload)
+    app.view.forward_simulation_location_validated.assert_called_once_with(
+        payload.simulation_id,
+        payload.marker_id,
+        payload.line,
+        payload.lat,
+        payload.lon,
+        payload.label,
+    )

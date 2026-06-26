@@ -469,18 +469,15 @@ class Location(QWidget):
             self.ui.crosshair_button, Qt.AlignmentFlag.AlignCenter
         )
 
-    def set_coordinates(
-        self, latitude: float, longitude: float, label: str | None = None
-    ) -> None:
+    def set_coordinates(self, latitude: float, longitude: float) -> None:
         """Update coordinate value labels while preserving axis title labels."""
         logger.info(
             "Setting coordinates",
             latitude=latitude,
             longitude=longitude,
-            label=label,
         )
-        self.ui.latitude_value_label.setText(str(latitude))
-        self.ui.longitude_value_label.setText(str(longitude))
+        self.set_latitude(latitude)
+        self.set_longitude(longitude)
 
     def set_latitude(self, latitude: float) -> None:
         """Update the latitude value label only."""
@@ -972,6 +969,7 @@ class MapBlock(QWidget):
         self._pending_render_simulation_id = simulation_id
         self.show_map_loading_placeholder()
         self._on_run_helper_animation()
+        self.ui.coordinates.simulated_location_widget.clear_coordinates()
         signals.UI.RenderMapRequested.emit(simulation_id)
 
     def _is_stale_render_update(self, simulation_id: str) -> bool:
@@ -1031,9 +1029,10 @@ class MapBlock(QWidget):
         self,
         simulation_id: str,
         marker_id: str,
+        line: str,
         latitude: float,
         longitude: float,
-        label: object,
+        label: str,
     ) -> None:
         """Update the simulated location row after core validation succeeds."""
         if simulation_id != self._active_simulation_id:
@@ -1044,7 +1043,6 @@ class MapBlock(QWidget):
                 marker_id=marker_id,
             )
             return
-        _ = label
         self.ui.coordinates.simulated_location_widget.set_coordinates(
             latitude,
             longitude,

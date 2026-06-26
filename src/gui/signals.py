@@ -95,8 +95,8 @@ class SimulationSignals(QObject):
     SimulationContextChanged = Signal(str, int)
     SimulationLocationRequested = Signal(
         str, str, str, float, float
-    )  # simulation_id, marker_id, line, latitude, longitude
-    SimulationLocationValidated = Signal(str, str, float, float, object)
+    )  # simulation_id, marker_id, line, latitude, longitude, label
+    SimulationLocationValidated = Signal(str, str, str, float, float, str)
     # simulation_id, marker_id, lat, lon, label (str | None)
     SimulationLocationFailed = Signal(str, str, str)
     # simulation_id, marker_id, reason

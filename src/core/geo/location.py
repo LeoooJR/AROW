@@ -26,6 +26,10 @@ class Location:
         metadata={"description": "The label of the location"}, default=None
     )
 
+    def is_default(self) -> bool:
+        """Return True if the location is the default location."""
+        return self.lat == 0.0 and self.lon == 0.0 and self.label is None
+
     def to_payload(self) -> dict[str, float | str | None]:
         """Convert the location to a payload."""
         return {

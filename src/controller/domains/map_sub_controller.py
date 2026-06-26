@@ -178,10 +178,18 @@ class MapSubController(AppSubController):
             "MapSubController: simulation location validated",
             simulation_id=payload.simulation_id,
             marker_id=payload.marker_id,
+            line=payload.line,
             lat=payload.lat,
             lon=payload.lon,
         )
-        self.view.forward_simulation_location_validated(payload)
+        self.view.forward_simulation_location_validated(
+            simulation_id=payload.simulation_id,
+            marker_id=payload.marker_id,
+            line=payload.line or "",
+            lat=payload.lat,
+            lon=payload.lon,
+            label=payload.label or "",
+        )
 
     def _clear_render_job_if_current(
         self, simulation_id: str, job_id: str | None

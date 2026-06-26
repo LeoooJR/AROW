@@ -186,7 +186,7 @@ class SimulationSubController(AppSubController):
         except (
             AttributeError,
             ValueError,
-        ) as e:  # AttributeError: Device not found, ValueError: Device not in ADB server paired devices repository
+        ) as e:  # AttributeError: Device not found, ValueError: Device not in ADB server paired devices repository or invalid simulation marker location
             logger.error(
                 "SimulationSubController: failed to create simulation",
                 error=str(e),

@@ -725,6 +725,31 @@ class ModelEntrypoint(Entrypoint):
             ),
         )
         self._simulations.last_active_device_id = device_id
+        if not simulation.fake_location.is_default():
+            # Simulation is restored from disk; validate persisted marker metadata.
+            label = simulation.fake_location.label
+            if label is None or not str(label).strip():
+                raise ValueError(
+                    "Invalid simulation marker location: label is required for restored fake_location"
+                )
+            try:
+                pk, line = str(label).split("/", maxsplit=1)
+            except ValueError:
+                raise ValueError(
+                    f"Invalid simulation marker location: {label}, expected format: pk/line"
+                )
+            pk_normalized = str(pk).strip()
+            line_normalized = str(line).strip()
+            latitude = simulation.fake_location.lat
+            longitude = simulation.fake_location.lon
+            # Validate the simulation marker location, simulation metadata can have been modified by the user
+            self.validate_simulation_marker_location(
+                simulation_id=simulation.id,
+                marker_id=pk_normalized,
+                line=line_normalized,
+                latitude=latitude,
+                longitude=longitude,
+            )
 
     def get_simulation(self, id: str) -> Simulation | None:
         """

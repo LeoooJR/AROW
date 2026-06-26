@@ -1092,22 +1092,30 @@ class MainWindow(QMainWindow):
         signals.UI.MapRendered.emit(simulation_id, html_path)
 
     def forward_simulation_location_validated(
-        self, payload: SimulationLocationValidatedPayload
+        self,
+        simulation_id: str,
+        marker_id: str,
+        line: str,
+        lat: float,
+        lon: float,
+        label: str,
     ) -> None:
         """Forward validated simulation location to map consumers."""
         logger.info(
             "MainWindow: simulation location validated",
-            simulation_id=payload.simulation_id,
-            marker_id=payload.marker_id,
-            lat=payload.lat,
-            lon=payload.lon,
+            simulation_id=simulation_id,
+            marker_id=marker_id,
+            line=line,
+            lat=lat,
+            lon=lon,
         )
         signals.SIMULATION.SimulationLocationValidated.emit(
-            payload.simulation_id,
-            payload.marker_id,
-            payload.lat,
-            payload.lon,
-            payload.label,
+            simulation_id,
+            marker_id,
+            line,
+            lat,
+            lon,
+            label,
         )
 
     def forward_simulation_location_failed(
