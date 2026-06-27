@@ -85,3 +85,58 @@ def test_setup_logger_falls_back_when_primary_log_path_is_unwritable(
     assert calls == [primary, expected_fallback]
     assert log_path == expected_fallback
     assert os.environ[AROW_LOG_FILE_ENV] == str(expected_fallback)
+
+
+def test_setup_logger_uses_default_temp_fallback_dir_when_override_is_unset(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    primary = tmp_path / "primary" / "application_20260621_123045.log"
+    temp_root = tmp_path / "tmp-root"
+    calls: list[Path] = []
+
+    def fake_add(sink: str, **_kwargs: object) -> int:
+        path = Path(sink)
+        calls.append(path)
+        if path == primary:
+            raise PermissionError("primary path is not writable")
+        return 1
+
+    monkeypatch.setenv(AROW_LOG_FILE_ENV, str(primary))
+    monkeypatch.delenv("AROW_LOG_FALLBACK_DIR", raising=False)
+    monkeypatch.setattr("logger.tempfile.gettempdir", lambda: str(temp_root))
+    monkeypatch.setattr("logger.logger.remove", lambda: None)
+    monkeypatch.setattr("logger.logger.add", fake_add)
+
+    log_path = setup_logger()
+
+    expected_fallback = temp_root / "arow-logs" / primary.name
+    assert calls == [primary, expected_fallback]
+    assert log_path == expected_fallback
+    assert os.environ[AROW_LOG_FILE_ENV] == str(expected_fallback)
+
+
+def test_setup_logger_raises_last_error_when_primary_and_fallback_both_fail(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    primary = tmp_path / "primary" / "application_20260621_123045.log"
+    fallback_dir = tmp_path / "fallback"
+    calls: list[Path] = []
+
+    def fake_add(sink: str, **_kwargs: object) -> int:
+        path = Path(sink)
+        calls.append(path)
+        if path == primary:
+            raise PermissionError("primary path is not writable")
+        raise PermissionError("fallback path is not writable")
+
+    monkeypatch.setenv(AROW_LOG_FILE_ENV, str(primary))
+    monkeypatch.setenv("AROW_LOG_FALLBACK_DIR", str(fallback_dir))
+    monkeypatch.setattr("logger.logger.remove", lambda: None)
+    monkeypatch.setattr("logger.logger.add", fake_add)
+
+    with pytest.raises(PermissionError, match="fallback path is not writable"):
+        setup_logger()
+
+    assert calls == [primary, fallback_dir / primary.name]
