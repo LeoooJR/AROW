@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Final, Iterable
 
 from core.collection import Repository
-from core.devices import Phone, PhoneRepository
+from core.devices import Phone, PhoneRepository, phone_stable_key_is_collision_resistant
 from core.location import Location
 from logger import logger
 
@@ -323,9 +323,15 @@ class SimulationDiskStore:
         """
         Load persisted simulations from disk and bind each to a paired device instance.
 
-        Simulations whose device id is not in ``devices`` are deleted from disk.
+        Simulations whose device is not in ``devices`` are deleted from disk.
         """
         loaded: list[Simulation] = []
+        paired_by_stable_key = {
+            stable_key: paired
+            for paired in devices
+            for stable_key in [(paired.stable_key or "").strip()]
+            if phone_stable_key_is_collision_resistant(stable_key)
+        }
         for simulation_id in self._index_simulation_ids:
             try:
                 simulation = self._load_simulation_from_disk(simulation_id)
@@ -347,16 +353,23 @@ class SimulationDiskStore:
                 )
                 self._delete_persisted_simulation_dir(simulation_id)
                 continue
-            paired_device = devices.get(simulation.device.id)
+            persisted_device_id = simulation.device.id
+            paired_device = devices.get(persisted_device_id)
+            if paired_device is None:
+                stable_key = (simulation.device.stable_key or "").strip()
+                if phone_stable_key_is_collision_resistant(stable_key):
+                    paired_device = paired_by_stable_key.get(stable_key)
             if paired_device is None:
                 logger.info(
                     "SimulationDiskStore: deleting simulation for unavailable device",
                     simulation_id=simulation_id,
-                    device_id=simulation.device.id,
+                    device_id=persisted_device_id,
                 )
                 self._delete_persisted_simulation_dir(simulation_id)
                 continue
             simulation.device = paired_device
+            if self._last_active_device_id == persisted_device_id: # Simulation is linked to last active device
+                self._last_active_device_id = paired_device.id # Update the last active device id
             loaded.append(simulation)
         if (
             self._last_active_device_id is not None
