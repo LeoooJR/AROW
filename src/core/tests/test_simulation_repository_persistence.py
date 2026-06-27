@@ -218,6 +218,41 @@ def test_load_all_for_devices_binds_existing_phone_instance(tmp_path: Path) -> N
     assert loaded_repository.get("sim-1") is loaded[0]
 
 
+def test_load_all_for_devices_rebinds_simulation_by_stable_key_when_adb_id_changes(
+    tmp_path: Path,
+) -> None:
+    repository = SimulationRepository(tmp_path / "simulations")
+    persisted_phone = Phone(
+        id="device-old",
+        name="Pixel",
+        state="device",
+        hardware_serial="SER-123",
+    )
+    simulation = Simulation(id="sim-1", device=persisted_phone, active=True)
+    repository.add(simulation)
+    repository.last_active_device_id = persisted_phone.id
+    repository.write_all()
+
+    rebound_phone = Phone(
+        id="device-new",
+        name="Pixel",
+        state="device",
+        hardware_serial="SER-123",
+    )
+    paired_devices = PhoneRepository()
+    paired_devices.add(rebound_phone)
+
+    loaded_repository = SimulationRepository(tmp_path / "simulations")
+    loaded = loaded_repository.load_all_for_devices(paired_devices)
+
+    assert len(loaded) == 1
+    assert loaded[0].device is rebound_phone
+    assert loaded_repository.last_active_device_id == "device-new"
+    index_payload = json.loads(loaded_repository.index_file.read_text(encoding="utf-8"))
+    assert index_payload["last_active_device_id"] == "device-new"
+    assert loaded_repository.simulation_dir("sim-1").exists()
+
+
 def test_load_all_for_devices_deletes_stale_simulation(tmp_path: Path) -> None:
     repository = SimulationRepository(tmp_path / "simulations")
     stale_device = Phone(id="missing-device", name="Ghost", state="device")
@@ -270,6 +305,7 @@ def test_write_all_writes_simulation_json_and_index_last(tmp_path: Path) -> None
             "port": None,
             "state": "device",
             "stable_key": device.stable_key,
+            "last_communication": device.last_communication.isoformat(),
         },
         "real_location": {"lat": 1.0, "lon": 2.0, "label": "real"},
         "fake_location": {"lat": 3.0, "lon": 4.0, "label": "fake"},

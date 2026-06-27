@@ -90,10 +90,14 @@ def test_connect_model_signals_subscribes_to_simulation_events(tmp_path: Path) -
 
     subcontroller.connect_model_signals()
 
-    assert subscribe.call_count == 3
+    assert subscribe.call_count == 5
     subscribe.assert_any_call(
         CoreSignal.SIMULATION_CREATED,
         subcontroller._on_simulation_created,
+    )
+    subscribe.assert_any_call(
+        CoreSignal.MAP_RENDERED,
+        subcontroller._on_map_rendered,
     )
     subscribe.assert_any_call(
         CoreSignal.SIMULATION_STATE_CHANGED,
@@ -102,6 +106,10 @@ def test_connect_model_signals_subscribes_to_simulation_events(tmp_path: Path) -
     subscribe.assert_any_call(
         CoreSignal.SIMULATION_POSITION_CHANGED,
         subcontroller._on_simulation_position_changed,
+    )
+    subscribe.assert_any_call(
+        CoreSignal.SIMULATION_MAP_FILE_CHANGED,
+        subcontroller._on_simulation_map_file_changed,
     )
 
 
