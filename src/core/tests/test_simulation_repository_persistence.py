@@ -179,6 +179,31 @@ def test_simulation_from_payload_rebuilds_fields(tmp_path: Path) -> None:
     assert restored.device.last_communication == device.last_communication
 
 
+def test_simulation_payload_round_trips_external_artifact_paths(
+    tmp_path: Path,
+) -> None:
+    simulation_dir = tmp_path / "sim-1"
+    external_dir = tmp_path / "external"
+    external_dir.mkdir(parents=True)
+    map_file = external_dir / "sim-1.html"
+    log_file = external_dir / "sim-1.log"
+    map_file.write_text("<html></html>", encoding="utf-8")
+    log_file.write_text("log", encoding="utf-8")
+    simulation = Simulation(
+        id="sim-1",
+        map_file=map_file,
+        log_file=log_file,
+    )
+
+    payload = simulation.to_payload(simulation_dir, json_compatible=True)
+    restored = Simulation.from_payload(payload, simulation_dir)
+
+    assert payload["map_file"] == str(map_file)
+    assert payload["log_file"] == str(log_file)
+    assert restored.map_file == map_file
+    assert restored.log_file == log_file
+
+
 def test_disk_store_load_for_devices_binds_paired_phone(tmp_path: Path) -> None:
     repository = SimulationRepository(tmp_path / "simulations")
     paired_phone = Phone(id="device-1", name="Pixel", state="device")
@@ -265,6 +290,30 @@ def test_load_all_for_devices_deletes_stale_simulation(tmp_path: Path) -> None:
 
     assert loaded == []
     assert not loaded_repository.simulation_dir("sim-stale").exists()
+    index_payload = json.loads(loaded_repository.index_file.read_text(encoding="utf-8"))
+    assert index_payload["simulations"] == []
+
+
+def test_load_all_for_devices_deletes_invalid_persisted_simulation(tmp_path: Path) -> None:
+    save_dir = tmp_path / "simulations"
+    repository = SimulationRepository(save_dir)
+    paired_phone = Phone(id="device-1", name="Pixel", state="device")
+    simulation = Simulation(id="sim-1", device=paired_phone)
+    repository.add(simulation)
+    repository.write_all()
+    metadata_path = repository.simulation_metadata_file("sim-1")
+    payload = json.loads(metadata_path.read_text(encoding="utf-8"))
+    payload["schema_version"] = 999
+    metadata_path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+
+    loaded_repository = SimulationRepository(save_dir)
+    paired_devices = PhoneRepository()
+    paired_devices.add(paired_phone)
+
+    loaded = loaded_repository.load_all_for_devices(paired_devices)
+
+    assert loaded == []
+    assert not loaded_repository.simulation_dir("sim-1").exists()
     index_payload = json.loads(loaded_repository.index_file.read_text(encoding="utf-8"))
     assert index_payload["simulations"] == []
 
