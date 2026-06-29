@@ -218,6 +218,9 @@ class OperatorReadinessBlock(VerticalLayoutWrapper, Block):
         signals.DEVICE.RemoveActiveDeviceSucceeded.connect(
             self._on_remove_active_device_succeeded
         )
+        signals.SIMULATION.SimulationLocationValidated.connect(
+            self._on_simulation_location_validated
+        )
 
     def apply_theme_icons(self, theme: Theme) -> None:
         pass
@@ -255,9 +258,15 @@ class OperatorReadinessBlock(VerticalLayoutWrapper, Block):
         """Update the readiness row when the device selection succeeds."""
         self.ui.rows[self.ROWS_INDEX_MAPPING["device"]].update(
             label="Device",
-            detail="Device linked",
+            detail=f"Device {device_name} linked",
             status="READY",
             status_kind="ready",
+        )
+        self.ui.rows[self.ROWS_INDEX_MAPPING["location"]].update(
+            *self.texts.default_rows[self.ROWS_INDEX_MAPPING["location"]]
+        )
+        self.ui.rows[self.ROWS_INDEX_MAPPING["simulation"]].update(
+            *self.texts.default_rows[self.ROWS_INDEX_MAPPING["simulation"]]
         )
 
     @Slot(str)
@@ -265,6 +274,27 @@ class OperatorReadinessBlock(VerticalLayoutWrapper, Block):
         """Update the readiness row when the active device is removed."""
         self.ui.rows[self.ROWS_INDEX_MAPPING["device"]].update(
             *self.texts.default_rows[self.ROWS_INDEX_MAPPING["device"]]
+        )
+        self.ui.rows[self.ROWS_INDEX_MAPPING["location"]].update(
+            *self.texts.default_rows[self.ROWS_INDEX_MAPPING["location"]]
+        )
+        self.ui.rows[self.ROWS_INDEX_MAPPING["simulation"]].update(
+            *self.texts.default_rows[self.ROWS_INDEX_MAPPING["simulation"]]
+        )
+
+    @Slot(str, str, str, float, float, str)
+    def _on_simulation_location_validated(
+        self, simulation_id: str, id: str, line: str, lat: float, lon: float, label: str
+    ) -> None:
+        """Update the readiness row when the simulation location is validated."""
+        self.ui.rows[self.ROWS_INDEX_MAPPING["location"]].update(
+            label="Location",
+            detail=f"Set to {id} on {line}",
+            status="READY",
+            status_kind="ready",
+        )
+        self.ui.rows[self.ROWS_INDEX_MAPPING["simulation"]].update(
+            *self.texts.default_rows[self.ROWS_INDEX_MAPPING["simulation"]]
         )
 
 

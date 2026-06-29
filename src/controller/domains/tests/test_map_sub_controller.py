@@ -393,7 +393,7 @@ def test_on_simulation_location_validated_forwards_to_view(
     map_controller = _make_map_sub_controller(app)
     payload = SimulationLocationValidatedPayload(
         simulation_id="sim-1",
-        marker_id="001+000",
+        id="001+000",
         lat=48.88533318609319,
         lon=2.363530409238113,
         label="001+000 / 001000-1",
@@ -403,10 +403,10 @@ def test_on_simulation_location_validated_forwards_to_view(
     map_controller._on_simulation_location_validated(payload)
 
     app.view.forward_simulation_location_validated.assert_called_once_with(
-        payload.simulation_id,
-        payload.marker_id,
-        payload.line,
-        payload.lat,
-        payload.lon,
-        payload.label,
+        simulation_id=payload.simulation_id,
+        marker_id=payload.id,
+        line=payload.line,
+        lat=payload.lat,
+        lon=payload.lon,
+        label=payload.label,
     )

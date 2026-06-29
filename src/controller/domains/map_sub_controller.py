@@ -177,14 +177,14 @@ class MapSubController(AppSubController):
         logger.debug(
             "MapSubController: simulation location validated",
             simulation_id=payload.simulation_id,
-            marker_id=payload.marker_id,
+            id=payload.id,
             line=payload.line,
             lat=payload.lat,
             lon=payload.lon,
         )
         self.view.forward_simulation_location_validated(
             simulation_id=payload.simulation_id,
-            marker_id=payload.marker_id,
+            marker_id=payload.id,
             line=payload.line or "",
             lat=payload.lat,
             lon=payload.lon,

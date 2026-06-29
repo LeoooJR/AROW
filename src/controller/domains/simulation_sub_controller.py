@@ -4,13 +4,12 @@ Simulation state and lifecycle (active device, locations, start/stop/resume/paus
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Tuple
 
 from PySide6.QtCore import Slot
 
 from controller.domains.app_sub_controller import AppSubController
 from controller.helper import validate_model_entrypoint, validate_view
-from core.geo.location import Location
 from core.signals import (
     CoreSignal,
     MapRenderedPayload,
@@ -98,10 +97,10 @@ class SimulationSubController(AppSubController):
         self, payload: SimulationLocationValidatedPayload
     ) -> None:
         """Apply validated map milestone selection to simulation fake location."""
-        location = Location(
-            lat=payload.lat,
-            lon=payload.lon,
-            label=payload.label,
+        location: Tuple[float, float, str] = (
+            payload.lat,
+            payload.lon,
+            payload.label or "",
         )
         self.model_entrypoint.update_simulation(
             payload.simulation_id,

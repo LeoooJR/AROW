@@ -308,6 +308,9 @@ class Body(QWidget):
         )
 
         signals.UI.TargetSelectionRequested.connect(self._on_target_selection_requested)
+        signals.SIMULATION.SimulationLocationValidated.connect(
+            self._on_simulation_location_validated
+        )
 
     def _set_alignment(self) -> None:
         pass
@@ -507,6 +510,13 @@ class Body(QWidget):
         self.ui.progress_bar.setValue(0)
         self.ui.tabs.setCurrentIndex(0)
         # self.ui.tabs.setTabVisible(2, False) # TODO: uncomment this when the device tab is implemented
+
+    @Slot(str, str, str, float, float, str)
+    def _on_simulation_location_validated(
+        self, simulation_id: str, id: str, line: str, lat: float, lon: float, label: str
+    ) -> None:
+        """Handle the simulation location validated."""
+        self.ui.progress_bar.setValue(2)
 
 
 class MainContainer(QWidget):

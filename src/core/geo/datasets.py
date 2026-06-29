@@ -342,8 +342,9 @@ class DatasetRepository:
 
 
 class DatasetManager:
+    """Manager for datasets."""
 
-    REPOSITORY: DatasetRepository = DatasetRepository()
+    REPOSITORY: Final[DatasetRepository] = DatasetRepository()
 
     @classmethod
     def read(

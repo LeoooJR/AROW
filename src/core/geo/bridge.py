@@ -23,7 +23,7 @@ WEB_CHANNEL_INIT_JS = Element("""
 """)
 
 
-def marker_clicked_js_code(js_object_name: str) -> Element:
+def on_marker_clicked_js_code(js_object_name: str) -> Element:
     """Create inline JavaScript that wires milestone layer clicks to Qt bridge."""
     return Element(f"""
 (function() {{

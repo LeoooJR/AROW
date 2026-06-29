@@ -146,12 +146,12 @@ class SimulationLocationValidatedPayload:
     """Payload emitted when a map milestone location passes referentiel validation."""
 
     simulation_id: str
-    marker_id: str
+    id: str
     lat: float
     lon: float
     label: str | None
     line: str | None = None
-    type_reper: str | None = None
+    type: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

@@ -270,7 +270,7 @@ def test_update_simulation_location_persists_metadata(tmp_path: Path) -> None:
     subcontroller = _make_subcontroller(model_entrypoint)
     subcontroller.connect_model_signals()
     simulation_id = _create_simulation_id(model_entrypoint, "device-1")
-    new_fake_location = Location(lat=48.85, lon=2.35, label="Paris")
+    new_fake_location = (48.85, 2.35, "Paris")
 
     model_entrypoint.update_simulation(
         simulation_id,
@@ -281,7 +281,11 @@ def test_update_simulation_location_persists_metadata(tmp_path: Path) -> None:
         simulation_id
     )
     payload = json.loads(metadata_path.read_text(encoding="utf-8"))
-    assert payload["fake_location"] == new_fake_location.to_payload()
+    assert payload["fake_location"] == {
+        "lat": new_fake_location[0],
+        "lon": new_fake_location[1],
+        "label": new_fake_location[2],
+    }
 
 
 def test_set_simulation_active_emits_state_changed_with_simulation_id(
@@ -315,7 +319,7 @@ def test_update_simulation_location_emits_position_changed_with_simulation_id(
         tmp_path, device=Phone(id="device-1", state="device", model="Pixel")
     )
     simulation_id = _create_simulation_id(model_entrypoint, "device-1")
-    new_location = Location(lat=1.0, lon=2.0, label="updated")
+    new_location = (1.0, 2.0, "updated")
     captured: list[SimulationPositionChangedPayload] = []
 
     def capture_position(payload: SimulationPositionChangedPayload) -> None:
@@ -330,9 +334,9 @@ def test_update_simulation_location_emits_position_changed_with_simulation_id(
 
     assert len(captured) == 1
     assert captured[0].simulation_id == simulation_id
-    assert captured[0].lat == new_location.lat
-    assert captured[0].lon == new_location.lon
-    assert captured[0].label == new_location.label
+    assert captured[0].lat == new_location[0]
+    assert captured[0].lon == new_location[1]
+    assert captured[0].label == new_location[2]
 
 
 def test_simulation_location_validated_updates_fake_location_and_persists(
@@ -346,12 +350,12 @@ def test_simulation_location_validated_updates_fake_location_and_persists(
     simulation_id = _create_simulation_id(model_entrypoint, "device-1")
     payload = SimulationLocationValidatedPayload(
         simulation_id=simulation_id,
-        marker_id="001+000",
+        id="001+000",
         lat=48.88533318609319,
         lon=2.363530409238113,
         label="001+000 / 001000-1",
         line="001000-1",
-        type_reper="Kilomètre",
+        type="Kilomètre",
     )
 
     subcontroller._on_simulation_location_validated(payload)

@@ -11,7 +11,8 @@ import pytest
 from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
 from core.devices import Phone
 from core.entrypoint import ModelEntrypoint
-from core.geo.location import clear_referentiel_pk_cache
+from core.geo.element import clear_referentiel_pk_cache
+from core.geo.exceptions import MilestoneValidationError
 from core.signals import CoreSignal, SimulationLocationValidatedPayload
 
 
@@ -60,7 +61,7 @@ def test_validate_simulation_marker_location_emits_validated_payload(
 
     assert len(captured) == 1
     assert captured[0].simulation_id == simulation_id
-    assert captured[0].marker_id == "001+000"
+    assert captured[0].id == "001+000"
     assert captured[0].line == "001000-1"
     assert captured[0].lat == pytest.approx(48.88533318609319)
     assert captured[0].lon == pytest.approx(2.363530409238113)
@@ -107,7 +108,7 @@ def test_validate_simulation_marker_location_invalid_marker_raises_without_emit(
         capture,
     )
 
-    with pytest.raises(ValueError, match="Unknown milestone marker id"):
+    with pytest.raises(MilestoneValidationError, match="Unknown milestone id"):
         model_entrypoint.validate_simulation_marker_location(
             simulation_id,
             "999+999",

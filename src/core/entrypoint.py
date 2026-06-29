@@ -2,7 +2,7 @@ from abc import ABC
 from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
-from typing import Any, Callable, Literal, Mapping, overload
+from typing import Any, Callable, Literal, Mapping, Tuple, overload
 
 from core.adb.client import AdbClient
 from core.adb.server import AdbServer
@@ -20,7 +20,8 @@ from core.devices import (
     phone_stable_key_is_collision_resistant,
     serialize_phone_collection,
 )
-from core.geo.location import Location, validate_marker_location
+from core.geo.element import Milestone
+from core.geo.location import Location
 from core.signals import (
     ActivityLogFileUpdatedPayload,
     AdbServerStartedPayload,
@@ -795,9 +796,17 @@ class ModelEntrypoint(Entrypoint):
             if key not in simulation.__class__.__dataclass_fields__:
                 raise ValueError(f"Unknown simulation field: {key}")
             current = getattr(simulation, key)
+            # Handle location tuple, controller does not know about custom Location class
+            if key in ("real_location", "fake_location"):
+                if isinstance(value, tuple) and len(value) == 3:
+                    lat, lon, label = value
+                    value = Location(lat=lat, lon=lon, label=label)
+                else:
+                    raise ValueError(f"Invalid location tuple: {value}")
             if current == value:
                 continue
             setattr(simulation, key, value)
+            # Emit the signal for the changed field
             if key == "active":
                 self._signal_bus.emit(
                     CoreSignal.SIMULATION_STATE_CHANGED,
@@ -807,18 +816,15 @@ class ModelEntrypoint(Entrypoint):
                     ),
                 )
             elif key in ("real_location", "fake_location"):
-                if isinstance(value, Location):
-                    self._signal_bus.emit(
-                        CoreSignal.SIMULATION_POSITION_CHANGED,
-                        SimulationPositionChangedPayload(
-                            simulation_id=simulation.id,
-                            lat=value.lat,
-                            lon=value.lon,
-                            label=value.label,
-                        ),
-                    )
-                else:
-                    raise ValueError(f"Invalid location: {value}")
+                self._signal_bus.emit(
+                    CoreSignal.SIMULATION_POSITION_CHANGED,
+                    SimulationPositionChangedPayload(
+                        simulation_id=simulation.id,
+                        lat=value.lat,
+                        lon=value.lon,
+                        label=value.label,
+                    ),
+                )
             elif key == "map_file":
                 if isinstance(value, Path):
                     self._signal_bus.emit(
@@ -844,17 +850,19 @@ class ModelEntrypoint(Entrypoint):
         if simulation is None:
             raise ValueError(f"Simulation with id {simulation_id} not found")
 
-        validated = validate_marker_location(marker_id, line, latitude, longitude)
+        validated = Milestone.validate(
+            marker_id, line, Location(lat=latitude, lon=longitude)
+        )
         self._signal_bus.emit(
             CoreSignal.SIMULATION_LOCATION_VALIDATED,
             SimulationLocationValidatedPayload(
                 simulation_id=simulation_id,
-                marker_id=validated.marker_id,
-                lat=validated.lat,
-                lon=validated.lon,
+                id=validated.id,
+                lat=validated.location.lat,
+                lon=validated.location.lon,
                 label=validated.label,
                 line=validated.line,
-                type_reper=validated.type_reper,
+                type=validated.type,
             ),
         )
 

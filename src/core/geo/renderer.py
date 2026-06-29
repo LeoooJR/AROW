@@ -12,7 +12,7 @@ from loguru import logger
 from core.geo.bridge import (
     WEB_CHANNEL_INIT_JS,
     WEB_CHANNEL_SCRIPT_SRC,
-    marker_clicked_js_code,
+    on_marker_clicked_js_code,
 )
 from core.geo.datasets import DatasetManager
 from core.geo.icons import Icons
@@ -526,10 +526,10 @@ class MapRenderer:
         folium.LayerControl().add_to(self.map)
 
         self.map.get_root().script.add_child(
-            marker_clicked_js_code(milestones_low_zoom_layer.get_name())
+            on_marker_clicked_js_code(milestones_low_zoom_layer.get_name())
         )
         self.map.get_root().script.add_child(
-            marker_clicked_js_code(milestones_medium_zoom_layer.get_name())
+            on_marker_clicked_js_code(milestones_medium_zoom_layer.get_name())
         )
 
     def to_html(self, path: Path, prefix: str = "") -> Path:
