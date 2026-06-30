@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from core.devices import Phone, PhoneRepository
+from core.devices import compute_phone_stable_key
 from core.location import Location
 from core.simulation import (
     INDEX_FILENAME,
@@ -276,6 +277,53 @@ def test_load_all_for_devices_rebinds_simulation_by_stable_key_when_adb_id_chang
     index_payload = json.loads(loaded_repository.index_file.read_text(encoding="utf-8"))
     assert index_payload["last_active_device_id"] == "device-new"
     assert loaded_repository.simulation_dir("sim-1").exists()
+
+
+def test_load_all_for_devices_does_not_rebind_by_collision_prone_stable_key(
+    tmp_path: Path,
+) -> None:
+    repository = SimulationRepository(tmp_path / "simulations")
+    persisted_phone = Phone(
+        id="device-old",
+        name="Pixel",
+        state="device",
+        product="pixel",
+        model="Pixel 8",
+        manufacturer="Google",
+    )
+    persisted_phone.descriptor.stable_key = compute_phone_stable_key(
+        hardware_serial=None,
+        product=persisted_phone.product,
+        model=persisted_phone.model,
+        manufacturer=persisted_phone.manufacturer,
+        fingerprint_when_no_serial=True,
+    )
+    simulation = Simulation(id="sim-1", device=persisted_phone, active=True)
+    repository.add(simulation)
+    repository.last_active_device_id = persisted_phone.id
+    repository.write_all()
+
+    rebound_phone = Phone(
+        id="device-new",
+        name="Pixel",
+        state="device",
+        product="pixel",
+        model="Pixel 8",
+        manufacturer="Google",
+    )
+    rebound_phone.descriptor.stable_key = persisted_phone.stable_key
+    paired_devices = PhoneRepository()
+    paired_devices.add(rebound_phone)
+
+    loaded_repository = SimulationRepository(tmp_path / "simulations")
+    loaded = loaded_repository.load_all_for_devices(paired_devices)
+
+    assert loaded == []
+    assert loaded_repository.last_active_device_id is None
+    assert not loaded_repository.simulation_dir("sim-1").exists()
+    index_payload = json.loads(loaded_repository.index_file.read_text(encoding="utf-8"))
+    assert index_payload["simulations"] == []
+    assert index_payload["last_active_device_id"] is None
 
 
 def test_load_all_for_devices_deletes_stale_simulation(tmp_path: Path) -> None:
