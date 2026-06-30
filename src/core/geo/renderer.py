@@ -77,7 +77,7 @@ class MapRenderer:
         # Drop columns that are not needed for the map
         self.railways_geodataset: geopandas.GeoDataFrame = railways_geodataset.drop(
             columns=[
-                "idgaia",
+                "idgaia",  # TODO: This column is not needed for the map, but is of high value, may be used in the future.
                 "x_d_l93",
                 "y_d_l93",
                 "x_f_l93",

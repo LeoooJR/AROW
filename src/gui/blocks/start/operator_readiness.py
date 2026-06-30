@@ -284,12 +284,18 @@ class OperatorReadinessBlock(VerticalLayoutWrapper, Block):
 
     @Slot(str, str, str, float, float, str)
     def _on_simulation_location_validated(
-        self, simulation_id: str, id: str, line: str, lat: float, lon: float, label: str
+        self,
+        simulation_id: str,
+        id: str,
+        code_line: str,
+        lat: float,
+        lon: float,
+        label: str,
     ) -> None:
         """Update the readiness row when the simulation location is validated."""
         self.ui.rows[self.ROWS_INDEX_MAPPING["location"]].update(
             label="Location",
-            detail=f"Set to {id} on {line}",
+            detail=f"Set to {id} on {code_line}",
             status="READY",
             status_kind="ready",
         )

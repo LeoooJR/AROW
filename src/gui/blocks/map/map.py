@@ -71,13 +71,15 @@ class Bridge(QObject):
     Bridge between JavaScript and Python.
     """
 
-    markerClicked = Signal(str, str, float, float)
+    markerClicked = Signal(
+        str, str, float, float
+    )  # marker_id, code_line, latitude, longitude
 
     @Slot(str, str, float, float)  # Take arguments from JavaScript
     def onMarkerClicked(
-        self, marker_id: str, line: str, latitude: float, longitude: float
+        self, marker_id: str, code_line: str, latitude: float, longitude: float
     ) -> None:
-        self.markerClicked.emit(marker_id, line, latitude, longitude)
+        self.markerClicked.emit(marker_id, code_line, latitude, longitude)
 
 
 class Canvas(QWebEngineView):
@@ -1012,14 +1014,14 @@ class MapBlock(QWidget):
 
     @Slot(str, str, float, float)
     def _on_map_marker_clicked(
-        self, marker_id: str, line: str, latitude: float, longitude: float
+        self, marker_id: str, code_line: str, latitude: float, longitude: float
     ) -> None:
         """Handle marker click event."""
         if self._active_simulation_id is not None:
             signals.SIMULATION.SimulationLocationRequested.emit(
                 self._active_simulation_id,
                 marker_id,
-                line,
+                code_line,
                 latitude,
                 longitude,
             )
@@ -1029,7 +1031,7 @@ class MapBlock(QWidget):
         self,
         simulation_id: str,
         marker_id: str,
-        line: str,
+        code_line: str,
         latitude: float,
         longitude: float,
         label: str,

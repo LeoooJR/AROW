@@ -23,6 +23,7 @@ from core.signals import (
     MapRenderedPayload,
     MapRenderFailedPayload,
     SimulationDeletedPayload,
+    SimulationLocationRejectedPayload,
     SimulationLocationValidatedPayload,
 )
 from core.simulation import Simulation
@@ -342,7 +343,7 @@ def test_on_simulation_location_requested_validates_via_model_entrypoint(
     map_controller._on_simulation_location_requested(
         "sim-1",
         "001+000",
-        "001000-1",
+        "001000",
         48.88533318609319,
         2.363530409238113,
     )
@@ -350,37 +351,37 @@ def test_on_simulation_location_requested_validates_via_model_entrypoint(
     validate.assert_called_once_with(
         "sim-1",
         "001+000",
-        "001000-1",
+        "001000",
         48.88533318609319,
         2.363530409238113,
     )
 
 
-def test_on_simulation_location_requested_validation_failure_forwards_to_view(
+def test_on_simulation_location_rejected_forwards_to_view(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     app = _AppStub(tmp_path)
     _patch_controller_type_checks(monkeypatch, app)
     map_controller = _make_map_sub_controller(app)
-
-    def _raise(*_args: object, **_kwargs: object) -> None:
-        raise ValueError("invalid marker")
-
-    app.model_entrypoint.validate_simulation_marker_location = _raise  # type: ignore[method-assign]
-
-    map_controller._on_simulation_location_requested(
-        "sim-1",
-        "001+000",
-        "001000-1",
-        0.0,
-        0.0,
+    payload = SimulationLocationRejectedPayload(
+        simulation_id="sim-1",
+        id="001+000",
+        code_line="001000",
+        lat=0.0,
+        lon=0.0,
+        reason="invalid marker",
     )
 
-    app.view.forward_simulation_location_failed.assert_called_once_with(
-        "sim-1",
-        "001+000",
-        "invalid marker",
+    map_controller._on_simulation_location_rejected(payload)
+
+    app.view.forward_simulation_location_rejected.assert_called_once_with(
+        simulation_id=payload.simulation_id,
+        marker_id=payload.id,
+        code_line=payload.code_line,
+        lat=payload.lat,
+        lon=payload.lon,
+        reason=payload.reason,
     )
 
 
@@ -397,7 +398,7 @@ def test_on_simulation_location_validated_forwards_to_view(
         lat=48.88533318609319,
         lon=2.363530409238113,
         label="001+000 / 001000-1",
-        line="001000-1",
+        code_line="001000",
     )
 
     map_controller._on_simulation_location_validated(payload)
@@ -405,7 +406,7 @@ def test_on_simulation_location_validated_forwards_to_view(
     app.view.forward_simulation_location_validated.assert_called_once_with(
         simulation_id=payload.simulation_id,
         marker_id=payload.id,
-        line=payload.line,
+        code_line=payload.code_line,
         lat=payload.lat,
         lon=payload.lon,
         label=payload.label,

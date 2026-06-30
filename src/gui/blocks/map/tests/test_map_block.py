@@ -458,7 +458,7 @@ def test_map_block_simulation_location_validated_updates_simulated_row(qtbot) ->
     signals.SIMULATION.SimulationLocationValidated.emit(
         "sim-1",
         "001+000",
-        "001000-1",
+        "001000",
         48.88533318609319,
         2.363530409238113,
         "001+000 / 001000-1",
@@ -481,7 +481,7 @@ def test_map_block_simulation_location_validated_ignores_stale_simulation_id(
     signals.SIMULATION.SimulationLocationValidated.emit(
         "sim-2",
         "001+000",
-        "001000-1",
+        "001000",
         48.88533318609319,
         2.363530409238113,
         "001+000 / 001000-1",

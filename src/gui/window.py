@@ -513,7 +513,13 @@ class Body(QWidget):
 
     @Slot(str, str, str, float, float, str)
     def _on_simulation_location_validated(
-        self, simulation_id: str, id: str, line: str, lat: float, lon: float, label: str
+        self,
+        simulation_id: str,
+        id: str,
+        code_line: str,
+        lat: float,
+        lon: float,
+        label: str,
     ) -> None:
         """Handle the simulation location validated."""
         self.ui.progress_bar.setValue(2)
@@ -845,7 +851,7 @@ class MainWindow(QMainWindow):
         map_render_failed_toast: str = (
             "Failed to render map for simulation {simulation_id}: {reason}."
         )
-        simulation_location_failed_toast: str = (
+        simulation_location_rejected_toast: str = (
             "Invalid map location for marker {marker_id}: {reason}."
         )
 
@@ -1105,7 +1111,7 @@ class MainWindow(QMainWindow):
         self,
         simulation_id: str,
         marker_id: str,
-        line: str,
+        code_line: str,
         lat: float,
         lon: float,
         label: str,
@@ -1115,36 +1121,48 @@ class MainWindow(QMainWindow):
             "MainWindow: simulation location validated",
             simulation_id=simulation_id,
             marker_id=marker_id,
-            line=line,
+            code_line=code_line,
             lat=lat,
             lon=lon,
         )
         signals.SIMULATION.SimulationLocationValidated.emit(
             simulation_id,
             marker_id,
-            line,
+            code_line,
             lat,
             lon,
             label,
         )
 
-    def forward_simulation_location_failed(
-        self, simulation_id: str, marker_id: str, reason: str
+    def forward_simulation_location_rejected(
+        self,
+        simulation_id: str,
+        marker_id: str,
+        code_line: str,
+        lat: float,
+        lon: float,
+        reason: str,
     ) -> None:
         """Notify the user when map milestone validation fails."""
         logger.warning(
-            "MainWindow: simulation location validation failed",
+            "MainWindow: simulation location rejected",
             simulation_id=simulation_id,
             marker_id=marker_id,
+            code_line=code_line,
+            lat=lat,
+            lon=lon,
             reason=reason,
         )
-        signals.SIMULATION.SimulationLocationFailed.emit(
+        signals.SIMULATION.SimulationLocationRejected.emit(
             simulation_id,
             marker_id,
+            code_line,
+            lat,
+            lon,
             reason,
         )
         self.ui.container.post_toast(
-            self.texts.simulation_location_failed_toast.format(
+            self.texts.simulation_location_rejected_toast.format(
                 marker_id=marker_id,
                 reason=reason,
             ),

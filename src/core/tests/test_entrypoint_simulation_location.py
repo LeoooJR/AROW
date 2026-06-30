@@ -12,8 +12,11 @@ from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
 from core.devices import Phone
 from core.entrypoint import ModelEntrypoint
 from core.geo.element import clear_referentiel_pk_cache
-from core.geo.exceptions import MilestoneValidationError
-from core.signals import CoreSignal, SimulationLocationValidatedPayload
+from core.signals import (
+    CoreSignal,
+    SimulationLocationRejectedPayload,
+    SimulationLocationValidatedPayload,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -54,7 +57,7 @@ def test_validate_simulation_marker_location_emits_validated_payload(
     model_entrypoint.validate_simulation_marker_location(
         simulation_id,
         "001+000",
-        "001000-1",
+        "001000",
         48.88533318609319,
         2.363530409238113,
     )
@@ -62,7 +65,7 @@ def test_validate_simulation_marker_location_emits_validated_payload(
     assert len(captured) == 1
     assert captured[0].simulation_id == simulation_id
     assert captured[0].id == "001+000"
-    assert captured[0].line == "001000-1"
+    assert captured[0].code_line == "001000"
     assert captured[0].lat == pytest.approx(48.88533318609319)
     assert captured[0].lon == pytest.approx(2.363530409238113)
 
@@ -85,7 +88,7 @@ def test_validate_simulation_marker_location_missing_simulation_raises(
         model_entrypoint.validate_simulation_marker_location(
             "missing",
             "001+000",
-            "001000-1",
+            "001000",
             48.88533318609319,
             2.363530409238113,
         )
@@ -93,28 +96,40 @@ def test_validate_simulation_marker_location_missing_simulation_raises(
     assert captured == []
 
 
-def test_validate_simulation_marker_location_invalid_marker_raises_without_emit(
+def test_validate_simulation_marker_location_invalid_marker_emits_rejected_payload(
     tmp_path: Path,
 ) -> None:
     model_entrypoint = _make_model(tmp_path)
     simulation_id = next(iter(model_entrypoint._simulations)).id
-    captured: list[SimulationLocationValidatedPayload] = []
+    validated: list[SimulationLocationValidatedPayload] = []
+    rejected: list[SimulationLocationRejectedPayload] = []
 
-    def capture(payload: SimulationLocationValidatedPayload) -> None:
-        captured.append(payload)
+    def capture_validated(payload: SimulationLocationValidatedPayload) -> None:
+        validated.append(payload)
+
+    def capture_rejected(payload: SimulationLocationRejectedPayload) -> None:
+        rejected.append(payload)
 
     model_entrypoint.subscribe(
         CoreSignal.SIMULATION_LOCATION_VALIDATED,
-        capture,
+        capture_validated,
+    )
+    model_entrypoint.subscribe(
+        CoreSignal.SIMULATION_LOCATION_REJECTED,
+        capture_rejected,
     )
 
-    with pytest.raises(MilestoneValidationError, match="Unknown milestone id"):
-        model_entrypoint.validate_simulation_marker_location(
-            simulation_id,
-            "999+999",
-            "001000-1",
-            0.0,
-            0.0,
-        )
+    model_entrypoint.validate_simulation_marker_location(
+        simulation_id,
+        "999+999",
+        "001000",
+        0.0,
+        0.0,
+    )
 
-    assert captured == []
+    assert validated == []
+    assert len(rejected) == 1
+    assert rejected[0].simulation_id == simulation_id
+    assert rejected[0].id == "999+999"
+    assert rejected[0].code_line == "001000"
+    assert "Unknown milestone id" in rejected[0].reason

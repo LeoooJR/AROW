@@ -314,6 +314,9 @@ class MilestoneTargetBlock(VerticalLayoutWrapper, Block):
         signals.DEVICE.DeviceSelectionSucceeded.connect(
             self._on_device_selection_succeeded
         )
+        signals.DEVICE.RemoveActiveDeviceSucceeded.connect(
+            self._on_remove_active_device_succeeded
+        )
         signals.SIMULATION.SimulationLocationValidated.connect(
             self._on_simulation_location_validated
         )
@@ -324,7 +327,7 @@ class MilestoneTargetBlock(VerticalLayoutWrapper, Block):
     def set_target_values(
         self,
         *,
-        line: object | None = None,
+        code_line: object | None = None,
         km: object | None = None,
         longitude: object | None = None,
         latitude: object | None = None,
@@ -335,7 +338,7 @@ class MilestoneTargetBlock(VerticalLayoutWrapper, Block):
     ) -> None:
         """Update displayed milestone values and optional status badge."""
         updates: tuple[tuple[object | None, MilestoneMetadataItem], ...] = (
-            (line, self.ui.line_item),
+            (code_line, self.ui.line_item),
             (km, self.ui.km_item),
             (_coordinate_display_value(longitude), self.ui.longitude_item),
             (_coordinate_display_value(latitude), self.ui.latitude_item),
@@ -354,7 +357,7 @@ class MilestoneTargetBlock(VerticalLayoutWrapper, Block):
     def clear_target_values(self) -> None:
         """Clear the target values."""
         self.set_target_values(
-            line=None,
+            code_line=None,
             km=None,
             longitude=None,
             latitude=None,
@@ -376,7 +379,7 @@ class MilestoneTargetBlock(VerticalLayoutWrapper, Block):
         self,
         simulation_id: str,
         marker_id: str,
-        line: str,
+        code_line: str,
         latitude: float,
         longitude: float,
         label: str,
@@ -384,7 +387,7 @@ class MilestoneTargetBlock(VerticalLayoutWrapper, Block):
         """Update the milestone target block when a simulation location is validated."""
         _ = simulation_id
         self.set_target_values(
-            line=line,
+            code_line=code_line,
             km=marker_id,
             latitude=latitude,
             longitude=longitude,
@@ -401,10 +404,15 @@ class MilestoneTargetBlock(VerticalLayoutWrapper, Block):
         """Update the milestone target block when a device selection succeeds."""
         self.clear_target_values()
 
+    @Slot(str)
+    def _on_remove_active_device_succeeded(self, device_id: str) -> None:
+        """Update the milestone target block when the active device is removed."""
+        self.clear_target_values()
+
     def set_placeholder_values(self) -> None:
         """Populate the block with generated placeholder milestone values."""
         self.set_target_values(
-            line=self.texts.placeholder_line,
+            code_line=self.texts.placeholder_line,
             km=self.texts.placeholder_km,
             longitude=self.texts.placeholder_longitude,
             latitude=self.texts.placeholder_latitude,

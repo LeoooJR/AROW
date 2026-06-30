@@ -21,6 +21,7 @@ from core.devices import (
     serialize_phone_collection,
 )
 from core.geo.element import Milestone
+from core.geo.exceptions import MilestoneValidationError
 from core.geo.location import Location
 from core.signals import (
     ActivityLogFileUpdatedPayload,
@@ -40,6 +41,7 @@ from core.signals import (
     SignalHandler,
     SimulationCreatedPayload,
     SimulationDeletedPayload,
+    SimulationLocationRejectedPayload,
     SimulationLocationValidatedPayload,
     SimulationMapFileChangedPayload,
     SimulationPositionChangedPayload,
@@ -201,6 +203,13 @@ class Entrypoint(ABC):
     @overload
     def subscribe(
         self,
+        signal: Literal[CoreSignal.SIMULATION_LOCATION_REJECTED],
+        handler: SignalHandler[SimulationLocationRejectedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
         signal: Literal[CoreSignal.SIMULATION_MAP_FILE_CHANGED],
         handler: SignalHandler[SimulationMapFileChangedPayload],
     ) -> None: ...
@@ -328,6 +337,13 @@ class Entrypoint(ABC):
         self,
         signal: Literal[CoreSignal.SIMULATION_LOCATION_VALIDATED],
         handler: SignalHandler[SimulationLocationValidatedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_LOCATION_REJECTED],
+        handler: SignalHandler[SimulationLocationRejectedPayload],
     ) -> None: ...
 
     @overload
@@ -731,23 +747,23 @@ class ModelEntrypoint(Entrypoint):
             label = simulation.fake_location.label
             if label is None or not str(label).strip():
                 raise ValueError(
-                    "Invalid simulation marker location: label is required for restored fake_location"
+                    "Invalid simulation marker location: label is required for restored fake_location (pk/code_line)"
                 )
             try:
-                pk, line = str(label).split("/", maxsplit=1)
+                pk, code_line = str(label).split("/", maxsplit=1)
             except ValueError:
                 raise ValueError(
-                    f"Invalid simulation marker location: {label}, expected format: pk/line"
+                    f"Invalid simulation marker location: {label}, expected format: pk/code_line"
                 )
             pk_normalized = str(pk).strip()
-            line_normalized = str(line).strip()
+            code_line_normalized = str(code_line).strip()
             latitude = simulation.fake_location.lat
             longitude = simulation.fake_location.lon
             # Validate the simulation marker location, simulation metadata can have been modified by the user
             self.validate_simulation_marker_location(
                 simulation_id=simulation.id,
                 marker_id=pk_normalized,
-                line=line_normalized,
+                code_line=code_line_normalized,
                 latitude=latitude,
                 longitude=longitude,
             )
@@ -841,7 +857,7 @@ class ModelEntrypoint(Entrypoint):
         self,
         simulation_id: str,
         marker_id: str,
-        line: str,
+        code_line: str,
         latitude: float,
         longitude: float,
     ) -> None:
@@ -850,21 +866,34 @@ class ModelEntrypoint(Entrypoint):
         if simulation is None:
             raise ValueError(f"Simulation with id {simulation_id} not found")
 
-        validated = Milestone.validate(
-            marker_id, line, Location(lat=latitude, lon=longitude)
-        )
-        self._signal_bus.emit(
-            CoreSignal.SIMULATION_LOCATION_VALIDATED,
-            SimulationLocationValidatedPayload(
-                simulation_id=simulation_id,
-                id=validated.id,
-                lat=validated.location.lat,
-                lon=validated.location.lon,
-                label=validated.label,
-                line=validated.line,
-                type=validated.type,
-            ),
-        )
+        try:
+            validated = Milestone.validate(
+                marker_id, code_line, Location(lat=latitude, lon=longitude)
+            )
+            self._signal_bus.emit(
+                CoreSignal.SIMULATION_LOCATION_VALIDATED,
+                SimulationLocationValidatedPayload(
+                    simulation_id=simulation_id,
+                    id=validated.id,
+                    lat=validated.geometry.y,
+                    lon=validated.geometry.x,
+                    label=validated.label,
+                    code_line=validated.line.code,
+                    type=validated.type,
+                ),
+            )
+        except MilestoneValidationError as error:
+            self._signal_bus.emit(
+                CoreSignal.SIMULATION_LOCATION_REJECTED,
+                SimulationLocationRejectedPayload(
+                    simulation_id=simulation_id,
+                    id=marker_id,
+                    code_line=code_line,
+                    lat=latitude,
+                    lon=longitude,
+                    reason=str(error),
+                ),
+            )
 
     def persist_simulation(self, simulation_id: str) -> None:
         """Write one simulation metadata file to disk."""

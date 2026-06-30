@@ -23,6 +23,7 @@ from core.signals import (
     MapRenderedPayload,
     MapRenderFailedPayload,
     SimulationDeletedPayload,
+    SimulationLocationRejectedPayload,
     SimulationLocationValidatedPayload,
 )
 from gui.signals import signals
@@ -75,6 +76,10 @@ class MapSubController(AppSubController):
         self.model_entrypoint.subscribe(
             CoreSignal.SIMULATION_LOCATION_VALIDATED,
             self._on_simulation_location_validated,
+        )
+        self.model_entrypoint.subscribe(
+            CoreSignal.SIMULATION_LOCATION_REJECTED,
+            self._on_simulation_location_rejected,
         )
 
     @validate_model_entrypoint
@@ -136,7 +141,7 @@ class MapSubController(AppSubController):
         self,
         simulation_id: str,
         marker_id: str,
-        line: str,
+        code_line: str,
         latitude: float,
         longitude: float,
     ) -> None:
@@ -148,26 +153,13 @@ class MapSubController(AppSubController):
             latitude=latitude,
             longitude=longitude,
         )
-        try:
-            self.model_entrypoint.validate_simulation_marker_location(
-                simulation_id,
-                marker_id,
-                line,
-                latitude,
-                longitude,
-            )
-        except ValueError as error:
-            logger.warning(
-                "MapSubController: simulation location validation failed",
-                simulation_id=simulation_id,
-                marker_id=marker_id,
-                error=str(error),
-            )
-            self.view.forward_simulation_location_failed(
-                simulation_id,
-                marker_id,
-                str(error),
-            )
+        self.model_entrypoint.validate_simulation_marker_location(
+            simulation_id,
+            marker_id,
+            code_line,
+            latitude,
+            longitude,
+        )
 
     @validate_view
     def _on_simulation_location_validated(
@@ -178,17 +170,40 @@ class MapSubController(AppSubController):
             "MapSubController: simulation location validated",
             simulation_id=payload.simulation_id,
             id=payload.id,
-            line=payload.line,
+            code_line=payload.code_line,
+            type=payload.type,
             lat=payload.lat,
             lon=payload.lon,
         )
         self.view.forward_simulation_location_validated(
             simulation_id=payload.simulation_id,
             marker_id=payload.id,
-            line=payload.line or "",
+            code_line=payload.code_line or "",
             lat=payload.lat,
             lon=payload.lon,
             label=payload.label or "",
+        )
+
+    @validate_view
+    def _on_simulation_location_rejected(
+        self, payload: SimulationLocationRejectedPayload
+    ) -> None:
+        logger.warning(
+            "MapSubController: simulation location rejected",
+            simulation_id=payload.simulation_id,
+            id=payload.id,
+            code_line=payload.code_line,
+            lat=payload.lat,
+            lon=payload.lon,
+            reason=payload.reason,
+        )
+        self.view.forward_simulation_location_rejected(
+            simulation_id=payload.simulation_id,
+            marker_id=payload.id,
+            code_line=payload.code_line or "",
+            lat=payload.lat,
+            lon=payload.lon,
+            reason=payload.reason,
         )
 
     def _clear_render_job_if_current(

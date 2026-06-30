@@ -50,8 +50,8 @@ def on_marker_clicked_js_code(js_object_name: str) -> Element:
             if (pk == null) {{
                 return;
             }}
-            var line = feature.properties.ligne;
-            if (line == null) {{
+            var code_ligne = feature.properties.code_ligne;
+            if (code_ligne == null) {{
                 return;
             }}
             var latlng = e.latlng;
@@ -66,7 +66,7 @@ def on_marker_clicked_js_code(js_object_name: str) -> Element:
             }}
             window.bridge.onMarkerClicked(
                 String(pk),
-                String(line),
+                String(code_ligne),
                 latlng.lat,
                 latlng.lng
             );

@@ -354,7 +354,7 @@ def test_simulation_location_validated_updates_fake_location_and_persists(
         lat=48.88533318609319,
         lon=2.363530409238113,
         label="001+000 / 001000-1",
-        line="001000-1",
+        code_line="001000",
         type="Kilomètre",
     )
 
