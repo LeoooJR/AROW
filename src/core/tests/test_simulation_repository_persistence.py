@@ -366,6 +366,58 @@ def test_load_all_for_devices_deletes_invalid_persisted_simulation(tmp_path: Pat
     assert index_payload["simulations"] == []
 
 
+def test_load_all_for_devices_deletes_simulation_with_missing_location_payload(
+    tmp_path: Path,
+) -> None:
+    save_dir = tmp_path / "simulations"
+    repository = SimulationRepository(save_dir)
+    paired_phone = Phone(id="device-1", name="Pixel", state="device")
+    simulation = Simulation(id="sim-1", device=paired_phone)
+    repository.add(simulation)
+    repository.write_all()
+    metadata_path = repository.simulation_metadata_file("sim-1")
+    payload = json.loads(metadata_path.read_text(encoding="utf-8"))
+    payload.pop("real_location")
+    metadata_path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+
+    loaded_repository = SimulationRepository(save_dir)
+    paired_devices = PhoneRepository()
+    paired_devices.add(paired_phone)
+
+    loaded = loaded_repository.load_all_for_devices(paired_devices)
+
+    assert loaded == []
+    assert not loaded_repository.simulation_dir("sim-1").exists()
+    index_payload = json.loads(loaded_repository.index_file.read_text(encoding="utf-8"))
+    assert index_payload["simulations"] == []
+
+
+def test_load_all_for_devices_deletes_simulation_without_persisted_device(
+    tmp_path: Path,
+) -> None:
+    save_dir = tmp_path / "simulations"
+    repository = SimulationRepository(save_dir)
+    paired_phone = Phone(id="device-1", name="Pixel", state="device")
+    simulation = Simulation(id="sim-1", device=paired_phone)
+    repository.add(simulation)
+    repository.write_all()
+    metadata_path = repository.simulation_metadata_file("sim-1")
+    payload = json.loads(metadata_path.read_text(encoding="utf-8"))
+    payload["device"] = None
+    metadata_path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+
+    loaded_repository = SimulationRepository(save_dir)
+    paired_devices = PhoneRepository()
+    paired_devices.add(paired_phone)
+
+    loaded = loaded_repository.load_all_for_devices(paired_devices)
+
+    assert loaded == []
+    assert not loaded_repository.simulation_dir("sim-1").exists()
+    index_payload = json.loads(loaded_repository.index_file.read_text(encoding="utf-8"))
+    assert index_payload["simulations"] == []
+
+
 def test_write_all_writes_simulation_json_and_index_last(tmp_path: Path) -> None:
     repository = SimulationRepository(tmp_path / "simulations")
     device = Phone(id="device-1", name="Pixel", state="device")
