@@ -55,86 +55,17 @@ class MapRenderer:
 
         manager: DatasetManager = DatasetManager()
 
-        stations_geodataset: geopandas.GeoDataFrame = manager.read("gares-de-voyageurs")
-
-        # Drop columns that are not needed for the map
-        stations_geodataset: geopandas.GeoDataFrame = stations_geodataset.drop(
-            columns="position_geographique"
+        self.stations_geodataset: geopandas.GeoDataFrame = manager.read(
+            "gares-de-voyageurs"
         )
 
-        # Convert columns to categorical types for better performance
-        self.stations_geodataset: geopandas.GeoDataFrame = stations_geodataset.astype(
-            {"segment_drg": "category"}
+        self.railways_geodataset: geopandas.GeoDataFrame = manager.read(
+            id="lignes-par-type"
         )
 
-        railways_geodataset: geopandas.GeoDataFrame = manager.read(id="lignes-par-type")
-
-        # Convert columns to categorical types for better performance
-        railways_geodataset: geopandas.GeoDataFrame = railways_geodataset.astype(
-            {"type_ligne": "category"}
+        self.milestones_geodataset: geopandas.GeoDataFrame = manager.read(
+            "referentiel_pk_gps"
         )
-
-        # Drop columns that are not needed for the map
-        self.railways_geodataset: geopandas.GeoDataFrame = railways_geodataset.drop(
-            columns=[
-                "idgaia",  # TODO: This column is not needed for the map, but is of high value, may be used in the future.
-                "x_d_l93",
-                "y_d_l93",
-                "x_f_l93",
-                "y_f_l93",
-                "x_d_wgs84",
-                "y_d_wgs84",
-                "x_f_wgs84",
-                "y_f_wgs84",
-                "c_geo_d",
-                "c_geo_f",
-                "geo_point_2d",
-            ]
-        )
-
-        milestones_dataset: pd.DataFrame = manager.read("referentiel_pk_gps")
-
-        # Convert columns names to lowercarse for consistency
-        milestones_dataset.columns = milestones_dataset.columns.map(lambda c: c.lower())
-
-        # Convert columns to categorical types for better performance
-        milestones_dataset: pd.DataFrame = milestones_dataset.astype(
-            {"type_reper": "category", "ligne": "category", "code_ligne": "category"}
-        )
-        # Vectorized WGS84: comma decimals in source CSV.
-        lon: pd.Series = pd.to_numeric(
-            milestones_dataset["longitude"]
-            .astype("string")
-            .str.replace(",", ".", regex=False),
-            errors="coerce",
-        )
-        lat: pd.Series = pd.to_numeric(
-            milestones_dataset["latitude"]
-            .astype("string")
-            .str.replace(",", ".", regex=False),
-            errors="coerce",
-        )
-        milestones_dataset["geometry"]: geopandas.GeoSeries = (
-            geopandas.GeoSeries.from_xy(lon, lat, crs="EPSG:4326")
-        )
-        milestones_dataset = milestones_dataset.drop(columns=["latitude", "longitude"])
-
-        # PK string (e.g. "001+000" -> 1.0 km, "012+500" -> 12.5 km), vectorized.
-        _pk: pd.Series = milestones_dataset["pk"].astype("string")
-        _parts = _pk.str.strip().str.split("+", n=1, expand=True)
-        _km_part: pd.Series = pd.to_numeric(_parts[0], errors="coerce")
-        _m_part: pd.Series = pd.to_numeric(_parts[1], errors="coerce")
-        milestones_dataset["kilometers"]: pd.Series = _km_part + _m_part / 1000.0
-
-        # Ensure that the geometry, code_ligne, and kilometers columns are not null, even if must not happen.
-        milestones_dataset: pd.DataFrame = milestones_dataset.dropna(
-            subset=["geometry", "code_ligne", "kilometers"]
-        )
-        self.milestones_geodataset: geopandas.GeoDataFrame = geopandas.GeoDataFrame(
-            milestones_dataset, crs="EPSG:4326"
-        )
-        # Drop the intermediate frame to lower peak RAM once geometry lives in GeoDataFrame.
-        del milestones_dataset
 
         milestones_kilometer_geodataset: geopandas.GeoDataFrame = (
             self.milestones_geodataset[

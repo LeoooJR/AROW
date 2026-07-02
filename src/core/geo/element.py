@@ -51,8 +51,6 @@ class _ValidatedRailwaySnapshot:
 def _referentiel_pk_dataset() -> pd.DataFrame:
     """Load and normalize the PK referentiel once per process."""
     dataset: pd.DataFrame = DatasetManager.read("referentiel_pk_gps")
-    dataset = dataset.copy()
-    dataset.columns = dataset.columns.map(lambda column: str(column).lower())
     return dataset
 
 
@@ -60,23 +58,6 @@ def _referentiel_pk_dataset() -> pd.DataFrame:
 def _lignes_par_type_dataset() -> geopandas.GeoDataFrame:
     """Load and normalize the lignes-par-type dataset once per process."""
     dataset: geopandas.GeoDataFrame = DatasetManager.read("lignes-par-type")
-    dataset = dataset.copy()
-    dataset = dataset.astype({"type_ligne": "category"})
-    dataset = dataset.drop(
-        columns=[
-            "x_d_l93",
-            "y_d_l93",
-            "x_f_l93",
-            "y_f_l93",
-            "x_d_wgs84",
-            "y_d_wgs84",
-            "x_f_wgs84",
-            "y_f_wgs84",
-            "c_geo_d",
-            "c_geo_f",
-            "geo_point_2d",
-        ]
-    )
     return dataset
 
 
@@ -391,8 +372,8 @@ class Milestone(MapElement, Payload):
             matches = matches_for_line
 
         row: pd.Series = matches.iloc[0]  # Convert to Series for consistent indexing.
-        referentiel_lat = float(row["latitude"])
-        referentiel_lon = float(row["longitude"])
+        referentiel_lat = float(row["geometry"].y)
+        referentiel_lon = float(row["geometry"].x)
         referentiel_geometry = Point(referentiel_lon, referentiel_lat)
 
         if referentiel_geometry.distance(geometry) > _COORD_TOLERANCE_DEGREES:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Final, Literal, Optional
+from typing import Callable, Dict, Final, Literal, Optional
 
 import geopandas
 import numpy as np
@@ -137,6 +137,14 @@ class GaresDeVoyageursSchema(pg.GeoDataFrameModel):
         return bool((_gares_geometry_is_point_or_empty(series)).all())
 
 
+def _preprocess_gares_de_voyageurs(
+    df: geopandas.GeoDataFrame,
+) -> geopandas.GeoDataFrame:
+    """Preprocess the gares de voyageurs dataset."""
+    without_position = df.drop(columns="position_geographique")
+    return without_position.astype({"segment_drg": "category"})
+
+
 class LignesParTypeSchema(pg.GeoDataFrameModel):
 
     type_ligne: Series[String] = pg.Field(
@@ -229,6 +237,26 @@ class LignesParTypeSchema(pg.GeoDataFrameModel):
         return bool(_lignes_geometry_is_line_or_multiline(series).all())
 
 
+def _preprocess_lignes_par_type(df: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
+    """Preprocess the lignes par type dataset."""
+    typed = df.astype({"type_ligne": "category"})
+    return typed.drop(
+        columns=[
+            "x_d_l93",
+            "y_d_l93",
+            "x_f_l93",
+            "y_f_l93",
+            "x_d_wgs84",
+            "y_d_wgs84",
+            "x_f_wgs84",
+            "y_f_wgs84",
+            "c_geo_d",
+            "c_geo_f",
+            "geo_point_2d",
+        ]
+    )
+
+
 class ReferentielPkGpsSchema(pa.DataFrameModel):
     """PK / hectometric referential with WGS84 columns (``referentiel_pk_gps`` CSV)."""
 
@@ -270,6 +298,39 @@ class ReferentielPkGpsSchema(pa.DataFrameModel):
     )
 
 
+def _preprocess_referentiel_pk_gps(df: pd.DataFrame) -> geopandas.GeoDataFrame:
+    """Preprocess the referentiel pk gps dataset."""
+    normalized = df.copy()
+    normalized.columns = normalized.columns.map(lambda c: c.lower())
+    typed = normalized.astype(
+        {"type_reper": "category", "ligne": "category", "code_ligne": "category"}
+    )
+
+    # Vectorized WGS84: comma decimals in source CSV.
+    lon = pd.to_numeric(
+        typed["longitude"].astype("string").str.replace(",", ".", regex=False),
+        errors="coerce",
+    )
+    lat = pd.to_numeric(
+        typed["latitude"].astype("string").str.replace(",", ".", regex=False),
+        errors="coerce",
+    )
+    typed["geometry"] = geopandas.GeoSeries.from_xy(lon, lat, crs="EPSG:4326")
+    without_lat_lon = typed.drop(columns=["latitude", "longitude"])
+
+    # PK string (e.g. "001+000" -> 1.0 km, "012+500" -> 12.5 km), vectorized.
+    pk_series = without_lat_lon["pk"].astype("string")
+    parts = pk_series.str.strip().str.split("+", n=1, expand=True)
+    km_part = pd.to_numeric(parts[0], errors="coerce")
+    m_part = pd.to_numeric(parts[1], errors="coerce")
+    without_lat_lon["kilometers"] = km_part + m_part / 1000.0
+
+    # Ensure geometry, code_ligne, and kilometers are present before map use.
+    cleaned = without_lat_lon.dropna(subset=["geometry", "code_ligne", "kilometers"])
+
+    return geopandas.GeoDataFrame(cleaned, geometry="geometry", crs="EPSG:4326")
+
+
 @dataclass(frozen=True)
 class DatasetDefinition:
 
@@ -282,6 +343,13 @@ class DatasetDefinition:
     last_update: str | None
     hash: str  # sha256sum
     schema: pa.DataFrameSchema | pg.GeoDataFrameSchema
+    preprocessing: (
+        Callable[
+            [geopandas.GeoDataFrame | pd.DataFrame],
+            geopandas.GeoDataFrame | pd.DataFrame,
+        ]
+        | None
+    ) = None
 
     @property
     def full_path(self) -> Path:
@@ -307,6 +375,7 @@ class DatasetRepository:
             last_update=None,
             hash="5bbc36c7be9b44499dacf9ffdde200085d4ba731d8561ce8cd2665df0ee1e31d",
             schema=GaresDeVoyageursSchema,
+            preprocessing=_preprocess_gares_de_voyageurs,
         ),
         "lignes-par-type": DatasetDefinition(
             id="lignes-par-type",
@@ -317,6 +386,7 @@ class DatasetRepository:
             last_update=None,
             hash="2a0da177f597f1fa6122e18d510b3a601b9315bf2c2ab511e58adee2b054b18c",
             schema=LignesParTypeSchema,
+            preprocessing=_preprocess_lignes_par_type,
         ),
         "referentiel_pk_gps": DatasetDefinition(
             id="referentiel_pk_gps",
@@ -327,6 +397,7 @@ class DatasetRepository:
             last_update=None,
             hash="0b106045e866aee214ea86700b50d6f6ab4c783a267a76c41d6674cde2de6d95",
             schema=ReferentielPkGpsSchema,
+            preprocessing=_preprocess_referentiel_pk_gps,
         ),
     }
 
@@ -375,7 +446,9 @@ class DatasetManager:
                 gdf: geopandas.GeoDataFrame = geopandas.read_file(
                     definition.full_path, encoding=effective_encoding
                 )
-                return cls._validate(definition, gdf)
+
+                validated_gdf = cls._validate(definition, gdf)
+                return cls._preprocess(definition, validated_gdf)
 
             else:
 
@@ -388,7 +461,8 @@ class DatasetManager:
                         encoding=effective_encoding,
                     )
 
-                    return cls._validate(definition, df)
+                    validated_df = cls._validate(definition, df)
+                    return cls._preprocess(definition, validated_df)
 
                 elif definition.format == "json":
 
@@ -426,3 +500,12 @@ class DatasetManager:
                 errors=e,
             )
             raise SchemaValidationError
+
+    @classmethod
+    def _preprocess(
+        cls, definition: DatasetDefinition, data: geopandas.GeoDataFrame | pd.DataFrame
+    ) -> geopandas.GeoDataFrame | pd.DataFrame:
+        """Preprocess the data."""
+        if definition.preprocessing:
+            return definition.preprocessing(data)
+        return data
