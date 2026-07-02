@@ -5,7 +5,7 @@ import re
 from abc import ABC
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Literal
+from typing import Literal, cast
 
 import geopandas
 import pandas as pd
@@ -21,7 +21,7 @@ from core.payload import Payload
 _COORD_TOLERANCE_DEGREES: float = 0.0001
 
 
-def _geometry_to_payload(geometry: BaseGeometry, **kwargs: object) -> bytes | str:
+def _serialize_geometry(geometry: BaseGeometry, **kwargs: object) -> bytes | str:
     """Serialize geometry for persistence; base64 when writing JSON metadata."""
     wkb = geometry.wkb
     if kwargs.get("json_compatible", False):
@@ -29,11 +29,11 @@ def _geometry_to_payload(geometry: BaseGeometry, **kwargs: object) -> bytes | st
     return wkb
 
 
-def _geometry_from_payload(raw: object) -> BaseGeometry:
+def _deserialize_geometry(raw: object) -> BaseGeometry:
     """Restore geometry from a payload field (raw WKB bytes or base64 text)."""
     if isinstance(raw, str):
         return from_wkb(base64.b64decode(raw))
-    return from_wkb(raw)
+    return from_wkb(cast(bytes, raw))
 
 
 @dataclass(frozen=True, slots=True)
@@ -237,20 +237,20 @@ class Station(MapElement, Payload):
             geometry,
         )
 
-    def to_payload(self, **kwargs) -> dict[str, object]:
+    def serialize(self, **kwargs) -> dict[str, object]:
         return {
             "id": self.id,
-            "geometry": _geometry_to_payload(self.geometry, **kwargs),
+            "geometry": _serialize_geometry(self.geometry, **kwargs),
         }
 
     @classmethod
-    def from_payload(cls, payload: dict[str, object], **kwargs) -> Station:
+    def deserialize(cls, payload: dict[str, object], **kwargs) -> Station:
         station_id = payload["id"]
         if not isinstance(station_id, str):
             raise ValueError("Station payload id must be a string")
         return cls(
             id=station_id,
-            geometry=_geometry_from_payload(payload["geometry"]),
+            geometry=_deserialize_geometry(payload["geometry"]),
         )
 
 
@@ -413,21 +413,21 @@ class Milestone(MapElement, Payload):
             geometry=referentiel_geometry,
         )
 
-    def to_payload(self, **kwargs) -> dict[str, object]:
+    def serialize(self, **kwargs) -> dict[str, object]:
         return {
             "id": self.id,
-            "line": self.line.to_payload(**kwargs),
+            "line": self.line.serialize(**kwargs),
             "type": self.type,
             "label": self.label,
-            "geometry": _geometry_to_payload(self.geometry, **kwargs),
+            "geometry": _serialize_geometry(self.geometry, **kwargs),
         }
 
     @classmethod
-    def from_payload(cls, payload: dict[str, object], **kwargs) -> Milestone:
+    def deserialize(cls, payload: dict[str, object], **kwargs) -> Milestone:
         line = payload.get("line")
         if not isinstance(line, dict):
             raise ValueError("Line must be a dictionary")
-        line = Railway.from_payload(line, **kwargs)
+        line = Railway.deserialize(line, **kwargs)
         milestone_id = payload.get("id")
         milestone_type = payload.get("type")
         milestone_label = payload.get("label")
@@ -442,7 +442,7 @@ class Milestone(MapElement, Payload):
             line=line,
             type=milestone_type,
             label=milestone_label,
-            geometry=_geometry_from_payload(payload.get("geometry")),
+            geometry=_deserialize_geometry(payload.get("geometry")),
         )
 
     def __repr__(self) -> str:
@@ -603,17 +603,17 @@ class Railway(MapElement, Payload):
             geometry=snapshot.geometry,
         )
 
-    def to_payload(self, **kwargs) -> dict[str, object]:
+    def serialize(self, **kwargs) -> dict[str, object]:
         return {
             "id": self.id,
             "code": self.code,
             "type": self.type,
             "label": self.label,
-            "geometry": _geometry_to_payload(self.geometry, **kwargs),
+            "geometry": _serialize_geometry(self.geometry, **kwargs),
         }
 
     @classmethod
-    def from_payload(cls, payload: dict[str, object], **kwargs) -> Railway:
+    def deserialize(cls, payload: dict[str, object], **kwargs) -> Railway:
         railway_id = payload.get("id")
         railway_code = payload.get("code")
         railway_type = payload.get("type")
@@ -631,7 +631,7 @@ class Railway(MapElement, Payload):
             code=railway_code,
             type=railway_type,
             label=railway_label,
-            geometry=_geometry_from_payload(payload.get("geometry", None)),
+            geometry=_deserialize_geometry(payload.get("geometry", None)),
         )
 
     def __repr__(self) -> str:

@@ -55,7 +55,7 @@ class Simulation(Payload):
     # When True, ``__setattr__`` logs changes to the public simulation fields.
     _fields_ready: bool = field(init=False, repr=False, compare=False, default=False)
 
-    def to_payload(  # type: ignore[override]
+    def serialize(  # type: ignore[override]
         self, simulation_dir: Path, **kwargs
     ) -> dict[str, object]:
         """
@@ -65,21 +65,21 @@ class Simulation(Payload):
             "schema_version": SIMULATION_REPOSITORY_SCHEMA_VERSION,
             "id": self.id,
             "device": (
-                self.device.to_payload(
+                self.device.serialize(
                     json_compatible=kwargs.get("json_compatible", False)
                 )
                 if self.device is not None
                 else None
             ),
-            "real_location": self.real_location.to_payload(**kwargs),
-            "spoofed_location": self.spoofed_location.to_payload(**kwargs),
+            "real_location": self.real_location.serialize(**kwargs),
+            "spoofed_location": self.spoofed_location.serialize(**kwargs),
             "map_file": _relative_to_simulation_dir(self.map_file, simulation_dir),
             "log_file": _relative_to_simulation_dir(self.log_file, simulation_dir),
             "active": self.active,
         }
 
     @classmethod
-    def from_payload(  # type: ignore[override]
+    def deserialize(  # type: ignore[override]
         cls, payload: dict[str, object], simulation_dir: Path, **kwargs
     ) -> Simulation:
         """
@@ -94,7 +94,7 @@ class Simulation(Payload):
         device_payload = payload.get("device")
         device: Phone | None = None
         if isinstance(device_payload, dict):
-            device = Phone.from_payload(device_payload, **kwargs)
+            device = Phone.deserialize(device_payload, **kwargs)
         real_location_payload = payload.get("real_location")
         spoofed_location_payload = payload.get("spoofed_location")
         if not isinstance(real_location_payload, dict):
@@ -116,8 +116,8 @@ class Simulation(Payload):
         return cls(
             id=simulation_id,
             device=device,
-            real_location=Location.from_payload(real_location_payload, **kwargs),
-            spoofed_location=Location.from_payload(spoofed_location_payload, **kwargs),
+            real_location=Location.deserialize(real_location_payload, **kwargs),
+            spoofed_location=Location.deserialize(spoofed_location_payload, **kwargs),
             map_file=map_file,
             log_file=log_file,
             active=active,
@@ -311,7 +311,7 @@ class SimulationDiskStore:
             )
             return None
         simulation_dir = self.simulation_dir(simulation_id)
-        return Simulation.from_payload(payload, simulation_dir)
+        return Simulation.deserialize(payload, simulation_dir)
 
     def _delete_persisted_simulation_dir(self, simulation_id: str) -> None:
         """Delete a simulation directory from disk."""
@@ -407,7 +407,7 @@ class SimulationDiskStore:
         simulation_dir = self.simulation_dir(simulation.id)
         simulation_dir.mkdir(parents=True, exist_ok=True)
         metadata_path = self.simulation_metadata_file(simulation.id)
-        payload = simulation.to_payload(simulation_dir, json_compatible=True)
+        payload = simulation.serialize(simulation_dir, json_compatible=True)
         _write_json_atomic(metadata_path, payload)
         return metadata_path
 

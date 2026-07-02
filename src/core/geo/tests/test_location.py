@@ -21,8 +21,8 @@ def _clear_referentiel_cache() -> Iterator[None]:
 
 def test_location_payload_round_trip_without_poi() -> None:
     location = Location(lat=48.885333, lon=2.363530, poi=None)
-    payload = location.to_payload()
-    restored = Location.from_payload(cast(dict[str, object], payload))
+    payload = location.serialize()
+    restored = Location.deserialize(cast(dict[str, object], payload))
     assert restored == location
 
 
@@ -37,8 +37,8 @@ def test_location_payload_round_trip_with_milestone() -> None:
         lon=2.363530409238113,
         poi=milestone,
     )
-    payload = location.to_payload()
-    restored = Location.from_payload(cast(dict[str, object], payload))
+    payload = location.serialize()
+    restored = Location.deserialize(cast(dict[str, object], payload))
     assert restored.lat == location.lat
     assert restored.lon == location.lon
     assert restored.poi is not None

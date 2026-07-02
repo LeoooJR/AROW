@@ -807,7 +807,7 @@ class ModelEntrypoint(Entrypoint):
                     lat, lon, poi_raw = value
                     poi: Milestone | None = None
                     if isinstance(poi_raw, dict):
-                        poi = Milestone.from_payload(poi_raw)
+                        poi = Milestone.deserialize(poi_raw)
                     elif poi_raw is not None:
                         raise ValueError(f"Invalid poi in location tuple: {poi_raw!r}")
                     value = Location(
@@ -836,7 +836,7 @@ class ModelEntrypoint(Entrypoint):
                         simulation_id=simulation.id,
                         lat=value.lat,
                         lon=value.lon,
-                        poi=(value.poi.to_payload() if value.poi is not None else None),
+                        poi=(value.poi.serialize() if value.poi is not None else None),
                     ),
                 )
             elif key == "map_file":
@@ -876,7 +876,7 @@ class ModelEntrypoint(Entrypoint):
                     simulation_id=simulation_id,
                     lat=validated.geometry.y,
                     lon=validated.geometry.x,
-                    poi=validated.to_payload(),
+                    poi=validated.serialize(),
                 ),
             )
         except MilestoneValidationError as error:

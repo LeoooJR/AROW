@@ -299,7 +299,7 @@ def test_authenticate_apply_success_adds_phone_and_emits_signal() -> None:
         (
             CoreSignal.DEVICE_AUTHENTIFICATION_SUCCEEDED,
             DeviceAuthentificationSucceededPayload(
-                device=phone.to_payload(),
+                device=phone.serialize(),
             ),
         )
     ]

@@ -168,7 +168,7 @@ def test_on_devices_updated_forwards_device_id_rebindings_to_view(
     _patch_controller_type_checks(monkeypatch, app)
     phone = Phone(id="device-1", state="device", model="Pixel")
     payload = DevicesUpdatedPayload(
-        devices=[phone.to_payload()],
+        devices=[phone.serialize()],
         device_id_rebindings={"old-device-1": "device-1"},
     )
 

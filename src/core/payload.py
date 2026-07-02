@@ -18,7 +18,7 @@ class Payload(ABC):
     """
 
     @abstractmethod
-    def to_payload(self, **kwargs) -> dict[str, Any]:
+    def serialize(self, **kwargs) -> dict[str, Any]:
         """
         Serialize the object's current state into a dictionary form suitable
         for writing to disk or other storage.
@@ -27,7 +27,7 @@ class Payload(ABC):
 
     @classmethod
     @abstractmethod
-    def from_payload(cls, payload: dict[str, Any], **kwargs) -> Self:
+    def deserialize(cls, payload: dict[str, Any], **kwargs) -> Self:
         """
         Populate an object from a dictionary form (typically loaded from
         disk or external storage).

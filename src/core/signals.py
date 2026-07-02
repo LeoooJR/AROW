@@ -12,7 +12,7 @@ Payload design rules (controllers must not depend on live core domain objects):
 - Prefer the smallest set of primitive fields (``str``, ``int``, ``float``, ``bool``).
 - ``pathlib.Path`` is allowed for filesystem resources; it is not a custom core domain type.
 - When a custom core object must be represented, serialize it (for example via
-  ``to_payload()``) into a ``dict`` and carry only that dict in the payload.
+  ``serialize()``) into a ``dict`` and carry only that dict in the payload.
 - Do not place live core domain instances (``Phone``, ``Simulation``, ``Location``,
   ``AdbBinary``, ``Exception``, etc.) on core signal payloads.
 - When a signal payload changes, update every emitter, subscriber, controller bridge,

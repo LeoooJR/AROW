@@ -28,21 +28,21 @@ class Location(Payload):
         """Return True if the location is the default location."""
         return self.lat == 0.0 and self.lon == 0.0 and self.poi is None
 
-    def to_payload(self, **kwargs) -> dict[str, object]:
-        """Convert the location to a payload."""
+    def serialize(self, **kwargs) -> dict[str, object]:
+        """Convert the location to a serialized dictionary."""
         return {
             "lat": self.lat,
             "lon": self.lon,
-            "poi": (self.poi.to_payload(**kwargs) if self.poi is not None else None),
+            "poi": (self.poi.serialize(**kwargs) if self.poi is not None else None),
         }
 
     @classmethod
-    def from_payload(cls, payload: dict[str, object], **kwargs) -> Location:
-        """Create a location from a payload."""
+    def deserialize(cls, payload: dict[str, object], **kwargs) -> Location:
+        """Create a location from a serialized dictionary."""
         poi_payload = payload.get("poi")
         poi: Milestone | None = None
         if isinstance(poi_payload, dict):
-            poi = Milestone.from_payload(
+            poi = Milestone.deserialize(
                 cast(dict[str, object], poi_payload),
                 **kwargs,
             )
