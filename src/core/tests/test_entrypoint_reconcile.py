@@ -69,7 +69,17 @@ def test_create_simulation_reuses_existing_device_simulation(tmp_path: Path) -> 
     server.paired_devices.add(phone)
 
     first_simulation_id = _create_simulation_id(model_entrypoint, "device-1")
-    second_simulation_id = _create_simulation_id(model_entrypoint, "device-1")
+
+    captured: list[str] = []
+
+    def capture(payload: SimulationCreatedPayload) -> None:
+        captured.append(payload.simulation_id)
+
+    model_entrypoint.subscribe(CoreSignal.SIMULATION_CREATED, capture)
+    model_entrypoint.create_simulation("device-1")
+    second_simulation_id = first_simulation_id
+
+    assert captured == []
 
     assert first_simulation_id == second_simulation_id
     assert len(list(model_entrypoint._simulations)) == 1

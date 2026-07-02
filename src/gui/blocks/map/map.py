@@ -522,7 +522,7 @@ class Coordinates(QFrame):
         simulation_state_off: LeadingIconLabel
         simulation_state_on: LeadingIconLabel
         location_widget: Location
-        simulated_location_widget: Location
+        spoofed_location_widget: Location
         play_button: ToolButton
 
     def __init__(self, parent: QWidget = None):
@@ -591,10 +591,10 @@ class Coordinates(QFrame):
         location_widget = Location(self, icon_qt_path(GenericIcons.LOCATION))
         layout.addWidget(location_widget)
 
-        simulated_location_widget = Location(
+        spoofed_location_widget = Location(
             self, icon_qt_path(GenericIcons.FAKE_LOCATION)
         )
-        layout.addWidget(simulated_location_widget)
+        layout.addWidget(spoofed_location_widget)
 
         self.setLayout(layout)
 
@@ -604,7 +604,7 @@ class Coordinates(QFrame):
             simulation_state_off=simulation_state_off,
             simulation_state_on=simulation_state_on,
             location_widget=location_widget,
-            simulated_location_widget=simulated_location_widget,
+            spoofed_location_widget=spoofed_location_widget,
             play_button=play_button,
         )
         self._finalize_ui_hooks()
@@ -617,7 +617,7 @@ class Coordinates(QFrame):
         pb.set_icon(GenericIcons.PAUSE if pb.property("toggle") else GenericIcons.PLAY)
         pb.apply_theme_icons(theme)
         self.ui.location_widget.apply_row_icons(theme, GenericIcons.LOCATION)
-        self.ui.simulated_location_widget.apply_row_icons(
+        self.ui.spoofed_location_widget.apply_row_icons(
             theme, GenericIcons.FAKE_LOCATION
         )
 
@@ -632,9 +632,9 @@ class Coordinates(QFrame):
         return self.ui.location_widget
 
     @property
-    def simulated_location_widget(self) -> Location:
+    def spoofed_location_widget(self) -> Location:
         """Return the simulated-location coordinate widget."""
-        return self.ui.simulated_location_widget
+        return self.ui.spoofed_location_widget
 
     def _finalize_ui_hooks(self) -> None:
         """Run the final UI setup hooks for the coordinates section."""
@@ -660,7 +660,7 @@ class Coordinates(QFrame):
             self.ui.location_widget, Qt.AlignmentFlag.AlignCenter
         )
         self.layout().setAlignment(
-            self.ui.simulated_location_widget, Qt.AlignmentFlag.AlignCenter
+            self.ui.spoofed_location_widget, Qt.AlignmentFlag.AlignCenter
         )
 
     def set_simulation_state(self, state: bool) -> None:
@@ -971,7 +971,7 @@ class MapBlock(QWidget):
         self._pending_render_simulation_id = simulation_id
         self.show_map_loading_placeholder()
         self._on_run_helper_animation()
-        self.ui.coordinates.simulated_location_widget.clear_coordinates()
+        self.ui.coordinates.spoofed_location_widget.clear_coordinates()
         signals.UI.RenderMapRequested.emit(simulation_id)
 
     def _is_stale_render_update(self, simulation_id: str) -> bool:
@@ -1026,7 +1026,7 @@ class MapBlock(QWidget):
                 longitude,
             )
 
-    @Slot(str, str, float, float, object)
+    @Slot(str, str, str, float, float, str)
     def _on_simulation_location_validated(
         self,
         simulation_id: str,
@@ -1045,7 +1045,7 @@ class MapBlock(QWidget):
                 marker_id=marker_id,
             )
             return
-        self.ui.coordinates.simulated_location_widget.set_coordinates(
+        self.ui.coordinates.spoofed_location_widget.set_coordinates(
             latitude,
             longitude,
         )

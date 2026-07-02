@@ -475,7 +475,7 @@ class Phone(Device[PhoneDescriptor]):
     def shell_device_name(self) -> str:
         return self._descriptor.shell_device_name
 
-    def to_payload(self, json_compatible: bool = False) -> dict[str, object]:
+    def to_payload(self, **kwargs) -> dict[str, object]:
         """
         Convert the phone to a payload.
         """
@@ -489,13 +489,13 @@ class Phone(Device[PhoneDescriptor]):
             "stable_key": self.stable_key,
             "last_communication": (
                 self.last_communication.isoformat()
-                if json_compatible
+                if kwargs.get("json_compatible", False)
                 else self.last_communication
             ),
         }
 
-    @staticmethod
-    def from_payload(payload: dict[str, object]) -> Phone:
+    @classmethod
+    def from_payload(cls, payload: dict[str, object], **kwargs) -> Phone:
         """
         Create a phone from a persisted payload written by :meth:`to_payload`.
         """
@@ -516,7 +516,7 @@ class Phone(Device[PhoneDescriptor]):
             last_communication = datetime.datetime.fromisoformat(last_communication_raw)
         elif isinstance(last_communication_raw, datetime.datetime):
             last_communication = last_communication_raw
-        phone = Phone(
+        phone = cls(
             id=str(payload["id"]),
             name=str(name_raw) if name_raw is not None else None,
             os=str(os_raw) if os_raw is not None else None,

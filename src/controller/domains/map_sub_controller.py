@@ -90,21 +90,20 @@ class MapSubController(AppSubController):
             "MapSubController: render map requested",
             simulation_id=simulation_id,
         )
-        application_dir = self.model_entrypoint.application_dir
-        simulation = self.model_entrypoint.get_simulation(simulation_id)
-        if simulation is None:
-            logger.warning(
+        if self.model_entrypoint.get_simulation(simulation_id) is None:
+            logger.error(
                 "MapSubController: simulation not found",
                 simulation_id=simulation_id,
             )
             return
-        # Check if map already exists, if so, lazy load it
-        html_path = simulation.map_file
-        if html_path is not None and html_path.exists():
-            logger.debug(
-                "MapSubController: map already rendered",
-                simulation_id=simulation_id,
-            )
+        if self.model_entrypoint.is_map_rendered_for_simulation(simulation_id):
+            html_path = self.model_entrypoint.get_map_file_for_simulation(simulation_id)
+            if html_path is None:
+                logger.error(
+                    "MapSubController: map file not found",
+                    simulation_id=simulation_id,
+                )
+                return
             self.view.forward_map_rendered(
                 simulation_id,
                 html_path,
@@ -120,6 +119,7 @@ class MapSubController(AppSubController):
                     simulation_id=simulation_id,
                 )
                 return
+            application_dir = self.model_entrypoint.application_dir
             handle = self._submit_model_entrypoint_async_call(
                 name="render_map",
                 fn=self.model_entrypoint.render_map,
@@ -166,22 +166,27 @@ class MapSubController(AppSubController):
         self, payload: SimulationLocationValidatedPayload
     ) -> None:
         """Forward validated simulation location to the map view."""
+        poi = payload.point_of_interest
+        line = poi.get("line")
+        code_line = ""
+        if isinstance(line, dict):
+            code_line = str(line.get("code", ""))
         logger.debug(
             "MapSubController: simulation location validated",
             simulation_id=payload.simulation_id,
-            id=payload.id,
-            code_line=payload.code_line,
-            type=payload.type,
+            id=poi.get("id"),
+            code_line=code_line,
+            type=poi.get("type"),
             lat=payload.lat,
             lon=payload.lon,
         )
         self.view.forward_simulation_location_validated(
             simulation_id=payload.simulation_id,
-            marker_id=payload.id,
-            code_line=payload.code_line or "",
+            marker_id=str(poi.get("id", "")),
+            code_line=code_line,
             lat=payload.lat,
             lon=payload.lon,
-            label=payload.label or "",
+            label=str(poi.get("label", "")),
         )
 
     @validate_view

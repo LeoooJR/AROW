@@ -139,7 +139,7 @@ class SimulationPositionChangedPayload:
     simulation_id: str
     lat: float
     lon: float
-    label: str | None
+    point_of_interest: dict[str, object] | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -147,12 +147,9 @@ class SimulationLocationValidatedPayload:
     """Payload emitted when a map milestone location passes referentiel validation."""
 
     simulation_id: str
-    id: str
     lat: float
     lon: float
-    label: str | None
-    code_line: str | None = None
-    type: str | None = None
+    point_of_interest: dict[str, object]
 
 
 @dataclass(frozen=True, slots=True)

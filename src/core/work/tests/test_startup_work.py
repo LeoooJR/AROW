@@ -248,7 +248,7 @@ def test_startup_apply_restores_last_active_device_when_online(
     assert model_entrypoint.adb_server is second_outcome.adb_server
     assert model_entrypoint._simulations.get("sim-1") is not None
     assert model_entrypoint._simulations.last_active_device_id == phone.id
-    assert simulation_created == ["sim-1"]
+    assert simulation_created == []
     assert second_outcome.adb_server is not None
     working_device = second_outcome.adb_server.get_working_device()
     assert working_device is not None

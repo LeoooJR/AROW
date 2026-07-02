@@ -64,8 +64,11 @@ def test_validate_simulation_marker_location_emits_validated_payload(
 
     assert len(captured) == 1
     assert captured[0].simulation_id == simulation_id
-    assert captured[0].id == "001+000"
-    assert captured[0].code_line == "001000"
+    poi = captured[0].point_of_interest
+    assert poi["id"] == "001+000"
+    line = poi["line"]
+    assert isinstance(line, dict)
+    assert line["code"] == "001000"
     assert captured[0].lat == pytest.approx(48.88533318609319)
     assert captured[0].lon == pytest.approx(2.363530409238113)
 

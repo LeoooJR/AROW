@@ -3,39 +3,55 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional, cast
+from typing import cast
+
+from core.geo.element import Milestone
+from core.payload import Payload
 
 
 @dataclass(frozen=True, unsafe_hash=True)
-class Location:
+class Location(Payload):
+    """Location."""
+
     lat: float = field(
         metadata={"description": "The latitude of the location"}, default=0.0
     )
     lon: float = field(
         metadata={"description": "The longitude of the location"}, default=0.0
     )
-    label: Optional[str] = field(
-        metadata={"description": "The label of the location"}, default=None
+    point_of_interest: Milestone | None = field(
+        metadata={"description": "The point of interest at the given location"},
+        default=None,
     )
 
     def is_default(self) -> bool:
         """Return True if the location is the default location."""
-        return self.lat == 0.0 and self.lon == 0.0 and self.label is None
+        return self.lat == 0.0 and self.lon == 0.0 and self.point_of_interest is None
 
-    def to_payload(self) -> dict[str, float | str | None]:
+    def to_payload(self, **kwargs) -> dict[str, object]:
         """Convert the location to a payload."""
         return {
             "lat": self.lat,
             "lon": self.lon,
-            "label": self.label,
+            "point_of_interest": (
+                self.point_of_interest.to_payload(**kwargs)
+                if self.point_of_interest is not None
+                else None
+            ),
         }
 
-    @staticmethod
-    def from_payload(payload: dict[str, object]) -> Location:
+    @classmethod
+    def from_payload(cls, payload: dict[str, object], **kwargs) -> Location:
         """Create a location from a payload."""
-        label = payload.get("label")
-        return Location(
-            lat=float(cast(float | int | str, payload["lat"])),
-            lon=float(cast(float | int | str, payload["lon"])),
-            label=None if label is None else str(label),
+        point_of_interest_payload = payload.get("point_of_interest")
+        point_of_interest: Milestone | None = None
+        if isinstance(point_of_interest_payload, dict):
+            point_of_interest = Milestone.from_payload(
+                cast(dict[str, object], point_of_interest_payload),
+                **kwargs,
+            )
+        return cls(
+            lat=float(cast(float | int | str, payload.get("lat", 0.0))),
+            lon=float(cast(float | int | str, payload.get("lon", 0.0))),
+            point_of_interest=point_of_interest,
         )

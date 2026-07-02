@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import re
 from abc import ABC
 from dataclasses import dataclass
@@ -8,15 +9,31 @@ from typing import Literal
 
 import geopandas
 import pandas as pd
+from shapely import from_wkb
 from shapely.geometry import LineString, MultiLineString, Point
 from shapely.geometry.base import BaseGeometry
 
 from core.geo.datasets import DatasetManager
 from core.geo.exceptions import MilestoneValidationError, RailwayValidationError
-from core.geo.location import Location
+from core.payload import Payload
 
 # Maximum WGS84 delta (degrees) between clicked map coords and referentiel row.
 _COORD_TOLERANCE_DEGREES: float = 0.0001
+
+
+def _geometry_to_payload(geometry: BaseGeometry, **kwargs: object) -> bytes | str:
+    """Serialize geometry for persistence; base64 when writing JSON metadata."""
+    wkb = geometry.wkb
+    if kwargs.get("json_compatible", False):
+        return base64.b64encode(wkb).decode("ascii")
+    return wkb
+
+
+def _geometry_from_payload(raw: object) -> BaseGeometry:
+    """Restore geometry from a payload field (raw WKB bytes or base64 text)."""
+    if isinstance(raw, str):
+        return from_wkb(base64.b64decode(raw))
+    return from_wkb(raw)
 
 
 @dataclass(frozen=True, slots=True)
@@ -197,35 +214,47 @@ class MapElement(ABC):
         return hash((self._id, self._geometry))
 
 
-class Station(MapElement):
+class Station(MapElement, Payload):
     """
     A station on the map.
     """
 
-    def __init__(self, id: str, geometry: Location | Point):
+    def __init__(self, id: str, geometry: Point):
         """
         Initialize a station with the given id and geometry.
 
         Args:
             id: The id of the station.
-            geometry: The geometry of the station. Can be a Location or a Point.
+            geometry: The geometry of the station. Must be a Point.
 
         Raises:
-            TypeError: If the geometry is not a Location or a Point.
+            TypeError: If the geometry is not a Point.
         """
-        if not isinstance(geometry, Location) and not isinstance(geometry, Point):
-            raise TypeError("Geometry must be a Location or a Point")
+        if not isinstance(geometry, Point):
+            raise TypeError("Geometry must be a Point")
         super().__init__(
             id,
-            (
-                Point(geometry.lon, geometry.lat)
-                if isinstance(geometry, Location)
-                else geometry
-            ),
+            geometry,
+        )
+
+    def to_payload(self, **kwargs) -> dict[str, object]:
+        return {
+            "id": self.id,
+            "geometry": _geometry_to_payload(self.geometry, **kwargs),
+        }
+
+    @classmethod
+    def from_payload(cls, payload: dict[str, object], **kwargs) -> Station:
+        station_id = payload["id"]
+        if not isinstance(station_id, str):
+            raise ValueError("Station payload id must be a string")
+        return cls(
+            id=station_id,
+            geometry=_geometry_from_payload(payload["geometry"]),
         )
 
 
-class Milestone(MapElement):
+class Milestone(MapElement, Payload):
     """
     A milestone on the map.
     """
@@ -235,7 +264,7 @@ class Milestone(MapElement):
         id: str,
         line: Railway,
         type: str,
-        geometry: Location | Point,
+        geometry: Point,
         label: str | None = None,
     ):
         """
@@ -246,21 +275,17 @@ class Milestone(MapElement):
             line: The line of the milestone. Must be a Railway.
             type: The type of the milestone.
             label: The label of the milestone.
-            geometry: The geometry of the milestone. Can be a Location or a Point.
+            geometry: The geometry of the milestone. Must be a Point.
 
         Raises:
-            TypeError: If the geometry is not a Location or a Point.
+            TypeError: If the geometry is not a Point.
             RailwayValidationError: If the line is not a valid railway.
         """
-        if not isinstance(geometry, Location) and not isinstance(geometry, Point):
-            raise TypeError("Geometry must be a Location or a Point")
+        if not isinstance(geometry, Point):
+            raise TypeError("Geometry must be a Point")
         super().__init__(
             id,
-            (
-                Point(geometry.lon, geometry.lat)
-                if isinstance(geometry, Location)
-                else geometry
-            ),
+            geometry,
         )
         if not isinstance(line, Railway):
             raise TypeError("Line must be a Railway")
@@ -299,15 +324,13 @@ class Milestone(MapElement):
         return self.geometry.dwithin(line.geometry, _COORD_TOLERANCE_DEGREES)
 
     @classmethod
-    def validate(
-        cls, id: str, line: str | Railway, geometry: Location | Point
-    ) -> Milestone:
+    def validate(cls, id: str, line: str | Railway, geometry: Point) -> Milestone:
         """Resolve and validate a map milestone against ``referentiel_pk_gps``.
 
         Args:
             id: PK string from map feature properties (e.g. ``001+000``).
             line: Line string or Railway from map feature properties (e.g. ``590000``).
-            geometry: The geometry of the milestone. Can be a Location or a Point.
+            geometry: The geometry of the milestone. Must be a Point.
 
         Returns:
             Validated milestone.
@@ -319,13 +342,8 @@ class Milestone(MapElement):
         if not normalized_id:
             raise MilestoneValidationError("Milestone id must not be empty")
 
-        if not isinstance(geometry, Location) and not isinstance(geometry, Point):
-            raise TypeError("Geometry must be a Location or a Point")
-        geometry = (
-            Point(geometry.lon, geometry.lat)
-            if isinstance(geometry, Location)
-            else geometry
-        )
+        if not isinstance(geometry, Point):
+            raise TypeError("Geometry must be a Point")
 
         if not isinstance(line, str) and not isinstance(line, Railway):
             raise TypeError("Line must be a string or a Railway")
@@ -395,11 +413,43 @@ class Milestone(MapElement):
             geometry=referentiel_geometry,
         )
 
+    def to_payload(self, **kwargs) -> dict[str, object]:
+        return {
+            "id": self.id,
+            "line": self.line.to_payload(**kwargs),
+            "type": self.type,
+            "label": self.label,
+            "geometry": _geometry_to_payload(self.geometry, **kwargs),
+        }
+
+    @classmethod
+    def from_payload(cls, payload: dict[str, object], **kwargs) -> Milestone:
+        line = payload.get("line")
+        if not isinstance(line, dict):
+            raise ValueError("Line must be a dictionary")
+        line = Railway.from_payload(line, **kwargs)
+        milestone_id = payload.get("id")
+        milestone_type = payload.get("type")
+        milestone_label = payload.get("label")
+        if not isinstance(milestone_id, str):
+            raise ValueError("Milestone payload id must be a string")
+        if not isinstance(milestone_type, str):
+            raise ValueError("Milestone payload type must be a string")
+        if milestone_label is not None and not isinstance(milestone_label, str):
+            raise ValueError("Milestone payload label must be a string or null")
+        return cls(
+            id=milestone_id,
+            line=line,
+            type=milestone_type,
+            label=milestone_label,
+            geometry=_geometry_from_payload(payload.get("geometry")),
+        )
+
     def __repr__(self) -> str:
         return self._label
 
 
-class Railway(MapElement):
+class Railway(MapElement, Payload):
     """
     A railway on the map.
     """
@@ -551,6 +601,37 @@ class Railway(MapElement):
             type=snapshot.type,
             label=snapshot.label,
             geometry=snapshot.geometry,
+        )
+
+    def to_payload(self, **kwargs) -> dict[str, object]:
+        return {
+            "id": self.id,
+            "code": self.code,
+            "type": self.type,
+            "label": self.label,
+            "geometry": _geometry_to_payload(self.geometry, **kwargs),
+        }
+
+    @classmethod
+    def from_payload(cls, payload: dict[str, object], **kwargs) -> Railway:
+        railway_id = payload.get("id")
+        railway_code = payload.get("code")
+        railway_type = payload.get("type")
+        railway_label = payload.get("label")
+        if not isinstance(railway_id, str):
+            raise ValueError("Railway payload id must be a string")
+        if not isinstance(railway_code, str):
+            raise ValueError("Railway payload code must be a string")
+        if not isinstance(railway_type, str):
+            raise ValueError("Railway payload type must be a string")
+        if not isinstance(railway_label, str):
+            raise ValueError("Railway payload label must be a string")
+        return cls(
+            id=railway_id,
+            code=railway_code,
+            type=railway_type,
+            label=railway_label,
+            geometry=_geometry_from_payload(payload.get("geometry", None)),
         )
 
     def __repr__(self) -> str:

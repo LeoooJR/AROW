@@ -4,6 +4,8 @@ from functools import cached_property
 from pathlib import Path
 from typing import Any, Callable, Literal, Mapping, Tuple, overload
 
+from shapely.geometry import Point
+
 from core.adb.client import AdbClient
 from core.adb.server import AdbServer
 from core.application_paths import (
@@ -727,46 +729,33 @@ class ModelEntrypoint(Entrypoint):
         if simulation is None:
             simulation = Simulation(device=device)
             self._simulations.add(simulation)
+            # Emit the signal for the created simulation
+            self._signal_bus.emit(
+                CoreSignal.SIMULATION_CREATED,
+                SimulationCreatedPayload(
+                    simulation_id=simulation.id,
+                    device_id=device.id,
+                    device_name=device.name,
+                ),
+            )
         else:
+            # Simulation is restored from disk; validate persisted marker metadata.
             logger.info(
                 "ModelEntrypoint: reusing existing simulation for device",
                 simulation_id=simulation.id,
                 device_id=device_id,
             )
-        self._signal_bus.emit(
-            CoreSignal.SIMULATION_CREATED,
-            SimulationCreatedPayload(
-                simulation_id=simulation.id,
-                device_id=device.id,
-                device_name=device.name,
-            ),
-        )
-        self._simulations.last_active_device_id = device_id
-        if not simulation.fake_location.is_default():
-            # Simulation is restored from disk; validate persisted marker metadata.
-            label = simulation.fake_location.label
-            if label is None or not str(label).strip():
-                raise ValueError(
-                    "Invalid simulation marker location: label is required for restored fake_location (pk/code_line)"
-                )
-            try:
-                pk, code_line = str(label).split("/", maxsplit=1)
-            except ValueError:
-                raise ValueError(
-                    f"Invalid simulation marker location: {label}, expected format: pk/code_line"
-                )
-            pk_normalized = str(pk).strip()
-            code_line_normalized = str(code_line).strip()
-            latitude = simulation.fake_location.lat
-            longitude = simulation.fake_location.lon
             # Validate the simulation marker location, simulation metadata can have been modified by the user
-            self.validate_simulation_marker_location(
-                simulation_id=simulation.id,
-                marker_id=pk_normalized,
-                code_line=code_line_normalized,
-                latitude=latitude,
-                longitude=longitude,
-            )
+            if simulation.spoofed_location.point_of_interest is not None:
+                self.validate_simulation_marker_location(
+                    simulation_id=simulation.id,
+                    marker_id=simulation.spoofed_location.point_of_interest.id,
+                    code_line=simulation.spoofed_location.point_of_interest.line.code,
+                    latitude=simulation.spoofed_location.point_of_interest.geometry.y,
+                    longitude=simulation.spoofed_location.point_of_interest.geometry.x,
+                )
+        # Set the last active device id
+        self._simulations.last_active_device_id = device_id
 
     def get_simulation(self, id: str) -> Simulation | None:
         """
@@ -813,10 +802,21 @@ class ModelEntrypoint(Entrypoint):
                 raise ValueError(f"Unknown simulation field: {key}")
             current = getattr(simulation, key)
             # Handle location tuple, controller does not know about custom Location class
-            if key in ("real_location", "fake_location"):
+            if key in ("real_location", "spoofed_location"):
                 if isinstance(value, tuple) and len(value) == 3:
-                    lat, lon, label = value
-                    value = Location(lat=lat, lon=lon, label=label)
+                    lat, lon, poi_raw = value
+                    point_of_interest: Milestone | None = None
+                    if isinstance(poi_raw, dict):
+                        point_of_interest = Milestone.from_payload(poi_raw)
+                    elif poi_raw is not None:
+                        raise ValueError(
+                            f"Invalid point_of_interest in location tuple: {poi_raw!r}"
+                        )
+                    value = Location(
+                        lat=lat,
+                        lon=lon,
+                        point_of_interest=point_of_interest,
+                    )
                 else:
                     raise ValueError(f"Invalid location tuple: {value}")
             if current == value:
@@ -831,14 +831,18 @@ class ModelEntrypoint(Entrypoint):
                         active=simulation.active,
                     ),
                 )
-            elif key in ("real_location", "fake_location"):
+            elif key in ("real_location", "spoofed_location"):
                 self._signal_bus.emit(
                     CoreSignal.SIMULATION_POSITION_CHANGED,
                     SimulationPositionChangedPayload(
                         simulation_id=simulation.id,
                         lat=value.lat,
                         lon=value.lon,
-                        label=value.label,
+                        point_of_interest=(
+                            value.point_of_interest.to_payload()
+                            if value.point_of_interest is not None
+                            else None
+                        ),
                     ),
                 )
             elif key == "map_file":
@@ -868,18 +872,17 @@ class ModelEntrypoint(Entrypoint):
 
         try:
             validated = Milestone.validate(
-                marker_id, code_line, Location(lat=latitude, lon=longitude)
+                marker_id,
+                code_line,
+                Point(longitude, latitude),
             )
             self._signal_bus.emit(
                 CoreSignal.SIMULATION_LOCATION_VALIDATED,
                 SimulationLocationValidatedPayload(
                     simulation_id=simulation_id,
-                    id=validated.id,
                     lat=validated.geometry.y,
                     lon=validated.geometry.x,
-                    label=validated.label,
-                    code_line=validated.line.code,
-                    type=validated.type,
+                    point_of_interest=validated.to_payload(),
                 ),
             )
         except MilestoneValidationError as error:
@@ -973,6 +976,24 @@ class ModelEntrypoint(Entrypoint):
             simulation_id=simulation_id,
             application_dir=application_dir,
         ).run()
+
+    def get_map_file_for_simulation(self, simulation_id: str) -> Path | None:
+        """
+        Get the map file for a simulation.
+        """
+        simulation = self.get_simulation(simulation_id)
+        if simulation is None:
+            return None
+        return simulation.map_file
+
+    def is_map_rendered_for_simulation(self, simulation_id: str) -> bool:
+        """
+        Check if the map is rendered for a simulation.
+        """
+        simulation = self.get_simulation(simulation_id)
+        if simulation is None:
+            return False
+        return simulation.map_file is not None and simulation.map_file.exists()
 
     def apply_result(self, result: CoreRuntimeWorkOutcome) -> None:
         """

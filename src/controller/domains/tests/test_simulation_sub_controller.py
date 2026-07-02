@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import builtins
 import json
+from collections.abc import Iterator
 from pathlib import Path
 from typing import cast
 from unittest.mock import MagicMock, patch
@@ -15,7 +16,7 @@ from controller.orchestration.app_controller import AppController
 from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
 from core.devices import Phone
 from core.entrypoint import ModelEntrypoint
-from core.geo.location import Location
+from core.geo.element import clear_referentiel_pk_cache
 from core.signals import (
     CoreSignal,
     SimulationCreatedPayload,
@@ -23,6 +24,13 @@ from core.signals import (
     SimulationPositionChangedPayload,
     SimulationStateChangedPayload,
 )
+
+
+@pytest.fixture(autouse=True)
+def _clear_referentiel_cache() -> Iterator[None]:
+    clear_referentiel_pk_cache()
+    yield
+    clear_referentiel_pk_cache()
 
 
 class _AppProbe:
@@ -270,21 +278,21 @@ def test_update_simulation_location_persists_metadata(tmp_path: Path) -> None:
     subcontroller = _make_subcontroller(model_entrypoint)
     subcontroller.connect_model_signals()
     simulation_id = _create_simulation_id(model_entrypoint, "device-1")
-    new_fake_location = (48.85, 2.35, "Paris")
+    new_spoofed_location = (48.85, 2.35, None)
 
     model_entrypoint.update_simulation(
         simulation_id,
-        fake_location=new_fake_location,
+        spoofed_location=new_spoofed_location,
     )
 
     metadata_path = model_entrypoint._simulations.simulation_metadata_file(
         simulation_id
     )
     payload = json.loads(metadata_path.read_text(encoding="utf-8"))
-    assert payload["fake_location"] == {
-        "lat": new_fake_location[0],
-        "lon": new_fake_location[1],
-        "label": new_fake_location[2],
+    assert payload["spoofed_location"] == {
+        "lat": new_spoofed_location[0],
+        "lon": new_spoofed_location[1],
+        "point_of_interest": None,
     }
 
 
@@ -319,7 +327,7 @@ def test_update_simulation_location_emits_position_changed_with_simulation_id(
         tmp_path, device=Phone(id="device-1", state="device", model="Pixel")
     )
     simulation_id = _create_simulation_id(model_entrypoint, "device-1")
-    new_location = (1.0, 2.0, "updated")
+    new_spoofed_location = (1.0, 2.0, None)
     captured: list[SimulationPositionChangedPayload] = []
 
     def capture_position(payload: SimulationPositionChangedPayload) -> None:
@@ -330,44 +338,57 @@ def test_update_simulation_location_emits_position_changed_with_simulation_id(
         capture_position,
     )
 
-    model_entrypoint.update_simulation(simulation_id, real_location=new_location)
+    model_entrypoint.update_simulation(
+        simulation_id, real_location=new_spoofed_location
+    )
 
     assert len(captured) == 1
     assert captured[0].simulation_id == simulation_id
-    assert captured[0].lat == new_location[0]
-    assert captured[0].lon == new_location[1]
-    assert captured[0].label == new_location[2]
+    assert captured[0].lat == new_spoofed_location[0]
+    assert captured[0].lon == new_spoofed_location[1]
+    assert captured[0].point_of_interest is None
 
 
-def test_simulation_location_validated_updates_fake_location_and_persists(
+def test_simulation_location_validated_updates_spoofed_location_and_persists(
     tmp_path: Path,
 ) -> None:
     model_entrypoint = _make_model(
         tmp_path, device=Phone(id="device-1", state="device", model="Pixel")
     )
     subcontroller = _make_subcontroller(model_entrypoint)
-    subcontroller.connect_model_signals()
     simulation_id = _create_simulation_id(model_entrypoint, "device-1")
-    payload = SimulationLocationValidatedPayload(
-        simulation_id=simulation_id,
-        id="001+000",
-        lat=48.88533318609319,
-        lon=2.363530409238113,
-        label="001+000 / 001000-1",
-        code_line="001000",
-        type="Kilomètre",
-    )
+    captured: list[SimulationLocationValidatedPayload] = []
 
+    def capture(payload: SimulationLocationValidatedPayload) -> None:
+        captured.append(payload)
+
+    model_entrypoint.subscribe(CoreSignal.SIMULATION_LOCATION_VALIDATED, capture)
+    model_entrypoint.validate_simulation_marker_location(
+        simulation_id,
+        "001+000",
+        "001000",
+        48.88533318609319,
+        2.363530409238113,
+    )
+    assert len(captured) == 1
+    payload = captured[0]
+
+    subcontroller.connect_model_signals()
     subcontroller._on_simulation_location_validated(payload)
 
     simulation = model_entrypoint.get_simulation(simulation_id)
     assert simulation is not None
-    assert simulation.fake_location.lat == pytest.approx(payload.lat)
-    assert simulation.fake_location.lon == pytest.approx(payload.lon)
-    assert simulation.fake_location.label == payload.label
+    assert simulation.spoofed_location.lat == pytest.approx(payload.lat)
+    assert simulation.spoofed_location.lon == pytest.approx(payload.lon)
+    assert simulation.spoofed_location.point_of_interest is not None
+    assert (
+        simulation.spoofed_location.point_of_interest.id
+        == payload.point_of_interest["id"]
+    )
     metadata_path = model_entrypoint._simulations.simulation_metadata_file(
         simulation_id
     )
     persisted = json.loads(metadata_path.read_text(encoding="utf-8"))
-    assert persisted["fake_location"]["lat"] == pytest.approx(payload.lat)
-    assert persisted["fake_location"]["lon"] == pytest.approx(payload.lon)
+    assert persisted["spoofed_location"]["lat"] == pytest.approx(payload.lat)
+    assert persisted["spoofed_location"]["lon"] == pytest.approx(payload.lon)
+    assert persisted["spoofed_location"]["point_of_interest"]["id"] == "001+000"

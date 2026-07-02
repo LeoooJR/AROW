@@ -5,10 +5,10 @@ from __future__ import annotations
 from collections.abc import Iterator
 
 import pytest
+from shapely.geometry import Point
 
 from core.geo.element import Milestone, Railway, clear_referentiel_pk_cache
 from core.geo.exceptions import MilestoneValidationError
-from core.geo.location import Location
 
 
 @pytest.fixture(autouse=True)
@@ -22,7 +22,7 @@ def test_milestone_validate_returns_canonical_referentiel_coords() -> None:
     validated = Milestone.validate(
         "001+000",
         "001000",
-        Location(lat=48.88533318609319, lon=2.363530409238113),
+        Point(2.363530409238113, 48.88533318609319),
     )
     expected_line = Railway.validate(code="001000")
 
@@ -39,7 +39,7 @@ def test_milestone_validate_rejects_unknown_marker() -> None:
         Milestone.validate(
             "999+999",
             "001000",
-            Location(lat=0.0, lon=0.0),
+            Point(0.0, 0.0),
         )
 
 
@@ -51,7 +51,7 @@ def test_milestone_validate_rejects_unknown_line_for_duplicate_pk() -> None:
         Milestone.validate(
             "140+000",
             "001306",
-            Location(lat=47.758652, lon=1.935775),
+            Point(1.935775, 47.758652),
         )
 
 
@@ -59,7 +59,7 @@ def test_milestone_validate_resolves_duplicate_pk_by_line() -> None:
     validated = Milestone.validate(
         "140+000",
         "590000",
-        Location(lat=47.758652, lon=1.935775),
+        Point(1.935775, 47.758652),
     )
     assert validated.line.code == "590000"
     assert validated.geometry.y == pytest.approx(47.758652)
@@ -74,5 +74,5 @@ def test_milestone_validate_rejects_coord_mismatch() -> None:
         Milestone.validate(
             "001+000",
             "001000",
-            Location(lat=48.0, lon=2.0),
+            Point(2.0, 48.0),
         )

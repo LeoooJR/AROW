@@ -4,7 +4,7 @@ Simulation state and lifecycle (active device, locations, start/stop/resume/paus
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Slot
 
@@ -96,15 +96,14 @@ class SimulationSubController(AppSubController):
     def _on_simulation_location_validated(
         self, payload: SimulationLocationValidatedPayload
     ) -> None:
-        """Apply validated map milestone selection to simulation fake location."""
-        location: Tuple[float, float, str] = (
-            payload.lat,
-            payload.lon,
-            payload.label or "",
-        )
+        """Apply validated map milestone selection to simulation spoofed location."""
         self.model_entrypoint.update_simulation(
             payload.simulation_id,
-            fake_location=location,
+            spoofed_location=(
+                payload.lat,
+                payload.lon,
+                payload.point_of_interest,
+            ),
         )
 
     def is_simulation_active(self, id: str) -> bool:
@@ -191,7 +190,9 @@ class SimulationSubController(AppSubController):
                 error=str(e),
                 device_id=device_id,
             )
-            self.view.forward_device_selection_failed(device_id, device_name)
+            self.view.forward_device_selection_failed(
+                device_id, device_name
+            )  # TODO: must be connected to a core signal
 
     @Slot(str)
     def _on_remove_device_requested(self, device_id: str) -> None:

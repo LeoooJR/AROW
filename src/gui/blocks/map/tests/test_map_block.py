@@ -437,7 +437,7 @@ def test_map_block_placeholder_helper_animation_noops_when_canvas_visible(
 def test_location_set_coordinates_preserves_title_labels(qtbot) -> None:
     block = MapBlock()
     qtbot.addWidget(block)
-    location = block.ui.coordinates.simulated_location_widget
+    location = block.ui.coordinates.spoofed_location_widget
     latitude_title = location.ui.latitude_label.text()
     longitude_title = location.ui.longitude_label.text()
 
@@ -465,7 +465,7 @@ def test_map_block_simulation_location_validated_updates_simulated_row(qtbot) ->
     )
     qtbot.wait(0)
 
-    simulated = block.ui.coordinates.simulated_location_widget
+    simulated = block.ui.coordinates.spoofed_location_widget
     assert simulated.ui.latitude_value_label.text() == str(48.88533318609319)
     assert simulated.ui.longitude_value_label.text() == str(2.363530409238113)
 
@@ -476,7 +476,7 @@ def test_map_block_simulation_location_validated_ignores_stale_simulation_id(
     block = MapBlock()
     qtbot.addWidget(block)
     block._active_simulation_id = "sim-1"
-    simulated = block.ui.coordinates.simulated_location_widget
+    simulated = block.ui.coordinates.spoofed_location_widget
 
     signals.SIMULATION.SimulationLocationValidated.emit(
         "sim-2",
