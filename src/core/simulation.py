@@ -33,11 +33,11 @@ class Simulation(Payload):
         hash=True,
     )
     real_location: Location = field(
-        default_factory=lambda: Location(lat=0.0, lon=0.0, point_of_interest=None),
+        default_factory=lambda: Location(lat=0.0, lon=0.0, poi=None),
         metadata={"description": "The real location of the device"},
     )
     spoofed_location: Location = field(
-        default_factory=lambda: Location(lat=0.0, lon=0.0, point_of_interest=None),
+        default_factory=lambda: Location(lat=0.0, lon=0.0, poi=None),
         metadata={"description": "The spoofed location to simulate on the device"},
     )
     device: Phone | None = field(

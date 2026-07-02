@@ -292,7 +292,7 @@ def test_update_simulation_location_persists_metadata(tmp_path: Path) -> None:
     assert payload["spoofed_location"] == {
         "lat": new_spoofed_location[0],
         "lon": new_spoofed_location[1],
-        "point_of_interest": None,
+        "poi": None,
     }
 
 
@@ -346,7 +346,7 @@ def test_update_simulation_location_emits_position_changed_with_simulation_id(
     assert captured[0].simulation_id == simulation_id
     assert captured[0].lat == new_spoofed_location[0]
     assert captured[0].lon == new_spoofed_location[1]
-    assert captured[0].point_of_interest is None
+    assert captured[0].poi is None
 
 
 def test_simulation_location_validated_updates_spoofed_location_and_persists(
@@ -380,15 +380,12 @@ def test_simulation_location_validated_updates_spoofed_location_and_persists(
     assert simulation is not None
     assert simulation.spoofed_location.lat == pytest.approx(payload.lat)
     assert simulation.spoofed_location.lon == pytest.approx(payload.lon)
-    assert simulation.spoofed_location.point_of_interest is not None
-    assert (
-        simulation.spoofed_location.point_of_interest.id
-        == payload.point_of_interest["id"]
-    )
+    assert simulation.spoofed_location.poi is not None
+    assert simulation.spoofed_location.poi.id == payload.poi["id"]
     metadata_path = model_entrypoint._simulations.simulation_metadata_file(
         simulation_id
     )
     persisted = json.loads(metadata_path.read_text(encoding="utf-8"))
     assert persisted["spoofed_location"]["lat"] == pytest.approx(payload.lat)
     assert persisted["spoofed_location"]["lon"] == pytest.approx(payload.lon)
-    assert persisted["spoofed_location"]["point_of_interest"]["id"] == "001+000"
+    assert persisted["spoofed_location"]["poi"]["id"] == "001+000"

@@ -396,7 +396,7 @@ def test_on_simulation_location_validated_forwards_to_view(
         simulation_id="sim-1",
         lat=48.88533318609319,
         lon=2.363530409238113,
-        point_of_interest={
+        poi={
             "id": "001+000",
             "line": {"code": "001000"},
             "label": "001+000 / 001000-1",

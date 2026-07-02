@@ -102,7 +102,7 @@ class SimulationSubController(AppSubController):
             spoofed_location=(
                 payload.lat,
                 payload.lon,
-                payload.point_of_interest,
+                payload.poi,
             ),
         )
 

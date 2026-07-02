@@ -64,7 +64,7 @@ def test_validate_simulation_marker_location_emits_validated_payload(
 
     assert len(captured) == 1
     assert captured[0].simulation_id == simulation_id
-    poi = captured[0].point_of_interest
+    poi = captured[0].poi
     assert poi["id"] == "001+000"
     line = poi["line"]
     assert isinstance(line, dict)

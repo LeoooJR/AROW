@@ -159,8 +159,8 @@ def test_simulation_from_payload_rebuilds_fields(tmp_path: Path) -> None:
     simulation = Simulation(
         id="sim-1",
         device=device,
-        real_location=Location(lat=1.0, lon=2.0, point_of_interest=None),
-        spoofed_location=Location(lat=3.0, lon=4.0, point_of_interest=None),
+        real_location=Location(lat=1.0, lon=2.0, poi=None),
+        spoofed_location=Location(lat=3.0, lon=4.0, poi=None),
         map_file=map_file,
         log_file=log_file,
         active=True,
@@ -240,8 +240,8 @@ def test_write_all_writes_simulation_json_and_index_last(tmp_path: Path) -> None
     simulation_one = Simulation(
         id="sim-1",
         device=device,
-        real_location=Location(lat=1.0, lon=2.0, point_of_interest=None),
-        spoofed_location=Location(lat=3.0, lon=4.0, point_of_interest=None),
+        real_location=Location(lat=1.0, lon=2.0, poi=None),
+        spoofed_location=Location(lat=3.0, lon=4.0, poi=None),
         active=True,
     )
     simulation_two = Simulation(id="sim-2")
@@ -263,8 +263,8 @@ def test_write_all_writes_simulation_json_and_index_last(tmp_path: Path) -> None
         "schema_version": SIMULATION_REPOSITORY_SCHEMA_VERSION,
         "id": "sim-1",
         "device": device.to_payload(json_compatible=True),
-        "real_location": {"lat": 1.0, "lon": 2.0, "point_of_interest": None},
-        "spoofed_location": {"lat": 3.0, "lon": 4.0, "point_of_interest": None},
+        "real_location": {"lat": 1.0, "lon": 2.0, "poi": None},
+        "spoofed_location": {"lat": 3.0, "lon": 4.0, "poi": None},
         "map_file": "map/sim-1.html",
         "log_file": "sim-1.log",
         "active": True,

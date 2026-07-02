@@ -746,13 +746,13 @@ class ModelEntrypoint(Entrypoint):
                 device_id=device_id,
             )
             # Validate the simulation marker location, simulation metadata can have been modified by the user
-            if simulation.spoofed_location.point_of_interest is not None:
+            if simulation.spoofed_location.poi is not None:
                 self.validate_simulation_marker_location(
                     simulation_id=simulation.id,
-                    marker_id=simulation.spoofed_location.point_of_interest.id,
-                    code_line=simulation.spoofed_location.point_of_interest.line.code,
-                    latitude=simulation.spoofed_location.point_of_interest.geometry.y,
-                    longitude=simulation.spoofed_location.point_of_interest.geometry.x,
+                    marker_id=simulation.spoofed_location.poi.id,
+                    code_line=simulation.spoofed_location.poi.line.code,
+                    latitude=simulation.spoofed_location.poi.geometry.y,
+                    longitude=simulation.spoofed_location.poi.geometry.x,
                 )
         # Set the last active device id
         self._simulations.last_active_device_id = device_id
@@ -805,17 +805,15 @@ class ModelEntrypoint(Entrypoint):
             if key in ("real_location", "spoofed_location"):
                 if isinstance(value, tuple) and len(value) == 3:
                     lat, lon, poi_raw = value
-                    point_of_interest: Milestone | None = None
+                    poi: Milestone | None = None
                     if isinstance(poi_raw, dict):
-                        point_of_interest = Milestone.from_payload(poi_raw)
+                        poi = Milestone.from_payload(poi_raw)
                     elif poi_raw is not None:
-                        raise ValueError(
-                            f"Invalid point_of_interest in location tuple: {poi_raw!r}"
-                        )
+                        raise ValueError(f"Invalid poi in location tuple: {poi_raw!r}")
                     value = Location(
                         lat=lat,
                         lon=lon,
-                        point_of_interest=point_of_interest,
+                        poi=poi,
                     )
                 else:
                     raise ValueError(f"Invalid location tuple: {value}")
@@ -838,11 +836,7 @@ class ModelEntrypoint(Entrypoint):
                         simulation_id=simulation.id,
                         lat=value.lat,
                         lon=value.lon,
-                        point_of_interest=(
-                            value.point_of_interest.to_payload()
-                            if value.point_of_interest is not None
-                            else None
-                        ),
+                        poi=(value.poi.to_payload() if value.poi is not None else None),
                     ),
                 )
             elif key == "map_file":
@@ -882,7 +876,7 @@ class ModelEntrypoint(Entrypoint):
                     simulation_id=simulation_id,
                     lat=validated.geometry.y,
                     lon=validated.geometry.x,
-                    point_of_interest=validated.to_payload(),
+                    poi=validated.to_payload(),
                 ),
             )
         except MilestoneValidationError as error:

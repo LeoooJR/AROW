@@ -166,7 +166,7 @@ class MapSubController(AppSubController):
         self, payload: SimulationLocationValidatedPayload
     ) -> None:
         """Forward validated simulation location to the map view."""
-        poi = payload.point_of_interest
+        poi = payload.poi
         line = poi.get("line")
         code_line = ""
         if isinstance(line, dict):

@@ -139,7 +139,7 @@ class SimulationPositionChangedPayload:
     simulation_id: str
     lat: float
     lon: float
-    point_of_interest: dict[str, object] | None
+    poi: dict[str, object] | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -149,7 +149,7 @@ class SimulationLocationValidatedPayload:
     simulation_id: str
     lat: float
     lon: float
-    point_of_interest: dict[str, object]
+    poi: dict[str, object]
 
 
 @dataclass(frozen=True, slots=True)
