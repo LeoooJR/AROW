@@ -365,8 +365,8 @@ def test_simulation_location_validated_updates_spoofed_location_and_persists(
     model_entrypoint.subscribe(CoreSignal.SIMULATION_LOCATION_VALIDATED, capture)
     model_entrypoint.validate_simulation_marker_location(
         simulation_id,
-        "001+000",
-        "001000",
+        1,
+        "001000-1",
         48.88533318609319,
         2.363530409238113,
     )
@@ -381,11 +381,13 @@ def test_simulation_location_validated_updates_spoofed_location_and_persists(
     assert simulation.spoofed_location.lat == pytest.approx(payload.lat)
     assert simulation.spoofed_location.lon == pytest.approx(payload.lon)
     assert simulation.spoofed_location.poi is not None
-    assert simulation.spoofed_location.poi.id == payload.poi["id"]
+    assert simulation.spoofed_location.poi.id == "001000-1-1"
+    assert simulation.spoofed_location.poi.is_validated
     metadata_path = model_entrypoint._simulations.simulation_metadata_file(
         simulation_id
     )
     persisted = json.loads(metadata_path.read_text(encoding="utf-8"))
     assert persisted["spoofed_location"]["lat"] == pytest.approx(payload.lat)
     assert persisted["spoofed_location"]["lon"] == pytest.approx(payload.lon)
-    assert persisted["spoofed_location"]["poi"]["id"] == "001+000"
+    assert persisted["spoofed_location"]["poi"]["km"] == 1
+    assert persisted["spoofed_location"]["poi"]["line"]["code"] == "001000"

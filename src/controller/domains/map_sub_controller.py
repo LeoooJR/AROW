@@ -136,12 +136,12 @@ class MapSubController(AppSubController):
                 self._render_jobs_by_simulation_id[simulation_id] = handle
 
     @validate_model_entrypoint
-    @Slot(str, str, str, float, float)
+    @Slot(str, int, str, float, float)
     def _on_simulation_location_requested(
         self,
         simulation_id: str,
-        marker_id: str,
-        code_line: str,
+        km: int,
+        line: str,
         latitude: float,
         longitude: float,
     ) -> None:
@@ -149,14 +149,15 @@ class MapSubController(AppSubController):
         logger.debug(
             "MapSubController: simulation location requested",
             simulation_id=simulation_id,
-            marker_id=marker_id,
+            km=km,
+            line=line,
             latitude=latitude,
             longitude=longitude,
         )
         self.model_entrypoint.validate_simulation_marker_location(
             simulation_id,
-            marker_id,
-            code_line,
+            km,
+            line,
             latitude,
             longitude,
         )
@@ -167,23 +168,34 @@ class MapSubController(AppSubController):
     ) -> None:
         """Forward validated simulation location to the map view."""
         poi = payload.poi
-        line = poi.get("line")
-        code_line = ""
-        if isinstance(line, dict):
-            code_line = str(line.get("code", ""))
+        poi_km = poi.get("km", 0)
+        if not isinstance(poi_km, int):
+            logger.warning(
+                "MapSubController: validated poi km is not an integer",
+                simulation_id=payload.simulation_id,
+                km=poi_km,
+            )
+            return
+        km = poi_km
+        line_payload = poi.get("line")
+        line = ""
+        if isinstance(line_payload, dict):
+            code = str(line_payload.get("code", ""))
+            troncon = str(line_payload.get("troncon", ""))
+            line = f"{code}-{troncon}"
         logger.debug(
             "MapSubController: simulation location validated",
             simulation_id=payload.simulation_id,
-            id=poi.get("id"),
-            code_line=code_line,
+            km=km,
+            line=line,
             type=poi.get("type"),
             lat=payload.lat,
             lon=payload.lon,
         )
         self.view.forward_simulation_location_validated(
             simulation_id=payload.simulation_id,
-            marker_id=str(poi.get("id", "")),
-            code_line=code_line,
+            km=km,
+            line=line,
             lat=payload.lat,
             lon=payload.lon,
             label=str(poi.get("label", "")),
@@ -196,16 +208,16 @@ class MapSubController(AppSubController):
         logger.warning(
             "MapSubController: simulation location rejected",
             simulation_id=payload.simulation_id,
-            id=payload.id,
-            code_line=payload.code_line,
+            km=payload.km,
+            line=payload.line,
             lat=payload.lat,
             lon=payload.lon,
             reason=payload.reason,
         )
         self.view.forward_simulation_location_rejected(
             simulation_id=payload.simulation_id,
-            marker_id=payload.id,
-            code_line=payload.code_line or "",
+            km=payload.km,
+            line=payload.line,
             lat=payload.lat,
             lon=payload.lon,
             reason=payload.reason,

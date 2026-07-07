@@ -327,7 +327,7 @@ class MilestoneTargetBlock(VerticalLayoutWrapper, Block):
     def set_target_values(
         self,
         *,
-        code_line: object | None = None,
+        line: object | None = None,
         km: object | None = None,
         longitude: object | None = None,
         latitude: object | None = None,
@@ -338,7 +338,7 @@ class MilestoneTargetBlock(VerticalLayoutWrapper, Block):
     ) -> None:
         """Update displayed milestone values and optional status badge."""
         updates: tuple[tuple[object | None, MilestoneMetadataItem], ...] = (
-            (code_line, self.ui.line_item),
+            (line, self.ui.line_item),
             (km, self.ui.km_item),
             (_coordinate_display_value(longitude), self.ui.longitude_item),
             (_coordinate_display_value(latitude), self.ui.latitude_item),
@@ -357,7 +357,7 @@ class MilestoneTargetBlock(VerticalLayoutWrapper, Block):
     def clear_target_values(self) -> None:
         """Clear the target values."""
         self.set_target_values(
-            code_line=None,
+            line=None,
             km=None,
             longitude=None,
             latitude=None,
@@ -378,8 +378,8 @@ class MilestoneTargetBlock(VerticalLayoutWrapper, Block):
     def _on_simulation_location_validated(
         self,
         simulation_id: str,
-        marker_id: str,
-        code_line: str,
+        km: int,
+        line: str,
         latitude: float,
         longitude: float,
         label: str,
@@ -387,8 +387,8 @@ class MilestoneTargetBlock(VerticalLayoutWrapper, Block):
         """Update the milestone target block when a simulation location is validated."""
         _ = simulation_id
         self.set_target_values(
-            code_line=code_line,
-            km=marker_id,
+            line=line,
+            km=km,
             latitude=latitude,
             longitude=longitude,
             type_=label,
@@ -412,7 +412,7 @@ class MilestoneTargetBlock(VerticalLayoutWrapper, Block):
     def set_placeholder_values(self) -> None:
         """Populate the block with generated placeholder milestone values."""
         self.set_target_values(
-            code_line=self.texts.placeholder_line,
+            line=self.texts.placeholder_line,
             km=self.texts.placeholder_km,
             longitude=self.texts.placeholder_longitude,
             latitude=self.texts.placeholder_latitude,

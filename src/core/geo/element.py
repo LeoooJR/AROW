@@ -20,6 +20,9 @@ from core.payload import Payload
 # Maximum WGS84 delta (degrees) between clicked map coords and referentiel row.
 _COORD_TOLERANCE_DEGREES: float = 0.0001
 
+# Internal factory marker: only validate() classmethods pass this token.
+_VALIDATED_FACTORY_TOKEN = object()
+
 
 def _serialize_geometry(geometry: BaseGeometry, **kwargs: object) -> bytes | str:
     """Serialize geometry for persistence; base64 when writing JSON metadata."""
@@ -42,9 +45,10 @@ class _ValidatedRailwaySnapshot:
 
     id: str
     code: str
+    troncon: int
     type: str
     label: str
-    geometry: MultiLineString
+    geometry: LineString | MultiLineString
 
 
 @lru_cache(maxsize=1)
@@ -69,68 +73,69 @@ def _normalize_lookup_key(value: object) -> str | None:
     return normalized or None
 
 
-def _scalar_field_value(group: geopandas.GeoDataFrame, column: str) -> str:
-    """Read the first non-null scalar in a segment group as a string field."""
-    series = group[column]
-    unique_values = series.dropna().unique()
-    if len(unique_values) == 0:
-        return ""
-    return str(unique_values[0])
-
-
-def _segment_linestrings(group: geopandas.GeoDataFrame) -> list[LineString]:
-    """Expand referentiel segment geometries into individual line strings."""
-    linestrings: list[LineString] = []
-    for geometry in group.geometry:
-        if isinstance(geometry, LineString):
-            linestrings.append(geometry)
-        elif isinstance(geometry, MultiLineString):
-            linestrings.extend(geometry.geoms)
-        else:
-            raise RailwayValidationError(
-                f"Unsupported railway geometry type: {type(geometry).__name__}"
-            )
-    if not linestrings:
-        raise RailwayValidationError(
-            "Railway geometry must contain at least one segment"
-        )
-    return linestrings
-
-
-def _railway_snapshot_from_segments(
-    group: geopandas.GeoDataFrame,
+def _railway_snapshot_from_segment(
+    row: pd.Series,
 ) -> _ValidatedRailwaySnapshot:
-    """Merge segmented referentiel rows into one multi-linestring railway snapshot."""
-    segment_geometries = _segment_linestrings(group)
+    """Build one railway snapshot from a single lignes-par-type segment row."""
+    id_key = _normalize_lookup_key(row["idgaia"])
+    code_key = _normalize_lookup_key(row["code_ligne"])
+    if id_key is None or code_key is None:
+        raise ValueError("Missing railway lookup key in lignes-par-type row")
     return _ValidatedRailwaySnapshot(
-        id=_scalar_field_value(group, "idgaia"),
-        code=_scalar_field_value(group, "code_ligne"),
-        type=_scalar_field_value(group, "type_ligne"),
-        label=_scalar_field_value(group, "lib_ligne"),
-        geometry=MultiLineString(segment_geometries),
+        id=id_key,
+        code=code_key,
+        troncon=int(row["rg_troncon"]),
+        type=row["type_ligne"],
+        label=row["lib_ligne"],
+        geometry=row["geometry"],
     )
 
 
 @lru_cache(maxsize=1)
-def _railway_lookup_indexes() -> (
-    tuple[dict[str, _ValidatedRailwaySnapshot], dict[str, _ValidatedRailwaySnapshot]]
-):
+def _railway_lookup_indexes() -> tuple[
+    dict[str, dict[int, _ValidatedRailwaySnapshot]],
+    dict[str, dict[int, _ValidatedRailwaySnapshot]],
+]:
     """Build O(1) railway lookup indexes keyed by SNCF Gaïa id and numeric line code."""
     referentiel = _lignes_par_type_dataset()
-    by_idgaia: dict[str, _ValidatedRailwaySnapshot] = {}
-    by_code_ligne: dict[str, _ValidatedRailwaySnapshot] = {}
+    by_idgaia: dict[str, dict[int, _ValidatedRailwaySnapshot]] = (
+        {}
+    )  # Keyed by SNCF Gaïa id and troncon.
+    by_code_ligne: dict[str, dict[int, _ValidatedRailwaySnapshot]] = (
+        {}
+    )  # Keyed by numeric line code and troncon.
 
-    idgaia_keys = referentiel["idgaia"].map(_normalize_lookup_key)
-    for lookup_key, group in referentiel.groupby(idgaia_keys, sort=False):
+    idgaia_keys = referentiel["idgaia"].unique().map(_normalize_lookup_key)
+    for lookup_key in idgaia_keys:
         if lookup_key is None:
             continue
-        by_idgaia[lookup_key] = _railway_snapshot_from_segments(group)
+        result: pd.DataFrame = referentiel.loc[referentiel["idgaia"] == lookup_key]
+        for (
+            _index,
+            row,
+        ) in (
+            result.iterrows()
+        ):  # Iterate over all segments (troncons) for the same railway.
+            by_idgaia.setdefault(lookup_key, {})[int(row["rg_troncon"])] = (
+                _railway_snapshot_from_segment(row)
+            )
 
-    code_keys = referentiel["code_ligne"].map(_normalize_lookup_key)
-    for lookup_key, group in referentiel.groupby(code_keys, sort=False):
+    code_keys = referentiel["code_ligne"].unique().map(_normalize_lookup_key)
+    for lookup_key in code_keys:
         if lookup_key is None:
             continue
-        by_code_ligne[lookup_key] = _railway_snapshot_from_segments(group)
+        code_result: pd.DataFrame = referentiel.loc[
+            referentiel["code_ligne"] == lookup_key
+        ]
+        for (
+            _index,
+            row,
+        ) in (
+            code_result.iterrows()
+        ):  # Iterate over all segments (troncons) for the same railway.
+            by_code_ligne.setdefault(lookup_key, {})[int(row["rg_troncon"])] = (
+                _railway_snapshot_from_segment(row)
+            )
 
     return by_idgaia, by_code_ligne
 
@@ -143,15 +148,15 @@ def _normalize_code_ligne(value: object) -> str:
     return normalized
 
 
-def clear_referentiel_pk_cache() -> None:
-    """Clear the cached referentiel dataset (for tests)."""
-    _referentiel_pk_dataset.cache_clear()
-
-
 def clear_lignes_par_type_cache() -> None:
     """Clear the cached lignes-par-type dataset (for tests)."""
     _lignes_par_type_dataset.cache_clear()
     _railway_lookup_indexes.cache_clear()
+
+
+def clear_referentiel_pk_cache() -> None:
+    """Clear the cached referentiel PK dataset (for tests)."""
+    _referentiel_pk_dataset.cache_clear()
 
 
 class MapElement(ABC):
@@ -242,20 +247,24 @@ class Milestone(MapElement, Payload):
 
     def __init__(
         self,
-        id: str,
+        km: int,
         line: Railway,
-        type: str,
+        type: Literal["Kilometer", "Hectometer"],
+        label: str,
         geometry: Point,
-        label: str | None = None,
+        *,
+        _validated_token: object | None = None,
     ):
         """
-        Initialize a milestone with the given id, line, type, label and geometry.
+        Initialize a milestone with the given km, line, type, label and geometry.
+
+        Do not use this constructor directly, use Milestone.validate() instead.
 
         Args:
-            id: The id of the milestone.
+            km: The kilometer of the milestone.
             line: The line of the milestone. Must be a Railway.
-            type: The type of the milestone.
-            label: The label of the milestone.
+            type: The type of the milestone (e.g Kilometer, Hectomètre, etc.).
+            label: The label of the milestone (e.g "25+000").
             geometry: The geometry of the milestone. Must be a Point.
 
         Raises:
@@ -264,18 +273,31 @@ class Milestone(MapElement, Payload):
         """
         if not isinstance(geometry, Point):
             raise TypeError("Geometry must be a Point")
-        super().__init__(
-            id,
-            geometry,
-        )
         if not isinstance(line, Railway):
             raise TypeError("Line must be a Railway")
-        validated_line = Railway.validate(id=line.id)
-        if not self._is_on_line(validated_line):
-            raise MilestoneValidationError(f"Milestone {id} is not on line {line}")
-        self._line = validated_line
+        _id = f"{line.code}-{line.troncon}-{km}"
+        super().__init__(
+            _id,
+            geometry,
+        )
+        self._id = _id
+        self._km = km
+        self._line = line
         self._type = type
-        self._label = label or f"{super().id} on {validated_line}"
+        self._label = label
+        self._is_validated = _validated_token is _VALIDATED_FACTORY_TOKEN
+
+    @property
+    def is_validated(self) -> bool:
+        """Return True when the milestone was created by ``Milestone.validate``."""
+        return self._is_validated
+
+    @property
+    def km(self) -> int:
+        """
+        Return the kilometer of the milestone.
+        """
+        return self._km
 
     @property
     def line(self) -> Railway:
@@ -305,13 +327,15 @@ class Milestone(MapElement, Payload):
         return self.geometry.dwithin(line.geometry, _COORD_TOLERANCE_DEGREES)
 
     @classmethod
-    def validate(cls, id: str, line: str | Railway, geometry: Point) -> Milestone:
+    def validate(
+        cls, km: int, line: Railway, geometry: Point | None = None
+    ) -> Milestone:
         """Resolve and validate a map milestone against ``referentiel_pk_gps``.
 
         Args:
-            id: PK string from map feature properties (e.g. ``001+000``).
-            line: Line string or Railway from map feature properties (e.g. ``590000``).
-            geometry: The geometry of the milestone. Must be a Point.
+            km: The kilometer of the milestone.
+            line: The line of the milestone. Must be a valid Railway initialized with Railway.validate().
+            geometry: The geometry of the milestone. Must be a Point. Will be validated if provided.
 
         Returns:
             Validated milestone.
@@ -319,115 +343,100 @@ class Milestone(MapElement, Payload):
         Raises:
             MilestoneValidationError: When the milestone is unknown or location diverges from referentiel.
         """
-        normalized_id = str(id).strip()
-        if not normalized_id:
-            raise MilestoneValidationError("Milestone id must not be empty")
 
-        if not isinstance(geometry, Point):
-            raise TypeError("Geometry must be a Point")
+        if not isinstance(km, int):
+            raise TypeError("Kilometer must be an integer")
+        if km <= 0:
+            raise MilestoneValidationError("Kilometer must be a positive integer")
 
-        if not isinstance(line, str) and not isinstance(line, Railway):
-            raise TypeError("Line must be a string or a Railway")
-
-        if isinstance(line, str):
-            line_identifier_type = Railway.resolve_line_identifier_type(line)
-            line_lookup_key = line
-        else:  # Railway instance
-            line_identifier_type = "idgaia"  # Most precise and reliable source.
-            line_lookup_key = (
-                line.id
-            )  # Extract SNCF Gaïa line identifier from Railway instance, do not trust other properties.
-
-        if line_identifier_type == "idgaia":
-            validated_line = Railway.validate(id=line_lookup_key)
-        elif line_identifier_type == "code_ligne":
-            validated_line = Railway.validate(code=line_lookup_key)
-        else:
-            raise MilestoneValidationError(f"Invalid line identifier: {line!r}")
+        if geometry is not None:
+            if not isinstance(geometry, Point):
+                raise TypeError("Geometry must be a Point")
+            if geometry.x < -180 or geometry.x > 180:
+                raise MilestoneValidationError(
+                    "Geometry x coordinate must be between -180 and 180"
+                )
+            if geometry.y < -90 or geometry.y > 90:
+                raise MilestoneValidationError(
+                    "Geometry y coordinate must be between -90 and 90"
+                )
 
         referentiel = _referentiel_pk_dataset()
-        milestone_series: pd.Series = referentiel["pk"].astype("string").str.strip()
-        matches: pd.DataFrame = referentiel.loc[milestone_series == normalized_id]
-        if matches.empty:
-            raise MilestoneValidationError(f"Unknown milestone id: {normalized_id!r}")
 
-        if len(matches.index) > 1:
-            # If there are multiple matches, filter by line.
-            code_ligne_series: pd.Series = matches["code_ligne"].map(
-                _normalize_code_ligne
-            )
-            normalized_railway_code = _normalize_code_ligne(validated_line.code)
-            matches_for_line: pd.DataFrame = matches.loc[
-                code_ligne_series == normalized_railway_code
-            ]
-            if matches_for_line.empty:
-                raise MilestoneValidationError(
-                    f"Unknown milestone {normalized_id!r} on line with code_ligne: {validated_line.code!r}"
-                )
-            if len(matches_for_line.index) > 1:
-                raise MilestoneValidationError(
-                    f"Multiple matches for {normalized_id!r} on line with code_ligne: {validated_line.code!r}"
-                )
-            # Update in broader scope to avoid re-fetching the dataset.
-            matches = matches_for_line
-
-        row: pd.Series = matches.iloc[0]  # Convert to Series for consistent indexing.
-        referentiel_lat = float(row["geometry"].y)
-        referentiel_lon = float(row["geometry"].x)
-        referentiel_geometry = Point(referentiel_lon, referentiel_lat)
-
-        if referentiel_geometry.distance(geometry) > _COORD_TOLERANCE_DEGREES:
+        if not isinstance(line, Railway):
+            raise TypeError("Line must be a Railway")
+        if not line.is_validated:
             raise MilestoneValidationError(
-                "Geometry does not match referentiel for milestone "
-                f"{normalized_id!r}: geometry={geometry}, referentiel={referentiel_geometry}"
+                "Railway must be validated with Railway.validate()"
             )
+        code_normalized = _normalize_code_ligne(line.code)
+        result = referentiel[
+            (
+                referentiel["code_ligne"].astype(str).map(_normalize_code_ligne)
+                == code_normalized
+            )
+            & (referentiel["rg_troncon"].astype(int) == line.troncon)
+            & (referentiel["km"] == km)
+        ]
 
-        type_reper_value = row.get("type_reper")
-        referentiel_type = None if pd.isna(type_reper_value) else str(type_reper_value)
-        label = f"{normalized_id} on {validated_line}"
+        if result.empty:
+            raise MilestoneValidationError(f"Unknown milestone: {line.id!r} {km}")
 
-        return cls(
-            id=normalized_id,
-            line=validated_line,
-            type=referentiel_type or "",
-            label=label,
+        if len(result.index) > 1:
+            raise MilestoneValidationError(f"Multiple matches for {line.id!r} {km}")
+
+        row: pd.Series = result.iloc[0]  # Convert to Series for consistent indexing.
+        referentiel_geometry = Point(row["geometry"].x, row["geometry"].y)
+
+        if geometry is not None:
+            if referentiel_geometry.distance(geometry) > _COORD_TOLERANCE_DEGREES:
+                raise MilestoneValidationError(
+                    f"Geometry does not match referentiel for milestone {line.id!r} {km}"
+                )
+
+        referentiel_label = str(row["label"])
+
+        milestone = cls(
+            km=km,
+            line=line,
+            type="Kilometer",
+            label=referentiel_label,
             geometry=referentiel_geometry,
+            _validated_token=_VALIDATED_FACTORY_TOKEN,
         )
+
+        if milestone._is_on_line(line):
+            return milestone
+        else:
+            raise MilestoneValidationError(
+                f"Milestone {milestone._id} is not on line {line}"
+            )
 
     def serialize(self, **kwargs) -> dict[str, object]:
         return {
-            "id": self.id,
-            "line": self.line.serialize(**kwargs),
-            "type": self.type,
-            "label": self.label,
-            "geometry": _serialize_geometry(self.geometry, **kwargs),
+            "km": self._km,
+            "line": self._line.serialize(**kwargs),
+            "type": self._type,
+            "label": self._label,
         }
 
     @classmethod
     def deserialize(cls, payload: dict[str, object], **kwargs) -> Milestone:
-        line = payload.get("line")
-        if not isinstance(line, dict):
-            raise ValueError("Line must be a dictionary")
-        line = Railway.deserialize(line, **kwargs)
-        milestone_id = payload.get("id")
-        milestone_type = payload.get("type")
-        milestone_label = payload.get("label")
-        if not isinstance(milestone_id, str):
-            raise ValueError("Milestone payload id must be a string")
-        if not isinstance(milestone_type, str):
-            raise ValueError("Milestone payload type must be a string")
-        if milestone_label is not None and not isinstance(milestone_label, str):
-            raise ValueError("Milestone payload label must be a string or null")
-        return cls(
-            id=milestone_id,
+        line_payload = payload.get("line")
+        if not isinstance(line_payload, dict):
+            raise ValueError("Milestone payload line must be a dictionary")
+        line = Railway.deserialize(line_payload, **kwargs)
+        milestone_km = payload.get("km")
+        if not isinstance(milestone_km, int):
+            raise ValueError("Milestone payload km must be an integer")
+        milestone = cls.validate(
+            km=milestone_km,
             line=line,
-            type=milestone_type,
-            label=milestone_label,
-            geometry=_deserialize_geometry(payload.get("geometry")),
         )
+        return milestone
 
     def __repr__(self) -> str:
-        return self._label
+        return f"{self._km} on {self._line}"
 
 
 class Railway(MapElement, Payload):
@@ -439,26 +448,41 @@ class Railway(MapElement, Payload):
         self,
         id: str,
         code: str,
+        troncon: int,
         type: str,
         label: str,
         geometry: LineString | MultiLineString,
+        *,
+        _validated_token: object | None = None,
     ):
         """
         Initialize a railway with the given id, code, type and geometry.
+        Do not use this constructor directly, use Railway.validate() instead.
 
         Args:
             id: The id of the railway.
             code: The code of the railway.
+            troncon: The troncon of the railway.
             type: The type of the railway.
             label: The label of the railway.
-            geometry: The geometry of the railway. LineString or merged MultiLineString.
+            geometry: The geometry of the railway. Must be a LineString or MultiLineString.
+
+        Raises:
+            TypeError: If the geometry is not a LineString or MultiLineString.
         """
         if not isinstance(geometry, (LineString, MultiLineString)):
             raise TypeError("Geometry must be a LineString or MultiLineString")
         super().__init__(id, geometry)
         self._code = code
+        self._troncon = troncon
         self._type = type
         self._label = label
+        self._is_validated = _validated_token is _VALIDATED_FACTORY_TOKEN
+
+    @property
+    def is_validated(self) -> bool:
+        """Return True when the railway was created by ``Railway.validate``."""
+        return self._is_validated
 
     @property
     def code(self) -> str:
@@ -466,6 +490,13 @@ class Railway(MapElement, Payload):
         Return the code of the railway.
         """
         return self._code
+
+    @property
+    def troncon(self) -> int:
+        """
+        Return the troncon of the railway.
+        """
+        return self._troncon
 
     @property
     def type(self) -> str:
@@ -520,6 +551,7 @@ class Railway(MapElement, Payload):
         cls,
         id: str | None = None,
         code: str | None = None,
+        troncon: int | None = None,
         type: str | None = None,
     ) -> Railway:
         """Resolve and validate a map railway against ``lignes-par-type``. At least one of the id or code must be provided.
@@ -527,7 +559,7 @@ class Railway(MapElement, Payload):
         Args:
             id: SNCF Gaïa line identifier (UUID). Must be provided if numeric line code is not provided or unknown.
             code: Numeric line code (6 digits). Must be provided if SNCF Gaïa line identifier is not provided or unknown.
-            location: Location reported by the map click handler.
+            troncon: The troncon of the railway.
             type: Line category (e.g. principale, raccordement).
 
         Returns:
@@ -536,8 +568,12 @@ class Railway(MapElement, Payload):
         Raises:
             RailwayValidationError: When the railway is unknown or location diverges from referentiel.
         """
-        lookup_key_name = None
-        normalized_lookup_key = None
+        lookup_key_name = (
+            None  # The name of the lookup key to use (idgaia or code_ligne)
+        )
+        normalized_lookup_key = (
+            None  # The normalized lookup key to use (idgaia or code_ligne)
+        )
         if id is None and code is None:
             raise RailwayValidationError(
                 "At least one of the id or code must be provided"
@@ -556,21 +592,35 @@ class Railway(MapElement, Payload):
             lookup_key_name = "code_ligne"
             normalized_lookup_key = normalized_code
 
-        if type is not None:
-            normalized_type = str(type).strip()
-            if not normalized_type:
-                raise RailwayValidationError("Railway type must not be empty")
-
         if lookup_key_name is None or normalized_lookup_key is None:
             raise RailwayValidationError(
                 "At least one of the id or code must be provided"
             )
 
+        if troncon is not None:
+            normalized_troncon = int(troncon)
+            if normalized_troncon <= 0:
+                raise RailwayValidationError(
+                    "Railway troncon must be a positive integer"
+                )
+        else:
+            raise RailwayValidationError("Railway troncon must be provided")
+
+        if type is not None:
+            normalized_type = str(type).strip()
+            if not normalized_type:
+                raise RailwayValidationError("Railway type must not be empty")
+
         by_idgaia, by_code_ligne = _railway_lookup_indexes()
         if lookup_key_name == "idgaia":
-            snapshot = by_idgaia.get(normalized_lookup_key)
+            segments = by_idgaia.get(normalized_lookup_key)
         else:
-            snapshot = by_code_ligne.get(normalized_lookup_key)
+            segments = by_code_ligne.get(normalized_lookup_key)
+        if segments is None:
+            raise RailwayValidationError(
+                f"Unknown railway {lookup_key_name}: {normalized_lookup_key!r}"
+            )
+        snapshot = segments.get(normalized_troncon)
         if snapshot is None:
             raise RailwayValidationError(
                 f"Unknown railway {lookup_key_name}: {normalized_lookup_key!r}"
@@ -579,41 +629,45 @@ class Railway(MapElement, Payload):
         return cls(
             id=snapshot.id,
             code=snapshot.code,
+            troncon=snapshot.troncon,
             type=snapshot.type,
             label=snapshot.label,
             geometry=snapshot.geometry,
+            _validated_token=_VALIDATED_FACTORY_TOKEN,
         )
 
     def serialize(self, **kwargs) -> dict[str, object]:
         return {
             "id": self.id,
             "code": self.code,
+            "troncon": self.troncon,
             "type": self.type,
             "label": self.label,
-            "geometry": _serialize_geometry(self.geometry, **kwargs),
         }
 
     @classmethod
     def deserialize(cls, payload: dict[str, object], **kwargs) -> Railway:
         railway_id = payload.get("id")
         railway_code = payload.get("code")
+        railway_troncon = payload.get("troncon")
         railway_type = payload.get("type")
         railway_label = payload.get("label")
         if not isinstance(railway_id, str):
             raise ValueError("Railway payload id must be a string")
         if not isinstance(railway_code, str):
             raise ValueError("Railway payload code must be a string")
+        if not isinstance(railway_troncon, int):
+            raise ValueError("Railway payload troncon must be an integer")
         if not isinstance(railway_type, str):
             raise ValueError("Railway payload type must be a string")
         if not isinstance(railway_label, str):
             raise ValueError("Railway payload label must be a string")
-        return cls(
+        return cls.validate(
             id=railway_id,
             code=railway_code,
+            troncon=railway_troncon,
             type=railway_type,
-            label=railway_label,
-            geometry=_deserialize_geometry(payload.get("geometry", None)),
         )
 
     def __repr__(self) -> str:
-        return self._label
+        return f"{self._label} - {self._code} - {self._troncon}"

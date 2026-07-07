@@ -515,8 +515,8 @@ class Body(QWidget):
     def _on_simulation_location_validated(
         self,
         simulation_id: str,
-        id: str,
-        code_line: str,
+        km: int,
+        line: str,
         lat: float,
         lon: float,
         label: str,
@@ -852,7 +852,7 @@ class MainWindow(QMainWindow):
             "Failed to render map for simulation {simulation_id}: {reason}."
         )
         simulation_location_rejected_toast: str = (
-            "Invalid map location for marker {marker_id}: {reason}."
+            "Invalid map location for marker {km} on line {line}: {reason}."
         )
 
     @dataclass
@@ -1110,8 +1110,8 @@ class MainWindow(QMainWindow):
     def forward_simulation_location_validated(
         self,
         simulation_id: str,
-        marker_id: str,
-        code_line: str,
+        km: int,
+        line: str,
         lat: float,
         lon: float,
         label: str,
@@ -1120,15 +1120,15 @@ class MainWindow(QMainWindow):
         logger.info(
             "MainWindow: simulation location validated",
             simulation_id=simulation_id,
-            marker_id=marker_id,
-            code_line=code_line,
+            km=km,
+            line=line,
             lat=lat,
             lon=lon,
         )
         signals.SIMULATION.SimulationLocationValidated.emit(
             simulation_id,
-            marker_id,
-            code_line,
+            km,
+            line,
             lat,
             lon,
             label,
@@ -1137,8 +1137,8 @@ class MainWindow(QMainWindow):
     def forward_simulation_location_rejected(
         self,
         simulation_id: str,
-        marker_id: str,
-        code_line: str,
+        km: int,
+        line: str,
         lat: float,
         lon: float,
         reason: str,
@@ -1147,23 +1147,24 @@ class MainWindow(QMainWindow):
         logger.warning(
             "MainWindow: simulation location rejected",
             simulation_id=simulation_id,
-            marker_id=marker_id,
-            code_line=code_line,
+            km=km,
+            line=line,
             lat=lat,
             lon=lon,
             reason=reason,
         )
         signals.SIMULATION.SimulationLocationRejected.emit(
             simulation_id,
-            marker_id,
-            code_line,
+            km,
+            line,
             lat,
             lon,
             reason,
         )
         self.ui.container.post_toast(
             self.texts.simulation_location_rejected_toast.format(
-                marker_id=marker_id,
+                km=km,
+                line=line,
                 reason=reason,
             ),
             level="error",

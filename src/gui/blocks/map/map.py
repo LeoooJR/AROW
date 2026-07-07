@@ -71,15 +71,15 @@ class Bridge(QObject):
     Bridge between JavaScript and Python.
     """
 
-    markerClicked = Signal(
-        str, str, float, float
-    )  # marker_id, code_line, latitude, longitude
+    markerClicked = Signal(int, str, float, float)  # km, line, latitude, longitude
 
-    @Slot(str, str, float, float)  # Take arguments from JavaScript
+    @Slot(
+        int, str, float, float
+    )  # Take arguments from JavaScript, the slot is called from the JS code snippet in core/geo/bridge.py
     def onMarkerClicked(
-        self, marker_id: str, code_line: str, latitude: float, longitude: float
+        self, km: int, line: str, latitude: float, longitude: float
     ) -> None:
-        self.markerClicked.emit(marker_id, code_line, latitude, longitude)
+        self.markerClicked.emit(km, line, latitude, longitude)
 
 
 class Canvas(QWebEngineView):
@@ -175,13 +175,13 @@ class Canvas(QWebEngineView):
         """Connect signals for the canvas."""
         self.bridge.markerClicked.connect(self._on_marker_clicked)
 
-    @Slot(str, str, float, float)
+    @Slot(int, str, float, float)
     def _on_marker_clicked(
-        self, marker_id: str, line: str, latitude: float, longitude: float
+        self, km: int, line: str, latitude: float, longitude: float
     ) -> None:
         """Handle marker click event."""
-        logger.info(f"Marker clicked: {marker_id}, {line}, {latitude}, {longitude}")
-        signals.UI.MapMarkerClicked.emit(marker_id, line, latitude, longitude)
+        logger.info(f"Marker clicked: {km}, {line}, {latitude}, {longitude}")
+        signals.UI.MapMarkerClicked.emit(km, line, latitude, longitude)
 
 
 class Legend(QFrame):
@@ -1012,26 +1012,26 @@ class MapBlock(QWidget):
         self.show_map_render_failed_placeholder()
         self._on_run_helper_animation()
 
-    @Slot(str, str, float, float)
+    @Slot(int, str, float, float)
     def _on_map_marker_clicked(
-        self, marker_id: str, code_line: str, latitude: float, longitude: float
+        self, km: int, line: str, latitude: float, longitude: float
     ) -> None:
         """Handle marker click event."""
         if self._active_simulation_id is not None:
             signals.SIMULATION.SimulationLocationRequested.emit(
                 self._active_simulation_id,
-                marker_id,
-                code_line,
+                km,
+                line,
                 latitude,
                 longitude,
             )
 
-    @Slot(str, str, str, float, float, str)
+    @Slot(str, int, str, float, float, str)
     def _on_simulation_location_validated(
         self,
         simulation_id: str,
-        marker_id: str,
-        code_line: str,
+        km: int,
+        line: str,
         latitude: float,
         longitude: float,
         label: str,
@@ -1042,7 +1042,8 @@ class MapBlock(QWidget):
                 "MapBlock: ignoring stale simulation location validation",
                 simulation_id=simulation_id,
                 active_simulation_id=self._active_simulation_id,
-                marker_id=marker_id,
+                km=km,
+                line=line,
             )
             return
         self.ui.coordinates.spoofed_location_widget.set_coordinates(

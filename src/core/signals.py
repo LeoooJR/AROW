@@ -157,8 +157,8 @@ class SimulationLocationRejectedPayload:
     """Payload emitted when a map milestone location is rejected."""
 
     simulation_id: str
-    id: str
-    code_line: str
+    km: int
+    line: str
     lat: float
     lon: float
     reason: str

@@ -22,8 +22,8 @@ from core.devices import (
     phone_stable_key_is_collision_resistant,
     serialize_phone_collection,
 )
-from core.geo.element import Milestone
-from core.geo.exceptions import MilestoneValidationError
+from core.geo.element import Milestone, Railway
+from core.geo.exceptions import MilestoneValidationError, RailwayValidationError
 from core.geo.location import Location
 from core.signals import (
     ActivityLogFileUpdatedPayload,
@@ -747,12 +747,13 @@ class ModelEntrypoint(Entrypoint):
             )
             # Validate the simulation marker location, simulation metadata can have been modified by the user
             if simulation.spoofed_location.poi is not None:
+                poi = simulation.spoofed_location.poi
                 self.validate_simulation_marker_location(
                     simulation_id=simulation.id,
-                    marker_id=simulation.spoofed_location.poi.id,
-                    code_line=simulation.spoofed_location.poi.line.code,
-                    latitude=simulation.spoofed_location.poi.geometry.y,
-                    longitude=simulation.spoofed_location.poi.geometry.x,
+                    km=poi.km,
+                    line=f"{poi.line.code}-{poi.line.troncon}",
+                    latitude=poi.geometry.y,
+                    longitude=poi.geometry.x,
                 )
         # Set the last active device id
         self._simulations.last_active_device_id = device_id
@@ -854,8 +855,8 @@ class ModelEntrypoint(Entrypoint):
     def validate_simulation_marker_location(
         self,
         simulation_id: str,
-        marker_id: str,
-        code_line: str,
+        km: int,
+        line: str,
         latitude: float,
         longitude: float,
     ) -> None:
@@ -865,27 +866,32 @@ class ModelEntrypoint(Entrypoint):
             raise ValueError(f"Simulation with id {simulation_id} not found")
 
         try:
-            validated = Milestone.validate(
-                marker_id,
-                code_line,
+            code, troncon_raw = line.rsplit("-", maxsplit=1)
+            validated_line = Railway.validate(
+                code=code,
+                troncon=int(troncon_raw),
+            )
+            validated_milestone = Milestone.validate(
+                km,
+                validated_line,
                 Point(longitude, latitude),
             )
             self._signal_bus.emit(
                 CoreSignal.SIMULATION_LOCATION_VALIDATED,
                 SimulationLocationValidatedPayload(
                     simulation_id=simulation_id,
-                    lat=validated.geometry.y,
-                    lon=validated.geometry.x,
-                    poi=validated.serialize(),
+                    lat=validated_milestone.geometry.y,
+                    lon=validated_milestone.geometry.x,
+                    poi=validated_milestone.serialize(),
                 ),
             )
-        except MilestoneValidationError as error:
+        except (MilestoneValidationError, RailwayValidationError) as error:
             self._signal_bus.emit(
                 CoreSignal.SIMULATION_LOCATION_REJECTED,
                 SimulationLocationRejectedPayload(
                     simulation_id=simulation_id,
-                    id=marker_id,
-                    code_line=code_line,
+                    km=km,
+                    line=line,
                     lat=latitude,
                     lon=longitude,
                     reason=str(error),

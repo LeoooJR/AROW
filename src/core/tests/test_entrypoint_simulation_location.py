@@ -56,8 +56,8 @@ def test_validate_simulation_marker_location_emits_validated_payload(
     model_entrypoint.subscribe(CoreSignal.SIMULATION_LOCATION_VALIDATED, capture)
     model_entrypoint.validate_simulation_marker_location(
         simulation_id,
-        "001+000",
-        "001000",
+        1,
+        "001000-1",
         48.88533318609319,
         2.363530409238113,
     )
@@ -65,10 +65,12 @@ def test_validate_simulation_marker_location_emits_validated_payload(
     assert len(captured) == 1
     assert captured[0].simulation_id == simulation_id
     poi = captured[0].poi
-    assert poi["id"] == "001+000"
+    assert poi["km"] == 1
     line = poi["line"]
     assert isinstance(line, dict)
     assert line["code"] == "001000"
+    assert line["troncon"] == 1
+    assert poi["label"] == "001+000"
     assert captured[0].lat == pytest.approx(48.88533318609319)
     assert captured[0].lon == pytest.approx(2.363530409238113)
 
@@ -90,8 +92,8 @@ def test_validate_simulation_marker_location_missing_simulation_raises(
     with pytest.raises(ValueError, match="Simulation with id missing not found"):
         model_entrypoint.validate_simulation_marker_location(
             "missing",
-            "001+000",
-            "001000",
+            1,
+            "001000-1",
             48.88533318609319,
             2.363530409238113,
         )
@@ -124,8 +126,8 @@ def test_validate_simulation_marker_location_invalid_marker_emits_rejected_paylo
 
     model_entrypoint.validate_simulation_marker_location(
         simulation_id,
-        "999+999",
-        "001000",
+        999,
+        "001000-1",
         0.0,
         0.0,
     )
@@ -133,6 +135,6 @@ def test_validate_simulation_marker_location_invalid_marker_emits_rejected_paylo
     assert validated == []
     assert len(rejected) == 1
     assert rejected[0].simulation_id == simulation_id
-    assert rejected[0].id == "999+999"
-    assert rejected[0].code_line == "001000"
-    assert "Unknown milestone id" in rejected[0].reason
+    assert rejected[0].km == 999
+    assert rejected[0].line == "001000-1"
+    assert "Unknown milestone" in rejected[0].reason

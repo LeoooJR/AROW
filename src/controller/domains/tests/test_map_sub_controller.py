@@ -342,16 +342,16 @@ def test_on_simulation_location_requested_validates_via_model_entrypoint(
 
     map_controller._on_simulation_location_requested(
         "sim-1",
-        "001+000",
-        "001000",
+        1,
+        "001000-1",
         48.88533318609319,
         2.363530409238113,
     )
 
     validate.assert_called_once_with(
         "sim-1",
-        "001+000",
-        "001000",
+        1,
+        "001000-1",
         48.88533318609319,
         2.363530409238113,
     )
@@ -366,8 +366,8 @@ def test_on_simulation_location_rejected_forwards_to_view(
     map_controller = _make_map_sub_controller(app)
     payload = SimulationLocationRejectedPayload(
         simulation_id="sim-1",
-        id="001+000",
-        code_line="001000",
+        km=1,
+        line="001000-1",
         lat=0.0,
         lon=0.0,
         reason="invalid marker",
@@ -377,8 +377,8 @@ def test_on_simulation_location_rejected_forwards_to_view(
 
     app.view.forward_simulation_location_rejected.assert_called_once_with(
         simulation_id=payload.simulation_id,
-        marker_id=payload.id,
-        code_line=payload.code_line,
+        km=payload.km,
+        line=payload.line,
         lat=payload.lat,
         lon=payload.lon,
         reason=payload.reason,
@@ -397,10 +397,10 @@ def test_on_simulation_location_validated_forwards_to_view(
         lat=48.88533318609319,
         lon=2.363530409238113,
         poi={
-            "id": "001+000",
-            "line": {"code": "001000"},
-            "label": "001+000 / 001000-1",
-            "type": "Kilomètre",
+            "km": 1,
+            "line": {"code": "001000", "troncon": 1},
+            "label": "001+000",
+            "type": "Kilometer",
         },
     )
 
@@ -408,9 +408,9 @@ def test_on_simulation_location_validated_forwards_to_view(
 
     app.view.forward_simulation_location_validated.assert_called_once_with(
         simulation_id=payload.simulation_id,
-        marker_id="001+000",
-        code_line="001000",
+        km=1,
+        line="001000-1",
         lat=payload.lat,
         lon=payload.lon,
-        label="001+000 / 001000-1",
+        label="001+000",
     )

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Dict, Final, Literal, Optional
@@ -52,43 +53,6 @@ def _lignes_geometry_is_line_or_multiline(
 ) -> pd.Series:
     """Ligne tronçons: LineString or MultiLineString."""
     return geom_series.geom_type.isin(["LineString", "MultiLineString"])
-
-
-# --- Referentiel: French CSV sometimes uses comma decimals; full reads may infer string columns. ---
-
-
-def _parse_referentiel_wgs84_and_rg_troncon(df: pd.DataFrame) -> pd.DataFrame:
-    """Coerce ``latitude`` / ``longitude`` to float (comma or dot decimals) and ``RG_TRONCON`` to nullable int.
-
-    The static file mixes inferable float columns for small head reads and all-string coordinates for
-    long reads; this parser makes :class:`ReferentielPkGpsSchema` checks consistent.
-    """
-    if df.empty:
-        return df
-    out = df.copy()
-    for col in ("latitude", "longitude"):
-        if col not in out.columns:
-            continue
-        ser = out[col]
-        if pd.api.types.is_numeric_dtype(ser):
-            out[col] = pd.to_numeric(ser, errors="coerce")
-        else:
-            out[col] = pd.to_numeric(
-                ser.astype(str)
-                .str.replace(",", ".", regex=False)
-                .str.replace(" ", "", regex=False)
-                .str.strip(),
-                errors="coerce",
-            )
-    if "RG_TRONCON" in out.columns:
-        rt = out["RG_TRONCON"]
-        if not isinstance(
-            rt.dtype, pd.Int64Dtype
-        ) and not pd.api.types.is_integer_dtype(rt):
-            out["RG_TRONCON"] = (
-                pd.to_numeric(rt, errors="coerce").round().astype("Int64")
-            )
-    return out
 
 
 class GaresDeVoyageursSchema(pg.GeoDataFrameModel):
@@ -260,29 +224,19 @@ def _preprocess_lignes_par_type(df: geopandas.GeoDataFrame) -> geopandas.GeoData
 class ReferentielPkGpsSchema(pa.DataFrameModel):
     """PK / hectometric referential with WGS84 columns (``referentiel_pk_gps`` CSV)."""
 
-    @pa.dataframe_parser
-    @classmethod
-    def _parse_referentiel_numerics(cls, df: pd.DataFrame) -> pd.DataFrame:
-        """Parse comma-formatted WGS84 strings and tronçon index before validation.
-
-        The CSV is sometimes inferred as all-string coordinates on full read; the referentiel file
-        also uses comma as decimal separator in some BaseJSN rows. This keeps ``latitude``/``longitude``
-        in float form for WGS84 checks.
-        """
-        return _parse_referentiel_wgs84_and_rg_troncon(df)
-
-    TYPE_REPER: Series[String] = pa.Field(
-        nullable=False, description="Type de repère (T, Hectomètre, etc.)."
-    )
-    PK: Series[String] = pa.Field(
-        nullable=False, description="Point kilométrique (e.g. 000+052)."
-    )
-    LIGNE: Series[String] = pa.Field(
+    ligne: Series[String] = pa.Field(
         nullable=False, description="Line id (e.g. 001000-1)."
     )
-    CODE_LIGNE: Series[Int] = pa.Field(nullable=False, description="Numeric line code.")
+    code_ligne: Series[Int] = pa.Field(nullable=False, description="Numeric line code.")
+    # TYPE_REPER: Series[String] = pa.Field(
+    #     nullable=False, description="Type de repère (T, Hectomètre, etc.)."
+    # )
+    km: Series[Int] = pa.Field(nullable=False, description="Kilometer.")
+    label: Series[String] = pa.Field(
+        nullable=False, description="Point kilométrique (e.g. 000+052)."
+    )
     # Some rows have no tronçon; full-file reads use nullable integer.
-    RG_TRONCON: Series[INT64] = pa.Field(
+    rg_troncon: Series[INT64] = pa.Field(
         nullable=True,
         description="Rang du tronçon (nullable when absent in source).",
     )
@@ -299,34 +253,23 @@ class ReferentielPkGpsSchema(pa.DataFrameModel):
 
 
 def _preprocess_referentiel_pk_gps(df: pd.DataFrame) -> geopandas.GeoDataFrame:
-    """Preprocess the referentiel pk gps dataset."""
+    """Preprocess the referentiel pk gps dataset.
+    This dataset is a SQLite database with a single table called ``kilometric_points``.
+    Most of the preprocessing is done at the database level.
+    """
     normalized = df.copy()
     normalized.columns = normalized.columns.map(lambda c: c.lower())
     typed = normalized.astype(
-        {"type_reper": "category", "ligne": "category", "code_ligne": "category"}
+        {"ligne": "category", "code_ligne": "category", "rg_troncon": "category"}
     )
 
-    # Vectorized WGS84: comma decimals in source CSV.
-    lon = pd.to_numeric(
-        typed["longitude"].astype("string").str.replace(",", ".", regex=False),
-        errors="coerce",
+    typed["geometry"] = geopandas.GeoSeries.from_xy(
+        typed["longitude"], typed["latitude"], crs="EPSG:4326"
     )
-    lat = pd.to_numeric(
-        typed["latitude"].astype("string").str.replace(",", ".", regex=False),
-        errors="coerce",
-    )
-    typed["geometry"] = geopandas.GeoSeries.from_xy(lon, lat, crs="EPSG:4326")
     without_lat_lon = typed.drop(columns=["latitude", "longitude"])
 
-    # PK string (e.g. "001+000" -> 1.0 km, "012+500" -> 12.5 km), vectorized.
-    pk_series = without_lat_lon["pk"].astype("string")
-    parts = pk_series.str.strip().str.split("+", n=1, expand=True)
-    km_part = pd.to_numeric(parts[0], errors="coerce")
-    m_part = pd.to_numeric(parts[1], errors="coerce")
-    without_lat_lon["kilometers"] = km_part + m_part / 1000.0
-
-    # Ensure geometry, code_ligne, and kilometers are present before map use.
-    cleaned = without_lat_lon.dropna(subset=["geometry", "code_ligne", "kilometers"])
+    # Ensure geometry is present before map use.
+    cleaned = without_lat_lon.dropna(subset=["geometry"])
 
     return geopandas.GeoDataFrame(cleaned, geometry="geometry", crs="EPSG:4326")
 
@@ -337,9 +280,9 @@ class DatasetDefinition:
     id: str
     name: str
     lg: str
-    format: Literal["csv", "json", "geojson", "shapefile", "parquet"]
-    # Text encoding for the file (GeoJSON, CSV, etc.); fiona / pandas use this for strings.
-    encoding: str
+    format: Literal["csv", "json", "geojson", "shapefile", "parquet", "sqlite"]
+    # Text encoding for the file (GeoJSON, CSV, etc.);
+    encoding: str | None
     last_update: str | None
     hash: str  # sha256sum
     schema: pa.DataFrameSchema | pg.GeoDataFrameSchema
@@ -390,12 +333,12 @@ class DatasetRepository:
         ),
         "referentiel_pk_gps": DatasetDefinition(
             id="referentiel_pk_gps",
-            name="referentiel_pk_gps",
+            name="pk",
             lg="fr",
-            format="csv",
-            encoding="latin-1",
+            format="sqlite",
+            encoding=None,
             last_update=None,
-            hash="0b106045e866aee214ea86700b50d6f6ab4c783a267a76c41d6674cde2de6d95",
+            hash="198199d5a28232ada22949706a624fecf998e08f0c110a8b6787ca240a92a98b",
             schema=ReferentielPkGpsSchema,
             preprocessing=_preprocess_referentiel_pk_gps,
         ),
@@ -437,9 +380,11 @@ class DatasetManager:
 
         if definition:
 
-            effective_encoding: str = (
-                definition.encoding if encoding is None else encoding
+            effective_encoding = (
+                encoding if encoding is not None else definition.encoding
             )
+            if effective_encoding is None:
+                effective_encoding = "utf-8"
 
             if definition.format in ["geojson", "shapefile"]:
 
@@ -472,6 +417,25 @@ class DatasetManager:
 
                     raise NotImplementedError
 
+                elif definition.format == "sqlite":
+
+                    try:
+
+                        with sqlite3.connect(definition.full_path) as conn:
+
+                            sqlite_df = pd.read_sql(
+                                sql="SELECT * FROM kilometric_points", con=conn
+                            )
+
+                            validated_df = cls._validate(definition, sqlite_df)
+
+                            return cls._preprocess(definition, validated_df)
+
+                    except sqlite3.OperationalError as e:
+
+                        logger.error(f"Error connecting to SQLite database", error=e)
+                        raise
+
         raise ValueError(f"Dataset {id} not found")
 
     @classmethod
@@ -499,7 +463,7 @@ class DatasetManager:
                 definition=definition,
                 errors=e,
             )
-            raise SchemaValidationError
+            raise SchemaValidationError from e
 
     @classmethod
     def _preprocess(

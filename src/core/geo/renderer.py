@@ -19,10 +19,9 @@ from core.geo.icons import Icons
 
 # Columns embedded in Folium GeoJSON for milestone layers (tooltip/popup only).
 _MILESTONE_GEOJSON_COLUMNS: Final[Tuple[str, ...]] = (
-    "pk",
+    "label",
+    "km",
     "ligne",
-    "code_ligne",
-    "type_reper",
     "geometry",
 )
 
@@ -63,14 +62,8 @@ class MapRenderer:
             id="lignes-par-type"
         )
 
-        self.milestones_geodataset: geopandas.GeoDataFrame = manager.read(
+        kilometric_points_geodataset: geopandas.GeoDataFrame = manager.read(
             "referentiel_pk_gps"
-        )
-
-        milestones_kilometer_geodataset: geopandas.GeoDataFrame = (
-            self.milestones_geodataset[
-                self.milestones_geodataset["type_reper"] == "Kilomètre"
-            ]
         )
 
         self._milestones_visibility_settings: Final[
@@ -101,59 +94,53 @@ class MapRenderer:
 
         # Low-zoom markers: rule LOW, without per-row Python loops.
         low_mask: pd.Series = _at_distance_mask(
-            milestones_kilometer_geodataset["kilometers"], settings="LOW"
+            kilometric_points_geodataset["km"], settings="LOW"
         )
-        subset_indices: list[int] = milestones_kilometer_geodataset.index[
+        subset_indices: list[int] = kilometric_points_geodataset.index[
             low_mask
         ].tolist()
 
-        self._milestones_low_zoom_geodataset: geopandas.GeoDataFrame = (
-            milestones_kilometer_geodataset.loc[sorted(subset_indices)]
+        kilometric_points_on_low_zoom_geodataset: geopandas.GeoDataFrame = (
+            kilometric_points_geodataset.loc[sorted(subset_indices)]
         )
-        self._milestones_medium_zoom_geodataset: geopandas.GeoDataFrame = (
-            milestones_kilometer_geodataset.loc[
-                ~milestones_kilometer_geodataset.index.isin(subset_indices)
+        kilometric_points_on_medium_zoom_geodataset: geopandas.GeoDataFrame = (
+            kilometric_points_geodataset.loc[
+                ~kilometric_points_geodataset.index.isin(subset_indices)
             ]
         )
-        self._milestone_high_zoom_geodataset: geopandas.GeoDataFrame = (
-            self.milestones_geodataset[
-                self.milestones_geodataset["type_reper"] != "Kilomètre"
-            ]
+
+        n_km: int = len(kilometric_points_geodataset)
+        n_low: int = len(kilometric_points_on_low_zoom_geodataset)
+        n_med: int = len(kilometric_points_on_medium_zoom_geodataset)
+        logger.info(
+            "Milestone layers built: kilometric_points={} low_zoom={} medium_zoom={}",
+            n_km,
+            n_low,
+            n_med,
+            kilometric_points_rows=n_km,
+            low_zoom_rows=n_low,
+            medium_zoom_rows=n_med,
         )
 
         # Slim GeoJSON payloads for Folium (only columns used by tooltip/popup).
-        self._milestones_low_zoom_for_map: geopandas.GeoDataFrame = (
-            self._milestones_low_zoom_geodataset.loc[
+        self._kilometric_points_on_low_zoom_for_map: geopandas.GeoDataFrame = (
+            kilometric_points_on_low_zoom_geodataset.loc[
                 :, list(_MILESTONE_GEOJSON_COLUMNS)
             ].copy()
         )
-        self._milestones_medium_zoom_for_map: geopandas.GeoDataFrame = (
-            self._milestones_medium_zoom_geodataset.loc[
+        self._kilometric_points_on_medium_zoom_for_map: geopandas.GeoDataFrame = (
+            kilometric_points_on_medium_zoom_geodataset.loc[
                 :, list(_MILESTONE_GEOJSON_COLUMNS)
             ].copy()
         )
 
-        _n_km: int = len(milestones_kilometer_geodataset)
-        _n_low: int = len(self._milestones_low_zoom_geodataset)
-        _n_med: int = len(self._milestones_medium_zoom_geodataset)
-        _n_hi: int = len(self._milestone_high_zoom_geodataset)
-        logger.info(
-            "Milestone layers built: kilometer_only={} low_zoom={} medium_zoom={} "
-            "high_zoom_non_km={}",
-            _n_km,
-            _n_low,
-            _n_med,
-            _n_hi,
-            kilometer_only_rows=_n_km,
-            low_zoom_rows=_n_low,
-            medium_zoom_rows=_n_med,
-            high_zoom_non_km_rows=_n_hi,
-        )
         logger.opt(lazy=True).debug(
-            "Milestone slim GeoJSON serialized length (chars, for HTML weight): "
+            "Kilometric points slim GeoJSON serialized length (chars, for HTML weight): "
             "low={low_len} medium={med_len}",
-            low_len=lambda: len(self._milestones_low_zoom_for_map.to_json()),
-            med_len=lambda: len(self._milestones_medium_zoom_for_map.to_json()),
+            low_len=lambda: len(self._kilometric_points_on_low_zoom_for_map.to_json()),
+            med_len=lambda: len(
+                self._kilometric_points_on_medium_zoom_for_map.to_json()
+            ),
         )
 
     def _create_layers(self):
@@ -274,8 +261,8 @@ class MapRenderer:
 
         railways_layer.add_to(railways_features_group)
 
-        milestones_low_zoom_layer = folium.GeoJson(
-            self._milestones_low_zoom_for_map,
+        kilometric_points_on_low_zoom_layer = folium.GeoJson(
+            self._kilometric_points_on_low_zoom_for_map,
             name="MilestonesOnLowZoom",
             zoom_on_click=True,
             marker=folium.CircleMarker(
@@ -299,22 +286,22 @@ class MapRenderer:
                 "weight": 3,
             },
             tooltip=folium.GeoJsonTooltip(
-                fields=["pk", "ligne", "type_reper"],
-                aliases=["PK", "Ligne", "Type repère"],
+                fields=["km", "ligne"],
+                aliases=["KM", "Ligne"],
             ),
             popup=folium.GeoJsonPopup(
-                fields=["pk", "ligne", "code_ligne", "type_reper"],
-                aliases=["PK", "Ligne", "Code ligne", "Type repère"],
+                fields=["km", "label", "ligne"],
+                aliases=["KM", "Label", "Ligne"],
             ),
             popup_keep_highlighted=True,
             control=False,
             show=False,
         )
 
-        milestones_low_zoom_layer.add_to(railways_features_group)
+        kilometric_points_on_low_zoom_layer.add_to(railways_features_group)
 
-        milestones_medium_zoom_layer = folium.GeoJson(
-            self._milestones_medium_zoom_for_map,
+        kilometric_points_on_medium_zoom_layer = folium.GeoJson(
+            self._kilometric_points_on_medium_zoom_for_map,
             name="MilestonesOnMediumZoom",
             zoom_on_click=True,
             marker=folium.CircleMarker(
@@ -338,25 +325,25 @@ class MapRenderer:
                 "weight": 3,
             },
             tooltip=folium.GeoJsonTooltip(
-                fields=["pk", "ligne", "type_reper"],
-                aliases=["PK", "Ligne", "Type repère"],
+                fields=["km", "label", "ligne"],
+                aliases=["KM", "Label", "Ligne"],
             ),
             popup=folium.GeoJsonPopup(
-                fields=["pk", "ligne", "code_ligne", "type_reper"],
-                aliases=["PK", "Ligne", "Code ligne", "Type repère"],
+                fields=["km", "label", "ligne"],
+                aliases=["KM", "Label", "Ligne"],
             ),
             popup_keep_highlighted=True,
             control=False,
             show=False,
         )
 
-        milestones_medium_zoom_layer.add_to(railways_features_group)
+        kilometric_points_on_medium_zoom_layer.add_to(railways_features_group)
 
         self.map.get_root().script.add_child(folium.Element(f"""
         (function() {{
         var mapName = "{self.map.get_name()}";
-        var milestonesLowZoomLayerName = "{milestones_low_zoom_layer.get_name()}";
-        var milestonesMediumZoomLayerName = "{milestones_medium_zoom_layer.get_name()}";
+        var milestonesLowZoomLayerName = "{kilometric_points_on_low_zoom_layer.get_name()}";
+        var milestonesMediumZoomLayerName = "{kilometric_points_on_medium_zoom_layer.get_name()}";
         var railwaysLayerName = "{railways_layer.get_name()}";
         var railwaysFeaturesGroupName = "{railways_features_group_name}";
         var lowZoomThreshold = {self._milestones_visibility_settings["LOW"]["threshold"]};
@@ -457,10 +444,10 @@ class MapRenderer:
         folium.LayerControl().add_to(self.map)
 
         self.map.get_root().script.add_child(
-            on_marker_clicked_js_code(milestones_low_zoom_layer.get_name())
+            on_marker_clicked_js_code(kilometric_points_on_low_zoom_layer.get_name())
         )
         self.map.get_root().script.add_child(
-            on_marker_clicked_js_code(milestones_medium_zoom_layer.get_name())
+            on_marker_clicked_js_code(kilometric_points_on_medium_zoom_layer.get_name())
         )
 
     def to_html(self, path: Path, prefix: str = "") -> Path:
