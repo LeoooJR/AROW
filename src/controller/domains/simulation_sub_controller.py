@@ -17,6 +17,7 @@ from core.signals import (
     SimulationLocationValidatedPayload,
     SimulationMapFileChangedPayload,
     SimulationPositionChangedPayload,
+    SimulationRestoredPayload,
     SimulationStateChangedPayload,
 )
 from gui.signals import signals
@@ -44,6 +45,10 @@ class SimulationSubController(AppSubController):
         self.model_entrypoint.subscribe(
             CoreSignal.SIMULATION_CREATED,
             self._on_simulation_created,
+        )
+        self.model_entrypoint.subscribe(
+            CoreSignal.SIMULATION_RESTORED,
+            self._on_simulation_restored,
         )
         self.model_entrypoint.subscribe(
             CoreSignal.MAP_RENDERED,
@@ -227,6 +232,26 @@ class SimulationSubController(AppSubController):
             return
         logger.success(
             "SimulationSubController: simulation created",
+            simulation_id=payload.simulation_id,
+            device_id=payload.device_id,
+            device_name=payload.device_name,
+        )
+        self.view.forward_device_selection_succeeded(
+            payload.simulation_id,
+            payload.device_id,
+            payload.device_name,
+        )
+
+    def _on_simulation_restored(self, payload: SimulationRestoredPayload) -> None:
+        """Handle the simulation restored event."""
+        if not payload.device_id:
+            logger.error(
+                "SimulationSubController: simulation restored without device",
+                simulation_id=payload.simulation_id,
+            )
+            return
+        logger.success(
+            "SimulationSubController: simulation restored",
             simulation_id=payload.simulation_id,
             device_id=payload.device_id,
             device_name=payload.device_name,

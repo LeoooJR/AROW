@@ -582,7 +582,7 @@ class Coordinates(QFrame):
             tooltip=self.texts.play_button_tooltip,
             icon_size=button_settings.TOOLBUTTON_PROMINENT_ICON_SIZE,
         )
-        play_button.setEnabled(True)
+        play_button.setEnabled(False)
         play_button.setProperty("toggle", False)
         play_button.setProperty("simulation-control", True)
         play_button.clicked.connect(self._on_play_button_clicked)
@@ -662,6 +662,14 @@ class Coordinates(QFrame):
         self.layout().setAlignment(
             self.ui.spoofed_location_widget, Qt.AlignmentFlag.AlignCenter
         )
+
+    def unlock_play_button(self) -> None:
+        """Unlock the play button."""
+        self.ui.play_button.setEnabled(True)
+
+    def lock_play_button(self) -> None:
+        """Lock the play button."""
+        self.ui.play_button.setEnabled(False)
 
     def set_simulation_state(self, state: bool) -> None:
         """Animate and reflect active vs inactive simulation in the UI.
@@ -1050,6 +1058,7 @@ class MapBlock(QWidget):
             latitude,
             longitude,
         )
+        self.ui.coordinates.unlock_play_button()
 
     @Slot(str, str)
     def _on_device_selection_failed(self, device_id: str, device_name: str) -> None:
@@ -1065,6 +1074,7 @@ class MapBlock(QWidget):
     def _on_remove_active_device_succeeded(self, device_id: str) -> None:
         """Reset placeholder when the active device is removed."""
         self._reset_to_device_required_placeholder()
+        self.ui.coordinates.lock_play_button()
 
     @Slot(str)
     def _on_simulation_deleted(self, simulation_id: str) -> None:
@@ -1075,6 +1085,7 @@ class MapBlock(QWidget):
         ):
             return
         self._reset_to_device_required_placeholder()
+        self.ui.coordinates.lock_play_button()
 
     @Slot()
     def _on_run_helper_animation(self) -> None:

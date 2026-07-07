@@ -44,6 +44,7 @@ from core.signals import (
     SimulationLocationValidatedPayload,
     SimulationMapFileChangedPayload,
     SimulationPositionChangedPayload,
+    SimulationRestoredPayload,
     SimulationStateChangedPayload,
 )
 from core.simulation import Simulation, SimulationRepository
@@ -173,6 +174,13 @@ class Entrypoint(ABC):
         self,
         signal: Literal[CoreSignal.SIMULATION_CREATED],
         handler: SignalHandler[SimulationCreatedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_RESTORED],
+        handler: SignalHandler[SimulationRestoredPayload],
     ) -> None: ...
 
     @overload
@@ -312,6 +320,13 @@ class Entrypoint(ABC):
         self,
         signal: Literal[CoreSignal.SIMULATION_CREATED],
         handler: SignalHandler[SimulationCreatedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_RESTORED],
+        handler: SignalHandler[SimulationRestoredPayload],
     ) -> None: ...
 
     @overload
@@ -744,7 +759,15 @@ class ModelEntrypoint(Entrypoint):
             logger.info(
                 "ModelEntrypoint: reusing existing simulation for device",
                 simulation_id=simulation.id,
-                device_id=device_id,
+                device_id=device.id,
+            )
+            self._signal_bus.emit(
+                CoreSignal.SIMULATION_RESTORED,
+                SimulationRestoredPayload(
+                    simulation_id=simulation.id,
+                    device_id=device.id,
+                    device_name=device.name,
+                ),
             )
             # Validate the simulation marker location, simulation metadata can have been modified by the user
             if simulation.spoofed_location.poi is not None:
