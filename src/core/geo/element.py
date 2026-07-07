@@ -409,8 +409,6 @@ class Milestone(MapElement, Payload):
         return {
             "km": self._km,
             "line": self._line.serialize(**kwargs),
-            "type": self._type,
-            "label": self._label,
         }
 
     @classmethod
@@ -545,7 +543,6 @@ class Railway(MapElement, Payload):
         id: str | None = None,
         code: str | None = None,
         troncon: int | None = None,
-        type: str | None = None,
     ) -> Railway:
         """Resolve and validate a map railway against ``lignes-par-type``. At least one of the id or code must be provided.
 
@@ -553,7 +550,6 @@ class Railway(MapElement, Payload):
             id: SNCF Gaïa line identifier (UUID). Must be provided if numeric line code is not provided or unknown.
             code: Numeric line code (6 digits). Must be provided if SNCF Gaïa line identifier is not provided or unknown.
             troncon: The troncon of the railway.
-            type: Line category (e.g. principale, raccordement).
 
         Returns:
             Validated railway.
@@ -599,11 +595,6 @@ class Railway(MapElement, Payload):
         else:
             raise RailwayValidationError("Railway troncon must be provided")
 
-        if type is not None:
-            normalized_type = str(type).strip()
-            if not normalized_type:
-                raise RailwayValidationError("Railway type must not be empty")
-
         by_idgaia, by_code_ligne = _railway_lookup_indexes()
         if lookup_key_name == "idgaia":
             segments = by_idgaia.get(normalized_lookup_key)
@@ -634,33 +625,23 @@ class Railway(MapElement, Payload):
             "id": self.id,
             "code": self.code,
             "troncon": self.troncon,
-            "type": self.type,
-            "label": self.label,
         }
 
     @classmethod
     def deserialize(cls, payload: dict[str, object], **kwargs) -> Railway:
         railway_id = payload.get("id")
-        railway_code = payload.get("code")
-        railway_troncon = payload.get("troncon")
-        railway_type = payload.get("type")
-        railway_label = payload.get("label")
         if not isinstance(railway_id, str):
             raise ValueError("Railway payload id must be a string")
+        railway_code = payload.get("code")
         if not isinstance(railway_code, str):
             raise ValueError("Railway payload code must be a string")
+        railway_troncon = payload.get("troncon")
         if not isinstance(railway_troncon, int):
             raise ValueError("Railway payload troncon must be an integer")
-        if not isinstance(railway_type, str):
-            raise ValueError("Railway payload type must be a string")
-        if not isinstance(railway_label, str):
-            raise ValueError("Railway payload label must be a string")
-        return cls.validate(
-            id=railway_id,
-            code=railway_code,
-            troncon=railway_troncon,
-            type=railway_type,
+        railway = cls.validate(
+            id=railway_id, code=railway_code, troncon=railway_troncon
         )
+        return railway
 
     def __repr__(self) -> str:
         return f"{self._label} - {self._code} - {self._troncon}"

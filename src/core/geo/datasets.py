@@ -479,6 +479,8 @@ class DatasetManager:
         definition: DatasetDefinition | None = cls.REPOSITORY.get_dataset_definition(id)
         if definition is None:
             raise ValueError(f"Dataset {id} not found")
+        if definition.format != "sqlite":
+            raise ValueError(f"Dataset {id} is not a SQLite database")
 
         bound_parameters = _validate_query_parameters(parameters)
         placeholder_count = _count_sql_placeholders(sql)

@@ -16,7 +16,6 @@ from controller.orchestration.app_controller import AppController
 from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
 from core.devices import Phone
 from core.entrypoint import ModelEntrypoint
-from core.geo.element import clear_referentiel_pk_cache
 from core.signals import (
     CoreSignal,
     SimulationCreatedPayload,
@@ -24,13 +23,6 @@ from core.signals import (
     SimulationPositionChangedPayload,
     SimulationStateChangedPayload,
 )
-
-
-@pytest.fixture(autouse=True)
-def _clear_referentiel_cache() -> Iterator[None]:
-    clear_referentiel_pk_cache()
-    yield
-    clear_referentiel_pk_cache()
 
 
 class _AppProbe:
