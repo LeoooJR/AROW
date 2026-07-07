@@ -2,21 +2,13 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
 from typing import cast
 
 import pytest
 from shapely.geometry import Point
 
-from core.geo.element import Milestone, Railway, clear_referentiel_pk_cache
+from core.geo.element import Milestone, Railway
 from core.geo.location import Location
-
-
-@pytest.fixture(autouse=True)
-def _clear_referentiel_cache() -> Iterator[None]:
-    clear_referentiel_pk_cache()
-    yield
-    clear_referentiel_pk_cache()
 
 
 def test_location_payload_round_trip_without_poi() -> None:

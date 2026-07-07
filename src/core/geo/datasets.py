@@ -16,6 +16,30 @@ from pandera.typing.geopandas import GeoSeries
 
 from core.geo.exceptions import SchemaValidationError
 
+_SQLITE_BIND_SCALAR_TYPES = (str, int, float, bytes, type(None))
+
+
+def _count_sql_placeholders(sql: str) -> int:
+    """Count ``?`` bind placeholders in a SQL statement."""
+    return sql.count("?")
+
+
+def _validate_query_parameters(parameters: dict[str, object]) -> tuple[object, ...]:
+    """Validate and normalize bind parameters for SQLite prepared statements."""
+    bound_parameters: list[object] = []
+    for name, value in parameters.items():
+        if isinstance(value, bool):
+            raise TypeError(
+                f"Query parameter {name!r} must not be a bool; use int instead"
+            )
+        if not isinstance(value, _SQLITE_BIND_SCALAR_TYPES):
+            raise TypeError(
+                f"Query parameter {name!r} must be str, int, float, bytes, or None"
+            )
+        bound_parameters.append(value)
+    return tuple(bound_parameters)
+
+
 # --- Vectorized checks for object columns that hold nested GeoJSON dicts (lon/lat) ---
 
 
@@ -437,6 +461,54 @@ class DatasetManager:
                         raise
 
         raise ValueError(f"Dataset {id} not found")
+
+    @classmethod
+    def query(
+        cls, id: str, sql: str, **parameters: object
+    ) -> pd.DataFrame | geopandas.GeoDataFrame:
+        """Query a dataset using a parameterized SQL statement.
+
+        Args:
+            id: The dataset id.
+            sql: The SQL query to execute. Use ``?`` placeholders for bind values.
+            **parameters: Bind values passed in keyword order to the prepared statement.
+
+        Returns:
+            The result of the SQL query as a pandas DataFrame or geopandas.GeoDataFrame.
+        """
+        definition: DatasetDefinition | None = cls.REPOSITORY.get_dataset_definition(id)
+        if definition is None:
+            raise ValueError(f"Dataset {id} not found")
+
+        bound_parameters = _validate_query_parameters(parameters)
+        placeholder_count = _count_sql_placeholders(sql)
+        if placeholder_count != len(bound_parameters):
+            parameter_names = list(parameters.keys())
+            raise ValueError(
+                "SQL placeholder count does not match parameter count: "
+                f"{placeholder_count} placeholders, {len(bound_parameters)} parameters "
+                f"({parameter_names})"
+            )
+
+        try:
+            with sqlite3.connect(definition.full_path) as conn:
+                query_result = pd.read_sql(
+                    sql=sql,
+                    con=conn,
+                    params=bound_parameters,
+                )
+                if not query_result.empty:
+                    validated_df = cls._validate(definition, query_result)
+                    return cls._preprocess(definition, validated_df)
+                return query_result
+        except sqlite3.OperationalError as error:
+            logger.error(
+                "Error querying SQLite database",
+                sql=sql,
+                parameter_names=list(parameters.keys()),
+                error=error,
+            )
+            raise
 
     @classmethod
     def _validate(

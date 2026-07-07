@@ -52,13 +52,6 @@ class _ValidatedRailwaySnapshot:
 
 
 @lru_cache(maxsize=1)
-def _referentiel_pk_dataset() -> pd.DataFrame:
-    """Load and normalize the PK referentiel once per process."""
-    dataset: pd.DataFrame = DatasetManager.read("referentiel_pk_gps")
-    return dataset
-
-
-@lru_cache(maxsize=1)
 def _lignes_par_type_dataset() -> geopandas.GeoDataFrame:
     """Load and normalize the lignes-par-type dataset once per process."""
     dataset: geopandas.GeoDataFrame = DatasetManager.read("lignes-par-type")
@@ -152,11 +145,6 @@ def clear_lignes_par_type_cache() -> None:
     """Clear the cached lignes-par-type dataset (for tests)."""
     _lignes_par_type_dataset.cache_clear()
     _railway_lookup_indexes.cache_clear()
-
-
-def clear_referentiel_pk_cache() -> None:
-    """Clear the cached referentiel PK dataset (for tests)."""
-    _referentiel_pk_dataset.cache_clear()
 
 
 class MapElement(ABC):
@@ -361,23 +349,26 @@ class Milestone(MapElement, Payload):
                     "Geometry y coordinate must be between -90 and 90"
                 )
 
-        referentiel = _referentiel_pk_dataset()
-
         if not isinstance(line, Railway):
             raise TypeError("Line must be a Railway")
         if not line.is_validated:
             raise MilestoneValidationError(
                 "Railway must be validated with Railway.validate()"
             )
+
         code_normalized = _normalize_code_ligne(line.code)
-        result = referentiel[
-            (
-                referentiel["code_ligne"].astype(str).map(_normalize_code_ligne)
-                == code_normalized
-            )
-            & (referentiel["rg_troncon"].astype(int) == line.troncon)
-            & (referentiel["km"] == km)
-        ]
+        result = DatasetManager.query(
+            id="referentiel_pk_gps",
+            sql="""
+            SELECT * FROM kilometric_points
+            WHERE code_ligne = ?
+            AND rg_troncon = ?
+            AND km = ?
+            """,
+            code_ligne=code_normalized,
+            rg_troncon=line.troncon,
+            km=km,
+        )
 
         if result.empty:
             raise MilestoneValidationError(f"Unknown milestone: {line.id!r} {km}")
@@ -385,7 +376,9 @@ class Milestone(MapElement, Payload):
         if len(result.index) > 1:
             raise MilestoneValidationError(f"Multiple matches for {line.id!r} {km}")
 
-        row: pd.Series = result.iloc[0]  # Convert to Series for consistent indexing.
+        # Result is a single row DataFrame, convert to Series for consistent indexing.
+        row: pd.Series = result.iloc[0]
+
         referentiel_geometry = Point(row["geometry"].x, row["geometry"].y)
 
         if geometry is not None:

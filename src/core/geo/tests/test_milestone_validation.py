@@ -2,20 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
-
 import pytest
 from shapely.geometry import LineString, Point
 
-from core.geo.element import Milestone, Railway, clear_referentiel_pk_cache
+from core.geo.element import Milestone, Railway
 from core.geo.exceptions import MilestoneValidationError
-
-
-@pytest.fixture(autouse=True)
-def _clear_referentiel_cache() -> Iterator[None]:
-    clear_referentiel_pk_cache()
-    yield
-    clear_referentiel_pk_cache()
 
 
 def test_milestone_validate_returns_canonical_referentiel_coords() -> None:
