@@ -154,12 +154,24 @@ class MapSubController(AppSubController):
             latitude=latitude,
             longitude=longitude,
         )
-        self.model_entrypoint.validate_simulation_marker_location(
-            simulation_id,
-            km,
-            line,
-            latitude,
-            longitude,
+        if self.model_entrypoint.get_simulation(simulation_id) is None:
+            logger.error(
+                "MapSubController: simulation not found",
+                simulation_id=simulation_id,
+            )
+            return
+        location_callbacks = (
+            self._async_job_callbacks.validate_simulation_marker_location
+        )
+        self._submit_model_entrypoint_async_call(
+            name="validate_simulation_marker_location",
+            fn=self.model_entrypoint.validate_simulation_marker_location,
+            args=(simulation_id, km, line, latitude, longitude),
+            description="Validate map milestone location for simulation",
+            job_type="thread",
+            coalesce_key=f"validate_simulation_marker_location:{simulation_id}",
+            on_completed=location_callbacks.on_completed,
+            on_failed=location_callbacks.on_failed,
         )
 
     @validate_view

@@ -14,6 +14,7 @@ from PySide6.QtWidgets import QApplication
 from controller.core_work_callbacks import (
     RenderMapCallback,
     RenderMapSimulationCallback,
+    ValidateSimulationMarkerLocationCallback,
 )
 from controller.domains.map_sub_controller import MapSubController
 from controller.orchestration.app_controller import AppController
@@ -28,6 +29,9 @@ from core.signals import (
 )
 from core.simulation import Simulation
 from core.work.render_map_work import RenderMapOutcome
+from core.work.validate_simulation_marker_location_work import (
+    ValidateSimulationMarkerLocationOutcome,
+)
 
 pytestmark = [pytest.mark.async_jobs]
 
@@ -330,15 +334,14 @@ def test_persist_simulation_repository_delegates_to_model_entrypoint(
     assert metadata_path.is_file()
 
 
-def test_on_simulation_location_requested_validates_via_model_entrypoint(
+def test_on_simulation_location_requested_submits_thread_job(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     app = _AppStub(tmp_path)
     _patch_controller_type_checks(monkeypatch, app)
     map_controller = _make_map_sub_controller(app)
-    validate = MagicMock()
-    app.model_entrypoint.validate_simulation_marker_location = validate  # type: ignore[method-assign]
+    _add_simulation(app.model_entrypoint, "sim-1")
 
     map_controller._on_simulation_location_requested(
         "sim-1",
@@ -348,13 +351,87 @@ def test_on_simulation_location_requested_validates_via_model_entrypoint(
         2.363530409238113,
     )
 
-    validate.assert_called_once_with(
+    assert len(app.submitted) == 1
+    submit_kwargs = app.submitted[0]
+    assert submit_kwargs["name"] == "validate_simulation_marker_location"
+    assert submit_kwargs["job_type"] == "thread"
+    assert submit_kwargs["coalesce_key"] == "validate_simulation_marker_location:sim-1"
+    assert (
+        submit_kwargs["fn"] == app.model_entrypoint.validate_simulation_marker_location
+    )
+    assert submit_kwargs["args"] == (
         "sim-1",
         1,
         "001000-1",
         48.88533318609319,
         2.363530409238113,
     )
+    on_completed = submit_kwargs["on_completed"]
+    on_failed = submit_kwargs["on_failed"]
+    assert isinstance(on_completed.__self__, ValidateSimulationMarkerLocationCallback)
+    assert isinstance(on_failed.__self__, ValidateSimulationMarkerLocationCallback)
+
+
+def test_on_simulation_location_requested_skips_when_simulation_missing(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    app = _AppStub(tmp_path)
+    _patch_controller_type_checks(monkeypatch, app)
+    map_controller = _make_map_sub_controller(app)
+
+    map_controller._on_simulation_location_requested(
+        "sim-1",
+        1,
+        "001000-1",
+        48.88533318609319,
+        2.363530409238113,
+    )
+
+    assert app.submitted == []
+
+
+def test_validate_simulation_marker_location_callback_on_completed_applies_result() -> (
+    None
+):
+    app = _AppStub()
+    map_controller = _make_map_sub_controller(app)
+    apply_calls: list[object] = []
+    app.model_entrypoint.apply_result = lambda result: apply_calls.append(result)  # type: ignore[method-assign]
+    callback = ValidateSimulationMarkerLocationCallback(map_controller)
+    outcome = ValidateSimulationMarkerLocationOutcome(
+        rejected=SimulationLocationRejectedPayload(
+            simulation_id="sim-1",
+            km=1,
+            line="001000-1",
+            lat=0.0,
+            lon=0.0,
+            reason="bad",
+        ),
+    )
+
+    callback.on_completed(outcome)
+
+    assert apply_calls == [outcome]
+
+
+def test_validate_simulation_marker_location_callback_on_failed_delegates_to_apply_failure() -> (
+    None
+):
+    app = _AppStub()
+    map_controller = _make_map_sub_controller(app)
+    apply_calls: list[object] = []
+    app.model_entrypoint.apply_failure = lambda error: apply_calls.append(error)  # type: ignore[method-assign]
+    callback = ValidateSimulationMarkerLocationCallback(map_controller)
+    error = JobError(
+        message="Job failed: validate_simulation_marker_location: boom",
+        traceback="",
+        origin="validate_simulation_marker_location",
+    )
+
+    callback.on_failed(error)
+
+    assert apply_calls == [error]
 
 
 def test_on_simulation_location_rejected_forwards_to_view(

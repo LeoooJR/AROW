@@ -11,19 +11,22 @@ import pytest
 from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
 from core.devices import Phone
 from core.entrypoint import ModelEntrypoint
-from core.geo.element import clear_referentiel_pk_cache
+from core.geo.element import clear_lignes_par_type_cache
 from core.signals import (
     CoreSignal,
     SimulationLocationRejectedPayload,
     SimulationLocationValidatedPayload,
 )
+from core.work.validate_simulation_marker_location_work import (
+    ValidateSimulationMarkerLocationOutcome,
+)
 
 
 @pytest.fixture(autouse=True)
-def _clear_referentiel_cache() -> Iterator[None]:
-    clear_referentiel_pk_cache()
+def _clear_lignes_cache() -> Iterator[None]:
+    clear_lignes_par_type_cache()
     yield
-    clear_referentiel_pk_cache()
+    clear_lignes_par_type_cache()
 
 
 def _make_model(tmp_path: Path) -> ModelEntrypoint:
@@ -54,13 +57,15 @@ def test_validate_simulation_marker_location_emits_validated_payload(
         captured.append(payload)
 
     model_entrypoint.subscribe(CoreSignal.SIMULATION_LOCATION_VALIDATED, capture)
-    model_entrypoint.validate_simulation_marker_location(
+    outcome = model_entrypoint.validate_simulation_marker_location(
         simulation_id,
         1,
         "001000-1",
         48.88533318609319,
         2.363530409238113,
     )
+    assert isinstance(outcome, ValidateSimulationMarkerLocationOutcome)
+    model_entrypoint.apply_result(outcome)
 
     assert len(captured) == 1
     assert captured[0].simulation_id == simulation_id
@@ -70,7 +75,6 @@ def test_validate_simulation_marker_location_emits_validated_payload(
     assert isinstance(line, dict)
     assert line["code"] == "001000"
     assert line["troncon"] == 1
-    assert poi["label"] == "001+000"
     assert captured[0].lat == pytest.approx(48.88533318609319)
     assert captured[0].lon == pytest.approx(2.363530409238113)
 
@@ -124,13 +128,14 @@ def test_validate_simulation_marker_location_invalid_marker_emits_rejected_paylo
         capture_rejected,
     )
 
-    model_entrypoint.validate_simulation_marker_location(
+    outcome = model_entrypoint.validate_simulation_marker_location(
         simulation_id,
         999,
         "001000-1",
         0.0,
         0.0,
     )
+    model_entrypoint.apply_result(outcome)
 
     assert validated == []
     assert len(rejected) == 1

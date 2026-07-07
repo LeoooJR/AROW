@@ -355,13 +355,14 @@ def test_simulation_location_validated_updates_spoofed_location_and_persists(
         captured.append(payload)
 
     model_entrypoint.subscribe(CoreSignal.SIMULATION_LOCATION_VALIDATED, capture)
-    model_entrypoint.validate_simulation_marker_location(
+    outcome = model_entrypoint.validate_simulation_marker_location(
         simulation_id,
         1,
         "001000-1",
         48.88533318609319,
         2.363530409238113,
     )
+    model_entrypoint.apply_result(outcome)
     assert len(captured) == 1
     payload = captured[0]
 

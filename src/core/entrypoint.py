@@ -4,8 +4,6 @@ from functools import cached_property
 from pathlib import Path
 from typing import Any, Callable, Literal, Mapping, Tuple, overload
 
-from shapely.geometry import Point
-
 from core.adb.client import AdbClient
 from core.adb.server import AdbServer
 from core.application_paths import (
@@ -22,8 +20,7 @@ from core.devices import (
     phone_stable_key_is_collision_resistant,
     serialize_phone_collection,
 )
-from core.geo.element import Milestone, Railway
-from core.geo.exceptions import MilestoneValidationError, RailwayValidationError
+from core.geo.element import Milestone
 from core.geo.location import Location
 from core.signals import (
     ActivityLogFileUpdatedPayload,
@@ -67,6 +64,10 @@ from core.work.refresh_known_devices_work import (
 )
 from core.work.render_map_work import RenderMapOutcome, RenderMapWork
 from core.work.startup_work import StartupCoreRuntimeWork, StartupOutcome
+from core.work.validate_simulation_marker_location_work import (
+    ValidateSimulationMarkerLocationOutcome,
+    ValidateSimulationMarkerLocationWork,
+)
 from core.work.works_repository import CORE_RUNTIME_WORKS
 from logger import logger
 
@@ -748,13 +749,14 @@ class ModelEntrypoint(Entrypoint):
             # Validate the simulation marker location, simulation metadata can have been modified by the user
             if simulation.spoofed_location.poi is not None:
                 poi = simulation.spoofed_location.poi
-                self.validate_simulation_marker_location(
+                outcome = self.validate_simulation_marker_location(
                     simulation_id=simulation.id,
                     km=poi.km,
                     line=f"{poi.line.code}-{poi.line.troncon}",
                     latitude=poi.geometry.y,
                     longitude=poi.geometry.x,
                 )
+                self.apply_result(outcome)
         # Set the last active device id
         self._simulations.last_active_device_id = device_id
 
@@ -859,44 +861,19 @@ class ModelEntrypoint(Entrypoint):
         line: str,
         latitude: float,
         longitude: float,
-    ) -> None:
-        """Validate a map milestone and emit ``SIMULATION_LOCATION_VALIDATED`` on success."""
+    ) -> ValidateSimulationMarkerLocationOutcome:
+        """Validate a map milestone (worker thread). Apply via :meth:`apply_result`."""
         simulation = self.get_simulation(simulation_id)
         if simulation is None:
             raise ValueError(f"Simulation with id {simulation_id} not found")
 
-        try:
-            code, troncon_raw = line.rsplit("-", maxsplit=1)
-            validated_line = Railway.validate(
-                code=code,
-                troncon=int(troncon_raw),
-            )
-            validated_milestone = Milestone.validate(
-                km,
-                validated_line,
-                Point(longitude, latitude),
-            )
-            self._signal_bus.emit(
-                CoreSignal.SIMULATION_LOCATION_VALIDATED,
-                SimulationLocationValidatedPayload(
-                    simulation_id=simulation_id,
-                    lat=validated_milestone.geometry.y,
-                    lon=validated_milestone.geometry.x,
-                    poi=validated_milestone.serialize(),
-                ),
-            )
-        except (MilestoneValidationError, RailwayValidationError) as error:
-            self._signal_bus.emit(
-                CoreSignal.SIMULATION_LOCATION_REJECTED,
-                SimulationLocationRejectedPayload(
-                    simulation_id=simulation_id,
-                    km=km,
-                    line=line,
-                    lat=latitude,
-                    lon=longitude,
-                    reason=str(error),
-                ),
-            )
+        return ValidateSimulationMarkerLocationWork(
+            simulation_id=simulation_id,
+            km=km,
+            line=line,
+            latitude=latitude,
+            longitude=longitude,
+        ).run()
 
     def persist_simulation(self, simulation_id: str) -> None:
         """Write one simulation metadata file to disk."""

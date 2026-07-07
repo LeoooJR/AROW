@@ -1,0 +1,172 @@
+"""Tests for validate simulation marker location core runtime work."""
+
+from __future__ import annotations
+
+from collections.abc import Iterator
+from pathlib import Path
+from unittest.mock import patch
+
+import pytest
+
+from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
+from core.devices import Phone
+from core.entrypoint import ModelEntrypoint
+from core.geo.element import clear_lignes_par_type_cache
+from core.signals import (
+    CoreSignal,
+    ErrorRaisedPayload,
+    SimulationLocationRejectedPayload,
+    SimulationLocationValidatedPayload,
+)
+from core.work.validate_simulation_marker_location_work import (
+    ValidateSimulationMarkerLocationOutcome,
+    ValidateSimulationMarkerLocationWork,
+)
+
+
+@pytest.fixture(autouse=True)
+def _clear_lignes_cache() -> Iterator[None]:
+    clear_lignes_par_type_cache()
+    yield
+    clear_lignes_par_type_cache()
+
+
+def _make_model(tmp_path: Path) -> ModelEntrypoint:
+    state = MockAdbState(seed=601, initial_devices=0)
+    server = MockAdbServer(state=state)
+    client = MockAdbClient(state=state)
+    device = Phone(id="device-1", state="device", model="Pixel")
+    server.paired_devices.add(device)
+    with patch(
+        "core.entrypoint.get_or_create_application_dir",
+        return_value=tmp_path,
+    ):
+        model_entrypoint = ModelEntrypoint()
+    model_entrypoint._adb_server = server
+    model_entrypoint._adb_client = client
+    model_entrypoint.create_simulation("device-1")
+    return model_entrypoint
+
+
+def test_validate_simulation_marker_location_work_run_returns_validated_outcome(
+    tmp_path: Path,
+) -> None:
+    model_entrypoint = _make_model(tmp_path)
+    simulation_id = next(iter(model_entrypoint._simulations)).id
+
+    outcome = ValidateSimulationMarkerLocationWork(
+        simulation_id=simulation_id,
+        km=1,
+        line="001000-1",
+        latitude=48.88533318609319,
+        longitude=2.363530409238113,
+    ).run()
+
+    assert outcome.validated is not None
+    assert outcome.rejected is None
+    assert outcome.validated.simulation_id == simulation_id
+    assert outcome.validated.poi["km"] == 1
+
+
+def test_validate_simulation_marker_location_work_run_returns_rejected_outcome(
+    tmp_path: Path,
+) -> None:
+    model_entrypoint = _make_model(tmp_path)
+    simulation_id = next(iter(model_entrypoint._simulations)).id
+
+    outcome = ValidateSimulationMarkerLocationWork(
+        simulation_id=simulation_id,
+        km=999,
+        line="001000-1",
+        latitude=0.0,
+        longitude=0.0,
+    ).run()
+
+    assert outcome.validated is None
+    assert outcome.rejected is not None
+    assert outcome.rejected.simulation_id == simulation_id
+    assert "Unknown milestone" in outcome.rejected.reason
+
+
+def test_apply_main_thread_emits_validated_signal(tmp_path: Path) -> None:
+    model_entrypoint = _make_model(tmp_path)
+    simulation_id = next(iter(model_entrypoint._simulations)).id
+    captured: list[SimulationLocationValidatedPayload] = []
+
+    def capture(payload: SimulationLocationValidatedPayload) -> None:
+        captured.append(payload)
+
+    model_entrypoint.subscribe(CoreSignal.SIMULATION_LOCATION_VALIDATED, capture)
+    outcome = ValidateSimulationMarkerLocationWork(
+        simulation_id=simulation_id,
+        km=1,
+        line="001000-1",
+        latitude=48.88533318609319,
+        longitude=2.363530409238113,
+    ).run()
+    ValidateSimulationMarkerLocationWork.apply_main_thread(model_entrypoint, outcome)
+
+    assert len(captured) == 1
+    assert captured[0].simulation_id == simulation_id
+
+
+def test_apply_main_thread_emits_rejected_signal(tmp_path: Path) -> None:
+    model_entrypoint = _make_model(tmp_path)
+    simulation_id = next(iter(model_entrypoint._simulations)).id
+    captured: list[SimulationLocationRejectedPayload] = []
+
+    def capture(payload: SimulationLocationRejectedPayload) -> None:
+        captured.append(payload)
+
+    model_entrypoint.subscribe(CoreSignal.SIMULATION_LOCATION_REJECTED, capture)
+    outcome = ValidateSimulationMarkerLocationWork(
+        simulation_id=simulation_id,
+        km=999,
+        line="001000-1",
+        latitude=0.0,
+        longitude=0.0,
+    ).run()
+    ValidateSimulationMarkerLocationWork.apply_main_thread(model_entrypoint, outcome)
+
+    assert len(captured) == 1
+    assert captured[0].km == 999
+
+
+def test_apply_failure_main_thread_emits_generic_error(tmp_path: Path) -> None:
+    model_entrypoint = _make_model(tmp_path)
+    captured: list[ErrorRaisedPayload] = []
+
+    def capture(payload: ErrorRaisedPayload) -> None:
+        captured.append(payload)
+
+    model_entrypoint.subscribe(CoreSignal.ERROR_RAISED, capture)
+    ValidateSimulationMarkerLocationWork.apply_failure_main_thread(
+        model_entrypoint,
+        RuntimeError("unexpected"),
+    )
+
+    assert len(captured) == 1
+    assert captured[0].source == "ValidateSimulationMarkerLocationWork"
+
+
+def test_outcome_requires_exactly_one_payload() -> None:
+    with pytest.raises(ValueError, match="exactly one"):
+        ValidateSimulationMarkerLocationOutcome()
+
+    with pytest.raises(ValueError, match="exactly one"):
+        ValidateSimulationMarkerLocationOutcome(
+            validated=SimulationLocationValidatedPayload(
+                simulation_id="sim-1",
+                lat=0.0,
+                lon=0.0,
+                poi={},
+            ),
+            rejected=SimulationLocationRejectedPayload(
+                simulation_id="sim-1",
+                km=1,
+                line="001000-1",
+                lat=0.0,
+                lon=0.0,
+                reason="bad",
+            ),
+        )
