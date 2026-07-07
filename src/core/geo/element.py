@@ -3,7 +3,6 @@ from __future__ import annotations
 import base64
 import re
 from abc import ABC
-from dataclasses import dataclass
 from functools import lru_cache
 from typing import Literal, cast
 
@@ -39,18 +38,6 @@ def _deserialize_geometry(raw: object) -> BaseGeometry:
     return from_wkb(cast(bytes, raw))
 
 
-@dataclass(frozen=True, slots=True)
-class _ValidatedRailwaySnapshot:
-    """Pre-aggregated railway metadata and segment geometry from lignes-par-type."""
-
-    id: str
-    code: str
-    troncon: int
-    type: str
-    label: str
-    geometry: LineString | MultiLineString
-
-
 @lru_cache(maxsize=1)
 def _lignes_par_type_dataset() -> geopandas.GeoDataFrame:
     """Load and normalize the lignes-par-type dataset once per process."""
@@ -66,71 +53,21 @@ def _normalize_lookup_key(value: object) -> str | None:
     return normalized or None
 
 
-def _railway_snapshot_from_segment(
-    row: pd.Series,
-) -> _ValidatedRailwaySnapshot:
-    """Build one railway snapshot from a single lignes-par-type segment row."""
+def _railway_from_row(row: pd.Series) -> Railway:
+    """Build a validated railway from one indexed lignes-par-type row."""
     id_key = _normalize_lookup_key(row["idgaia"])
     code_key = _normalize_lookup_key(row["code_ligne"])
     if id_key is None or code_key is None:
         raise ValueError("Missing railway lookup key in lignes-par-type row")
-    return _ValidatedRailwaySnapshot(
+    return Railway(
         id=id_key,
         code=code_key,
         troncon=int(row["rg_troncon"]),
         type=row["type_ligne"],
         label=row["lib_ligne"],
         geometry=row["geometry"],
+        _validated_token=_VALIDATED_FACTORY_TOKEN,
     )
-
-
-@lru_cache(maxsize=1)
-def _railway_lookup_indexes() -> tuple[
-    dict[str, dict[int, _ValidatedRailwaySnapshot]],
-    dict[str, dict[int, _ValidatedRailwaySnapshot]],
-]:
-    """Build O(1) railway lookup indexes keyed by SNCF Gaïa id and numeric line code."""
-    referentiel = _lignes_par_type_dataset()
-    by_idgaia: dict[str, dict[int, _ValidatedRailwaySnapshot]] = (
-        {}
-    )  # Keyed by SNCF Gaïa id and troncon.
-    by_code_ligne: dict[str, dict[int, _ValidatedRailwaySnapshot]] = (
-        {}
-    )  # Keyed by numeric line code and troncon.
-
-    idgaia_keys = referentiel["idgaia"].unique().map(_normalize_lookup_key)
-    for lookup_key in idgaia_keys:
-        if lookup_key is None:
-            continue
-        result: pd.DataFrame = referentiel.loc[referentiel["idgaia"] == lookup_key]
-        for (
-            _index,
-            row,
-        ) in (
-            result.iterrows()
-        ):  # Iterate over all segments (troncons) for the same railway.
-            by_idgaia.setdefault(lookup_key, {})[int(row["rg_troncon"])] = (
-                _railway_snapshot_from_segment(row)
-            )
-
-    code_keys = referentiel["code_ligne"].unique().map(_normalize_lookup_key)
-    for lookup_key in code_keys:
-        if lookup_key is None:
-            continue
-        code_result: pd.DataFrame = referentiel.loc[
-            referentiel["code_ligne"] == lookup_key
-        ]
-        for (
-            _index,
-            row,
-        ) in (
-            code_result.iterrows()
-        ):  # Iterate over all segments (troncons) for the same railway.
-            by_code_ligne.setdefault(lookup_key, {})[int(row["rg_troncon"])] = (
-                _railway_snapshot_from_segment(row)
-            )
-
-    return by_idgaia, by_code_ligne
 
 
 def _normalize_code_ligne(value: object) -> str:
@@ -144,7 +81,6 @@ def _normalize_code_ligne(value: object) -> str:
 def clear_lignes_par_type_cache() -> None:
     """Clear the cached lignes-par-type dataset (for tests)."""
     _lignes_par_type_dataset.cache_clear()
-    _railway_lookup_indexes.cache_clear()
 
 
 class MapElement(ABC):
@@ -595,28 +531,42 @@ class Railway(MapElement, Payload):
         else:
             raise RailwayValidationError("Railway troncon must be provided")
 
-        by_idgaia, by_code_ligne = _railway_lookup_indexes()
-        if lookup_key_name == "idgaia":
-            segments = by_idgaia.get(normalized_lookup_key)
-        else:
-            segments = by_code_ligne.get(normalized_lookup_key)
-        if segments is None:
+        referentiel = _lignes_par_type_dataset()
+        try:
+            if lookup_key_name == "code_ligne":
+                row = referentiel.loc[
+                    (_normalize_code_ligne(normalized_lookup_key), normalized_troncon)
+                ]
+            else:
+                matches = referentiel.loc[
+                    (referentiel["idgaia"] == normalized_lookup_key)
+                    & (referentiel["rg_troncon"] == normalized_troncon)
+                ]
+                if matches.empty:
+                    raise KeyError(normalized_lookup_key)
+                row = matches.iloc[0]
+        except KeyError as error:
             raise RailwayValidationError(
                 f"Unknown railway {lookup_key_name}: {normalized_lookup_key!r}"
-            )
-        snapshot = segments.get(normalized_troncon)
-        if snapshot is None:
+            ) from error
+
+        if isinstance(row, pd.DataFrame):
             raise RailwayValidationError(
-                f"Unknown railway {lookup_key_name}: {normalized_lookup_key!r}"
+                f"Multiple matches for railway {lookup_key_name}: {normalized_lookup_key!r}"
             )
 
-        return cls(
-            id=snapshot.id,
-            code=snapshot.code,
-            troncon=snapshot.troncon,
-            type=snapshot.type,
-            label=snapshot.label,
-            geometry=snapshot.geometry,
+        id_key = _normalize_lookup_key(row["idgaia"])
+        code_key = _normalize_lookup_key(row["code_ligne"])
+        if id_key is None or code_key is None:
+            raise ValueError("Missing railway lookup key in lignes-par-type row")
+
+        return Railway(
+            id=id_key,
+            code=code_key,
+            troncon=int(row["rg_troncon"]),
+            type=row["type_ligne"],
+            label=row["lib_ligne"],
+            geometry=row["geometry"],
             _validated_token=_VALIDATED_FACTORY_TOKEN,
         )
 

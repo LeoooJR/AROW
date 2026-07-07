@@ -96,17 +96,12 @@ class MapRenderer:
         low_mask: pd.Series = _at_distance_mask(
             kilometric_points_geodataset["km"], settings="LOW"
         )
-        subset_indices: list[int] = kilometric_points_geodataset.index[
-            low_mask
-        ].tolist()
 
         kilometric_points_on_low_zoom_geodataset: geopandas.GeoDataFrame = (
-            kilometric_points_geodataset.loc[sorted(subset_indices)]
+            kilometric_points_geodataset.loc[low_mask]
         )
         kilometric_points_on_medium_zoom_geodataset: geopandas.GeoDataFrame = (
-            kilometric_points_geodataset.loc[
-                ~kilometric_points_geodataset.index.isin(subset_indices)
-            ]
+            kilometric_points_geodataset.loc[~low_mask]
         )
 
         n_km: int = len(kilometric_points_geodataset)

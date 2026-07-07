@@ -125,12 +125,21 @@ class GaresDeVoyageursSchema(pg.GeoDataFrameModel):
         return bool((_gares_geometry_is_point_or_empty(series)).all())
 
 
+def _normalize_code_ligne(value: object) -> str:
+    """Normalize numeric line codes to six digits for indexed lookups."""
+    normalized = str(value).strip()
+    if normalized.isdigit():
+        return normalized.zfill(6)
+    return normalized
+
+
 def _preprocess_gares_de_voyageurs(
     df: geopandas.GeoDataFrame,
 ) -> geopandas.GeoDataFrame:
     """Preprocess the gares de voyageurs dataset."""
     without_position = df.drop(columns="position_geographique")
-    return without_position.astype({"segment_drg": "category"})
+    typed = without_position.astype({"segment_drg": "category"})
+    return typed.set_index("codes_uic", drop=False).sort_index()
 
 
 class LignesParTypeSchema(pg.GeoDataFrameModel):
@@ -228,7 +237,7 @@ class LignesParTypeSchema(pg.GeoDataFrameModel):
 def _preprocess_lignes_par_type(df: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
     """Preprocess the lignes par type dataset."""
     typed = df.astype({"type_ligne": "category"})
-    return typed.drop(
+    cleaned = typed.drop(
         columns=[
             "x_d_l93",
             "y_d_l93",
@@ -243,6 +252,11 @@ def _preprocess_lignes_par_type(df: geopandas.GeoDataFrame) -> geopandas.GeoData
             "geo_point_2d",
         ]
     )
+    cleaned = cleaned.assign(
+        code_ligne=cleaned["code_ligne"].map(_normalize_code_ligne),
+        rg_troncon=cleaned["rg_troncon"].astype(int),
+    )
+    return cleaned.set_index(["code_ligne", "rg_troncon"], drop=False).sort_index()
 
 
 class ReferentielPkGpsSchema(pa.DataFrameModel):
@@ -283,9 +297,7 @@ def _preprocess_referentiel_pk_gps(df: pd.DataFrame) -> geopandas.GeoDataFrame:
     """
     normalized = df.copy()
     normalized.columns = normalized.columns.map(lambda c: c.lower())
-    typed = normalized.astype(
-        {"ligne": "category", "code_ligne": "category", "rg_troncon": "category"}
-    )
+    typed = normalized.astype({"ligne": "category", "label": "string"})
 
     typed["geometry"] = geopandas.GeoSeries.from_xy(
         typed["longitude"], typed["latitude"], crs="EPSG:4326"
@@ -294,8 +306,18 @@ def _preprocess_referentiel_pk_gps(df: pd.DataFrame) -> geopandas.GeoDataFrame:
 
     # Ensure geometry is present before map use.
     cleaned = without_lat_lon.dropna(subset=["geometry"])
+    dataframe = cleaned.assign(
+        code_ligne=cleaned["code_ligne"].astype(int),
+        rg_troncon=cleaned["rg_troncon"].astype(int),
+        km=cleaned["km"].astype(int),
+    )
 
-    return geopandas.GeoDataFrame(cleaned, geometry="geometry", crs="EPSG:4326")
+    geodataframe = geopandas.GeoDataFrame(
+        dataframe, geometry="geometry", crs="EPSG:4326"
+    )
+    return geodataframe.set_index(
+        ["code_ligne", "rg_troncon", "km"], drop=False
+    ).sort_index()
 
 
 @dataclass(frozen=True)

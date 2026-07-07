@@ -102,3 +102,36 @@ def test_query_referentiel_invalid_sql_raises_database_error() -> None:
 def test_query_unknown_dataset_raises_value_error() -> None:
     with pytest.raises(ValueError, match="Dataset missing not found"):
         DatasetManager.query(id="missing", sql="SELECT 1")
+
+
+def test_gares_de_voyageurs_index_is_codes_uic_with_retained_columns() -> None:
+    dataset = DatasetManager.read("gares-de-voyageurs")
+
+    assert dataset.index.name == "codes_uic"
+    assert dataset.index.is_unique
+    assert "codes_uic" in dataset.columns
+    assert "nom" in dataset.columns
+    assert "geometry" in dataset.columns
+
+
+def test_lignes_par_type_index_is_code_ligne_and_rg_troncon() -> None:
+    dataset = DatasetManager.read("lignes-par-type")
+
+    assert list(dataset.index.names) == ["code_ligne", "rg_troncon"]
+    assert dataset.index.is_unique
+    assert "code_ligne" in dataset.columns
+    assert "rg_troncon" in dataset.columns
+    assert "idgaia" in dataset.columns
+    assert "geometry" in dataset.columns
+
+
+def test_referentiel_pk_gps_index_is_code_ligne_rg_troncon_km() -> None:
+    dataset = DatasetManager.read("referentiel_pk_gps")
+
+    assert list(dataset.index.names) == ["code_ligne", "rg_troncon", "km"]
+    assert dataset.index.is_unique
+    assert "code_ligne" in dataset.columns
+    assert "rg_troncon" in dataset.columns
+    assert "km" in dataset.columns
+    assert "label" in dataset.columns
+    assert "geometry" in dataset.columns
