@@ -188,26 +188,25 @@ class MapSubController(AppSubController):
     ) -> None:
         """Forward validated simulation location to the map view."""
         poi = payload.poi
-        poi_km = poi.get("km", 0)
-        if not isinstance(poi_km, int):
+        km = poi.get("km", 0)
+        if not isinstance(km, int):
             logger.warning(
                 "MapSubController: validated poi km is not an integer",
                 simulation_id=payload.simulation_id,
-                km=poi_km,
+                km=km,
             )
             return
-        km = poi_km
-        line_payload = poi.get("line")
-        line = ""
-        if isinstance(line_payload, dict):
-            code = str(line_payload.get("code", ""))
-            troncon = str(line_payload.get("troncon", ""))
-            line = f"{code}-{troncon}"
+        line = poi.get("line")
+        line_repr = ""
+        if isinstance(line, dict):
+            code = str(line.get("code", ""))
+            troncon = str(line.get("troncon", ""))
+            line_repr = f"{code}-{troncon}"
         logger.debug(
             "MapSubController: simulation location validated",
             simulation_id=payload.simulation_id,
             km=km,
-            line=line,
+            line=line_repr,
             type=poi.get("type"),
             lat=payload.lat,
             lon=payload.lon,
@@ -215,7 +214,7 @@ class MapSubController(AppSubController):
         self.view.forward_simulation_location_validated(
             simulation_id=payload.simulation_id,
             km=km,
-            line=line,
+            line=line_repr,
             lat=payload.lat,
             lon=payload.lon,
             label=str(poi.get("label", "")),
