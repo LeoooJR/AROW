@@ -7,6 +7,7 @@ applied on the main thread and forwarded to the view.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Slot
@@ -52,6 +53,20 @@ class MapSubController(AppSubController):
     def _submit_model_entrypoint_async_call(self, *args, **kwargs):
         return self._app._submit_model_entrypoint_async_call(*args, **kwargs)
 
+    def _simulation_exists_preflight(self, simulation_id: str) -> Callable[[], bool]:
+        """Return a preflight gate that confirms the simulation still exists."""
+
+        def _preflight() -> bool:
+            if self.model_entrypoint.get_simulation(simulation_id) is None:
+                logger.error(
+                    "MapSubController: simulation not found",
+                    simulation_id=simulation_id,
+                )
+                return False
+            return True
+
+        return _preflight
+
     def connect_view_signals(self) -> None:
         """Connect map-relevant :data:`gui.signals.signals` when map UI is ready."""
         signals.UI.RenderMapRequested.connect(self._on_render_map_requested)
@@ -90,11 +105,8 @@ class MapSubController(AppSubController):
             "MapSubController: render map requested",
             simulation_id=simulation_id,
         )
-        if self.model_entrypoint.get_simulation(simulation_id) is None:
-            logger.error(
-                "MapSubController: simulation not found",
-                simulation_id=simulation_id,
-            )
+        simulation_preflight = self._simulation_exists_preflight(simulation_id)
+        if not simulation_preflight():
             return
         if self.model_entrypoint.is_map_rendered_for_simulation(simulation_id):
             html_path = self.model_entrypoint.get_map_file_for_simulation(simulation_id)
@@ -127,6 +139,7 @@ class MapSubController(AppSubController):
                 description="Render Folium map HTML for simulation",
                 job_type="process",
                 coalesce_key=f"render_map:{simulation_id}",
+                preflight=simulation_preflight,
                 on_completed=render_callbacks.on_completed,
                 on_failed=render_callbacks.on_failed,
                 on_cancelled=render_callbacks.on_cancelled,
@@ -154,12 +167,6 @@ class MapSubController(AppSubController):
             latitude=latitude,
             longitude=longitude,
         )
-        if self.model_entrypoint.get_simulation(simulation_id) is None:
-            logger.error(
-                "MapSubController: simulation not found",
-                simulation_id=simulation_id,
-            )
-            return
         location_callbacks = (
             self._async_job_callbacks.validate_simulation_marker_location
         )
@@ -170,6 +177,7 @@ class MapSubController(AppSubController):
             description="Validate map milestone location for simulation",
             job_type="thread",
             coalesce_key=f"validate_simulation_marker_location:{simulation_id}",
+            preflight=self._simulation_exists_preflight(simulation_id),
             on_completed=location_callbacks.on_completed,
             on_failed=location_callbacks.on_failed,
         )

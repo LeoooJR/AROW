@@ -59,7 +59,10 @@ class _AppStub:
         self.runner = MagicMock()
         self.runner.cancel = lambda job_id: self.cancelled_job_ids.append(job_id)
 
-    def _submit_model_entrypoint_async_call(self, **kwargs: Any) -> JobHandler:
+    def _submit_model_entrypoint_async_call(self, **kwargs: Any) -> JobHandler | None:
+        preflight = kwargs.get("preflight")
+        if preflight is not None and not preflight():
+            return None
         self.submitted.append(kwargs)
         return JobHandler(job_id="job-1", name=kwargs.get("name", ""))
 
@@ -106,6 +109,8 @@ def test_on_render_map_requested_submits_process_job(tmp_path: Path) -> None:
     assert submit_kwargs["coalesce_key"] == "render_map:sim-1"
     assert submit_kwargs["fn"] == app.model_entrypoint.render_map
     assert submit_kwargs["args"] == ("sim-1", app.model_entrypoint.application_dir)
+    assert callable(submit_kwargs["preflight"])
+    assert submit_kwargs["preflight"]() is True
     assert map_controller._render_jobs_by_simulation_id["sim-1"].job_id == "job-1"
     on_completed = submit_kwargs["on_completed"]
     on_failed = submit_kwargs["on_failed"]
@@ -145,6 +150,15 @@ def test_on_render_map_requested_skips_when_simulation_missing() -> None:
 
     assert app.submitted == []
     app.view.forward_map_rendered.assert_not_called()
+
+
+def test_simulation_exists_preflight_rejects_missing_simulation() -> None:
+    app = _AppStub()
+    map_controller = _make_map_sub_controller(app)
+
+    preflight = map_controller._simulation_exists_preflight("sim-1")
+
+    assert preflight() is False
 
 
 def test_render_callback_on_completed_applies_result() -> None:
@@ -366,6 +380,8 @@ def test_on_simulation_location_requested_submits_thread_job(
         48.88533318609319,
         2.363530409238113,
     )
+    assert callable(submit_kwargs["preflight"])
+    assert submit_kwargs["preflight"]() is True
     on_completed = submit_kwargs["on_completed"]
     on_failed = submit_kwargs["on_failed"]
     assert isinstance(on_completed.__self__, ValidateSimulationMarkerLocationCallback)
