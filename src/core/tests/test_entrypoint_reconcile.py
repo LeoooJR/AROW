@@ -17,6 +17,7 @@ from core.devices import (
 )
 from core.entrypoint import ModelEntrypoint
 from core.signals import CoreSignal, SimulationCreatedPayload
+from core.tests.signal_test_helpers import seed_adb_startup_for_entrypoint
 
 pytestmark = [pytest.mark.devices]
 
@@ -47,6 +48,7 @@ def _model_with_server(
         model_entrypoint = ModelEntrypoint()
     model_entrypoint._adb_server = server
     model_entrypoint._adb_client = client
+    seed_adb_startup_for_entrypoint(model_entrypoint)
     return model_entrypoint, server
 
 

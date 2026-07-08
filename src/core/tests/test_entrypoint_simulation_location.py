@@ -17,6 +17,7 @@ from core.signals import (
     SimulationLocationRejectedPayload,
     SimulationLocationValidatedPayload,
 )
+from core.tests.signal_test_helpers import seed_adb_startup_for_entrypoint
 from core.work.validate_simulation_marker_location_work import (
     ValidateSimulationMarkerLocationOutcome,
 )
@@ -42,6 +43,7 @@ def _make_model(tmp_path: Path) -> ModelEntrypoint:
         model_entrypoint = ModelEntrypoint()
     model_entrypoint._adb_server = server
     model_entrypoint._adb_client = client
+    seed_adb_startup_for_entrypoint(model_entrypoint)
     model_entrypoint.create_simulation("device-1")
     return model_entrypoint
 

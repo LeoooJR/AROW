@@ -254,6 +254,147 @@ CORE_SIGNAL_PAYLOAD_TYPES: Mapping[CoreSignal, type[object]] = {
 }
 
 
+class CoreSignalDependencyError(RuntimeError):
+    """Raised when a core signal is emitted without required prior emissions."""
+
+    def __init__(
+        self,
+        *,
+        signal: CoreSignal,
+        missing: tuple[CoreSignal, ...],
+        scope: str | None = None,
+    ) -> None:
+        self.signal = signal
+        self.missing = missing
+        self.scope = scope
+        if scope is None:
+            message = (
+                f"Cannot emit {signal!s}: requires prior "
+                f"{', '.join(str(item) for item in missing)}"
+            )
+        else:
+            message = (
+                f"Cannot emit {signal!s} for scope {scope!r}: requires prior "
+                f"{', '.join(str(item) for item in missing)} with the same scope"
+            )
+        super().__init__(message)
+
+
+@dataclass(frozen=True, slots=True)
+class CoreSignalDependencyRule:
+    """One dependency requirement: any listed signal may satisfy the rule."""
+
+    any_of: tuple[CoreSignal, ...]
+    match_scope_from: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class CoreSignalEmission:
+    """One recorded core signal emission for debugging and dependency checks."""
+
+    signal: CoreSignal
+    payload: object
+    scope: str | None = None
+
+
+# Payload field used to index scoped emissions for dependency checks.
+CORE_SIGNAL_SCOPE_FIELDS: Mapping[CoreSignal, str] = {
+    CoreSignal.ADB_SERVER_STARTED: "adb_binary_path",
+    CoreSignal.ADB_SERVER_STOPPED: "adb_binary_path",
+    CoreSignal.SIMULATION_CREATED: "simulation_id",
+    CoreSignal.SIMULATION_RESTORED: "simulation_id",
+    CoreSignal.SIMULATION_DELETED: "simulation_id",
+    CoreSignal.SIMULATION_STATE_CHANGED: "simulation_id",
+    CoreSignal.SIMULATION_POSITION_CHANGED: "simulation_id",
+    CoreSignal.SIMULATION_LOCATION_VALIDATED: "simulation_id",
+    CoreSignal.SIMULATION_LOCATION_REJECTED: "simulation_id",
+    CoreSignal.SIMULATION_MAP_FILE_CHANGED: "simulation_id",
+    CoreSignal.MAP_RENDERED: "simulation_id",
+    CoreSignal.MAP_RENDER_FAILED: "simulation_id",
+}
+
+# Required prior emissions before a signal may be published on the core bus.
+CORE_SIGNAL_DEPENDENCIES: Mapping[CoreSignal, tuple[CoreSignalDependencyRule, ...]] = {
+    CoreSignal.ADB_SERVER_STOPPED: (
+        CoreSignalDependencyRule(
+            any_of=(CoreSignal.ADB_SERVER_STARTED,),
+            match_scope_from="adb_binary_path",
+        ),
+    ),
+    CoreSignal.DEVICE_AUTHENTIFICATION_SUCCEEDED: (
+        CoreSignalDependencyRule(any_of=(CoreSignal.ADB_SERVER_STARTED,)),
+    ),
+    CoreSignal.DEVICES_UPDATED: (
+        CoreSignalDependencyRule(any_of=(CoreSignal.ADB_SERVER_STARTED,)),
+    ),
+    CoreSignal.SIMULATION_CREATED: (
+        CoreSignalDependencyRule(any_of=(CoreSignal.DEVICES_UPDATED,)),
+    ),
+    CoreSignal.SIMULATION_RESTORED: (
+        CoreSignalDependencyRule(any_of=(CoreSignal.DEVICES_UPDATED,)),
+    ),
+    CoreSignal.SIMULATION_DELETED: (
+        CoreSignalDependencyRule(
+            any_of=(CoreSignal.SIMULATION_CREATED, CoreSignal.SIMULATION_RESTORED),
+            match_scope_from="simulation_id",
+        ),
+    ),
+    CoreSignal.SIMULATION_STATE_CHANGED: (
+        CoreSignalDependencyRule(
+            any_of=(CoreSignal.SIMULATION_CREATED, CoreSignal.SIMULATION_RESTORED),
+            match_scope_from="simulation_id",
+        ),
+    ),
+    CoreSignal.SIMULATION_POSITION_CHANGED: (
+        CoreSignalDependencyRule(
+            any_of=(CoreSignal.SIMULATION_CREATED, CoreSignal.SIMULATION_RESTORED),
+            match_scope_from="simulation_id",
+        ),
+    ),
+    CoreSignal.SIMULATION_LOCATION_VALIDATED: (
+        CoreSignalDependencyRule(
+            any_of=(CoreSignal.SIMULATION_CREATED, CoreSignal.SIMULATION_RESTORED),
+            match_scope_from="simulation_id",
+        ),
+    ),
+    CoreSignal.SIMULATION_LOCATION_REJECTED: (
+        CoreSignalDependencyRule(
+            any_of=(CoreSignal.SIMULATION_CREATED, CoreSignal.SIMULATION_RESTORED),
+            match_scope_from="simulation_id",
+        ),
+    ),
+    CoreSignal.SIMULATION_MAP_FILE_CHANGED: (
+        CoreSignalDependencyRule(
+            any_of=(CoreSignal.SIMULATION_CREATED, CoreSignal.SIMULATION_RESTORED),
+            match_scope_from="simulation_id",
+        ),
+    ),
+    CoreSignal.MAP_RENDERED: (
+        CoreSignalDependencyRule(
+            any_of=(CoreSignal.SIMULATION_CREATED, CoreSignal.SIMULATION_RESTORED),
+            match_scope_from="simulation_id",
+        ),
+    ),
+    CoreSignal.MAP_RENDER_FAILED: (
+        CoreSignalDependencyRule(
+            any_of=(CoreSignal.SIMULATION_CREATED, CoreSignal.SIMULATION_RESTORED),
+            match_scope_from="simulation_id",
+        ),
+    ),
+}
+
+
+def _extract_core_signal_scope(signal: CoreSignal, payload: object) -> str | None:
+    """Return the scoped entity key carried by *payload*, when defined for *signal*."""
+    field_name = CORE_SIGNAL_SCOPE_FIELDS.get(signal)
+    if field_name is None:
+        return None
+    value = getattr(payload, field_name, None)
+    if value is None:
+        return None
+    return str(value)
+
+
 PayloadT = TypeVar("PayloadT", contravariant=True)
 
 
@@ -758,6 +899,69 @@ class InMemoryCoreSignalBus(CoreSignalBus):
 
     def __init__(self) -> None:
         self._subscribers: dict[CoreSignal, list[SignalHandler[Any]]] = {}
+        self._emissions: list[CoreSignalEmission] = []
+        self._emitted_global: set[CoreSignal] = set()
+        self._emitted_scoped: set[tuple[CoreSignal, str]] = set()
+
+    @property
+    def history(self) -> tuple[CoreSignalEmission, ...]:
+        """Return all recorded emissions in dispatch order."""
+        return tuple(self._emissions)
+
+    def has_emitted(self, signal: CoreSignal, *, scope: str | None = None) -> bool:
+        """Return whether *signal* was emitted, optionally for one scoped entity."""
+        if scope is None:
+            return signal in self._emitted_global
+        return (signal, scope) in self._emitted_scoped
+
+    def _validate_payload_type(self, signal: CoreSignal, payload: object) -> None:
+        expected_type = CORE_SIGNAL_PAYLOAD_TYPES.get(signal)
+        if expected_type is not None and not isinstance(payload, expected_type):
+            raise TypeError(
+                f"CoreSignalBus.emit expected {expected_type.__name__} for "
+                f"{signal!s}, got {type(payload).__name__}"
+            )
+
+    def _enforce_dependencies(self, signal: CoreSignal, payload: object) -> None:
+        rules = CORE_SIGNAL_DEPENDENCIES.get(signal, ())
+        for rule in rules:
+            if rule.match_scope_from is None:
+                if any(
+                    required_signal in self._emitted_global
+                    for required_signal in rule.any_of
+                ):
+                    continue
+                raise CoreSignalDependencyError(
+                    signal=signal,
+                    missing=rule.any_of,
+                )
+
+            scope_value = getattr(payload, rule.match_scope_from, None)
+            if scope_value is None:
+                raise CoreSignalDependencyError(
+                    signal=signal,
+                    missing=rule.any_of,
+                )
+            scope_key = str(scope_value)
+            if any(
+                (required_signal, scope_key) in self._emitted_scoped
+                for required_signal in rule.any_of
+            ):
+                continue
+            raise CoreSignalDependencyError(
+                signal=signal,
+                missing=rule.any_of,
+                scope=scope_key,
+            )
+
+    def _record_emission(self, signal: CoreSignal, payload: object) -> None:
+        scope = _extract_core_signal_scope(signal, payload)
+        self._emissions.append(
+            CoreSignalEmission(signal=signal, payload=payload, scope=scope)
+        )
+        self._emitted_global.add(signal)
+        if scope is not None:
+            self._emitted_scoped.add((signal, scope))
 
     @overload
     def subscribe(
@@ -1235,9 +1439,14 @@ class InMemoryCoreSignalBus(CoreSignalBus):
         """
         Emit one payload to all current handlers of a signal.
 
-        Exception policy: log and continue to avoid one faulty callback blocking
-        all downstream handlers.
+        Validates payload type and dependency history before recording the
+        emission. Exception policy: log and continue to avoid one faulty callback
+        blocking all downstream handlers.
         """
+        self._validate_payload_type(signal, payload)
+        self._enforce_dependencies(signal, payload)
+        self._record_emission(signal, payload)
+
         handlers = self._subscribers.get(signal, [])
         if not handlers:
             return

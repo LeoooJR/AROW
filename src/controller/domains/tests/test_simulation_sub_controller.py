@@ -23,6 +23,7 @@ from core.signals import (
     SimulationPositionChangedPayload,
     SimulationStateChangedPayload,
 )
+from core.tests.signal_test_helpers import seed_adb_startup_for_entrypoint
 
 
 class _AppProbe:
@@ -58,6 +59,7 @@ def _make_model(tmp_path: Path, *, device: Phone | None = None) -> ModelEntrypoi
         model_entrypoint = ModelEntrypoint()
     model_entrypoint._adb_server = server
     model_entrypoint._adb_client = client
+    seed_adb_startup_for_entrypoint(model_entrypoint)
     if device is not None:
         server.paired_devices.add(device)
     return model_entrypoint
@@ -80,6 +82,7 @@ def _create_simulation_id(model_entrypoint: ModelEntrypoint, device_id: str) -> 
         captured.append(payload.simulation_id)
 
     model_entrypoint.subscribe(CoreSignal.SIMULATION_CREATED, capture)
+    seed_adb_startup_for_entrypoint(model_entrypoint)
     model_entrypoint.create_simulation(device_id)
     assert len(captured) == 1
     return captured[0]
@@ -93,10 +96,14 @@ def test_connect_model_signals_subscribes_to_simulation_events(tmp_path: Path) -
 
     subcontroller.connect_model_signals()
 
-    assert subscribe.call_count == 6
+    assert subscribe.call_count == 7
     subscribe.assert_any_call(
         CoreSignal.SIMULATION_CREATED,
         subcontroller._on_simulation_created,
+    )
+    subscribe.assert_any_call(
+        CoreSignal.SIMULATION_RESTORED,
+        subcontroller._on_simulation_restored,
     )
     subscribe.assert_any_call(
         CoreSignal.MAP_RENDERED,
