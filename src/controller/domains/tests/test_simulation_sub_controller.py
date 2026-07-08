@@ -19,6 +19,8 @@ from core.entrypoint import ModelEntrypoint
 from core.signals import (
     CoreSignal,
     SimulationCreatedPayload,
+    SimulationCreationFailedPayload,
+    SimulationDeletedPayload,
     SimulationLocationValidatedPayload,
     SimulationPositionChangedPayload,
     SimulationStateChangedPayload,
@@ -96,7 +98,7 @@ def test_connect_model_signals_subscribes_to_simulation_events(tmp_path: Path) -
 
     subcontroller.connect_model_signals()
 
-    assert subscribe.call_count == 7
+    assert subscribe.call_count == 10
     subscribe.assert_any_call(
         CoreSignal.SIMULATION_CREATED,
         subcontroller._on_simulation_created,
@@ -104,6 +106,18 @@ def test_connect_model_signals_subscribes_to_simulation_events(tmp_path: Path) -
     subscribe.assert_any_call(
         CoreSignal.SIMULATION_RESTORED,
         subcontroller._on_simulation_restored,
+    )
+    subscribe.assert_any_call(
+        CoreSignal.SIMULATION_CREATION_FAILED,
+        subcontroller._on_simulation_creation_failed,
+    )
+    subscribe.assert_any_call(
+        CoreSignal.SIMULATION_DELETED,
+        subcontroller._on_simulation_deleted,
+    )
+    subscribe.assert_any_call(
+        CoreSignal.SIMULATION_DELETE_SKIPPED,
+        subcontroller._on_simulation_delete_skipped,
     )
     subscribe.assert_any_call(
         CoreSignal.MAP_RENDERED,
@@ -153,13 +167,14 @@ def test_device_selection_confirmed_forwards_failure_when_device_is_unknown(
     model_entrypoint = _make_model(tmp_path)
     subcontroller = _make_subcontroller(model_entrypoint)
     _patch_controller_type_checks(monkeypatch, subcontroller._app)
+    subcontroller.connect_model_signals()
 
     subcontroller._on_device_selection_confirmed("missing-device", "Ghost")
 
     assert list(model_entrypoint._simulations) == []
     view = _view_mock(subcontroller)
     view.forward_device_selection_failed.assert_called_once_with(
-        "missing-device", "Ghost"
+        "missing-device", "missing-device"
     )
     view.forward_device_selection_succeeded.assert_not_called()
 
@@ -199,6 +214,7 @@ def test_on_simulation_created_ignores_payload_without_device(tmp_path: Path) ->
 
 
 def test_remove_device_requested_deletes_simulation_and_forwards_success(
+    monkeypatch,
     tmp_path: Path,
 ) -> None:
     model_entrypoint = _make_model(
@@ -206,6 +222,8 @@ def test_remove_device_requested_deletes_simulation_and_forwards_success(
     )
     simulation_id = _create_simulation_id(model_entrypoint, "device-1")
     subcontroller = _make_subcontroller(model_entrypoint)
+    _patch_controller_type_checks(monkeypatch, subcontroller._app)
+    subcontroller.connect_model_signals()
 
     subcontroller._on_remove_device_requested("device-1")
 
@@ -226,6 +244,46 @@ def test_remove_device_requested_ignores_devices_without_active_simulation(
     subcontroller._on_remove_device_requested("device-1")
 
     _view_mock(subcontroller).forward_remove_active_device_succeeded.assert_not_called()
+
+
+def test_on_simulation_creation_failed_forwards_device_selection_failure(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    model_entrypoint = _make_model(tmp_path)
+    subcontroller = _make_subcontroller(model_entrypoint)
+    _patch_controller_type_checks(monkeypatch, subcontroller._app)
+    payload = SimulationCreationFailedPayload(
+        device_id="device-1",
+        device_name="Pixel",
+        reason="Device with id device-1 not found",
+    )
+
+    subcontroller._on_simulation_creation_failed(payload)
+
+    _view_mock(subcontroller).forward_device_selection_failed.assert_called_once_with(
+        "device-1",
+        "Pixel",
+    )
+
+
+def test_on_simulation_deleted_forwards_remove_active_device_success(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    model_entrypoint = _make_model(tmp_path)
+    subcontroller = _make_subcontroller(model_entrypoint)
+    _patch_controller_type_checks(monkeypatch, subcontroller._app)
+    payload = SimulationDeletedPayload(
+        simulation_id="sim-1",
+        device_id="device-1",
+    )
+
+    subcontroller._on_simulation_deleted(payload)
+
+    _view_mock(
+        subcontroller
+    ).forward_remove_active_device_succeeded.assert_called_once_with("device-1")
 
 
 def test_run_stop_pause_and_resume_update_simulation_active_state(

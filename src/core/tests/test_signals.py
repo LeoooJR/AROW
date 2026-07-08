@@ -14,6 +14,8 @@ from core.signals import (
     CoreSignalDependencyError,
     InMemoryCoreSignalBus,
     SimulationCreatedPayload,
+    SimulationCreationFailedPayload,
+    SimulationDeleteSkippedPayload,
     SimulationLocationValidatedPayload,
     SimulationRestoredPayload,
     SimulationStateChangedPayload,
@@ -201,6 +203,29 @@ def test_signal_bus_allows_simulation_dependent_signals_after_restore() -> None:
     )
 
     assert bus.has_emitted(CoreSignal.SIMULATION_STATE_CHANGED, scope="sim-2")
+
+
+def test_signal_bus_accepts_simulation_outcome_payloads_without_dependencies() -> None:
+    bus = InMemoryCoreSignalBus()
+
+    bus.emit(
+        CoreSignal.SIMULATION_CREATION_FAILED,
+        SimulationCreationFailedPayload(
+            device_id="device-1",
+            device_name="Pixel",
+            reason="Device with id device-1 not found",
+        ),
+    )
+    bus.emit(
+        CoreSignal.SIMULATION_DELETE_SKIPPED,
+        SimulationDeleteSkippedPayload(
+            device_id="device-1",
+            reason="Simulation for device with id device-1 not found",
+        ),
+    )
+
+    assert bus.has_emitted(CoreSignal.SIMULATION_CREATION_FAILED)
+    assert bus.has_emitted(CoreSignal.SIMULATION_DELETE_SKIPPED)
 
 
 def test_signal_bus_rejects_scoped_dependency_from_different_simulation_id() -> None:

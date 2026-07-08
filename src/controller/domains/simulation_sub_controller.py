@@ -14,6 +14,9 @@ from core.signals import (
     CoreSignal,
     MapRenderedPayload,
     SimulationCreatedPayload,
+    SimulationCreationFailedPayload,
+    SimulationDeletedPayload,
+    SimulationDeleteSkippedPayload,
     SimulationLocationValidatedPayload,
     SimulationMapFileChangedPayload,
     SimulationPositionChangedPayload,
@@ -49,6 +52,18 @@ class SimulationSubController(AppSubController):
         self.model_entrypoint.subscribe(
             CoreSignal.SIMULATION_RESTORED,
             self._on_simulation_restored,
+        )
+        self.model_entrypoint.subscribe(
+            CoreSignal.SIMULATION_CREATION_FAILED,
+            self._on_simulation_creation_failed,
+        )
+        self.model_entrypoint.subscribe(
+            CoreSignal.SIMULATION_DELETED,
+            self._on_simulation_deleted,
+        )
+        self.model_entrypoint.subscribe(
+            CoreSignal.SIMULATION_DELETE_SKIPPED,
+            self._on_simulation_delete_skipped,
         )
         self.model_entrypoint.subscribe(
             CoreSignal.MAP_RENDERED,
@@ -184,43 +199,16 @@ class SimulationSubController(AppSubController):
             input_device_id=device_id,
             input_device_name=device_name,
         )
-        try:
-            self.model_entrypoint.create_simulation(device_id=device_id)
-        except (
-            AttributeError,
-            ValueError,
-        ) as e:  # AttributeError: Device not found, ValueError: Device not in ADB server paired devices repository or invalid simulation marker location
-            logger.error(
-                "SimulationSubController: failed to create simulation",
-                error=str(e),
-                device_id=device_id,
-            )
-            self.view.forward_device_selection_failed(
-                device_id, device_name
-            )  # TODO: must be connected to a core signal
+        self.model_entrypoint.create_simulation(device_id=device_id)
 
     @Slot(str)
     def _on_remove_device_requested(self, device_id: str) -> None:
         """Handle the remove device requested event."""
-        try:
-            self.model_entrypoint.delete_simulation_for_device(device_id)
-            self.view.forward_remove_active_device_succeeded(device_id)
-        except (
-            ValueError
-        ) as e:  # Simulation for device not found, the device was not active
-            logger.debug(
-                "SimulationSubController: no simulation found for device, safely ignoring",
-                error=str(e),
-                device_id=device_id,
-            )
-            return
-        except Exception as e:
-            logger.error(
-                "SimulationSubController: failed to delete simulation for device",
-                error=str(e),
-                device_id=device_id,
-            )
-            return
+        logger.debug(
+            "SimulationSubController: remove device requested",
+            device_id=device_id,
+        )
+        self.model_entrypoint.delete_simulation_for_device(device_id)
 
     def _on_simulation_created(self, payload: SimulationCreatedPayload) -> None:
         """Handle the simulation created event."""
@@ -240,6 +228,49 @@ class SimulationSubController(AppSubController):
             payload.simulation_id,
             payload.device_id,
             payload.device_name,
+        )
+
+    @validate_view
+    def _on_simulation_creation_failed(
+        self, payload: SimulationCreationFailedPayload
+    ) -> None:
+        """Forward simulation creation failure to the device selection UI."""
+        logger.error(
+            "SimulationSubController: simulation creation failed",
+            device_id=payload.device_id,
+            device_name=payload.device_name,
+            reason=payload.reason,
+        )
+        self.view.forward_device_selection_failed(
+            payload.device_id,
+            payload.device_name,
+        )
+
+    @validate_view
+    def _on_simulation_deleted(self, payload: SimulationDeletedPayload) -> None:
+        """Forward active-device removal success when the payload carries device context."""
+        if payload.device_id is None:
+            logger.warning(
+                "SimulationSubController: simulation deleted without device id",
+                simulation_id=payload.simulation_id,
+            )
+            return
+        logger.info(
+            "SimulationSubController: simulation deleted for device",
+            simulation_id=payload.simulation_id,
+            device_id=payload.device_id,
+        )
+        self.view.forward_remove_active_device_succeeded(payload.device_id)
+
+    @validate_view
+    def _on_simulation_delete_skipped(
+        self, payload: SimulationDeleteSkippedPayload
+    ) -> None:
+        """Keep remove-device requests quiet when no active simulation exists."""
+        logger.debug(
+            "SimulationSubController: simulation delete skipped",
+            device_id=payload.device_id,
+            reason=payload.reason,
         )
 
     def _on_simulation_restored(self, payload: SimulationRestoredPayload) -> None:

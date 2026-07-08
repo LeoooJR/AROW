@@ -50,6 +50,8 @@ class CoreSignal(StrEnum):
     SIMULATION_CREATED = "simulation.created"
     SIMULATION_RESTORED = "simulation.restored"
     SIMULATION_DELETED = "simulation.deleted"
+    SIMULATION_CREATION_FAILED = "simulation.creation.failed"
+    SIMULATION_DELETE_SKIPPED = "simulation.delete.skipped"
     SIMULATION_STATE_CHANGED = "simulation.state.changed"
     SIMULATION_POSITION_CHANGED = "simulation.position.changed"
     SIMULATION_LOCATION_VALIDATED = "simulation.location.validated"
@@ -132,6 +134,24 @@ class SimulationDeletedPayload:
     """Payload emitted when a simulation is deleted."""
 
     simulation_id: str
+    device_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class SimulationCreationFailedPayload:
+    """Payload emitted when simulation creation is rejected."""
+
+    device_id: str
+    device_name: str
+    reason: str
+
+
+@dataclass(frozen=True, slots=True)
+class SimulationDeleteSkippedPayload:
+    """Payload emitted when simulation deletion is a no-op for a device."""
+
+    device_id: str
+    reason: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -240,6 +260,8 @@ CORE_SIGNAL_PAYLOAD_TYPES: Mapping[CoreSignal, type[object]] = {
     CoreSignal.SIMULATION_CREATED: SimulationCreatedPayload,
     CoreSignal.SIMULATION_RESTORED: SimulationRestoredPayload,
     CoreSignal.SIMULATION_DELETED: SimulationDeletedPayload,
+    CoreSignal.SIMULATION_CREATION_FAILED: SimulationCreationFailedPayload,
+    CoreSignal.SIMULATION_DELETE_SKIPPED: SimulationDeleteSkippedPayload,
     CoreSignal.SIMULATION_STATE_CHANGED: SimulationStateChangedPayload,
     CoreSignal.SIMULATION_POSITION_CHANGED: SimulationPositionChangedPayload,
     CoreSignal.SIMULATION_LOCATION_VALIDATED: SimulationLocationValidatedPayload,
@@ -489,6 +511,20 @@ class CoreSignalBus(ABC):
     @overload
     def subscribe(
         self,
+        signal: Literal[CoreSignal.SIMULATION_CREATION_FAILED],
+        handler: SignalHandler[SimulationCreationFailedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_DELETE_SKIPPED],
+        handler: SignalHandler[SimulationDeleteSkippedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
         signal: Literal[CoreSignal.SIMULATION_STATE_CHANGED],
         handler: SignalHandler[SimulationStateChangedPayload],
     ) -> None: ...
@@ -637,6 +673,20 @@ class CoreSignalBus(ABC):
         self,
         signal: Literal[CoreSignal.SIMULATION_DELETED],
         handler: SignalHandler[SimulationDeletedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_CREATION_FAILED],
+        handler: SignalHandler[SimulationCreationFailedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_DELETE_SKIPPED],
+        handler: SignalHandler[SimulationDeleteSkippedPayload],
     ) -> None: ...
 
     @overload
@@ -791,6 +841,20 @@ class CoreSignalBus(ABC):
         self,
         signal: Literal[CoreSignal.SIMULATION_DELETED],
         payload: SimulationDeletedPayload,
+    ) -> None: ...
+
+    @overload
+    def emit(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_CREATION_FAILED],
+        payload: SimulationCreationFailedPayload,
+    ) -> None: ...
+
+    @overload
+    def emit(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_DELETE_SKIPPED],
+        payload: SimulationDeleteSkippedPayload,
     ) -> None: ...
 
     @overload
@@ -1029,6 +1093,20 @@ class InMemoryCoreSignalBus(CoreSignalBus):
     @overload
     def subscribe(
         self,
+        signal: Literal[CoreSignal.SIMULATION_CREATION_FAILED],
+        handler: SignalHandler[SimulationCreationFailedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_DELETE_SKIPPED],
+        handler: SignalHandler[SimulationDeleteSkippedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
         signal: Literal[CoreSignal.SIMULATION_STATE_CHANGED],
         handler: SignalHandler[SimulationStateChangedPayload],
     ) -> None: ...
@@ -1187,6 +1265,20 @@ class InMemoryCoreSignalBus(CoreSignalBus):
         self,
         signal: Literal[CoreSignal.SIMULATION_DELETED],
         handler: SignalHandler[SimulationDeletedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_CREATION_FAILED],
+        handler: SignalHandler[SimulationCreationFailedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_DELETE_SKIPPED],
+        handler: SignalHandler[SimulationDeleteSkippedPayload],
     ) -> None: ...
 
     @overload
@@ -1353,6 +1445,20 @@ class InMemoryCoreSignalBus(CoreSignalBus):
         self,
         signal: Literal[CoreSignal.SIMULATION_DELETED],
         payload: SimulationDeletedPayload,
+    ) -> None: ...
+
+    @overload
+    def emit(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_CREATION_FAILED],
+        payload: SimulationCreationFailedPayload,
+    ) -> None: ...
+
+    @overload
+    def emit(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_DELETE_SKIPPED],
+        payload: SimulationDeleteSkippedPayload,
     ) -> None: ...
 
     @overload

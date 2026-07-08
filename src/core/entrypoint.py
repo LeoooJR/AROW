@@ -39,7 +39,9 @@ from core.signals import (
     MapRenderFailedPayload,
     SignalHandler,
     SimulationCreatedPayload,
+    SimulationCreationFailedPayload,
     SimulationDeletedPayload,
+    SimulationDeleteSkippedPayload,
     SimulationLocationRejectedPayload,
     SimulationLocationValidatedPayload,
     SimulationMapFileChangedPayload,
@@ -193,6 +195,20 @@ class Entrypoint(ABC):
     @overload
     def subscribe(
         self,
+        signal: Literal[CoreSignal.SIMULATION_CREATION_FAILED],
+        handler: SignalHandler[SimulationCreationFailedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_DELETE_SKIPPED],
+        handler: SignalHandler[SimulationDeleteSkippedPayload],
+    ) -> None: ...
+
+    @overload
+    def subscribe(
+        self,
         signal: Literal[CoreSignal.SIMULATION_STATE_CHANGED],
         handler: SignalHandler[SimulationStateChangedPayload],
     ) -> None: ...
@@ -334,6 +350,20 @@ class Entrypoint(ABC):
         self,
         signal: Literal[CoreSignal.SIMULATION_DELETED],
         handler: SignalHandler[SimulationDeletedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_CREATION_FAILED],
+        handler: SignalHandler[SimulationCreationFailedPayload],
+    ) -> None: ...
+
+    @overload
+    def unsubscribe(
+        self,
+        signal: Literal[CoreSignal.SIMULATION_DELETE_SKIPPED],
+        handler: SignalHandler[SimulationDeleteSkippedPayload],
     ) -> None: ...
 
     @overload
@@ -721,67 +751,97 @@ class ModelEntrypoint(Entrypoint):
         """
         Create a new simulation.
 
-        Emits a SIMULATION_CREATED signal.
+        Emits ``SIMULATION_CREATED`` on success, ``SIMULATION_RESTORED`` when reusing
+        an existing simulation, or ``SIMULATION_CREATION_FAILED`` when creation is rejected.
 
         Args:
             device_id: The id of the device to create the simulation for.
-
-        Returns:
-            None
-
-        Raises:
-            AttributeError: If the device is not found.
-            ValueError: If the device is not in the repository.
         """
-        device: Phone | None = self.get_device(device_id)
+        device: Phone | None = None
+        if self._adb_server is None or self._adb_client is None:
+            self._emit_simulation_creation_failed(
+                device_id,
+                device=None,
+                reason="ADB server must be initialized before creating a simulation",
+            )
+            return
+        device = self._adb_server.paired_devices.get(device_id)
         if device is None:
-            raise AttributeError(f"Device with id {device_id} not found")
-        if self._adb_server is None:
-            raise AttributeError(
-                "ADB server must be initialized before creating a simulation"
+            self._emit_simulation_creation_failed(
+                device_id,
+                device=None,
+                reason=f"Device with id {device_id} not found",
             )
-        self._adb_server.set_working_device(device)
-        simulation: Simulation | None = self._get_simulation_for_device(device_id)
-        if simulation is None:
-            simulation = Simulation(device=device)
-            self._simulations.add(simulation)
-            # Emit the signal for the created simulation
-            self._signal_bus.emit(
-                CoreSignal.SIMULATION_CREATED,
-                SimulationCreatedPayload(
-                    simulation_id=simulation.id,
-                    device_id=device.id,
-                    device_name=device.name,
-                ),
-            )
-        else:
-            # Simulation is restored from disk; validate persisted marker metadata.
-            logger.info(
-                "ModelEntrypoint: reusing existing simulation for device",
-                simulation_id=simulation.id,
-                device_id=device.id,
-            )
-            self._signal_bus.emit(
-                CoreSignal.SIMULATION_RESTORED,
-                SimulationRestoredPayload(
-                    simulation_id=simulation.id,
-                    device_id=device.id,
-                    device_name=device.name,
-                ),
-            )
-            # Validate the simulation marker location, simulation metadata can have been modified by the user
-            if simulation.spoofed_location.poi is not None:
-                poi = simulation.spoofed_location.poi
-                outcome = self.validate_simulation_marker_location(
-                    simulation_id=simulation.id,
-                    km=poi.km,
-                    line=f"{poi.line.code}-{poi.line.troncon}",
-                    latitude=poi.geometry.y,
-                    longitude=poi.geometry.x,
+            return
+        try:
+            self._adb_server.set_working_device(device)
+            simulation: Simulation | None = self._get_simulation_for_device(device_id)
+            if simulation is None:
+                simulation = Simulation(device=device)
+                self._simulations.add(simulation)
+                self._signal_bus.emit(
+                    CoreSignal.SIMULATION_CREATED,
+                    SimulationCreatedPayload(
+                        simulation_id=simulation.id,
+                        device_id=device.id,
+                        device_name=device.name,
+                    ),
                 )
-                self.apply_result(outcome)
-        # Set the last active device id
-        self._simulations.last_active_device_id = device_id
+            else:
+                logger.info(
+                    "ModelEntrypoint: reusing existing simulation for device",
+                    simulation_id=simulation.id,
+                    device_id=device.id,
+                )
+                self._signal_bus.emit(
+                    CoreSignal.SIMULATION_RESTORED,
+                    SimulationRestoredPayload(
+                        simulation_id=simulation.id,
+                        device_id=device.id,
+                        device_name=device.name,
+                    ),
+                )
+                if simulation.spoofed_location.poi is not None:
+                    poi = simulation.spoofed_location.poi
+                    outcome = self.validate_simulation_marker_location(
+                        simulation_id=simulation.id,
+                        km=poi.km,
+                        line=f"{poi.line.code}-{poi.line.troncon}",
+                        latitude=poi.geometry.y,
+                        longitude=poi.geometry.x,
+                    )
+                    self.apply_result(outcome)
+            self._simulations.last_active_device_id = device_id
+        except ValueError as error:
+            self._emit_simulation_creation_failed(
+                device_id,
+                device=device,
+                reason=str(error),
+            )
+
+    def _emit_simulation_creation_failed(
+        self,
+        device_id: str,
+        *,
+        device: Phone | None,
+        reason: str,
+    ) -> None:
+        """Publish a typed simulation creation failure for controller bridging."""
+        device_name = device.name if device is not None else device_id
+        logger.error(
+            "ModelEntrypoint: simulation creation failed",
+            device_id=device_id,
+            device_name=device_name,
+            reason=reason,
+        )
+        self._signal_bus.emit(
+            CoreSignal.SIMULATION_CREATION_FAILED,
+            SimulationCreationFailedPayload(
+                device_id=device_id,
+                device_name=device_name,
+                reason=reason,
+            ),
+        )
 
     def get_simulation(self, id: str) -> Simulation | None:
         """
@@ -930,25 +990,39 @@ class ModelEntrypoint(Entrypoint):
     def delete_simulation_for_device(self, device_id: str) -> None:
         """
         Delete a simulation for a device by id.
+
+        Emits ``SIMULATION_DELETED`` on success or ``SIMULATION_DELETE_SKIPPED`` when
+        no simulation exists for the device.
         """
         simulation = self._get_simulation_for_device(device_id)
-        if simulation is not None:
-            simulation_id = simulation.id
-            self.delete_simulation(simulation)
-            self._signal_bus.emit(
-                CoreSignal.SIMULATION_DELETED,
-                SimulationDeletedPayload(simulation_id=simulation_id),
+        if simulation is None:
+            logger.debug(
+                "ModelEntrypoint: no simulation found for device, skipping deletion",
+                device_id=device_id,
             )
-            if self._adb_server is not None:
-                working_device = self._adb_server.get_working_device()
-                if working_device is not None and working_device.id == device_id:
-                    self._adb_server.clear_working_device()
-            if self._simulations.last_active_device_id == device_id:
-                self._simulations.last_active_device_id = None
+            self._signal_bus.emit(
+                CoreSignal.SIMULATION_DELETE_SKIPPED,
+                SimulationDeleteSkippedPayload(
+                    device_id=device_id,
+                    reason=f"Simulation for device with id {device_id} not found",
+                ),
+            )
             return
-        raise ValueError(
-            f"Simulation for device with id {device_id} not found or working device not cleared"
+        simulation_id = simulation.id
+        self.delete_simulation(simulation)
+        self._signal_bus.emit(
+            CoreSignal.SIMULATION_DELETED,
+            SimulationDeletedPayload(
+                simulation_id=simulation_id,
+                device_id=device_id,
+            ),
         )
+        if self._adb_server is not None:
+            working_device = self._adb_server.get_working_device()
+            if working_device is not None and working_device.id == device_id:
+                self._adb_server.clear_working_device()
+        if self._simulations.last_active_device_id == device_id:
+            self._simulations.last_active_device_id = None
 
     @staticmethod
     def render_map(simulation_id: str, application_dir: Path) -> RenderMapOutcome:
