@@ -391,7 +391,7 @@ class DatasetRepository:
             format="sqlite",
             encoding=None,
             last_update=None,
-            hash="bac312913a078185fe979e3b3a7b0bf5e4abd9f1fd93df3b8c82ed22113f9c79",
+            hash="a6e4db7351a6f2d7e9b315538176719e5e1f0b2cf9ae7cd148f99322bd39c3c7",
             schema=ReferentielPkGpsSchema,
             preprocessing=_preprocess_referentiel_pk_gps,
         ),
