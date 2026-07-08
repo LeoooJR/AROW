@@ -1,13 +1,18 @@
-"""Tests for DatasetManager SQL query support."""
+"""Tests for DatasetManager SQL query support and asset robustness."""
 
 from __future__ import annotations
+
+from dataclasses import replace
+from pathlib import Path
+from unittest.mock import MagicMock
 
 import geopandas
 import pandas as pd
 import pytest
 from pandas.errors import DatabaseError
 
-from core.geo.datasets import DatasetManager
+from core.geo.datasets import DatasetDefinition, DatasetManager, DatasetRepository
+from core.geo.exceptions import DatasetCorruptionError, DatasetNotFoundError
 
 _REFERENTIEL_QUERY = """
 SELECT * FROM kilometric_points
@@ -99,9 +104,163 @@ def test_query_referentiel_invalid_sql_raises_database_error() -> None:
         )
 
 
-def test_query_unknown_dataset_raises_value_error() -> None:
-    with pytest.raises(ValueError, match="Dataset missing not found"):
+def test_query_unknown_dataset_raises_not_found() -> None:
+    with pytest.raises(DatasetNotFoundError, match="Dataset 'missing' not found"):
         DatasetManager.query(id="missing", sql="SELECT 1")
+
+
+def test_read_unknown_dataset_raises_not_found() -> None:
+    with pytest.raises(DatasetNotFoundError, match="Dataset 'missing' not found"):
+        DatasetManager.read("missing")
+
+
+def test_read_missing_asset_raises_not_found(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    definition = DatasetRepository.get_dataset_definition("gares-de-voyageurs")
+    assert definition is not None
+    missing_definition = replace(definition, name="arow-missing-asset")
+
+    monkeypatch.setattr(
+        DatasetManager.REPOSITORY,
+        "get_dataset_definition",
+        lambda dataset_id: (
+            missing_definition if dataset_id == "gares-de-voyageurs" else None
+        ),
+    )
+
+    with pytest.raises(
+        DatasetNotFoundError, match="Dataset asset not found"
+    ) as exc_info:
+        DatasetManager.read("gares-de-voyageurs")
+
+    error = exc_info.value
+    assert error.dataset_id == "gares-de-voyageurs"
+    assert error.path == missing_definition.full_path
+
+
+def test_read_non_file_asset_raises_not_found(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    definition = DatasetRepository.get_dataset_definition("gares-de-voyageurs")
+    assert definition is not None
+    directory_path = tmp_path / "gares-de-voyageurs.geojson"
+    directory_path.mkdir()
+
+    fake_definition = MagicMock(spec=DatasetDefinition)
+    fake_definition.id = definition.id
+    fake_definition.format = definition.format
+    fake_definition.encoding = definition.encoding
+    fake_definition.hash = definition.hash
+    fake_definition.schema = definition.schema
+    fake_definition.preprocessing = definition.preprocessing
+    fake_definition.full_path = directory_path
+
+    monkeypatch.setattr(
+        DatasetManager.REPOSITORY,
+        "get_dataset_definition",
+        lambda dataset_id: (
+            fake_definition if dataset_id == "gares-de-voyageurs" else None
+        ),
+    )
+
+    with pytest.raises(
+        DatasetNotFoundError, match="Dataset asset is not a file"
+    ) as exc_info:
+        DatasetManager.read("gares-de-voyageurs")
+
+    assert exc_info.value.path == directory_path
+
+
+def test_read_hash_mismatch_raises_corruption(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    definition = DatasetRepository.get_dataset_definition("gares-de-voyageurs")
+    assert definition is not None
+    tampered_definition = replace(definition, hash="0" * 64)
+
+    monkeypatch.setattr(
+        DatasetManager.REPOSITORY,
+        "get_dataset_definition",
+        lambda dataset_id: (
+            tampered_definition if dataset_id == "gares-de-voyageurs" else None
+        ),
+    )
+
+    with pytest.raises(DatasetCorruptionError, match="hash mismatch") as exc_info:
+        DatasetManager.read("gares-de-voyageurs")
+
+    error = exc_info.value
+    assert error.dataset_id == "gares-de-voyageurs"
+    assert error.expected_hash == "0" * 64
+    assert error.actual_hash is not None
+    assert error.actual_hash != error.expected_hash
+
+
+def test_read_corrupted_geojson_raises_corruption(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def _broken_read_file(*_args: object, **_kwargs: object) -> geopandas.GeoDataFrame:
+        raise ValueError("invalid geojson payload")
+
+    monkeypatch.setattr(geopandas, "read_file", _broken_read_file)
+    monkeypatch.setattr(
+        DatasetManager, "_preflight_dataset_asset", lambda _definition: None
+    )
+
+    with pytest.raises(DatasetCorruptionError, match="Failed to read dataset"):
+        DatasetManager.read("gares-de-voyageurs")
+
+
+def test_query_hash_mismatch_raises_corruption(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    definition = DatasetRepository.get_dataset_definition("referentiel_pk_gps")
+    assert definition is not None
+    tampered_definition = replace(definition, hash="0" * 64)
+
+    monkeypatch.setattr(
+        DatasetManager.REPOSITORY,
+        "get_dataset_definition",
+        lambda dataset_id: (
+            tampered_definition if dataset_id == "referentiel_pk_gps" else None
+        ),
+    )
+
+    with pytest.raises(DatasetCorruptionError, match="hash mismatch"):
+        DatasetManager.query(
+            id="referentiel_pk_gps",
+            sql=_REFERENTIEL_QUERY,
+            code_ligne=1000,
+            rg_troncon=1,
+            km=1,
+        )
+
+
+def test_query_missing_asset_raises_not_found(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    definition = DatasetRepository.get_dataset_definition("referentiel_pk_gps")
+    assert definition is not None
+    missing_definition = replace(definition, name="arow-missing-sqlite")
+
+    monkeypatch.setattr(
+        DatasetManager.REPOSITORY,
+        "get_dataset_definition",
+        lambda dataset_id: (
+            missing_definition if dataset_id == "referentiel_pk_gps" else None
+        ),
+    )
+
+    with pytest.raises(DatasetNotFoundError, match="Dataset asset not found"):
+        DatasetManager.query(
+            id="referentiel_pk_gps",
+            sql=_REFERENTIEL_QUERY,
+            code_ligne=1000,
+            rg_troncon=1,
+            km=1,
+        )
 
 
 def test_gares_de_voyageurs_index_is_codes_uic_with_retained_columns() -> None:

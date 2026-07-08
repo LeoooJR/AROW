@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,10 +12,16 @@ import pandas as pd
 import pandera.geopandas as pg
 import pandera.pandas as pa
 from loguru import logger
+from pandas.errors import DatabaseError
 from pandera.typing import INT64, Float, Int, Int32, Object, Series, String
 from pandera.typing.geopandas import GeoSeries
 
-from core.geo.exceptions import SchemaValidationError
+from core.geo.exceptions import (
+    DatasetCorruptionError,
+    DatasetError,
+    DatasetNotFoundError,
+    SchemaValidationError,
+)
 
 _SQLITE_BIND_SCALAR_TYPES = (str, int, float, bytes, type(None))
 
@@ -362,7 +369,7 @@ class DatasetRepository:
             format="geojson",
             encoding="utf-8",
             last_update=None,
-            hash="5bbc36c7be9b44499dacf9ffdde200085d4ba731d8561ce8cd2665df0ee1e31d",
+            hash="65cea4575dda5b43f42626d1377f6e340fe173f3d7db3cafd879099686b12588",
             schema=GaresDeVoyageursSchema,
             preprocessing=_preprocess_gares_de_voyageurs,
         ),
@@ -373,7 +380,7 @@ class DatasetRepository:
             format="geojson",
             encoding="utf-8",
             last_update=None,
-            hash="2a0da177f597f1fa6122e18d510b3a601b9315bf2c2ab511e58adee2b054b18c",
+            hash="931b0f0917b8be71c0f97d6bb90d4c34c9d9ff9d4a389b01a4de9a58c9c62066",
             schema=LignesParTypeSchema,
             preprocessing=_preprocess_lignes_par_type,
         ),
@@ -384,7 +391,7 @@ class DatasetRepository:
             format="sqlite",
             encoding=None,
             last_update=None,
-            hash="198199d5a28232ada22949706a624fecf998e08f0c110a8b6787ca240a92a98b",
+            hash="bac312913a078185fe979e3b3a7b0bf5e4abd9f1fd93df3b8c82ed22113f9c79",
             schema=ReferentielPkGpsSchema,
             preprocessing=_preprocess_referentiel_pk_gps,
         ),
@@ -407,6 +414,105 @@ class DatasetManager:
     REPOSITORY: Final[DatasetRepository] = DatasetRepository()
 
     @classmethod
+    def _get_required_definition(cls, dataset_id: str) -> DatasetDefinition:
+        """Return a dataset definition or raise when the id is unknown."""
+        definition = cls.REPOSITORY.get_dataset_definition(dataset_id)
+        if definition is None:
+            raise DatasetNotFoundError(
+                dataset_id,
+                f"Dataset {dataset_id!r} not found",
+            )
+        return definition
+
+    @classmethod
+    def _ensure_dataset_file(cls, definition: DatasetDefinition) -> Path:
+        """Verify the packaged asset path exists and is a regular file."""
+        path = definition.full_path
+        if not path.exists():
+            logger.error(
+                "Dataset asset missing",
+                dataset_id=definition.id,
+                path=str(path),
+                format=definition.format,
+            )
+            raise DatasetNotFoundError(
+                definition.id,
+                f"Dataset asset not found: {path}",
+                path=path,
+            )
+        if not path.is_file():
+            logger.error(
+                "Dataset asset is not a file",
+                dataset_id=definition.id,
+                path=str(path),
+                format=definition.format,
+            )
+            raise DatasetNotFoundError(
+                definition.id,
+                f"Dataset asset is not a file: {path}",
+                path=path,
+            )
+        return path
+
+    @classmethod
+    def _verify_dataset_hash(cls, definition: DatasetDefinition) -> None:
+        """Verify the on-disk asset matches the catalog SHA-256 hash."""
+        path = cls._ensure_dataset_file(definition)
+        digest = hashlib.sha256()
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+        actual_hash = digest.hexdigest()
+        if actual_hash != definition.hash:
+            logger.error(
+                "Dataset asset hash mismatch",
+                dataset_id=definition.id,
+                path=str(path),
+                format=definition.format,
+                expected_hash=definition.hash,
+                actual_hash=actual_hash,
+            )
+            raise DatasetCorruptionError(
+                definition.id,
+                f"Dataset asset hash mismatch for {definition.id!r}: {path}",
+                path=path,
+                expected_hash=definition.hash,
+                actual_hash=actual_hash,
+            )
+
+    @classmethod
+    def _preflight_dataset_asset(cls, definition: DatasetDefinition) -> None:
+        """Ensure the dataset asset exists and matches its catalog hash."""
+        cls._verify_dataset_hash(definition)
+
+    @classmethod
+    def _wrap_dataset_read_error(
+        cls,
+        definition: DatasetDefinition,
+        error: Exception,
+        *,
+        operation: str,
+    ) -> None:
+        """Re-raise dataset-layer errors and wrap unexpected read failures."""
+        if isinstance(error, DatasetError):
+            raise error
+        path = definition.full_path
+        logger.error(
+            "Dataset asset read failed",
+            dataset_id=definition.id,
+            path=str(path),
+            format=definition.format,
+            operation=operation,
+            error=str(error),
+            exc_info=True,
+        )
+        raise DatasetCorruptionError(
+            definition.id,
+            f"Failed to read dataset {definition.id!r} ({operation}): {path}",
+            path=path,
+        ) from error
+
+    @classmethod
     def read(
         cls, id: str, encoding: str | None = None
     ) -> geopandas.GeoDataFrame | pd.DataFrame:
@@ -420,69 +526,65 @@ class DatasetManager:
 
         Returns:
             The dataset as a geopandas.GeoDataFrame or pd.DataFrame.
+
+        Raises:
+            DatasetNotFoundError: Unknown dataset id or missing asset file.
+            DatasetCorruptionError: Hash mismatch or unreadable/corrupted asset.
+            SchemaValidationError: Schema validation failed after a successful read.
         """
+        definition = cls._get_required_definition(id)
+        cls._preflight_dataset_asset(definition)
 
-        definition: DatasetDefinition | None = cls.REPOSITORY.get_dataset_definition(id)
+        effective_encoding = encoding if encoding is not None else definition.encoding
+        if effective_encoding is None:
+            effective_encoding = "utf-8"
 
-        if definition:
-
-            effective_encoding = (
-                encoding if encoding is not None else definition.encoding
-            )
-            if effective_encoding is None:
-                effective_encoding = "utf-8"
-
+        try:
             if definition.format in ["geojson", "shapefile"]:
-
                 gdf: geopandas.GeoDataFrame = geopandas.read_file(
                     definition.full_path, encoding=effective_encoding
                 )
-
                 validated_gdf = cls._validate(definition, gdf)
                 return cls._preprocess(definition, validated_gdf)
 
-            else:
+            if definition.format == "csv":
+                df: pd.DataFrame = pd.read_csv(
+                    definition.full_path,
+                    sep=";",
+                    header=0,
+                    encoding=effective_encoding,
+                )
+                validated_df = cls._validate(definition, df)
+                return cls._preprocess(definition, validated_df)
 
-                if definition.format == "csv":
+            if definition.format == "json":
+                raise NotImplementedError
 
-                    df: pd.DataFrame = pd.read_csv(
-                        definition.full_path,
-                        sep=";",
-                        header=0,
-                        encoding=effective_encoding,
+            if definition.format == "parquet":
+                raise NotImplementedError
+
+            if definition.format == "sqlite":
+                with sqlite3.connect(definition.full_path) as conn:
+                    sqlite_df = pd.read_sql(
+                        sql="SELECT * FROM kilometric_points", con=conn
                     )
+                validated_df = cls._validate(definition, sqlite_df)
+                return cls._preprocess(definition, validated_df)
 
-                    validated_df = cls._validate(definition, df)
-                    return cls._preprocess(definition, validated_df)
-
-                elif definition.format == "json":
-
-                    raise NotImplementedError
-
-                elif definition.format == "parquet":
-
-                    raise NotImplementedError
-
-                elif definition.format == "sqlite":
-
-                    try:
-
-                        with sqlite3.connect(definition.full_path) as conn:
-
-                            sqlite_df = pd.read_sql(
-                                sql="SELECT * FROM kilometric_points", con=conn
-                            )
-
-                            validated_df = cls._validate(definition, sqlite_df)
-
-                            return cls._preprocess(definition, validated_df)
-
-                    except sqlite3.OperationalError as e:
-
-                        logger.error(f"Error connecting to SQLite database", error=e)
-                        raise
-
-        raise ValueError(f"Dataset {id} not found")
+            raise DatasetCorruptionError(
+                definition.id,
+                f"Unsupported dataset format {definition.format!r} for {definition.id!r}",
+                path=definition.full_path,
+            )
+        except NotImplementedError:
+            raise
+        except Exception as error:
+            cls._wrap_dataset_read_error(
+                definition,
+                error,
+                operation=f"read:{definition.format}",
+            )
+            raise AssertionError("unreachable")
 
     @classmethod
     def query(
@@ -497,10 +599,14 @@ class DatasetManager:
 
         Returns:
             The result of the SQL query as a pandas DataFrame or geopandas.GeoDataFrame.
+
+        Raises:
+            DatasetNotFoundError: Unknown dataset id or missing asset file.
+            DatasetCorruptionError: Hash mismatch or unreadable SQLite asset.
+            ValueError: Dataset is not SQLite or bind parameter contract is invalid.
+            SchemaValidationError: Schema validation failed on non-empty query results.
         """
-        definition: DatasetDefinition | None = cls.REPOSITORY.get_dataset_definition(id)
-        if definition is None:
-            raise ValueError(f"Dataset {id} not found")
+        definition = cls._get_required_definition(id)
         if definition.format != "sqlite":
             raise ValueError(f"Dataset {id} is not a SQLite database")
 
@@ -515,24 +621,45 @@ class DatasetManager:
             )
 
         try:
+            cls._preflight_dataset_asset(definition)
             with sqlite3.connect(definition.full_path) as conn:
                 query_result = pd.read_sql(
                     sql=sql,
                     con=conn,
                     params=bound_parameters,
                 )
-                if not query_result.empty:
-                    validated_df = cls._validate(definition, query_result)
-                    return cls._preprocess(definition, validated_df)
-                return query_result
         except sqlite3.OperationalError as error:
             logger.error(
                 "Error querying SQLite database",
+                dataset_id=definition.id,
+                path=str(definition.full_path),
                 sql=sql,
                 parameter_names=list(parameters.keys()),
                 error=error,
             )
             raise
+        except DatabaseError as error:
+            logger.error(
+                "Error querying SQLite database",
+                dataset_id=definition.id,
+                path=str(definition.full_path),
+                sql=sql,
+                parameter_names=list(parameters.keys()),
+                error=error,
+            )
+            raise
+        except Exception as error:
+            cls._wrap_dataset_read_error(
+                definition,
+                error,
+                operation="query:sqlite-connect",
+            )
+            raise AssertionError("unreachable")
+
+        if not query_result.empty:
+            validated_df = cls._validate(definition, query_result)
+            return cls._preprocess(definition, validated_df)
+        return query_result
 
     @classmethod
     def _validate(
