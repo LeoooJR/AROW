@@ -219,7 +219,7 @@ class ModelEntrypoint(Entrypoint):
     def activity_log_file(self, value: Path) -> None:
         """Set the current app-wide activity log path."""
         self._activity_log_file = value
-        self._signal_bus.emit(
+        self.emit_core_signal(
             CoreSignals.ACTIVITY_LOG_FILE_UPDATED,
             ActivityLogFileUpdatedPayload(path=value),
         )
@@ -230,7 +230,7 @@ class ModelEntrypoint(Entrypoint):
             self._activity_log_file = default_activity_log_file_path(
                 self.application_dir
             )
-            self._signal_bus.emit(
+            self.emit_core_signal(
                 CoreSignals.ACTIVITY_LOG_FILE_UPDATED,
                 ActivityLogFileUpdatedPayload(path=self._activity_log_file),
             )
@@ -326,7 +326,7 @@ class ModelEntrypoint(Entrypoint):
         Restart the ADB server and keep the instance in entrypoint state.
         """
         if self._adb_server is not None:
-            self._signal_bus.emit(
+            self.emit_core_signal(
                 CoreSignals.ADB_SERVER_STOPPED,
                 AdbServerStoppedPayload(
                     adb_binary_path=str(self._adb_server.binary.path),
@@ -337,13 +337,13 @@ class ModelEntrypoint(Entrypoint):
                 "ModelEntrypoint: ADB server restarted",
                 adb_path=str(self._adb_server.binary.path),
             )
-            self._signal_bus.emit(
+            self.emit_core_signal(
                 CoreSignals.ADB_SERVER_STARTED,
                 AdbServerStartedPayload(
                     adb_binary_path=str(self._adb_server.binary.path),
                 ),
             )
-            self._signal_bus.emit(
+            self.emit_core_signal(
                 CoreSignals.DEVICES_UPDATED,
                 DevicesUpdatedPayload(
                     devices=serialize_phone_collection(self.get_known_devices()),
@@ -507,7 +507,7 @@ class ModelEntrypoint(Entrypoint):
             if simulation is None:
                 simulation = Simulation(device=device)
                 self._simulations.add(simulation)
-                self._signal_bus.emit(
+                self.emit_core_signal(
                     CoreSignals.SIMULATION_CREATED,
                     SimulationCreatedPayload(
                         simulation_id=simulation.id,
@@ -521,7 +521,7 @@ class ModelEntrypoint(Entrypoint):
                     simulation_id=simulation.id,
                     device_id=device.id,
                 )
-                self._signal_bus.emit(
+                self.emit_core_signal(
                     CoreSignals.SIMULATION_RESTORED,
                     SimulationRestoredPayload(
                         simulation_id=simulation.id,
@@ -562,7 +562,7 @@ class ModelEntrypoint(Entrypoint):
             device_name=device_name,
             reason=reason,
         )
-        self._signal_bus.emit(
+        self.emit_core_signal(
             CoreSignals.SIMULATION_CREATION_FAILED,
             SimulationCreationFailedPayload(
                 device_id=device_id,
@@ -596,7 +596,7 @@ class ModelEntrypoint(Entrypoint):
         if simulation.active == active:
             return
         simulation.active = active
-        self._signal_bus.emit(
+        self.emit_core_signal(
             CoreSignals.SIMULATION_STATE_CHANGED,
             SimulationStateChangedPayload(
                 simulation_id=simulation.id,
@@ -636,7 +636,7 @@ class ModelEntrypoint(Entrypoint):
             setattr(simulation, key, value)
             # Emit the signal for the changed field
             if key == "active":
-                self._signal_bus.emit(
+                self.emit_core_signal(
                     CoreSignals.SIMULATION_STATE_CHANGED,
                     SimulationStateChangedPayload(
                         simulation_id=simulation.id,
@@ -644,7 +644,7 @@ class ModelEntrypoint(Entrypoint):
                     ),
                 )
             elif key in ("real_location", "spoofed_location"):
-                self._signal_bus.emit(
+                self.emit_core_signal(
                     CoreSignals.SIMULATION_POSITION_CHANGED,
                     SimulationPositionChangedPayload(
                         simulation_id=simulation.id,
@@ -655,7 +655,7 @@ class ModelEntrypoint(Entrypoint):
                 )
             elif key == "map_file":
                 if isinstance(value, Path):
-                    self._signal_bus.emit(
+                    self.emit_core_signal(
                         CoreSignals.SIMULATION_MAP_FILE_CHANGED,
                         SimulationMapFileChangedPayload(
                             simulation_id=simulation.id,
@@ -728,7 +728,7 @@ class ModelEntrypoint(Entrypoint):
                 "ModelEntrypoint: no simulation found for device, skipping deletion",
                 device_id=device_id,
             )
-            self._signal_bus.emit(
+            self.emit_core_signal(
                 CoreSignals.SIMULATION_DELETE_SKIPPED,
                 SimulationDeleteSkippedPayload(
                     device_id=device_id,
@@ -738,7 +738,7 @@ class ModelEntrypoint(Entrypoint):
             return
         simulation_id = simulation.id
         self.delete_simulation(simulation)
-        self._signal_bus.emit(
+        self.emit_core_signal(
             CoreSignals.SIMULATION_DELETED,
             SimulationDeletedPayload(
                 simulation_id=simulation_id,
