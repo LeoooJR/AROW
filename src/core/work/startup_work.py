@@ -275,34 +275,25 @@ class StartupCoreRuntimeWork(CoreRuntimeWork[StartupOutcome]):
         if not isinstance(model_entrypoint, _ModelEntrypoint):
             raise TypeError("apply_main_thread() requires ModelEntrypoint")
         if result.adb_server is not None:
-            model_entrypoint._adb_server = result.adb_server
+            model_entrypoint.adb_server = result.adb_server
         if result.adb_client is not None:
-            model_entrypoint._adb_client = result.adb_client
+            model_entrypoint.adb_client = result.adb_client
         for simulation in result.simulations:
-            try:
-                model_entrypoint._simulations.restore(simulation)
-            except ValueError as error:
-                logger.warning(
-                    "startup_work: failed to restore persisted simulation",
-                    simulation_id=simulation.id,
-                    error=str(error),
-                )
+            model_entrypoint.restore_persisted_simulation(simulation)
         if result.adb_server is not None:
-            model_entrypoint._signal_bus.emit(
+            model_entrypoint.emit_core_signal(
                 CoreSignals.ADB_SERVER_STARTED,
                 AdbServerStartedPayload(
                     adb_binary_path=str(result.adb_server.binary.path),
                 ),
             )
-            model_entrypoint._signal_bus.emit(
+            model_entrypoint.emit_core_signal(
                 CoreSignals.DEVICES_UPDATED,
                 DevicesUpdatedPayload(
                     devices=serialize_phone_collection(result.devices),
                 ),
             )
-        model_entrypoint._simulations.sync_last_active_device_id(
-            result.last_active_device_id
-        )
+        model_entrypoint.sync_last_active_device_id(result.last_active_device_id)
         if result.last_active_device_id is not None:
             paired_device = (
                 result.adb_server.paired_devices.get(result.last_active_device_id)

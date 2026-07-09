@@ -15,6 +15,7 @@ from core.geo.element import clear_lignes_par_type_cache
 from core.signals import (
     CoreSignals,
     ErrorRaisedPayload,
+    SimulationCreatedPayload,
     SimulationLocationRejectedPayload,
     SimulationLocationValidatedPayload,
 )
@@ -32,7 +33,7 @@ def _clear_lignes_cache() -> Iterator[None]:
     clear_lignes_par_type_cache()
 
 
-def _make_model(tmp_path: Path) -> ModelEntrypoint:
+def _make_model(tmp_path: Path) -> tuple[ModelEntrypoint, str]:
     state = MockAdbState(seed=601, initial_devices=0)
     server = MockAdbServer(state=state)
     client = MockAdbClient(state=state)
@@ -43,18 +44,23 @@ def _make_model(tmp_path: Path) -> ModelEntrypoint:
         return_value=tmp_path,
     ):
         model_entrypoint = ModelEntrypoint()
-    model_entrypoint._adb_server = server
-    model_entrypoint._adb_client = client
+    model_entrypoint.adb_server = server
+    model_entrypoint.adb_client = client
     seed_adb_startup_for_entrypoint(model_entrypoint)
+    captured_ids: list[str] = []
+
+    def capture(payload: SimulationCreatedPayload) -> None:
+        captured_ids.append(payload.simulation_id)
+
+    model_entrypoint.signal_bus.subscribe(CoreSignals.SIMULATION_CREATED, capture)
     model_entrypoint.create_simulation("device-1")
-    return model_entrypoint
+    return model_entrypoint, captured_ids[0]
 
 
 def test_validate_simulation_marker_location_work_run_returns_validated_outcome(
     tmp_path: Path,
 ) -> None:
-    model_entrypoint = _make_model(tmp_path)
-    simulation_id = next(iter(model_entrypoint._simulations)).id
+    model_entrypoint, simulation_id = _make_model(tmp_path)
 
     outcome = ValidateSimulationMarkerLocationWork(
         simulation_id=simulation_id,
@@ -73,8 +79,7 @@ def test_validate_simulation_marker_location_work_run_returns_validated_outcome(
 def test_validate_simulation_marker_location_work_run_returns_rejected_outcome(
     tmp_path: Path,
 ) -> None:
-    model_entrypoint = _make_model(tmp_path)
-    simulation_id = next(iter(model_entrypoint._simulations)).id
+    model_entrypoint, simulation_id = _make_model(tmp_path)
 
     outcome = ValidateSimulationMarkerLocationWork(
         simulation_id=simulation_id,
@@ -91,8 +96,7 @@ def test_validate_simulation_marker_location_work_run_returns_rejected_outcome(
 
 
 def test_apply_main_thread_emits_validated_signal(tmp_path: Path) -> None:
-    model_entrypoint = _make_model(tmp_path)
-    simulation_id = next(iter(model_entrypoint._simulations)).id
+    model_entrypoint, simulation_id = _make_model(tmp_path)
     captured: list[SimulationLocationValidatedPayload] = []
 
     def capture(payload: SimulationLocationValidatedPayload) -> None:
@@ -115,8 +119,7 @@ def test_apply_main_thread_emits_validated_signal(tmp_path: Path) -> None:
 
 
 def test_apply_main_thread_emits_rejected_signal(tmp_path: Path) -> None:
-    model_entrypoint = _make_model(tmp_path)
-    simulation_id = next(iter(model_entrypoint._simulations)).id
+    model_entrypoint, simulation_id = _make_model(tmp_path)
     captured: list[SimulationLocationRejectedPayload] = []
 
     def capture(payload: SimulationLocationRejectedPayload) -> None:
@@ -139,7 +142,7 @@ def test_apply_main_thread_emits_rejected_signal(tmp_path: Path) -> None:
 
 
 def test_apply_failure_main_thread_emits_generic_error(tmp_path: Path) -> None:
-    model_entrypoint = _make_model(tmp_path)
+    model_entrypoint, _simulation_id = _make_model(tmp_path)
     captured: list[ErrorRaisedPayload] = []
 
     def capture(payload: ErrorRaisedPayload) -> None:

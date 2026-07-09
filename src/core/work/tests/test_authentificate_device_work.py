@@ -237,7 +237,7 @@ def test_mock_authenticate_non_protocol_failure_raises() -> None:
 def test_authenticate_apply_failure_emits_device_authentification_failed() -> None:
     model_entrypoint = ModelEntrypoint()
     emitted: list[tuple[CoreSignal[Any], object]] = []
-    model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
+    model_entrypoint.emit_core_signal = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
         (signal, payload)
     )
     error = DeviceAuthentificationError(
@@ -265,7 +265,7 @@ def test_authenticate_apply_failure_emits_device_authentification_failed() -> No
 def test_authenticate_apply_failure_emits_error_raised_for_generic_exception() -> None:
     model_entrypoint = ModelEntrypoint()
     emitted: list[tuple[CoreSignal[Any], object]] = []
-    model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
+    model_entrypoint.emit_core_signal = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
         (signal, payload)
     )
     error = RuntimeError("unexpected")
@@ -285,10 +285,10 @@ def test_authenticate_apply_success_adds_phone_and_emits_signal() -> None:
     state = MockAdbState(seed=444, initial_devices=0)
     server = MockAdbServer(state=state)
     model_entrypoint = ModelEntrypoint()
-    model_entrypoint._adb_server = server
+    model_entrypoint.adb_server = server
     phone = Phone(id="paired-phone", state="device")
     emitted: list[tuple[CoreSignal[Any], object]] = []
-    model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
+    model_entrypoint.emit_core_signal = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
         (signal, payload)
     )
 

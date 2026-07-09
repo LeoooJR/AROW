@@ -110,7 +110,7 @@ class RenderMapWork(CoreRuntimeWork[RenderMapOutcome]):
             )
             return
         simulation.map_file = outcome.html_path
-        model_entrypoint._signal_bus.emit(
+        model_entrypoint.emit_core_signal(
             CoreSignals.MAP_RENDERED,
             MapRenderedPayload(
                 simulation_id=outcome.simulation_id,
@@ -130,7 +130,7 @@ class RenderMapWork(CoreRuntimeWork[RenderMapOutcome]):
             simulation = model_entrypoint.get_simulation(error.simulation_id)
             if simulation is not None:
                 simulation.map_file = None
-                model_entrypoint._signal_bus.emit(
+                model_entrypoint.emit_core_signal(
                     CoreSignals.MAP_RENDER_FAILED,
                     MapRenderFailedPayload(
                         simulation_id=error.simulation_id,

@@ -38,6 +38,6 @@ def seed_adb_startup_for_entrypoint(
 ) -> None:
     """Seed dependency history on a model entrypoint bus for isolated core tests."""
     seed_adb_startup_signals(
-        model_entrypoint._signal_bus,
+        model_entrypoint.signal_bus,
         adb_binary_path=adb_binary_path,
     )

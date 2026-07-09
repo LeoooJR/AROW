@@ -216,9 +216,8 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
 
         if not isinstance(model_entrypoint, _ModelEntrypoint):
             raise TypeError("apply_main_thread() requires ModelEntrypoint")
-        if model_entrypoint._adb_server is not None:
-            model_entrypoint._adb_server.paired_devices.add(outcome.success_phone)
-        model_entrypoint._signal_bus.emit(
+        model_entrypoint.register_paired_device(outcome.success_phone)
+        model_entrypoint.emit_core_signal(
             CoreSignals.DEVICE_AUTHENTIFICATION_SUCCEEDED,
             DeviceAuthentificationSucceededPayload(
                 device=outcome.success_phone.serialize(json_compatible=False),
@@ -234,7 +233,7 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
         if not isinstance(model_entrypoint, _ModelEntrypoint):
             raise TypeError("apply_failure_main_thread() requires ModelEntrypoint")
         if isinstance(error, DeviceAuthentificationError):
-            model_entrypoint._signal_bus.emit(
+            model_entrypoint.emit_core_signal(
                 CoreSignals.DEVICE_AUTHENTIFICATION_FAILED,
                 DeviceAuthentificationFailedPayload(
                     ip=error.ip,

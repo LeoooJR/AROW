@@ -112,13 +112,13 @@ class ValidateSimulationMarkerLocationWork(
         if not isinstance(model_entrypoint, _ModelEntrypoint):
             raise TypeError("apply_main_thread() requires ModelEntrypoint")
         if outcome.validated is not None:
-            model_entrypoint._signal_bus.emit(
+            model_entrypoint.emit_core_signal(
                 CoreSignals.SIMULATION_LOCATION_VALIDATED,
                 outcome.validated,
             )
             return
         if outcome.rejected is not None:
-            model_entrypoint._signal_bus.emit(
+            model_entrypoint.emit_core_signal(
                 CoreSignals.SIMULATION_LOCATION_REJECTED,
                 outcome.rejected,
             )

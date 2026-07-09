@@ -15,7 +15,6 @@ from typing import TYPE_CHECKING
 from core.application_paths import get_or_create_application_dir
 from core.devices import compute_computer_stable_key
 from core.exceptions import CoreException
-from core.signals import CoreSignals, HostComputerIdentityPayload
 from core.work.core_runtime_work import CoreRuntimeWork, CoreRuntimeWorkOutcome
 from core.work.helper import preflight
 from logger import logger
@@ -137,11 +136,7 @@ class HostInstallIdentityWork(CoreRuntimeWork[HostInstallIdentityOutcome]):
             )
             return
         key = compute_computer_stable_key(token)
-        model_entrypoint._host.descriptor.stable_key = key
-        model_entrypoint._signal_bus.emit(
-            CoreSignals.HOST_COMPUTER_IDENTITY_UPDATED,
-            HostComputerIdentityPayload(stable_key=key),
-        )
+        model_entrypoint.set_host_identity(key)
         logger.debug(
             "HostInstallIdentityWork: host install identity applied (stable_key redacted in extras by default)",
         )

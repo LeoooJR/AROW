@@ -82,7 +82,7 @@ class CoreRuntimeWork(ABC, Generic[TOutcome]):
     ) -> None:
         """Emit a generic error on the core signal bus (Qt main thread)."""
         payload_error = error if isinstance(error, Exception) else None
-        model_entrypoint._signal_bus.emit(
+        model_entrypoint.emit_core_signal(
             CoreSignals.ERROR_RAISED,
             ErrorRaisedPayload(
                 source=source,

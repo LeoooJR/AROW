@@ -99,14 +99,24 @@ def test_refresh_known_devices_apply_replaces_devices_and_emits_update() -> None
     server = MockAdbServer(state=state)
     client = MockAdbClient(state=state)
     model_entrypoint = ModelEntrypoint()
-    model_entrypoint._adb_server = server
-    model_entrypoint._adb_client = client
+    model_entrypoint.adb_server = server
+    model_entrypoint.adb_client = client
     stale_phone = Phone(id="stale-device", state="device")
     refreshed_phone = Phone(id="fresh-device", state="device")
     server.paired_devices.add(stale_phone)
     emitted: list[tuple[CoreSignal[Any], object]] = []
-    model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
-        (signal, payload)
+    skipped: list[SimulationDeleteSkippedPayload] = []
+
+    def fake_emit(signal: CoreSignal[Any], payload: object) -> None:
+        emitted.append((signal, payload))
+
+    def capture_skipped(payload: SimulationDeleteSkippedPayload) -> None:
+        skipped.append(payload)
+
+    model_entrypoint.emit_core_signal = fake_emit  # type: ignore[method-assign]
+    model_entrypoint.signal_bus.subscribe(
+        CoreSignals.SIMULATION_DELETE_SKIPPED,
+        capture_skipped,
     )
 
     outcome = RefreshKnownDevicesOutcome(devices=[refreshed_phone])
@@ -114,20 +124,20 @@ def test_refresh_known_devices_apply_replaces_devices_and_emits_update() -> None
 
     assert server.paired_devices.get("stale-device") is None
     assert server.paired_devices.get("fresh-device") is refreshed_phone
-    assert len(emitted) == 2
-    assert emitted[0] == (
-        CoreSignals.SIMULATION_DELETE_SKIPPED,
+    assert skipped == [
         SimulationDeleteSkippedPayload(
             device_id="stale-device",
             reason="Simulation for device with id stale-device not found",
-        ),
-    )
-    assert emitted[1] == (
-        CoreSignals.DEVICES_UPDATED,
-        DevicesUpdatedPayload(
-            devices=serialize_phone_collection([refreshed_phone]),
-        ),
-    )
+        )
+    ]
+    assert emitted == [
+        (
+            CoreSignals.DEVICES_UPDATED,
+            DevicesUpdatedPayload(
+                devices=serialize_phone_collection([refreshed_phone]),
+            ),
+        )
+    ]
 
 
 def test_refresh_known_devices_apply_emits_safe_device_id_rebindings() -> None:
@@ -136,8 +146,8 @@ def test_refresh_known_devices_apply_emits_safe_device_id_rebindings() -> None:
     server = MockAdbServer(state=state)
     client = MockAdbClient(state=state)
     model_entrypoint = ModelEntrypoint()
-    model_entrypoint._adb_server = server
-    model_entrypoint._adb_client = client
+    model_entrypoint.adb_server = server
+    model_entrypoint.adb_client = client
     paired_phone = Phone(
         id="192.168.0.10:5555",
         state="device",
@@ -152,7 +162,7 @@ def test_refresh_known_devices_apply_emits_safe_device_id_rebindings() -> None:
     )
     server.paired_devices.add(paired_phone)
     emitted: list[tuple[CoreSignal[Any], object]] = []
-    model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
+    model_entrypoint.emit_core_signal = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
         (signal, payload)
     )
 
@@ -178,12 +188,12 @@ def test_refresh_known_devices_apply_skips_emit_when_devices_unchanged() -> None
     server = MockAdbServer(state=state)
     client = MockAdbClient(state=state)
     model_entrypoint = ModelEntrypoint()
-    model_entrypoint._adb_server = server
-    model_entrypoint._adb_client = client
+    model_entrypoint.adb_server = server
+    model_entrypoint.adb_client = client
     phone = Phone(id="device-1", state="device", model="Pixel")
     server.paired_devices.add(phone)
     emitted: list[tuple[CoreSignal[Any], object]] = []
-    model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
+    model_entrypoint.emit_core_signal = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
         (signal, payload)
     )
 

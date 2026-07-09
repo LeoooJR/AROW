@@ -2,7 +2,7 @@ from abc import ABC
 from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
-from typing import Any, Callable, Mapping, Tuple
+from typing import Any, Callable, Mapping, Tuple, TypeVar
 
 from core.adb.client import AdbClient
 from core.adb.server import AdbServer
@@ -27,8 +27,10 @@ from core.signals import (
     ActivityLogFileUpdatedPayload,
     AdbServerStartedPayload,
     AdbServerStoppedPayload,
+    CoreSignal,
     CoreSignals,
     DevicesUpdatedPayload,
+    HostComputerIdentityPayload,
     SimulationCreatedPayload,
     SimulationCreationFailedPayload,
     SimulationDeletedPayload,
@@ -62,6 +64,8 @@ from core.work.validate_simulation_marker_location_work import (
 )
 from core.work.works_repository import CORE_RUNTIME_WORKS
 from logger import logger
+
+PayloadT = TypeVar("PayloadT")
 
 # Main-thread appliers keyed by exact worker outcome type (AsyncRunner completion).
 CoreRuntimeResultApplier = Callable[["ModelEntrypoint", CoreRuntimeWorkOutcome], None]
@@ -115,6 +119,14 @@ class Entrypoint(ABC):
         """Return the core domain signal bus."""
         return self._signal_bus
 
+    def emit_core_signal(
+        self,
+        signal: CoreSignal[PayloadT],
+        payload: PayloadT,
+    ) -> None:
+        """Publish one typed payload on the core signal bus."""
+        self.signal_bus.emit(signal, payload)
+
     @cached_property
     def config_dir(self) -> Path:
         return get_or_create_config_dir()
@@ -153,6 +165,50 @@ class ModelEntrypoint(Entrypoint):
     def adb_server(self) -> AdbServer | None:
         """Return the active ADB server instance if available."""
         return self._adb_server
+
+    @adb_server.setter
+    def adb_server(self, value: AdbServer | None) -> None:
+        """Bind or clear the active ADB server instance."""
+        self._adb_server = value
+
+    @property
+    def adb_client(self) -> AdbClient | None:
+        """Return the active ADB client instance if available."""
+        return self._adb_client
+
+    @adb_client.setter
+    def adb_client(self, value: AdbClient | None) -> None:
+        """Bind or clear the active ADB client instance."""
+        self._adb_client = value
+
+    def register_paired_device(self, phone: Phone) -> None:
+        """Add one paired phone to the active ADB server repository."""
+        if self._adb_server is None:
+            return
+        self._adb_server.paired_devices.add(phone)
+
+    def restore_persisted_simulation(self, simulation: Simulation) -> None:
+        """Restore one persisted simulation into the in-memory repository."""
+        try:
+            self._simulations.restore(simulation)
+        except ValueError as error:
+            logger.warning(
+                "ModelEntrypoint: failed to restore persisted simulation",
+                simulation_id=simulation.id,
+                error=str(error),
+            )
+
+    def sync_last_active_device_id(self, device_id: str | None) -> None:
+        """Update the persisted last-active device selection."""
+        self._simulations.sync_last_active_device_id(device_id)
+
+    def set_host_identity(self, stable_key: str) -> None:
+        """Apply persisted install identity to the host descriptor and emit."""
+        self._host.descriptor.stable_key = stable_key
+        self.emit_core_signal(
+            CoreSignals.HOST_COMPUTER_IDENTITY_UPDATED,
+            HostComputerIdentityPayload(stable_key=stable_key),
+        )
 
     @property
     def activity_log_file(self) -> Path | None:

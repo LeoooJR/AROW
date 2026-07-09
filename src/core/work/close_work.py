@@ -84,8 +84,9 @@ class CloseCoreRuntimeWork(CoreRuntimeWork[CloseOutcome]):
                 "ModelEntrypoint: close apply skipped stop signal (no stopped server)",
             )
             return
-        model_entrypoint._adb_server = None
-        model_entrypoint._signal_bus.emit(
+        model_entrypoint.adb_server = None
+        model_entrypoint.adb_client = None
+        model_entrypoint.emit_core_signal(
             CoreSignals.ADB_SERVER_STOPPED,
             AdbServerStoppedPayload(
                 adb_binary_path=str(result.adb_server.binary.path),

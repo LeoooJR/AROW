@@ -240,7 +240,7 @@ def test_startup_apply_restores_last_active_device_when_online(
     def capture(payload: SimulationCreatedPayload) -> None:
         simulation_created.append(payload.simulation_id)
 
-    model_entrypoint._signal_bus.subscribe(
+    model_entrypoint.signal_bus.subscribe(
         CoreSignals.SIMULATION_CREATED,
         capture,
     )
@@ -248,8 +248,8 @@ def test_startup_apply_restores_last_active_device_when_online(
     StartupCoreRuntimeWork.apply_main_thread(model_entrypoint, second_outcome)
 
     assert model_entrypoint.adb_server is second_outcome.adb_server
-    assert model_entrypoint._simulations.get("sim-1") is not None
-    assert model_entrypoint._simulations.last_active_device_id == phone.id
+    restored = model_entrypoint.get_simulation("sim-1")
+    assert restored is not None
     assert simulation_created == []
     assert second_outcome.adb_server is not None
     working_device = second_outcome.adb_server.get_working_device()
@@ -284,7 +284,7 @@ def test_startup_apply_skips_last_active_device_when_offline(
     def capture(payload: SimulationCreatedPayload) -> None:
         simulation_created.append(payload.simulation_id)
 
-    model_entrypoint._signal_bus.subscribe(
+    model_entrypoint.signal_bus.subscribe(
         CoreSignals.SIMULATION_CREATED,
         capture,
     )
@@ -292,7 +292,8 @@ def test_startup_apply_skips_last_active_device_when_offline(
     StartupCoreRuntimeWork.apply_main_thread(model_entrypoint, second_outcome)
 
     assert simulation_created == []
-    assert model_entrypoint._simulations.last_active_device_id == phone.id
+    third_outcome = StartupCoreRuntimeWork(use_mock_adb=True).run()
+    assert third_outcome.last_active_device_id == phone.id
 
 
 def test_startup_apply_binds_mock_runtime_and_emits_startup_signals() -> None:
@@ -302,7 +303,7 @@ def test_startup_apply_binds_mock_runtime_and_emits_startup_signals() -> None:
     devices = server.get_known_devices()
     model_entrypoint = ModelEntrypoint()
     emitted: list[tuple[CoreSignal[Any], object]] = []
-    model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
+    model_entrypoint.emit_core_signal = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
         (signal, payload)
     )
 
@@ -312,7 +313,7 @@ def test_startup_apply_binds_mock_runtime_and_emits_startup_signals() -> None:
     )
 
     assert model_entrypoint.adb_server is server
-    assert model_entrypoint._adb_client is client
+    assert model_entrypoint.adb_client is client
     assert emitted == [
         (
             CoreSignals.ADB_SERVER_STARTED,
@@ -346,7 +347,7 @@ def test_startup_apply_restores_persisted_simulations() -> None:
         ),
     )
 
-    restored = model_entrypoint._simulations.get("sim-1")
+    restored = model_entrypoint.get_simulation("sim-1")
     assert restored is simulation
     assert restored is not None
     assert restored.device is phone

@@ -204,7 +204,7 @@ class RefreshKnownDevicesWork(CoreRuntimeWork[RefreshKnownDevicesOutcome]):
 
         if not isinstance(model_entrypoint, _ModelEntrypoint):
             raise TypeError("apply_main_thread() requires ModelEntrypoint")
-        adb_server = model_entrypoint._adb_server
+        adb_server = model_entrypoint.adb_server
         if adb_server is None:
             raise AttributeError(
                 "ADB server must be initialized before applying refresh outcome"
@@ -212,7 +212,7 @@ class RefreshKnownDevicesWork(CoreRuntimeWork[RefreshKnownDevicesOutcome]):
         reconcile_result = model_entrypoint.reconcile_paired_devices(outcome.devices)
         if not reconcile_result.changed:
             return
-        model_entrypoint._signal_bus.emit(
+        model_entrypoint.emit_core_signal(
             CoreSignals.DEVICES_UPDATED,
             DevicesUpdatedPayload(
                 devices=serialize_phone_collection(adb_server.paired_devices),
