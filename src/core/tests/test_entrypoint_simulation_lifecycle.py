@@ -11,7 +11,7 @@ from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
 from core.devices import Phone
 from core.entrypoint import ModelEntrypoint
 from core.signals import (
-    CoreSignal,
+    CoreSignals,
     SimulationCreatedPayload,
     SimulationCreationFailedPayload,
     SimulationDeletedPayload,
@@ -46,8 +46,8 @@ def test_create_simulation_missing_device_emits_creation_failed(
     def capture_failed(payload: SimulationCreationFailedPayload) -> None:
         captured.append(payload)
 
-    model_entrypoint.subscribe(
-        CoreSignal.SIMULATION_CREATION_FAILED,
+    model_entrypoint.signal_bus.subscribe(
+        CoreSignals.SIMULATION_CREATION_FAILED,
         capture_failed,
     )
 
@@ -73,7 +73,9 @@ def test_delete_simulation_for_device_emits_deleted_with_device_id(
     def capture_created(payload: SimulationCreatedPayload) -> None:
         created_ids.append(payload.simulation_id)
 
-    model_entrypoint.subscribe(CoreSignal.SIMULATION_CREATED, capture_created)
+    model_entrypoint.signal_bus.subscribe(
+        CoreSignals.SIMULATION_CREATED, capture_created
+    )
     model_entrypoint.create_simulation("device-1")
     assert len(created_ids) == 1
 
@@ -82,7 +84,9 @@ def test_delete_simulation_for_device_emits_deleted_with_device_id(
     def capture_deleted(payload: SimulationDeletedPayload) -> None:
         captured.append(payload)
 
-    model_entrypoint.subscribe(CoreSignal.SIMULATION_DELETED, capture_deleted)
+    model_entrypoint.signal_bus.subscribe(
+        CoreSignals.SIMULATION_DELETED, capture_deleted
+    )
 
     model_entrypoint.delete_simulation_for_device("device-1")
 
@@ -104,8 +108,8 @@ def test_delete_simulation_for_device_without_simulation_emits_skipped(
     def capture_skipped(payload: SimulationDeleteSkippedPayload) -> None:
         captured.append(payload)
 
-    model_entrypoint.subscribe(
-        CoreSignal.SIMULATION_DELETE_SKIPPED,
+    model_entrypoint.signal_bus.subscribe(
+        CoreSignals.SIMULATION_DELETE_SKIPPED,
         capture_skipped,
     )
 

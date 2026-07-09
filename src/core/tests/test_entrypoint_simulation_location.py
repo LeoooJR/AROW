@@ -13,7 +13,7 @@ from core.devices import Phone
 from core.entrypoint import ModelEntrypoint
 from core.geo.element import clear_lignes_par_type_cache
 from core.signals import (
-    CoreSignal,
+    CoreSignals,
     SimulationLocationRejectedPayload,
     SimulationLocationValidatedPayload,
 )
@@ -58,7 +58,9 @@ def test_validate_simulation_marker_location_emits_validated_payload(
     def capture(payload: SimulationLocationValidatedPayload) -> None:
         captured.append(payload)
 
-    model_entrypoint.subscribe(CoreSignal.SIMULATION_LOCATION_VALIDATED, capture)
+    model_entrypoint.signal_bus.subscribe(
+        CoreSignals.SIMULATION_LOCATION_VALIDATED, capture
+    )
     outcome = model_entrypoint.validate_simulation_marker_location(
         simulation_id,
         1,
@@ -90,8 +92,8 @@ def test_validate_simulation_marker_location_missing_simulation_raises(
     def capture(payload: SimulationLocationValidatedPayload) -> None:
         captured.append(payload)
 
-    model_entrypoint.subscribe(
-        CoreSignal.SIMULATION_LOCATION_VALIDATED,
+    model_entrypoint.signal_bus.subscribe(
+        CoreSignals.SIMULATION_LOCATION_VALIDATED,
         capture,
     )
 
@@ -121,12 +123,12 @@ def test_validate_simulation_marker_location_invalid_marker_emits_rejected_paylo
     def capture_rejected(payload: SimulationLocationRejectedPayload) -> None:
         rejected.append(payload)
 
-    model_entrypoint.subscribe(
-        CoreSignal.SIMULATION_LOCATION_VALIDATED,
+    model_entrypoint.signal_bus.subscribe(
+        CoreSignals.SIMULATION_LOCATION_VALIDATED,
         capture_validated,
     )
-    model_entrypoint.subscribe(
-        CoreSignal.SIMULATION_LOCATION_REJECTED,
+    model_entrypoint.signal_bus.subscribe(
+        CoreSignals.SIMULATION_LOCATION_REJECTED,
         capture_rejected,
     )
 

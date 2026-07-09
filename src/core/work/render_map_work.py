@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 from core.exceptions import CoreException
 from core.geo.renderer import MapRenderer
 from core.signals import (
-    CoreSignal,
+    CoreSignals,
     MapRenderedPayload,
     MapRenderFailedPayload,
 )
@@ -111,7 +111,7 @@ class RenderMapWork(CoreRuntimeWork[RenderMapOutcome]):
             return
         simulation.map_file = outcome.html_path
         model_entrypoint._signal_bus.emit(
-            CoreSignal.MAP_RENDERED,
+            CoreSignals.MAP_RENDERED,
             MapRenderedPayload(
                 simulation_id=outcome.simulation_id,
                 html_path=outcome.html_path,
@@ -131,7 +131,7 @@ class RenderMapWork(CoreRuntimeWork[RenderMapOutcome]):
             if simulation is not None:
                 simulation.map_file = None
                 model_entrypoint._signal_bus.emit(
-                    CoreSignal.MAP_RENDER_FAILED,
+                    CoreSignals.MAP_RENDER_FAILED,
                     MapRenderFailedPayload(
                         simulation_id=error.simulation_id,
                         reason=error.reason,

@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from core.signal_bus import InMemoryCoreSignalBus
 from core.signals import (
     AdbServerStartedPayload,
-    CoreSignal,
+    CoreSignals,
     DevicesUpdatedPayload,
-    InMemoryCoreSignalBus,
 )
 
 if TYPE_CHECKING:
@@ -22,11 +22,11 @@ def seed_adb_startup_signals(
 ) -> None:
     """Record the minimum ADB startup emissions required before device/simulation signals."""
     bus.emit(
-        CoreSignal.ADB_SERVER_STARTED,
+        CoreSignals.ADB_SERVER_STARTED,
         AdbServerStartedPayload(adb_binary_path=adb_binary_path),
     )
     bus.emit(
-        CoreSignal.DEVICES_UPDATED,
+        CoreSignals.DEVICES_UPDATED,
         DevicesUpdatedPayload(devices=[]),
     )
 

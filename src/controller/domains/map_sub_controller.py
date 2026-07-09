@@ -20,7 +20,7 @@ from controller.domains.app_sub_controller import AppSubController
 from controller.helper import validate_model_entrypoint, validate_view
 from controller.runner import JobHandler
 from core.signals import (
-    CoreSignal,
+    CoreSignals,
     MapRenderedPayload,
     MapRenderFailedPayload,
     SimulationDeletedPayload,
@@ -79,21 +79,23 @@ class MapSubController(AppSubController):
         self.model_entrypoint.persist_simulations()
 
     def connect_model_signals(self) -> None:
-        """Subscribe to map-relevant :class:`CoreSignal` values when needed."""
-        self.model_entrypoint.subscribe(CoreSignal.MAP_RENDERED, self._on_map_rendered)
-        self.model_entrypoint.subscribe(
-            CoreSignal.MAP_RENDER_FAILED, self._on_map_render_failed
+        """Subscribe to map-relevant :class:`CoreSignals` values when needed."""
+        self.model_entrypoint.signal_bus.subscribe(
+            CoreSignals.MAP_RENDERED, self._on_map_rendered
         )
-        self.model_entrypoint.subscribe(
-            CoreSignal.SIMULATION_DELETED,
+        self.model_entrypoint.signal_bus.subscribe(
+            CoreSignals.MAP_RENDER_FAILED, self._on_map_render_failed
+        )
+        self.model_entrypoint.signal_bus.subscribe(
+            CoreSignals.SIMULATION_DELETED,
             self._on_simulation_deleted,
         )
-        self.model_entrypoint.subscribe(
-            CoreSignal.SIMULATION_LOCATION_VALIDATED,
+        self.model_entrypoint.signal_bus.subscribe(
+            CoreSignals.SIMULATION_LOCATION_VALIDATED,
             self._on_simulation_location_validated,
         )
-        self.model_entrypoint.subscribe(
-            CoreSignal.SIMULATION_LOCATION_REJECTED,
+        self.model_entrypoint.signal_bus.subscribe(
+            CoreSignals.SIMULATION_LOCATION_REJECTED,
             self._on_simulation_location_rejected,
         )
 

@@ -13,7 +13,7 @@ from core.devices import Phone
 from core.entrypoint import ModelEntrypoint
 from core.geo.element import clear_lignes_par_type_cache
 from core.signals import (
-    CoreSignal,
+    CoreSignals,
     ErrorRaisedPayload,
     SimulationLocationRejectedPayload,
     SimulationLocationValidatedPayload,
@@ -98,7 +98,9 @@ def test_apply_main_thread_emits_validated_signal(tmp_path: Path) -> None:
     def capture(payload: SimulationLocationValidatedPayload) -> None:
         captured.append(payload)
 
-    model_entrypoint.subscribe(CoreSignal.SIMULATION_LOCATION_VALIDATED, capture)
+    model_entrypoint.signal_bus.subscribe(
+        CoreSignals.SIMULATION_LOCATION_VALIDATED, capture
+    )
     outcome = ValidateSimulationMarkerLocationWork(
         simulation_id=simulation_id,
         km=1,
@@ -120,7 +122,9 @@ def test_apply_main_thread_emits_rejected_signal(tmp_path: Path) -> None:
     def capture(payload: SimulationLocationRejectedPayload) -> None:
         captured.append(payload)
 
-    model_entrypoint.subscribe(CoreSignal.SIMULATION_LOCATION_REJECTED, capture)
+    model_entrypoint.signal_bus.subscribe(
+        CoreSignals.SIMULATION_LOCATION_REJECTED, capture
+    )
     outcome = ValidateSimulationMarkerLocationWork(
         simulation_id=simulation_id,
         km=999,
@@ -141,7 +145,7 @@ def test_apply_failure_main_thread_emits_generic_error(tmp_path: Path) -> None:
     def capture(payload: ErrorRaisedPayload) -> None:
         captured.append(payload)
 
-    model_entrypoint.subscribe(CoreSignal.ERROR_RAISED, capture)
+    model_entrypoint.signal_bus.subscribe(CoreSignals.ERROR_RAISED, capture)
     ValidateSimulationMarkerLocationWork.apply_failure_main_thread(
         model_entrypoint,
         RuntimeError("unexpected"),

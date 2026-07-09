@@ -12,7 +12,7 @@ from shapely.geometry import Point
 from core.geo.element import Milestone, Railway
 from core.geo.exceptions import MilestoneValidationError, RailwayValidationError
 from core.signals import (
-    CoreSignal,
+    CoreSignals,
     SimulationLocationRejectedPayload,
     SimulationLocationValidatedPayload,
 )
@@ -113,13 +113,13 @@ class ValidateSimulationMarkerLocationWork(
             raise TypeError("apply_main_thread() requires ModelEntrypoint")
         if outcome.validated is not None:
             model_entrypoint._signal_bus.emit(
-                CoreSignal.SIMULATION_LOCATION_VALIDATED,
+                CoreSignals.SIMULATION_LOCATION_VALIDATED,
                 outcome.validated,
             )
             return
         if outcome.rejected is not None:
             model_entrypoint._signal_bus.emit(
-                CoreSignal.SIMULATION_LOCATION_REJECTED,
+                CoreSignals.SIMULATION_LOCATION_REJECTED,
                 outcome.rejected,
             )
 

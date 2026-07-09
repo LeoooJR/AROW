@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 
 from core.adb.server import AdbServer
 from core.exceptions import CoreException
-from core.signals import AdbServerStoppedPayload, CoreSignal
+from core.signals import AdbServerStoppedPayload, CoreSignals
 from core.work.core_runtime_work import CoreRuntimeWork, CoreRuntimeWorkOutcome
 from core.work.helper import preflight
 from logger import logger
@@ -86,7 +86,7 @@ class CloseCoreRuntimeWork(CoreRuntimeWork[CloseOutcome]):
             return
         model_entrypoint._adb_server = None
         model_entrypoint._signal_bus.emit(
-            CoreSignal.ADB_SERVER_STOPPED,
+            CoreSignals.ADB_SERVER_STOPPED,
             AdbServerStoppedPayload(
                 adb_binary_path=str(result.adb_server.binary.path),
             ),

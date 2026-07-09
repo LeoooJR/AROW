@@ -15,7 +15,7 @@ from core.adb.server import AdbServer
 from core.devices import Phone
 from core.exceptions import CoreException
 from core.signals import (
-    CoreSignal,
+    CoreSignals,
     DeviceAuthentificationFailedPayload,
     DeviceAuthentificationSucceededPayload,
 )
@@ -219,7 +219,7 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
         if model_entrypoint._adb_server is not None:
             model_entrypoint._adb_server.paired_devices.add(outcome.success_phone)
         model_entrypoint._signal_bus.emit(
-            CoreSignal.DEVICE_AUTHENTIFICATION_SUCCEEDED,
+            CoreSignals.DEVICE_AUTHENTIFICATION_SUCCEEDED,
             DeviceAuthentificationSucceededPayload(
                 device=outcome.success_phone.serialize(json_compatible=False),
             ),
@@ -235,7 +235,7 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
             raise TypeError("apply_failure_main_thread() requires ModelEntrypoint")
         if isinstance(error, DeviceAuthentificationError):
             model_entrypoint._signal_bus.emit(
-                CoreSignal.DEVICE_AUTHENTIFICATION_FAILED,
+                CoreSignals.DEVICE_AUTHENTIFICATION_FAILED,
                 DeviceAuthentificationFailedPayload(
                     ip=error.ip,
                     port=error.port,

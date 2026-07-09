@@ -4,13 +4,15 @@ Tests for faker-backed mock ADB (no real adb binary; not marked ``@pytest.mark.a
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from core import ADB_BINARY_BUILD_NUMBER, ADB_BINARY_BUILD_VERSION, ADB_BINARY_VERSION
 from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
 from core.adb.command import ADBCommandParser, AdbCommands
 from core.entrypoint import ModelEntrypoint
-from core.signals import CoreSignal
+from core.signals import CoreSignal, CoreSignals
 
 pytestmark = [pytest.mark.mock_adb]
 
@@ -40,7 +42,7 @@ def test_mock_server_binary_version_output_matches_parser() -> None:
 
 def test_model_entrypoint_startup_mock_returns_outcome_without_emitting() -> None:
     model_entrypoint = ModelEntrypoint(use_mock_adb=True)
-    emitted: list[tuple[CoreSignal, object]] = []
+    emitted: list[tuple[CoreSignal[Any], object]] = []
     model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
         (signal, payload)
     )

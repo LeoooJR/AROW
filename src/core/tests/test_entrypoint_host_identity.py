@@ -6,7 +6,7 @@ import pytest
 
 from core.devices import compute_computer_stable_key
 from core.entrypoint import ModelEntrypoint
-from core.signals import CoreSignal, HostComputerIdentityPayload
+from core.signals import CoreSignals, HostComputerIdentityPayload
 from core.work.host_install_identity_work import HostInstallIdentityOutcome
 
 pytestmark = [pytest.mark.devices]
@@ -35,7 +35,9 @@ def test_apply_host_install_identity_outcome_emits_core_signal() -> None:
         assert isinstance(payload, HostComputerIdentityPayload)
         received.append(payload)
 
-    model_entrypoint.subscribe(CoreSignal.HOST_COMPUTER_IDENTITY_UPDATED, capture)
+    model_entrypoint.signal_bus.subscribe(
+        CoreSignals.HOST_COMPUTER_IDENTITY_UPDATED, capture
+    )
     token = "dddddddd-dddd-dddd-dddd-dddddddddddd"
     model_entrypoint.apply_result(HostInstallIdentityOutcome(install_token=token))
 

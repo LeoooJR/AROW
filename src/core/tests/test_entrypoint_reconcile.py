@@ -16,7 +16,7 @@ from core.devices import (
     apply_phone_ro_serial_enrichment,
 )
 from core.entrypoint import ModelEntrypoint
-from core.signals import CoreSignal, SimulationCreatedPayload
+from core.signals import CoreSignals, SimulationCreatedPayload
 from core.tests.signal_test_helpers import seed_adb_startup_for_entrypoint
 
 pytestmark = [pytest.mark.devices]
@@ -29,7 +29,7 @@ def _create_simulation_id(model_entrypoint: ModelEntrypoint, device_id: str) -> 
     def capture(payload: SimulationCreatedPayload) -> None:
         captured.append(payload.simulation_id)
 
-    model_entrypoint.subscribe(CoreSignal.SIMULATION_CREATED, capture)
+    model_entrypoint.signal_bus.subscribe(CoreSignals.SIMULATION_CREATED, capture)
     model_entrypoint.create_simulation(device_id)
     assert len(captured) == 1
     return captured[0]
@@ -77,7 +77,7 @@ def test_create_simulation_reuses_existing_device_simulation(tmp_path: Path) -> 
     def capture(payload: SimulationCreatedPayload) -> None:
         captured.append(payload.simulation_id)
 
-    model_entrypoint.subscribe(CoreSignal.SIMULATION_CREATED, capture)
+    model_entrypoint.signal_bus.subscribe(CoreSignals.SIMULATION_CREATED, capture)
     model_entrypoint.create_simulation("device-1")
     second_simulation_id = first_simulation_id
 

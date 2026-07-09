@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from controller.runner import JobError
 from core.entrypoint import ModelEntrypoint
 from core.signals import (
     CoreSignal,
+    CoreSignals,
     DeviceAuthentificationFailedPayload,
     ErrorRaisedPayload,
 )
@@ -17,7 +20,7 @@ pytestmark = [pytest.mark.async_jobs]
 
 def test_apply_failure_routes_auth_error_by_origin() -> None:
     model_entrypoint = ModelEntrypoint()
-    emitted: list[tuple[CoreSignal, object]] = []
+    emitted: list[tuple[CoreSignal[Any], object]] = []
     model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
         (signal, payload)
     )
@@ -39,7 +42,7 @@ def test_apply_failure_routes_auth_error_by_origin() -> None:
 
     assert emitted == [
         (
-            CoreSignal.DEVICE_AUTHENTIFICATION_FAILED,
+            CoreSignals.DEVICE_AUTHENTIFICATION_FAILED,
             DeviceAuthentificationFailedPayload(
                 ip="10.0.0.5",
                 port=37777,
@@ -52,7 +55,7 @@ def test_apply_failure_routes_auth_error_by_origin() -> None:
 
 def test_apply_failure_routes_generic_exception_by_origin() -> None:
     model_entrypoint = ModelEntrypoint()
-    emitted: list[tuple[CoreSignal, object]] = []
+    emitted: list[tuple[CoreSignal[Any], object]] = []
     model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
         (signal, payload)
     )
@@ -69,7 +72,7 @@ def test_apply_failure_routes_generic_exception_by_origin() -> None:
 
     assert len(emitted) == 1
     signal, payload = emitted[0]
-    assert signal == CoreSignal.ERROR_RAISED
+    assert signal == CoreSignals.ERROR_RAISED
     assert isinstance(payload, ErrorRaisedPayload)
     assert payload.source == "AuthenticateDeviceWork"
     assert payload.message == "unexpected auth bug"
@@ -90,7 +93,7 @@ def test_apply_failure_routes_generic_exception_for_each_work_origin(
     origin: str, expected_source: str
 ) -> None:
     model_entrypoint = ModelEntrypoint()
-    emitted: list[tuple[CoreSignal, object]] = []
+    emitted: list[tuple[CoreSignal[Any], object]] = []
     model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
         (signal, payload)
     )
@@ -107,7 +110,7 @@ def test_apply_failure_routes_generic_exception_for_each_work_origin(
 
     assert len(emitted) == 1
     signal, payload = emitted[0]
-    assert signal == CoreSignal.ERROR_RAISED
+    assert signal == CoreSignals.ERROR_RAISED
     assert isinstance(payload, ErrorRaisedPayload)
     assert payload.source == expected_source
     assert payload.error_type == "RuntimeError"
@@ -116,7 +119,7 @@ def test_apply_failure_routes_generic_exception_for_each_work_origin(
 
 def test_apply_failure_falls_back_to_exception_type_without_origin() -> None:
     model_entrypoint = ModelEntrypoint()
-    emitted: list[tuple[CoreSignal, object]] = []
+    emitted: list[tuple[CoreSignal[Any], object]] = []
     model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
         (signal, payload)
     )
@@ -131,7 +134,7 @@ def test_apply_failure_falls_back_to_exception_type_without_origin() -> None:
 
     assert emitted == [
         (
-            CoreSignal.DEVICE_AUTHENTIFICATION_FAILED,
+            CoreSignals.DEVICE_AUTHENTIFICATION_FAILED,
             DeviceAuthentificationFailedPayload(
                 ip="1.2.3.4",
                 port=12345,
@@ -144,7 +147,7 @@ def test_apply_failure_falls_back_to_exception_type_without_origin() -> None:
 
 def test_emit_generic_error_emits_error_raised_payload() -> None:
     model_entrypoint = ModelEntrypoint()
-    emitted: list[tuple[CoreSignal, object]] = []
+    emitted: list[tuple[CoreSignal[Any], object]] = []
     model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
         (signal, payload)
     )
@@ -159,7 +162,7 @@ def test_emit_generic_error_emits_error_raised_payload() -> None:
 
     assert len(emitted) == 1
     signal, payload = emitted[0]
-    assert signal == CoreSignal.ERROR_RAISED
+    assert signal == CoreSignals.ERROR_RAISED
     assert isinstance(payload, ErrorRaisedPayload)
     assert payload.source == "TestSource"
     assert payload.message == "direct helper test"
@@ -169,7 +172,7 @@ def test_emit_generic_error_emits_error_raised_payload() -> None:
 
 def test_apply_failure_uses_generic_handler_for_unknown_job_error() -> None:
     model_entrypoint = ModelEntrypoint()
-    emitted: list[tuple[CoreSignal, object]] = []
+    emitted: list[tuple[CoreSignal[Any], object]] = []
     model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
         (signal, payload)
     )
@@ -183,7 +186,7 @@ def test_apply_failure_uses_generic_handler_for_unknown_job_error() -> None:
 
     assert len(emitted) == 1
     signal, payload = emitted[0]
-    assert signal == CoreSignal.ERROR_RAISED
+    assert signal == CoreSignals.ERROR_RAISED
     assert isinstance(payload, ErrorRaisedPayload)
     assert payload.source == "ModelEntrypoint"
     assert payload.message == "Job failed: unknown_job: boom"

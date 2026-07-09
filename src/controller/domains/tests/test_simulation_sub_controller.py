@@ -17,7 +17,7 @@ from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
 from core.devices import Phone
 from core.entrypoint import ModelEntrypoint
 from core.signals import (
-    CoreSignal,
+    CoreSignals,
     SimulationCreatedPayload,
     SimulationCreationFailedPayload,
     SimulationDeletedPayload,
@@ -83,7 +83,7 @@ def _create_simulation_id(model_entrypoint: ModelEntrypoint, device_id: str) -> 
     def capture(payload: SimulationCreatedPayload) -> None:
         captured.append(payload.simulation_id)
 
-    model_entrypoint.subscribe(CoreSignal.SIMULATION_CREATED, capture)
+    model_entrypoint.signal_bus.subscribe(CoreSignals.SIMULATION_CREATED, capture)
     seed_adb_startup_for_entrypoint(model_entrypoint)
     model_entrypoint.create_simulation(device_id)
     assert len(captured) == 1
@@ -94,49 +94,49 @@ def test_connect_model_signals_subscribes_to_simulation_events(tmp_path: Path) -
     model_entrypoint = _make_model(tmp_path)
     subcontroller = _make_subcontroller(model_entrypoint)
     subscribe = MagicMock()
-    model_entrypoint.subscribe = subscribe  # type: ignore[method-assign]
+    model_entrypoint.signal_bus.subscribe = subscribe  # type: ignore[method-assign]
 
     subcontroller.connect_model_signals()
 
     assert subscribe.call_count == 10
     subscribe.assert_any_call(
-        CoreSignal.SIMULATION_CREATED,
+        CoreSignals.SIMULATION_CREATED,
         subcontroller._on_simulation_created,
     )
     subscribe.assert_any_call(
-        CoreSignal.SIMULATION_RESTORED,
+        CoreSignals.SIMULATION_RESTORED,
         subcontroller._on_simulation_restored,
     )
     subscribe.assert_any_call(
-        CoreSignal.SIMULATION_CREATION_FAILED,
+        CoreSignals.SIMULATION_CREATION_FAILED,
         subcontroller._on_simulation_creation_failed,
     )
     subscribe.assert_any_call(
-        CoreSignal.SIMULATION_DELETED,
+        CoreSignals.SIMULATION_DELETED,
         subcontroller._on_simulation_deleted,
     )
     subscribe.assert_any_call(
-        CoreSignal.SIMULATION_DELETE_SKIPPED,
+        CoreSignals.SIMULATION_DELETE_SKIPPED,
         subcontroller._on_simulation_delete_skipped,
     )
     subscribe.assert_any_call(
-        CoreSignal.MAP_RENDERED,
+        CoreSignals.MAP_RENDERED,
         subcontroller._on_map_rendered,
     )
     subscribe.assert_any_call(
-        CoreSignal.SIMULATION_STATE_CHANGED,
+        CoreSignals.SIMULATION_STATE_CHANGED,
         subcontroller._on_simulation_state_changed,
     )
     subscribe.assert_any_call(
-        CoreSignal.SIMULATION_POSITION_CHANGED,
+        CoreSignals.SIMULATION_POSITION_CHANGED,
         subcontroller._on_simulation_position_changed,
     )
     subscribe.assert_any_call(
-        CoreSignal.SIMULATION_MAP_FILE_CHANGED,
+        CoreSignals.SIMULATION_MAP_FILE_CHANGED,
         subcontroller._on_simulation_map_file_changed,
     )
     subscribe.assert_any_call(
-        CoreSignal.SIMULATION_LOCATION_VALIDATED,
+        CoreSignals.SIMULATION_LOCATION_VALIDATED,
         subcontroller._on_simulation_location_validated,
     )
 
@@ -365,8 +365,8 @@ def test_set_simulation_active_emits_state_changed_with_simulation_id(
     def capture_state(payload: SimulationStateChangedPayload) -> None:
         captured.append(payload)
 
-    model_entrypoint.subscribe(
-        CoreSignal.SIMULATION_STATE_CHANGED,
+    model_entrypoint.signal_bus.subscribe(
+        CoreSignals.SIMULATION_STATE_CHANGED,
         capture_state,
     )
 
@@ -390,8 +390,8 @@ def test_update_simulation_location_emits_position_changed_with_simulation_id(
     def capture_position(payload: SimulationPositionChangedPayload) -> None:
         captured.append(payload)
 
-    model_entrypoint.subscribe(
-        CoreSignal.SIMULATION_POSITION_CHANGED,
+    model_entrypoint.signal_bus.subscribe(
+        CoreSignals.SIMULATION_POSITION_CHANGED,
         capture_position,
     )
 
@@ -419,7 +419,9 @@ def test_simulation_location_validated_updates_spoofed_location_and_persists(
     def capture(payload: SimulationLocationValidatedPayload) -> None:
         captured.append(payload)
 
-    model_entrypoint.subscribe(CoreSignal.SIMULATION_LOCATION_VALIDATED, capture)
+    model_entrypoint.signal_bus.subscribe(
+        CoreSignals.SIMULATION_LOCATION_VALIDATED, capture
+    )
     outcome = model_entrypoint.validate_simulation_marker_location(
         simulation_id,
         1,

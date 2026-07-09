@@ -26,7 +26,7 @@ from core.devices import (
     serialize_phone_collection,
 )
 from core.exceptions import CoreException
-from core.signals import CoreSignal, DevicesUpdatedPayload
+from core.signals import CoreSignals, DevicesUpdatedPayload
 from core.work.core_runtime_work import CoreRuntimeWork, CoreRuntimeWorkOutcome
 from core.work.helper import preflight
 
@@ -213,7 +213,7 @@ class RefreshKnownDevicesWork(CoreRuntimeWork[RefreshKnownDevicesOutcome]):
         if not reconcile_result.changed:
             return
         model_entrypoint._signal_bus.emit(
-            CoreSignal.DEVICES_UPDATED,
+            CoreSignals.DEVICES_UPDATED,
             DevicesUpdatedPayload(
                 devices=serialize_phone_collection(adb_server.paired_devices),
                 device_id_rebindings=reconcile_result.device_id_rebindings,

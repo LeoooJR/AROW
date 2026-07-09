@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -13,6 +14,7 @@ from core.entrypoint import ModelEntrypoint
 from core.signals import (
     AdbServerStartedPayload,
     CoreSignal,
+    CoreSignals,
     DevicesUpdatedPayload,
     SimulationCreatedPayload,
 )
@@ -239,7 +241,7 @@ def test_startup_apply_restores_last_active_device_when_online(
         simulation_created.append(payload.simulation_id)
 
     model_entrypoint._signal_bus.subscribe(
-        CoreSignal.SIMULATION_CREATED,
+        CoreSignals.SIMULATION_CREATED,
         capture,
     )
 
@@ -283,7 +285,7 @@ def test_startup_apply_skips_last_active_device_when_offline(
         simulation_created.append(payload.simulation_id)
 
     model_entrypoint._signal_bus.subscribe(
-        CoreSignal.SIMULATION_CREATED,
+        CoreSignals.SIMULATION_CREATED,
         capture,
     )
 
@@ -299,7 +301,7 @@ def test_startup_apply_binds_mock_runtime_and_emits_startup_signals() -> None:
     client = MockAdbClient(state=state)
     devices = server.get_known_devices()
     model_entrypoint = ModelEntrypoint()
-    emitted: list[tuple[CoreSignal, object]] = []
+    emitted: list[tuple[CoreSignal[Any], object]] = []
     model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
         (signal, payload)
     )
@@ -313,11 +315,11 @@ def test_startup_apply_binds_mock_runtime_and_emits_startup_signals() -> None:
     assert model_entrypoint._adb_client is client
     assert emitted == [
         (
-            CoreSignal.ADB_SERVER_STARTED,
+            CoreSignals.ADB_SERVER_STARTED,
             AdbServerStartedPayload(adb_binary_path=str(server.binary.path)),
         ),
         (
-            CoreSignal.DEVICES_UPDATED,
+            CoreSignals.DEVICES_UPDATED,
             DevicesUpdatedPayload(
                 devices=serialize_phone_collection(devices),
             ),

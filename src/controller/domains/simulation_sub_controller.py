@@ -11,7 +11,7 @@ from PySide6.QtCore import Slot
 from controller.domains.app_sub_controller import AppSubController
 from controller.helper import validate_model_entrypoint, validate_view
 from core.signals import (
-    CoreSignal,
+    CoreSignals,
     MapRenderedPayload,
     SimulationCreatedPayload,
     SimulationCreationFailedPayload,
@@ -45,44 +45,44 @@ class SimulationSubController(AppSubController):
         )  # Ensuring no simulation is running before device is removed by adb subcontroller
 
     def connect_model_signals(self) -> None:
-        self.model_entrypoint.subscribe(
-            CoreSignal.SIMULATION_CREATED,
+        self.model_entrypoint.signal_bus.subscribe(
+            CoreSignals.SIMULATION_CREATED,
             self._on_simulation_created,
         )
-        self.model_entrypoint.subscribe(
-            CoreSignal.SIMULATION_RESTORED,
+        self.model_entrypoint.signal_bus.subscribe(
+            CoreSignals.SIMULATION_RESTORED,
             self._on_simulation_restored,
         )
-        self.model_entrypoint.subscribe(
-            CoreSignal.SIMULATION_CREATION_FAILED,
+        self.model_entrypoint.signal_bus.subscribe(
+            CoreSignals.SIMULATION_CREATION_FAILED,
             self._on_simulation_creation_failed,
         )
-        self.model_entrypoint.subscribe(
-            CoreSignal.SIMULATION_DELETED,
+        self.model_entrypoint.signal_bus.subscribe(
+            CoreSignals.SIMULATION_DELETED,
             self._on_simulation_deleted,
         )
-        self.model_entrypoint.subscribe(
-            CoreSignal.SIMULATION_DELETE_SKIPPED,
+        self.model_entrypoint.signal_bus.subscribe(
+            CoreSignals.SIMULATION_DELETE_SKIPPED,
             self._on_simulation_delete_skipped,
         )
-        self.model_entrypoint.subscribe(
-            CoreSignal.MAP_RENDERED,
+        self.model_entrypoint.signal_bus.subscribe(
+            CoreSignals.MAP_RENDERED,
             self._on_map_rendered,
         )
-        self.model_entrypoint.subscribe(
-            CoreSignal.SIMULATION_STATE_CHANGED,
+        self.model_entrypoint.signal_bus.subscribe(
+            CoreSignals.SIMULATION_STATE_CHANGED,
             self._on_simulation_state_changed,
         )
-        self.model_entrypoint.subscribe(
-            CoreSignal.SIMULATION_POSITION_CHANGED,
+        self.model_entrypoint.signal_bus.subscribe(
+            CoreSignals.SIMULATION_POSITION_CHANGED,
             self._on_simulation_position_changed,
         )
-        self.model_entrypoint.subscribe(
-            CoreSignal.SIMULATION_MAP_FILE_CHANGED,
+        self.model_entrypoint.signal_bus.subscribe(
+            CoreSignals.SIMULATION_MAP_FILE_CHANGED,
             self._on_simulation_map_file_changed,
         )
-        self.model_entrypoint.subscribe(
-            CoreSignal.SIMULATION_LOCATION_VALIDATED,
+        self.model_entrypoint.signal_bus.subscribe(
+            CoreSignals.SIMULATION_LOCATION_VALIDATED,
             self._on_simulation_location_validated,
         )
 
