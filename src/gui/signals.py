@@ -39,7 +39,9 @@ class UISignals(QObject):
     RenderMapRequested = Signal(str)
     MapRendered = Signal(str, object)  # simulation_id, html_path
     MapRenderFailed = Signal(str, str)  # simulation_id, reason
-    MapMarkerClicked = Signal(int, str, float, float)  # km, line, latitude, longitude
+    MapMarkerClicked = Signal(
+        int, str, int, float, float
+    )  # km, line_code, line_troncon, latitude, longitude
 
 
 class ADBServerSignals(QObject):
@@ -92,12 +94,12 @@ class SimulationSignals(QObject):
     SimulationDeleted = Signal(str)
     SimulationContextChanged = Signal(str, int)
     SimulationLocationRequested = Signal(
-        str, int, str, float, float
-    )  # simulation_id, km, line, latitude, longitude
-    SimulationLocationValidated = Signal(str, int, str, float, float, str)
-    # simulation_id, km, line, lat, lon, label (str | None)
-    SimulationLocationRejected = Signal(str, int, str, float, float, str)
-    # simulation_id, km, line, lat, lon, reason
+        str, int, str, int, float, float
+    )  # simulation_id, km, line_code, line_troncon, latitude, longitude
+    SimulationLocationValidated = Signal(str, int, str, int, float, float, str)
+    # simulation_id, km, line_code, line_troncon, lat, lon, label (str | None)
+    SimulationLocationRejected = Signal(str, int, str, int, float, float, str)
+    # simulation_id, km, line_code, line_troncon, lat, lon, reason
     SimulationPositionChanged = Signal(float, float)
 
 

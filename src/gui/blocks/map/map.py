@@ -34,7 +34,6 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from core.application_paths import get_or_create_application_dir
 from gui.blocks.map.device_required_placeholder import DeviceRequiredMapPlaceholder
 from gui.blocks.map.map_loading_placeholder import MapLoadingPlaceholder
 from gui.blocks.map.map_render_failed_placeholder import MapRenderFailedPlaceholder
@@ -71,15 +70,27 @@ class Bridge(QObject):
     Bridge between JavaScript and Python.
     """
 
-    markerClicked = Signal(int, str, float, float)  # km, line, latitude, longitude
+    markerClicked = Signal(
+        int, str, int, float, float
+    )  # km, line_code, line_troncon, latitude, longitude
 
     @Slot(
-        int, str, float, float
+        int, str, int, float, float
     )  # Take arguments from JavaScript, the slot is called from the JS code snippet in core/geo/bridge.py
     def onMarkerClicked(
-        self, km: int, line: str, latitude: float, longitude: float
+        self,
+        km: int,
+        line_code: str,
+        line_troncon: int,
+        latitude: float,
+        longitude: float,
     ) -> None:
-        self.markerClicked.emit(km, line, latitude, longitude)
+        normalized_line_code = str(line_code).strip()
+        if normalized_line_code.isdigit():
+            normalized_line_code = normalized_line_code.zfill(6)
+        self.markerClicked.emit(
+            km, normalized_line_code, line_troncon, latitude, longitude
+        )
 
 
 class Canvas(QWebEngineView):
@@ -175,13 +186,22 @@ class Canvas(QWebEngineView):
         """Connect signals for the canvas."""
         self.bridge.markerClicked.connect(self._on_marker_clicked)
 
-    @Slot(int, str, float, float)
+    @Slot(int, str, int, float, float)
     def _on_marker_clicked(
-        self, km: int, line: str, latitude: float, longitude: float
+        self,
+        km: int,
+        line_code: str,
+        line_troncon: int,
+        latitude: float,
+        longitude: float,
     ) -> None:
         """Handle marker click event."""
-        logger.info(f"Marker clicked: {km}, {line}, {latitude}, {longitude}")
-        signals.UI.MapMarkerClicked.emit(km, line, latitude, longitude)
+        logger.info(
+            f"Marker clicked: {km}, {line_code}, {line_troncon}, {latitude}, {longitude}"
+        )
+        signals.UI.MapMarkerClicked.emit(
+            km, line_code, line_troncon, latitude, longitude
+        )
 
 
 class Legend(QFrame):
@@ -924,20 +944,6 @@ class MapBlock(QWidget):
         self.show_device_required_placeholder()
         self._on_run_helper_animation()
 
-    def _map_html_path(self, simulation_id: str) -> Path:
-        """Return the expected on-disk HTML path for a simulation map."""
-        return (
-            get_or_create_application_dir()
-            / "simulations"
-            / simulation_id
-            / "map"
-            / f"{simulation_id}.html"
-        )
-
-    def _load_map_html(self, simulation_id: str) -> None:
-        """Load the rendered map HTML into the canvas when available."""
-        self._load_map_html_from_path(simulation_id, self._map_html_path(simulation_id))
-
     def _load_map_html_from_path(self, simulation_id: str, html_path: Path) -> None:
         """Load map HTML from a concrete on-disk path into the canvas."""
         if not html_path.is_file():
@@ -1020,26 +1026,33 @@ class MapBlock(QWidget):
         self.show_map_render_failed_placeholder()
         self._on_run_helper_animation()
 
-    @Slot(int, str, float, float)
+    @Slot(int, str, int, float, float)
     def _on_map_marker_clicked(
-        self, km: int, line: str, latitude: float, longitude: float
+        self,
+        km: int,
+        line_code: str,
+        line_troncon: int,
+        latitude: float,
+        longitude: float,
     ) -> None:
         """Handle marker click event."""
         if self._active_simulation_id is not None:
             signals.SIMULATION.SimulationLocationRequested.emit(
                 self._active_simulation_id,
                 km,
-                line,
+                line_code,
+                line_troncon,
                 latitude,
                 longitude,
             )
 
-    @Slot(str, int, str, float, float, str)
+    @Slot(str, int, str, int, float, float, str)
     def _on_simulation_location_validated(
         self,
         simulation_id: str,
         km: int,
-        line: str,
+        line_code: str,
+        line_troncon: int,
         latitude: float,
         longitude: float,
         label: str,
@@ -1051,7 +1064,8 @@ class MapBlock(QWidget):
                 simulation_id=simulation_id,
                 active_simulation_id=self._active_simulation_id,
                 km=km,
-                line=line,
+                line_code=line_code,
+                line_troncon=line_troncon,
             )
             return
         self.ui.coordinates.spoofed_location_widget.set_coordinates(

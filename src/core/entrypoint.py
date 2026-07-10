@@ -2,7 +2,7 @@ from abc import ABC
 from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
-from typing import Any, Callable, Mapping, Tuple, TypeVar
+from typing import Any, Callable, Literal, Mapping, Tuple, TypeVar, cast
 
 from core.adb.client import AdbClient
 from core.adb.server import AdbServer
@@ -20,7 +20,7 @@ from core.devices import (
     phone_stable_key_is_collision_resistant,
     serialize_phone_collection,
 )
-from core.geo.element import Milestone
+from core.geo.element import Milestone, Railway
 from core.geo.location import Location
 from core.signal_bus import InMemoryCoreSignalBus
 from core.signals import (
@@ -35,6 +35,8 @@ from core.signals import (
     SimulationCreationFailedPayload,
     SimulationDeletedPayload,
     SimulationDeleteSkippedPayload,
+    SimulationLocationValidatedPayload,
+    SimulationLocationValidationRequestedPayload,
     SimulationMapFileChangedPayload,
     SimulationPositionChangedPayload,
     SimulationRestoredPayload,
@@ -531,14 +533,17 @@ class ModelEntrypoint(Entrypoint):
                 )
                 if simulation.spoofed_location.poi is not None:
                     poi = simulation.spoofed_location.poi
-                    outcome = self.validate_simulation_marker_location(
-                        simulation_id=simulation.id,
-                        km=poi.km,
-                        line=f"{poi.line.code}-{poi.line.troncon}",
-                        latitude=poi.geometry.y,
-                        longitude=poi.geometry.x,
+                    self.emit_core_signal(
+                        CoreSignals.SIMULATION_LOCATION_VALIDATION_REQUESTED,
+                        SimulationLocationValidationRequestedPayload(
+                            simulation_id=simulation.id,
+                            km=poi.km,
+                            line_code=poi.line.code,
+                            line_troncon=poi.line.troncon,
+                            lat=poi.geometry.y,
+                            lon=poi.geometry.x,
+                        ),
                     )
-                    self.apply_result(outcome)
             self._simulations.last_active_device_id = device_id
         except ValueError as error:
             self._emit_simulation_creation_failed(
@@ -665,11 +670,53 @@ class ModelEntrypoint(Entrypoint):
                 else:
                     raise ValueError(f"Invalid map file: {value}")
 
+    def apply_validated_simulation_location(
+        self, payload: SimulationLocationValidatedPayload
+    ) -> None:
+        """
+        Apply an already-validated map milestone to the simulation spoofed location.
+
+        Rebuilds domain objects from scalar payload fields without referentiel lookup.
+        """
+        simulation: Simulation | None = self._simulations.get(payload.simulation_id)
+        if simulation is None:
+            raise ValueError(f"Simulation with id {payload.simulation_id} not found")
+        railway = Railway.from_validated_summary(
+            id=payload.line_id,
+            code=payload.line_code,
+            troncon=payload.line_troncon,
+            type=payload.line_type,
+            label=payload.line_label,
+            geometry_wkb_b64=payload.line_geometry_wkb_b64,
+        )
+        milestone = Milestone.from_validated_summary(
+            km=payload.km,
+            line=railway,
+            type=cast(Literal["Kilometer", "Hectometer"], payload.milestone_type),
+            label=payload.label,
+            lat=payload.lat,
+            lon=payload.lon,
+        )
+        new_location = Location(lat=payload.lat, lon=payload.lon, poi=milestone)
+        if simulation.spoofed_location == new_location:
+            return
+        simulation.spoofed_location = new_location
+        self.emit_core_signal(
+            CoreSignals.SIMULATION_POSITION_CHANGED,
+            SimulationPositionChangedPayload(
+                simulation_id=simulation.id,
+                lat=new_location.lat,
+                lon=new_location.lon,
+                poi=milestone.serialize(),
+            ),
+        )
+
     def validate_simulation_marker_location(
         self,
         simulation_id: str,
         km: int,
-        line: str,
+        line_code: str,
+        line_troncon: int,
         latitude: float,
         longitude: float,
     ) -> ValidateSimulationMarkerLocationOutcome:
@@ -681,7 +728,8 @@ class ModelEntrypoint(Entrypoint):
         return ValidateSimulationMarkerLocationWork(
             simulation_id=simulation_id,
             km=km,
-            line=line,
+            line_code=line_code,
+            line_troncon=line_troncon,
             latitude=latitude,
             longitude=longitude,
         ).run()

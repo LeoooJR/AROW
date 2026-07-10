@@ -215,7 +215,15 @@ def test_signal_bus_allows_simulation_dependent_signals_after_create() -> None:
             simulation_id="sim-1",
             lat=1.0,
             lon=2.0,
-            poi={"km": 1, "line": {"code": "001000", "troncon": 1}},
+            km=1,
+            line_id="line-id",
+            line_code="001000",
+            line_troncon=1,
+            line_type="type",
+            line_label="label",
+            label="001+000",
+            milestone_type="Kilometer",
+            line_geometry_wkb_b64="",
         ),
     )
 

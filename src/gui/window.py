@@ -25,7 +25,6 @@ from shiboken6 import isValid
 
 import gui.faker as ui_faker
 import gui.ressources_rc  # noqa: F401
-from core.signals import SimulationLocationValidatedPayload
 from gui import __application__
 from gui.animation import animate_widget_visibility
 from gui.blocks.top_bar import TopBar
@@ -511,12 +510,13 @@ class Body(QWidget):
         self.ui.tabs.setCurrentIndex(0)
         # self.ui.tabs.setTabVisible(2, False) # TODO: uncomment this when the device tab is implemented
 
-    @Slot(str, str, str, float, float, str)
+    @Slot(str, int, str, int, float, float, str)
     def _on_simulation_location_validated(
         self,
         simulation_id: str,
         km: int,
-        line: str,
+        line_code: str,
+        line_troncon: int,
         lat: float,
         lon: float,
         label: str,
@@ -852,7 +852,7 @@ class MainWindow(QMainWindow):
             "Failed to render map for simulation {simulation_id}: {reason}."
         )
         simulation_location_rejected_toast: str = (
-            "Invalid map location for marker {km} on line {line}: {reason}."
+            "Invalid map location for marker {km} on line {line_code}-{line_troncon}: {reason}."
         )
 
     @dataclass
@@ -1111,7 +1111,8 @@ class MainWindow(QMainWindow):
         self,
         simulation_id: str,
         km: int,
-        line: str,
+        line_code: str,
+        line_troncon: int,
         lat: float,
         lon: float,
         label: str,
@@ -1121,14 +1122,16 @@ class MainWindow(QMainWindow):
             "MainWindow: simulation location validated",
             simulation_id=simulation_id,
             km=km,
-            line=line,
+            line_code=line_code,
+            line_troncon=line_troncon,
             lat=lat,
             lon=lon,
         )
         signals.SIMULATION.SimulationLocationValidated.emit(
             simulation_id,
             km,
-            line,
+            line_code,
+            line_troncon,
             lat,
             lon,
             label,
@@ -1138,7 +1141,8 @@ class MainWindow(QMainWindow):
         self,
         simulation_id: str,
         km: int,
-        line: str,
+        line_code: str,
+        line_troncon: int,
         lat: float,
         lon: float,
         reason: str,
@@ -1148,7 +1152,8 @@ class MainWindow(QMainWindow):
             "MainWindow: simulation location rejected",
             simulation_id=simulation_id,
             km=km,
-            line=line,
+            line_code=line_code,
+            line_troncon=line_troncon,
             lat=lat,
             lon=lon,
             reason=reason,
@@ -1156,7 +1161,8 @@ class MainWindow(QMainWindow):
         signals.SIMULATION.SimulationLocationRejected.emit(
             simulation_id,
             km,
-            line,
+            line_code,
+            line_troncon,
             lat,
             lon,
             reason,
@@ -1164,7 +1170,8 @@ class MainWindow(QMainWindow):
         self.ui.container.post_toast(
             self.texts.simulation_location_rejected_toast.format(
                 km=km,
-                line=line,
+                line_code=line_code,
+                line_troncon=line_troncon,
                 reason=reason,
             ),
             level="error",

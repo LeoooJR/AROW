@@ -22,6 +22,8 @@ _MILESTONE_GEOJSON_COLUMNS: Final[Tuple[str, ...]] = (
     "label",
     "km",
     "ligne",
+    "code_ligne",
+    "rg_troncon",
     "geometry",
 )
 

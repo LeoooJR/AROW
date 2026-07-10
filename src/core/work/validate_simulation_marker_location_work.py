@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 from shapely.geometry import Point
 
-from core.geo.element import Milestone, Railway
+from core.geo.element import Milestone, Railway, _serialize_geometry
 from core.geo.exceptions import MilestoneValidationError, RailwayValidationError
 from core.signals import (
     CoreSignals,
@@ -37,6 +37,54 @@ class ValidateSimulationMarkerLocationOutcome(CoreRuntimeWorkOutcome):
             )
 
 
+def _validated_payload_from_milestone(
+    *,
+    simulation_id: str,
+    milestone: Milestone,
+    line: Railway,
+) -> SimulationLocationValidatedPayload:
+    """Build a scalar validated payload from worker-thread domain objects."""
+    geometry_b64 = _serialize_geometry(line.geometry, json_compatible=True)
+    return SimulationLocationValidatedPayload(
+        simulation_id=simulation_id,
+        lat=milestone.geometry.y,
+        lon=milestone.geometry.x,
+        km=milestone.km,
+        label=milestone.label,
+        milestone_type=milestone.type,
+        line_id=line.id,
+        line_code=line.code,
+        line_troncon=line.troncon,
+        line_type=line.type,
+        line_label=line.label,
+        line_geometry_wkb_b64=str(geometry_b64),
+    )
+
+
+def _rejected_payload(
+    *,
+    simulation_id: str,
+    km: int,
+    line_code: str,
+    line_troncon: int,
+    latitude: float,
+    longitude: float,
+    reason: str,
+) -> ValidateSimulationMarkerLocationOutcome:
+    """Return a typed rejected outcome for validation or parse failures."""
+    return ValidateSimulationMarkerLocationOutcome(
+        rejected=SimulationLocationRejectedPayload(
+            simulation_id=simulation_id,
+            km=km,
+            line_code=line_code,
+            line_troncon=line_troncon,
+            lat=latitude,
+            lon=longitude,
+            reason=reason,
+        ),
+    )
+
+
 class ValidateSimulationMarkerLocationWork(
     CoreRuntimeWork[ValidateSimulationMarkerLocationOutcome]
 ):
@@ -49,13 +97,15 @@ class ValidateSimulationMarkerLocationWork(
         *,
         simulation_id: str,
         km: int,
-        line: str,
+        line_code: str,
+        line_troncon: int,
         latitude: float,
         longitude: float,
     ) -> None:
         self._simulation_id = simulation_id
         self._km = km
-        self._line = line
+        self._line_code = line_code
+        self._line_troncon = line_troncon
         self._latitude = latitude
         self._longitude = longitude
 
@@ -68,14 +118,12 @@ class ValidateSimulationMarkerLocationWork(
             :meth:`apply_main_thread`; validation failures are outcomes, not exceptions.
 
         Raises:
-            ValueError: When ``line`` cannot be parsed into code and troncon.
             Exception: Unexpected failures propagate to AsyncRunner.
         """
         try:
-            code, troncon_raw = self._line.rsplit("-", maxsplit=1)
             validated_line = Railway.validate(
-                code=code,
-                troncon=int(troncon_raw),
+                code=self._line_code,
+                troncon=self._line_troncon,
             )
             validated_milestone = Milestone.validate(
                 self._km,
@@ -83,23 +131,21 @@ class ValidateSimulationMarkerLocationWork(
                 Point(self._longitude, self._latitude),
             )
             return ValidateSimulationMarkerLocationOutcome(
-                validated=SimulationLocationValidatedPayload(
+                validated=_validated_payload_from_milestone(
                     simulation_id=self._simulation_id,
-                    lat=validated_milestone.geometry.y,
-                    lon=validated_milestone.geometry.x,
-                    poi=validated_milestone.serialize(),
+                    milestone=validated_milestone,
+                    line=validated_line,
                 ),
             )
         except (MilestoneValidationError, RailwayValidationError) as error:
-            return ValidateSimulationMarkerLocationOutcome(
-                rejected=SimulationLocationRejectedPayload(
-                    simulation_id=self._simulation_id,
-                    km=self._km,
-                    line=self._line,
-                    lat=self._latitude,
-                    lon=self._longitude,
-                    reason=str(error),
-                ),
+            return _rejected_payload(
+                simulation_id=self._simulation_id,
+                km=self._km,
+                line_code=self._line_code,
+                line_troncon=self._line_troncon,
+                latitude=self._latitude,
+                longitude=self._longitude,
+                reason=str(error),
             )
 
     @staticmethod

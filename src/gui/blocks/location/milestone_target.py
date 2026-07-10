@@ -374,12 +374,13 @@ class MilestoneTargetBlock(VerticalLayoutWrapper, Block):
         """Re-apply placeholder values when UI constraints are disabled."""
         self.set_placeholder_values()
 
-    @Slot(str, str, str, float, float, str)
+    @Slot(str, int, str, int, float, float, str)
     def _on_simulation_location_validated(
         self,
         simulation_id: str,
         km: int,
-        line: str,
+        line_code: str,
+        line_troncon: int,
         latitude: float,
         longitude: float,
         label: str,
@@ -387,7 +388,7 @@ class MilestoneTargetBlock(VerticalLayoutWrapper, Block):
         """Update the milestone target block when a simulation location is validated."""
         _ = simulation_id
         self.set_target_values(
-            line=line,
+            line=f"{line_code}-{line_troncon}",
             km=km,
             latitude=latitude,
             longitude=longitude,

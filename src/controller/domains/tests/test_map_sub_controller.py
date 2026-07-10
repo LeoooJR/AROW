@@ -26,6 +26,7 @@ from core.signals import (
     SimulationDeletedPayload,
     SimulationLocationRejectedPayload,
     SimulationLocationValidatedPayload,
+    SimulationLocationValidationRequestedPayload,
 )
 from core.simulation import Simulation
 from core.work.render_map_work import RenderMapOutcome
@@ -360,7 +361,8 @@ def test_on_simulation_location_requested_submits_thread_job(
     map_controller._on_simulation_location_requested(
         "sim-1",
         1,
-        "001000-1",
+        "001000",
+        1,
         48.88533318609319,
         2.363530409238113,
     )
@@ -376,7 +378,8 @@ def test_on_simulation_location_requested_submits_thread_job(
     assert submit_kwargs["args"] == (
         "sim-1",
         1,
-        "001000-1",
+        "001000",
+        1,
         48.88533318609319,
         2.363530409238113,
     )
@@ -399,7 +402,8 @@ def test_on_simulation_location_requested_skips_when_simulation_missing(
     map_controller._on_simulation_location_requested(
         "sim-1",
         1,
-        "001000-1",
+        "001000",
+        1,
         48.88533318609319,
         2.363530409238113,
     )
@@ -419,7 +423,8 @@ def test_validate_simulation_marker_location_callback_on_completed_applies_resul
         rejected=SimulationLocationRejectedPayload(
             simulation_id="sim-1",
             km=1,
-            line="001000-1",
+            line_code="001000",
+            line_troncon=1,
             lat=0.0,
             lon=0.0,
             reason="bad",
@@ -460,7 +465,8 @@ def test_on_simulation_location_rejected_forwards_to_view(
     payload = SimulationLocationRejectedPayload(
         simulation_id="sim-1",
         km=1,
-        line="001000-1",
+        line_code="001000",
+        line_troncon=1,
         lat=0.0,
         lon=0.0,
         reason="invalid marker",
@@ -471,7 +477,8 @@ def test_on_simulation_location_rejected_forwards_to_view(
     app.view.forward_simulation_location_rejected.assert_called_once_with(
         simulation_id=payload.simulation_id,
         km=payload.km,
-        line=payload.line,
+        line_code="001000",
+        line_troncon=1,
         lat=payload.lat,
         lon=payload.lon,
         reason=payload.reason,
@@ -489,12 +496,15 @@ def test_on_simulation_location_validated_forwards_to_view(
         simulation_id="sim-1",
         lat=48.88533318609319,
         lon=2.363530409238113,
-        poi={
-            "km": 1,
-            "line": {"code": "001000", "troncon": 1},
-            "label": "001+000",
-            "type": "Kilometer",
-        },
+        km=1,
+        line_id="line-id",
+        line_code="001000",
+        line_troncon=1,
+        line_type="type",
+        line_label="label",
+        label="001+000",
+        milestone_type="Kilometer",
+        line_geometry_wkb_b64="",
     )
 
     map_controller._on_simulation_location_validated(payload)
@@ -502,8 +512,41 @@ def test_on_simulation_location_validated_forwards_to_view(
     app.view.forward_simulation_location_validated.assert_called_once_with(
         simulation_id=payload.simulation_id,
         km=1,
-        line="001000-1",
+        line_code="001000",
+        line_troncon=1,
         lat=payload.lat,
         lon=payload.lon,
         label="001+000",
+    )
+
+
+def test_on_simulation_location_validation_requested_submits_async_job(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    app = _AppStub(tmp_path)
+    _patch_controller_type_checks(monkeypatch, app)
+    map_controller = _make_map_sub_controller(app)
+    _add_simulation(app.model_entrypoint, "sim-1")
+    payload = SimulationLocationValidationRequestedPayload(
+        simulation_id="sim-1",
+        km=1,
+        line_code="001000",
+        line_troncon=1,
+        lat=48.88533318609319,
+        lon=2.363530409238113,
+    )
+
+    map_controller._on_simulation_location_validation_requested(payload)
+
+    assert len(app.submitted) == 1
+    submit_kwargs = app.submitted[0]
+    assert submit_kwargs["name"] == "validate_simulation_marker_location"
+    assert submit_kwargs["args"] == (
+        "sim-1",
+        1,
+        "001000",
+        1,
+        48.88533318609319,
+        2.363530409238113,
     )

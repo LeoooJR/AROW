@@ -150,13 +150,33 @@ class SimulationPositionChangedPayload:
 
 
 @dataclass(frozen=True, slots=True)
+class SimulationLocationValidationRequestedPayload:
+    """Payload requesting async validation of a map milestone for a simulation."""
+
+    simulation_id: str
+    km: int
+    line_code: str
+    line_troncon: int
+    lat: float
+    lon: float
+
+
+@dataclass(frozen=True, slots=True)
 class SimulationLocationValidatedPayload:
     """Payload emitted when a map milestone location passes referentiel validation."""
 
     simulation_id: str
     lat: float
     lon: float
-    poi: dict[str, object]
+    km: int
+    line_id: str
+    line_code: str
+    line_troncon: int
+    line_type: str
+    line_label: str
+    label: str
+    milestone_type: str
+    line_geometry_wkb_b64: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -165,7 +185,8 @@ class SimulationLocationRejectedPayload:
 
     simulation_id: str
     km: int
-    line: str
+    line_code: str
+    line_troncon: int
     lat: float
     lon: float
     reason: str
@@ -261,6 +282,10 @@ class CoreSignals:
     SIMULATION_POSITION_CHANGED = CoreSignal(
         "simulation.position.changed", SimulationPositionChangedPayload
     )
+    SIMULATION_LOCATION_VALIDATION_REQUESTED = CoreSignal(
+        "simulation.location.validation.requested",
+        SimulationLocationValidationRequestedPayload,
+    )
     SIMULATION_LOCATION_VALIDATED = CoreSignal(
         "simulation.location.validated",
         SimulationLocationValidatedPayload,
@@ -339,6 +364,7 @@ CORE_SIGNAL_SCOPE_FIELDS: Mapping[CoreSignal[Any], str] = {
     CoreSignals.SIMULATION_DELETED: "simulation_id",
     CoreSignals.SIMULATION_STATE_CHANGED: "simulation_id",
     CoreSignals.SIMULATION_POSITION_CHANGED: "simulation_id",
+    CoreSignals.SIMULATION_LOCATION_VALIDATION_REQUESTED: "simulation_id",
     CoreSignals.SIMULATION_LOCATION_VALIDATED: "simulation_id",
     CoreSignals.SIMULATION_LOCATION_REJECTED: "simulation_id",
     CoreSignals.SIMULATION_MAP_FILE_CHANGED: "simulation_id",
@@ -381,6 +407,12 @@ CORE_SIGNAL_DEPENDENCIES: Mapping[
         ),
     ),
     CoreSignals.SIMULATION_POSITION_CHANGED: (
+        CoreSignalDependencyRule(
+            any_of=(CoreSignals.SIMULATION_CREATED, CoreSignals.SIMULATION_RESTORED),
+            match_scope_from="simulation_id",
+        ),
+    ),
+    CoreSignals.SIMULATION_LOCATION_VALIDATION_REQUESTED: (
         CoreSignalDependencyRule(
             any_of=(CoreSignals.SIMULATION_CREATED, CoreSignals.SIMULATION_RESTORED),
             match_scope_from="simulation_id",

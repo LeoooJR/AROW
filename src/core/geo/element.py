@@ -341,6 +341,27 @@ class Milestone(MapElement, Payload):
                 f"Milestone {milestone._id} is not on line {line}"
             )
 
+    @classmethod
+    def from_validated_summary(
+        cls,
+        *,
+        km: int,
+        line: Railway,
+        type: Literal["Kilometer", "Hectometer"],
+        label: str,
+        lat: float,
+        lon: float,
+    ) -> Milestone:
+        """Rebuild a validated milestone on the main thread without referentiel lookup."""
+        return cls(
+            km=km,
+            line=line,
+            type=type,
+            label=label,
+            geometry=Point(lon, lat),
+            _validated_token=_VALIDATED_FACTORY_TOKEN,
+        )
+
     def serialize(self, **kwargs) -> dict[str, object]:
         return {
             "km": self._km,
@@ -567,6 +588,31 @@ class Railway(MapElement, Payload):
             type=row["type_ligne"],
             label=row["lib_ligne"],
             geometry=row["geometry"],
+            _validated_token=_VALIDATED_FACTORY_TOKEN,
+        )
+
+    @classmethod
+    def from_validated_summary(
+        cls,
+        *,
+        id: str,
+        code: str,
+        troncon: int,
+        type: str,
+        label: str,
+        geometry_wkb_b64: str,
+    ) -> Railway:
+        """Rebuild a validated railway on the main thread without referentiel lookup."""
+        geometry = _deserialize_geometry(geometry_wkb_b64)
+        if not isinstance(geometry, (LineString, MultiLineString)):
+            raise ValueError("Railway geometry must be a LineString or MultiLineString")
+        return cls(
+            id=id,
+            code=code,
+            troncon=troncon,
+            type=type,
+            label=label,
+            geometry=geometry,
             _validated_token=_VALIDATED_FACTORY_TOKEN,
         )
 

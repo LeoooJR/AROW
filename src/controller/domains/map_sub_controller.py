@@ -26,6 +26,7 @@ from core.signals import (
     SimulationDeletedPayload,
     SimulationLocationRejectedPayload,
     SimulationLocationValidatedPayload,
+    SimulationLocationValidationRequestedPayload,
 )
 from gui.signals import signals
 from logger import logger
@@ -91,6 +92,10 @@ class MapSubController(AppSubController):
             self._on_simulation_deleted,
         )
         self.model_entrypoint.signal_bus.subscribe(
+            CoreSignals.SIMULATION_LOCATION_VALIDATION_REQUESTED,
+            self._on_simulation_location_validation_requested,
+        )
+        self.model_entrypoint.signal_bus.subscribe(
             CoreSignals.SIMULATION_LOCATION_VALIDATED,
             self._on_simulation_location_validated,
         )
@@ -151,12 +156,13 @@ class MapSubController(AppSubController):
                 self._render_jobs_by_simulation_id[simulation_id] = handle
 
     @validate_model_entrypoint
-    @Slot(str, int, str, float, float)
+    @Slot(str, int, str, int, float, float)
     def _on_simulation_location_requested(
         self,
         simulation_id: str,
         km: int,
-        line: str,
+        line_code: str,
+        line_troncon: int,
         latitude: float,
         longitude: float,
     ) -> None:
@@ -165,17 +171,60 @@ class MapSubController(AppSubController):
             "MapSubController: simulation location requested",
             simulation_id=simulation_id,
             km=km,
-            line=line,
+            line_code=line_code,
+            line_troncon=line_troncon,
             latitude=latitude,
             longitude=longitude,
         )
+        self._submit_simulation_location_validation(
+            simulation_id=simulation_id,
+            km=km,
+            line_code=line_code,
+            line_troncon=line_troncon,
+            latitude=latitude,
+            longitude=longitude,
+        )
+
+    @validate_model_entrypoint
+    def _on_simulation_location_validation_requested(
+        self, payload: SimulationLocationValidationRequestedPayload
+    ) -> None:
+        """Submit async validation when the model requests restored-marker revalidation."""
+        logger.debug(
+            "MapSubController: simulation location validation requested",
+            simulation_id=payload.simulation_id,
+            km=payload.km,
+            line=f"{payload.line_code}-{payload.line_troncon}",
+            lat=payload.lat,
+            lon=payload.lon,
+        )
+        self._submit_simulation_location_validation(
+            simulation_id=payload.simulation_id,
+            km=payload.km,
+            line_code=payload.line_code,
+            line_troncon=payload.line_troncon,
+            latitude=payload.lat,
+            longitude=payload.lon,
+        )
+
+    def _submit_simulation_location_validation(
+        self,
+        *,
+        simulation_id: str,
+        km: int,
+        line_code: str,
+        line_troncon: int,
+        latitude: float,
+        longitude: float,
+    ) -> None:
+        """Shared AsyncRunner submission for map and restored-marker validation."""
         location_callbacks = (
             self._async_job_callbacks.validate_simulation_marker_location
         )
         self._submit_model_entrypoint_async_call(
             name="validate_simulation_marker_location",
             fn=self.model_entrypoint.validate_simulation_marker_location,
-            args=(simulation_id, km, line, latitude, longitude),
+            args=(simulation_id, km, line_code, line_troncon, latitude, longitude),
             description="Validate map milestone location for simulation",
             job_type="thread",
             coalesce_key=f"validate_simulation_marker_location:{simulation_id}",
@@ -189,37 +238,23 @@ class MapSubController(AppSubController):
         self, payload: SimulationLocationValidatedPayload
     ) -> None:
         """Forward validated simulation location to the map view."""
-        poi = payload.poi
-        km = poi.get("km", 0)
-        if not isinstance(km, int):
-            logger.warning(
-                "MapSubController: validated poi km is not an integer",
-                simulation_id=payload.simulation_id,
-                km=km,
-            )
-            return
-        line = poi.get("line")
-        line_repr = ""
-        if isinstance(line, dict):
-            code = str(line.get("code", ""))
-            troncon = str(line.get("troncon", ""))
-            line_repr = f"{code}-{troncon}"
         logger.debug(
             "MapSubController: simulation location validated",
             simulation_id=payload.simulation_id,
-            km=km,
-            line=line_repr,
-            type=poi.get("type"),
+            km=payload.km,
+            line=f"{payload.line_code}-{payload.line_troncon}",
+            type=payload.milestone_type,
             lat=payload.lat,
             lon=payload.lon,
         )
         self.view.forward_simulation_location_validated(
             simulation_id=payload.simulation_id,
-            km=km,
-            line=line_repr,
+            km=payload.km,
+            line_code=payload.line_code,
+            line_troncon=payload.line_troncon,
             lat=payload.lat,
             lon=payload.lon,
-            label=str(poi.get("label", "")),
+            label=payload.label,
         )
 
     @validate_view
@@ -230,7 +265,8 @@ class MapSubController(AppSubController):
             "MapSubController: simulation location rejected",
             simulation_id=payload.simulation_id,
             km=payload.km,
-            line=payload.line,
+            line_code=payload.line_code,
+            line_troncon=payload.line_troncon,
             lat=payload.lat,
             lon=payload.lon,
             reason=payload.reason,
@@ -238,7 +274,8 @@ class MapSubController(AppSubController):
         self.view.forward_simulation_location_rejected(
             simulation_id=payload.simulation_id,
             km=payload.km,
-            line=payload.line,
+            line_code=payload.line_code,
+            line_troncon=payload.line_troncon,
             lat=payload.lat,
             lon=payload.lon,
             reason=payload.reason,
