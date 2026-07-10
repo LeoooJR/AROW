@@ -144,9 +144,6 @@ class SimulationPositionChangedPayload:
     """Payload emitted when the effective simulation position changes."""
 
     simulation_id: str
-    lat: float
-    lon: float
-    poi: dict[str, object] | None
 
 
 @dataclass(frozen=True, slots=True)

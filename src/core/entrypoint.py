@@ -2,7 +2,7 @@ from abc import ABC
 from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
-from typing import Any, Callable, Literal, Mapping, Tuple, TypeVar, cast
+from typing import Callable, Literal, Mapping, Tuple, TypeVar, cast
 
 from core.adb.client import AdbClient
 from core.adb.server import AdbServer
@@ -609,78 +609,64 @@ class ModelEntrypoint(Entrypoint):
             ),
         )
 
-    def update_simulation(self, id: str, **kwargs: Any) -> None:
-        """
-        Update a simulation.
-        """
-        simulation: Simulation | None = self._simulations.get(id)
+    def set_simulation_real_location(
+        self, simulation_id: str, lat: float, lon: float
+    ) -> None:
+        """Set the simulation real device location and emit position changed."""
+        simulation = self._simulations.get(simulation_id)
         if simulation is None:
-            raise ValueError(f"Simulation with id {id} not found")
-        for key, value in kwargs.items():
-            if key not in simulation.__class__.__dataclass_fields__:
-                raise ValueError(f"Unknown simulation field: {key}")
-            current = getattr(simulation, key)
-            # Handle location tuple, controller does not know about custom Location class
-            if key in ("real_location", "spoofed_location"):
-                if isinstance(value, tuple) and len(value) == 3:
-                    lat, lon, poi_raw = value
-                    poi: Milestone | None = None
-                    if isinstance(poi_raw, dict):
-                        poi = Milestone.deserialize(poi_raw)
-                    elif poi_raw is not None:
-                        raise ValueError(f"Invalid poi in location tuple: {poi_raw!r}")
-                    value = Location(
-                        lat=lat,
-                        lon=lon,
-                        poi=poi,
-                    )
-                else:
-                    raise ValueError(f"Invalid location tuple: {value}")
-            if current == value:
-                continue
-            setattr(simulation, key, value)
-            # Emit the signal for the changed field
-            if key == "active":
-                self.emit_core_signal(
-                    CoreSignals.SIMULATION_STATE_CHANGED,
-                    SimulationStateChangedPayload(
-                        simulation_id=simulation.id,
-                        active=simulation.active,
-                    ),
-                )
-            elif key in ("real_location", "spoofed_location"):
-                self.emit_core_signal(
-                    CoreSignals.SIMULATION_POSITION_CHANGED,
-                    SimulationPositionChangedPayload(
-                        simulation_id=simulation.id,
-                        lat=value.lat,
-                        lon=value.lon,
-                        poi=(value.poi.serialize() if value.poi is not None else None),
-                    ),
-                )
-            elif key == "map_file":
-                if isinstance(value, Path):
-                    self.emit_core_signal(
-                        CoreSignals.SIMULATION_MAP_FILE_CHANGED,
-                        SimulationMapFileChangedPayload(
-                            simulation_id=simulation.id,
-                            map_file_path=value,
-                        ),
-                    )
-                else:
-                    raise ValueError(f"Invalid map file: {value}")
+            raise ValueError(f"Simulation with id {simulation_id} not found")
+        self._set_simulation_location(
+            simulation,
+            "real_location",
+            Location(lat=lat, lon=lon, poi=None),
+        )
 
-    def apply_validated_simulation_location(
-        self, payload: SimulationLocationValidatedPayload
+    def set_simulation_spoofed_location(
+        self,
+        simulation_id: str,
+        lat: float,
+        lon: float,
+        marker: SimulationLocationValidatedPayload | None = None,
     ) -> None:
         """
-        Apply an already-validated map milestone to the simulation spoofed location.
+        Set the simulation spoofed location and emit position changed.
 
-        Rebuilds domain objects from scalar payload fields without referentiel lookup.
+        When ``marker`` is provided, rebuild validated geo domain objects inside
+        core from the payload without referentiel lookup or ``Milestone.deserialize``.
         """
-        simulation: Simulation | None = self._simulations.get(payload.simulation_id)
+        simulation = self._simulations.get(simulation_id)
         if simulation is None:
-            raise ValueError(f"Simulation with id {payload.simulation_id} not found")
+            raise ValueError(f"Simulation with id {simulation_id} not found")
+        poi: Milestone | None = None
+        if marker is not None:
+            poi = self._milestone_from_validated_payload(marker)
+        self._set_simulation_location(
+            simulation,
+            "spoofed_location",
+            Location(lat=lat, lon=lon, poi=poi),
+        )
+
+    def set_simulation_map_file(self, simulation_id: str, map_file: Path) -> None:
+        """Set the simulation map file path and emit map-file changed."""
+        simulation = self._simulations.get(simulation_id)
+        if simulation is None:
+            raise ValueError(f"Simulation with id {simulation_id} not found")
+        if simulation.map_file == map_file:
+            return
+        simulation.map_file = map_file
+        self.emit_core_signal(
+            CoreSignals.SIMULATION_MAP_FILE_CHANGED,
+            SimulationMapFileChangedPayload(
+                simulation_id=simulation.id,
+                map_file_path=map_file,
+            ),
+        )
+
+    def _milestone_from_validated_payload(
+        self, payload: SimulationLocationValidatedPayload
+    ) -> Milestone:
+        """Rebuild a validated milestone from scalar payload fields."""
         railway = Railway.from_validated_summary(
             id=payload.line_id,
             code=payload.line_code,
@@ -689,7 +675,7 @@ class ModelEntrypoint(Entrypoint):
             label=payload.line_label,
             geometry_wkb_b64=payload.line_geometry_wkb_b64,
         )
-        milestone = Milestone.from_validated_summary(
+        return Milestone.from_validated_summary(
             km=payload.km,
             line=railway,
             type=cast(Literal["Kilometer", "Hectometer"], payload.milestone_type),
@@ -697,17 +683,22 @@ class ModelEntrypoint(Entrypoint):
             lat=payload.lat,
             lon=payload.lon,
         )
-        new_location = Location(lat=payload.lat, lon=payload.lon, poi=milestone)
-        if simulation.spoofed_location == new_location:
+
+    def _set_simulation_location(
+        self,
+        simulation: Simulation,
+        field_name: Literal["real_location", "spoofed_location"],
+        location: Location,
+    ) -> None:
+        """Assign a location field when changed and emit position changed."""
+        current = getattr(simulation, field_name)
+        if current == location:
             return
-        simulation.spoofed_location = new_location
+        setattr(simulation, field_name, location)
         self.emit_core_signal(
             CoreSignals.SIMULATION_POSITION_CHANGED,
             SimulationPositionChangedPayload(
                 simulation_id=simulation.id,
-                lat=new_location.lat,
-                lon=new_location.lon,
-                poi=milestone.serialize(),
             ),
         )
 

@@ -160,7 +160,7 @@ def test_validate_simulation_marker_location_invalid_marker_emits_rejected_paylo
     assert "Unknown milestone" in rejected[0].reason
 
 
-def test_apply_validated_simulation_location_updates_spoofed_location_without_deserialize(
+def test_set_simulation_spoofed_location_from_validated_payload_updates_without_deserialize(
     tmp_path: Path,
 ) -> None:
     model_entrypoint, simulation_id = _make_model(tmp_path)
@@ -175,7 +175,12 @@ def test_apply_validated_simulation_location_updates_spoofed_location_without_de
     assert outcome.validated is not None
     payload = outcome.validated
 
-    model_entrypoint.apply_validated_simulation_location(payload)
+    model_entrypoint.set_simulation_spoofed_location(
+        payload.simulation_id,
+        payload.lat,
+        payload.lon,
+        payload,
+    )
 
     simulation = model_entrypoint.get_simulation(simulation_id)
     assert simulation is not None

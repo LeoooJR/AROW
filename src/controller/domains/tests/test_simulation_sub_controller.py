@@ -328,27 +328,24 @@ def test_run_persists_active_state_to_metadata(tmp_path: Path) -> None:
     assert payload["active"] is True
 
 
-def test_update_simulation_location_persists_metadata(tmp_path: Path) -> None:
+def test_set_simulation_spoofed_location_persists_metadata(tmp_path: Path) -> None:
     model_entrypoint = _make_model(
         tmp_path, device=Phone(id="device-1", state="device", model="Pixel")
     )
     subcontroller = _make_subcontroller(model_entrypoint)
     subcontroller.connect_model_signals()
     simulation_id = _create_simulation_id(model_entrypoint, "device-1")
-    new_spoofed_location = (48.85, 2.35, None)
+    lat, lon = 48.85, 2.35
 
-    model_entrypoint.update_simulation(
-        simulation_id,
-        spoofed_location=new_spoofed_location,
-    )
+    model_entrypoint.set_simulation_spoofed_location(simulation_id, lat, lon)
 
     metadata_path = model_entrypoint._simulations.simulation_metadata_file(
         simulation_id
     )
     payload = json.loads(metadata_path.read_text(encoding="utf-8"))
     assert payload["spoofed_location"] == {
-        "lat": new_spoofed_location[0],
-        "lon": new_spoofed_location[1],
+        "lat": lat,
+        "lon": lon,
         "poi": None,
     }
 
@@ -377,14 +374,14 @@ def test_set_simulation_active_emits_state_changed_with_simulation_id(
     assert captured[0].active is True
 
 
-def test_update_simulation_location_emits_position_changed_with_simulation_id(
+def test_set_simulation_real_location_emits_position_changed_with_simulation_id(
     tmp_path: Path,
 ) -> None:
     model_entrypoint = _make_model(
         tmp_path, device=Phone(id="device-1", state="device", model="Pixel")
     )
     simulation_id = _create_simulation_id(model_entrypoint, "device-1")
-    new_spoofed_location = (1.0, 2.0, None)
+    lat, lon = 1.0, 2.0
     captured: list[SimulationPositionChangedPayload] = []
 
     def capture_position(payload: SimulationPositionChangedPayload) -> None:
@@ -395,15 +392,10 @@ def test_update_simulation_location_emits_position_changed_with_simulation_id(
         capture_position,
     )
 
-    model_entrypoint.update_simulation(
-        simulation_id, real_location=new_spoofed_location
-    )
+    model_entrypoint.set_simulation_real_location(simulation_id, lat, lon)
 
     assert len(captured) == 1
     assert captured[0].simulation_id == simulation_id
-    assert captured[0].lat == new_spoofed_location[0]
-    assert captured[0].lon == new_spoofed_location[1]
-    assert captured[0].poi is None
 
 
 def test_simulation_location_validated_updates_spoofed_location_and_persists(

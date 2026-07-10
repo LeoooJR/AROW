@@ -117,7 +117,12 @@ class SimulationSubController(AppSubController):
         self, payload: SimulationLocationValidatedPayload
     ) -> None:
         """Apply validated map milestone selection to simulation spoofed location."""
-        self.model_entrypoint.apply_validated_simulation_location(payload)
+        self.model_entrypoint.set_simulation_spoofed_location(
+            payload.simulation_id,
+            payload.lat,
+            payload.lon,
+            payload,
+        )
 
     def is_simulation_active(self, id: str) -> bool:
         """Check if the simulation is active."""
