@@ -22,7 +22,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic, Literal, TypeVar
 
 PayloadT = TypeVar("PayloadT")
 
@@ -172,7 +172,7 @@ class SimulationLocationValidatedPayload:
     line_type: str
     line_label: str
     label: str
-    milestone_type: str
+    milestone_type: Literal["Kilometer", "Hectometer"]
     line_geometry_wkb_b64: str
 
 

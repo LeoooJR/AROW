@@ -84,7 +84,7 @@ def test_create_simulation_reuses_existing_device_simulation(tmp_path: Path) -> 
     assert captured == []
 
     assert first_simulation_id == second_simulation_id
-    assert len(list(model_entrypoint._simulations)) == 1
+    assert model_entrypoint.get_simulation(first_simulation_id) is not None
 
 
 def test_create_simulation_persists_last_active_device_id(tmp_path: Path) -> None:
@@ -96,10 +96,9 @@ def test_create_simulation_persists_last_active_device_id(tmp_path: Path) -> Non
     _create_simulation_id(model_entrypoint, "device-1")
 
     index_payload = json.loads(
-        model_entrypoint._simulations.index_file.read_text(encoding="utf-8")
+        (tmp_path / "simulations" / "index.json").read_text(encoding="utf-8")
     )
     assert index_payload["last_active_device_id"] == "device-1"
-    assert model_entrypoint._simulations.last_active_device_id == "device-1"
 
 
 def test_reconcile_removes_stale_device_and_simulation(tmp_path: Path) -> None:

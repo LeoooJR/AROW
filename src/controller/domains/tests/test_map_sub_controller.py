@@ -88,11 +88,22 @@ def _make_map_sub_controller(app: _AppStub) -> MapSubController:
     return MapSubController(cast(AppController, app))
 
 
+def _simulation_metadata_path(
+    model_entrypoint: ModelEntrypoint, simulation_id: str
+) -> Path:
+    return (
+        model_entrypoint.application_dir
+        / "simulations"
+        / simulation_id
+        / "simulation.json"
+    )
+
+
 def _add_simulation(
     model_entrypoint: ModelEntrypoint, simulation_id: str
 ) -> Simulation:
     simulation = Simulation(id=simulation_id)
-    model_entrypoint._simulations.add(simulation)
+    model_entrypoint.restore_persisted_simulation(simulation)
     return simulation
 
 
@@ -345,7 +356,7 @@ def test_persist_simulation_repository_delegates_to_model_entrypoint(
 
     map_controller.persist_simulation_repository()
 
-    metadata_path = app.model_entrypoint._simulations.simulation_metadata_file("sim-1")
+    metadata_path = _simulation_metadata_path(app.model_entrypoint, "sim-1")
     assert metadata_path.is_file()
 
 

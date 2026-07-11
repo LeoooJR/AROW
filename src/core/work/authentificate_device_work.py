@@ -7,12 +7,13 @@ from __future__ import annotations
 import ipaddress
 import re
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, ClassVar
+from typing import ClassVar, cast
 
 from core.adb.client import AdbClient
 from core.adb.exceptions import AdbClientException, AdbServerException
 from core.adb.server import AdbServer
 from core.devices import Phone
+from core.entrypoint_protocol import CoreSignalEmitter, DeviceRegistrationEntrypoint
 from core.exceptions import CoreException
 from core.signals import (
     CoreSignals,
@@ -23,9 +24,6 @@ from core.work.core_runtime_work import CoreRuntimeWork, CoreRuntimeWorkOutcome
 from core.work.helper import preflight
 from core.work.refresh_known_devices_work import enrich_phones_with_adb_shell_properties
 from logger import logger
-
-if TYPE_CHECKING:
-    from core.entrypoint import ModelEntrypoint
 
 
 class DeviceAuthentificationError(CoreException):
@@ -209,15 +207,13 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
 
     @staticmethod
     def apply_main_thread(
-        model_entrypoint: ModelEntrypoint, outcome: AuthentificateDeviceOutcome
+        model_entrypoint: CoreSignalEmitter,
+        outcome: AuthentificateDeviceOutcome,
     ) -> None:
         """Emit successful authentification on the core bus (Qt main thread only)."""
-        from core.entrypoint import ModelEntrypoint as _ModelEntrypoint
-
-        if not isinstance(model_entrypoint, _ModelEntrypoint):
-            raise TypeError("apply_main_thread() requires ModelEntrypoint")
-        model_entrypoint.register_paired_device(outcome.success_phone)
-        model_entrypoint.emit_core_signal(
+        registration_entrypoint = cast(DeviceRegistrationEntrypoint, model_entrypoint)
+        registration_entrypoint.register_paired_device(outcome.success_phone)
+        registration_entrypoint.emit_core_signal(
             CoreSignals.DEVICE_AUTHENTIFICATION_SUCCEEDED,
             DeviceAuthentificationSucceededPayload(
                 device=outcome.success_phone.serialize(json_compatible=False),
@@ -226,12 +222,8 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
 
     @staticmethod
     def apply_failure_main_thread(
-        model_entrypoint: ModelEntrypoint, error: BaseException
+        model_entrypoint: CoreSignalEmitter, error: BaseException
     ) -> None:
-        from core.entrypoint import ModelEntrypoint as _ModelEntrypoint
-
-        if not isinstance(model_entrypoint, _ModelEntrypoint):
-            raise TypeError("apply_failure_main_thread() requires ModelEntrypoint")
         if isinstance(error, DeviceAuthentificationError):
             model_entrypoint.emit_core_signal(
                 CoreSignals.DEVICE_AUTHENTIFICATION_FAILED,

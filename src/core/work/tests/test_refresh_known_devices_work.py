@@ -105,38 +105,31 @@ def test_refresh_known_devices_apply_replaces_devices_and_emits_update() -> None
     refreshed_phone = Phone(id="fresh-device", state="device")
     server.paired_devices.add(stale_phone)
     emitted: list[tuple[CoreSignal[Any], object]] = []
-    skipped: list[SimulationDeleteSkippedPayload] = []
 
     def fake_emit(signal: CoreSignal[Any], payload: object) -> None:
         emitted.append((signal, payload))
 
-    def capture_skipped(payload: SimulationDeleteSkippedPayload) -> None:
-        skipped.append(payload)
-
     model_entrypoint.emit_core_signal = fake_emit  # type: ignore[method-assign]
-    model_entrypoint.signal_bus.subscribe(
-        CoreSignals.SIMULATION_DELETE_SKIPPED,
-        capture_skipped,
-    )
 
     outcome = RefreshKnownDevicesOutcome(devices=[refreshed_phone])
     RefreshKnownDevicesWork.apply_main_thread(model_entrypoint, outcome)
 
     assert server.paired_devices.get("stale-device") is None
     assert server.paired_devices.get("fresh-device") is refreshed_phone
-    assert skipped == [
-        SimulationDeleteSkippedPayload(
-            device_id="stale-device",
-            reason="Simulation for device with id stale-device not found",
-        )
-    ]
     assert emitted == [
+        (
+            CoreSignals.SIMULATION_DELETE_SKIPPED,
+            SimulationDeleteSkippedPayload(
+                device_id="stale-device",
+                reason="Simulation for device with id stale-device not found",
+            ),
+        ),
         (
             CoreSignals.DEVICES_UPDATED,
             DevicesUpdatedPayload(
                 devices=serialize_phone_collection([refreshed_phone]),
             ),
-        )
+        ),
     ]
 
 

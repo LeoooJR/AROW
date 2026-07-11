@@ -9,17 +9,16 @@ from typing import TYPE_CHECKING
 
 from shapely.geometry import Point
 
-from core.geo.element import Milestone, Railway, _serialize_geometry
+from core.entrypoint_protocol import CoreSignalEmitter
 from core.geo.exceptions import MilestoneValidationError, RailwayValidationError
+from core.geo.milestone import Milestone
+from core.geo.railway import Railway
 from core.signals import (
     CoreSignals,
     SimulationLocationRejectedPayload,
     SimulationLocationValidatedPayload,
 )
 from core.work.core_runtime_work import CoreRuntimeWork, CoreRuntimeWorkOutcome
-
-if TYPE_CHECKING:
-    from core.entrypoint import ModelEntrypoint
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,30 +34,6 @@ class ValidateSimulationMarkerLocationOutcome(CoreRuntimeWorkOutcome):
                 "ValidateSimulationMarkerLocationOutcome requires exactly one of "
                 "validated or rejected payload"
             )
-
-
-def _validated_payload_from_milestone(
-    *,
-    simulation_id: str,
-    milestone: Milestone,
-    line: Railway,
-) -> SimulationLocationValidatedPayload:
-    """Build a scalar validated payload from worker-thread domain objects."""
-    geometry_b64 = _serialize_geometry(line.geometry, json_compatible=True)
-    return SimulationLocationValidatedPayload(
-        simulation_id=simulation_id,
-        lat=milestone.geometry.y,
-        lon=milestone.geometry.x,
-        km=milestone.km,
-        label=milestone.label,
-        milestone_type=milestone.type,
-        line_id=line.id,
-        line_code=line.code,
-        line_troncon=line.troncon,
-        line_type=line.type,
-        line_label=line.label,
-        line_geometry_wkb_b64=str(geometry_b64),
-    )
 
 
 def _rejected_payload(
@@ -131,7 +106,7 @@ class ValidateSimulationMarkerLocationWork(
                 Point(self._longitude, self._latitude),
             )
             return ValidateSimulationMarkerLocationOutcome(
-                validated=_validated_payload_from_milestone(
+                validated=Milestone.to_validated_payload(
                     simulation_id=self._simulation_id,
                     milestone=validated_milestone,
                     line=validated_line,
@@ -150,13 +125,9 @@ class ValidateSimulationMarkerLocationWork(
 
     @staticmethod
     def apply_main_thread(
-        model_entrypoint: ModelEntrypoint,
+        model_entrypoint: CoreSignalEmitter,
         outcome: ValidateSimulationMarkerLocationOutcome,
     ) -> None:
-        from core.entrypoint import ModelEntrypoint as _ModelEntrypoint
-
-        if not isinstance(model_entrypoint, _ModelEntrypoint):
-            raise TypeError("apply_main_thread() requires ModelEntrypoint")
         if outcome.validated is not None:
             model_entrypoint.emit_core_signal(
                 CoreSignals.SIMULATION_LOCATION_VALIDATED,
@@ -171,12 +142,8 @@ class ValidateSimulationMarkerLocationWork(
 
     @staticmethod
     def apply_failure_main_thread(
-        model_entrypoint: ModelEntrypoint, error: BaseException
+        model_entrypoint: CoreSignalEmitter, error: BaseException
     ) -> None:
-        from core.entrypoint import ModelEntrypoint as _ModelEntrypoint
-
-        if not isinstance(model_entrypoint, _ModelEntrypoint):
-            raise TypeError("apply_failure_main_thread() requires ModelEntrypoint")
         ValidateSimulationMarkerLocationWork.emit_generic_error(
             model_entrypoint,
             source="ValidateSimulationMarkerLocationWork",

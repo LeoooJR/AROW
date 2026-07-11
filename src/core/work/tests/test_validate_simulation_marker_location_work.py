@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
 from pathlib import Path
 from unittest.mock import patch
 
@@ -11,7 +10,6 @@ import pytest
 from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
 from core.devices import Phone
 from core.entrypoint import ModelEntrypoint
-from core.geo.element import clear_lignes_par_type_cache
 from core.signals import (
     CoreSignals,
     ErrorRaisedPayload,
@@ -19,21 +17,19 @@ from core.signals import (
     SimulationLocationRejectedPayload,
     SimulationLocationValidatedPayload,
 )
+from core.tests.geo_fixtures import (
+    SAMPLE_LATITUDE,
+    SAMPLE_LINE_CODE,
+    SAMPLE_LINE_TRONCON,
+    SAMPLE_LONGITUDE,
+)
 from core.tests.signal_test_helpers import seed_adb_startup_for_entrypoint
 from core.work.validate_simulation_marker_location_work import (
     ValidateSimulationMarkerLocationOutcome,
     ValidateSimulationMarkerLocationWork,
 )
 
-_LINE_CODE = "001000"
-_LINE_TRONCON = 1
-
-
-@pytest.fixture(autouse=True)
-def _clear_lignes_cache() -> Iterator[None]:
-    clear_lignes_par_type_cache()
-    yield
-    clear_lignes_par_type_cache()
+pytestmark = pytest.mark.usefixtures("clear_lignes_cache")
 
 
 def _make_model(tmp_path: Path) -> tuple[ModelEntrypoint, str]:
@@ -68,18 +64,18 @@ def test_validate_simulation_marker_location_work_run_returns_validated_outcome(
     outcome = ValidateSimulationMarkerLocationWork(
         simulation_id=simulation_id,
         km=1,
-        line_code=_LINE_CODE,
-        line_troncon=_LINE_TRONCON,
-        latitude=48.88533318609319,
-        longitude=2.363530409238113,
+        line_code=SAMPLE_LINE_CODE,
+        line_troncon=SAMPLE_LINE_TRONCON,
+        latitude=SAMPLE_LATITUDE,
+        longitude=SAMPLE_LONGITUDE,
     ).run()
 
     assert outcome.validated is not None
     assert outcome.rejected is None
     assert outcome.validated.simulation_id == simulation_id
     assert outcome.validated.km == 1
-    assert outcome.validated.line_code == _LINE_CODE
-    assert outcome.validated.line_troncon == _LINE_TRONCON
+    assert outcome.validated.line_code == SAMPLE_LINE_CODE
+    assert outcome.validated.line_troncon == SAMPLE_LINE_TRONCON
 
 
 def test_validate_simulation_marker_location_work_run_rejects_unknown_line(
@@ -92,8 +88,8 @@ def test_validate_simulation_marker_location_work_run_rejects_unknown_line(
         km=1,
         line_code="999999",
         line_troncon=1,
-        latitude=48.88533318609319,
-        longitude=2.363530409238113,
+        latitude=SAMPLE_LATITUDE,
+        longitude=SAMPLE_LONGITUDE,
     ).run()
 
     assert outcome.validated is None
@@ -111,8 +107,8 @@ def test_validate_simulation_marker_location_work_run_returns_rejected_outcome(
     outcome = ValidateSimulationMarkerLocationWork(
         simulation_id=simulation_id,
         km=999,
-        line_code=_LINE_CODE,
-        line_troncon=_LINE_TRONCON,
+        line_code=SAMPLE_LINE_CODE,
+        line_troncon=SAMPLE_LINE_TRONCON,
         latitude=0.0,
         longitude=0.0,
     ).run()
@@ -136,10 +132,10 @@ def test_apply_main_thread_emits_validated_signal(tmp_path: Path) -> None:
     outcome = ValidateSimulationMarkerLocationWork(
         simulation_id=simulation_id,
         km=1,
-        line_code=_LINE_CODE,
-        line_troncon=_LINE_TRONCON,
-        latitude=48.88533318609319,
-        longitude=2.363530409238113,
+        line_code=SAMPLE_LINE_CODE,
+        line_troncon=SAMPLE_LINE_TRONCON,
+        latitude=SAMPLE_LATITUDE,
+        longitude=SAMPLE_LONGITUDE,
     ).run()
     ValidateSimulationMarkerLocationWork.apply_main_thread(model_entrypoint, outcome)
 
@@ -160,8 +156,8 @@ def test_apply_main_thread_emits_rejected_signal(tmp_path: Path) -> None:
     outcome = ValidateSimulationMarkerLocationWork(
         simulation_id=simulation_id,
         km=999,
-        line_code=_LINE_CODE,
-        line_troncon=_LINE_TRONCON,
+        line_code=SAMPLE_LINE_CODE,
+        line_troncon=SAMPLE_LINE_TRONCON,
         latitude=0.0,
         longitude=0.0,
     ).run()
@@ -200,8 +196,8 @@ def test_outcome_requires_exactly_one_payload() -> None:
                 lon=0.0,
                 km=1,
                 line_id="line-id",
-                line_code=_LINE_CODE,
-                line_troncon=_LINE_TRONCON,
+                line_code=SAMPLE_LINE_CODE,
+                line_troncon=SAMPLE_LINE_TRONCON,
                 line_type="type",
                 line_label="label",
                 label="001+000",
@@ -211,8 +207,8 @@ def test_outcome_requires_exactly_one_payload() -> None:
             rejected=SimulationLocationRejectedPayload(
                 simulation_id="sim-1",
                 km=1,
-                line_code=_LINE_CODE,
-                line_troncon=_LINE_TRONCON,
+                line_code=SAMPLE_LINE_CODE,
+                line_troncon=SAMPLE_LINE_TRONCON,
                 lat=0.0,
                 lon=0.0,
                 reason="bad",

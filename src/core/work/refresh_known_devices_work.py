@@ -11,7 +11,7 @@ listing + enrichment with main-thread emission via :meth:`RefreshKnownDevicesWor
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import cast
 
 from core.adb.client import AdbClient
 from core.adb.server import AdbServer
@@ -25,13 +25,11 @@ from core.devices import (
     apply_phone_ro_serial_enrichment,
     serialize_phone_collection,
 )
+from core.entrypoint_protocol import CoreSignalEmitter, DeviceReconcileEntrypoint
 from core.exceptions import CoreException
 from core.signals import CoreSignals, DevicesUpdatedPayload
 from core.work.core_runtime_work import CoreRuntimeWork, CoreRuntimeWorkOutcome
 from core.work.helper import preflight
-
-if TYPE_CHECKING:
-    from core.entrypoint import ModelEntrypoint
 
 # Only states where ``adb -s … shell …`` reliably targets the handset.
 _EXECUTABLE_STATES = frozenset(("device",))
@@ -197,22 +195,21 @@ class RefreshKnownDevicesWork(CoreRuntimeWork[RefreshKnownDevicesOutcome]):
 
     @staticmethod
     def apply_main_thread(
-        model_entrypoint: ModelEntrypoint,
+        model_entrypoint: CoreSignalEmitter,
         outcome: RefreshKnownDevicesOutcome,
     ) -> None:
-        from core.entrypoint import ModelEntrypoint as _ModelEntrypoint
-
-        if not isinstance(model_entrypoint, _ModelEntrypoint):
-            raise TypeError("apply_main_thread() requires ModelEntrypoint")
-        adb_server = model_entrypoint.adb_server
+        reconcile_entrypoint = cast(DeviceReconcileEntrypoint, model_entrypoint)
+        adb_server = reconcile_entrypoint.adb_server
         if adb_server is None:
             raise AttributeError(
                 "ADB server must be initialized before applying refresh outcome"
             )
-        reconcile_result = model_entrypoint.reconcile_paired_devices(outcome.devices)
+        reconcile_result = reconcile_entrypoint.reconcile_paired_devices(
+            outcome.devices
+        )
         if not reconcile_result.changed:
             return
-        model_entrypoint.emit_core_signal(
+        reconcile_entrypoint.emit_core_signal(
             CoreSignals.DEVICES_UPDATED,
             DevicesUpdatedPayload(
                 devices=serialize_phone_collection(adb_server.paired_devices),
@@ -222,12 +219,8 @@ class RefreshKnownDevicesWork(CoreRuntimeWork[RefreshKnownDevicesOutcome]):
 
     @staticmethod
     def apply_failure_main_thread(
-        model_entrypoint: ModelEntrypoint, error: BaseException
+        model_entrypoint: CoreSignalEmitter, error: BaseException
     ) -> None:
-        from core.entrypoint import ModelEntrypoint as _ModelEntrypoint
-
-        if not isinstance(model_entrypoint, _ModelEntrypoint):
-            raise TypeError("apply_failure_main_thread() requires ModelEntrypoint")
         RefreshKnownDevicesWork.emit_generic_error(
             model_entrypoint,
             source="RefreshKnownDevicesWork",

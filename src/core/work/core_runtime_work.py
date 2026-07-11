@@ -9,12 +9,10 @@ the main thread.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Generic, TypeVar
+from typing import Generic, TypeVar
 
+from core.entrypoint_protocol import CoreSignalEmitter
 from core.signals import CoreSignals, ErrorRaisedPayload
-
-if TYPE_CHECKING:
-    from core.entrypoint import ModelEntrypoint
 
 
 class CoreRuntimeWorkOutcome:
@@ -60,21 +58,23 @@ class CoreRuntimeWork(ABC, Generic[TOutcome]):
 
     @staticmethod
     @abstractmethod
-    def apply_main_thread(model_entrypoint: ModelEntrypoint, outcome: TOutcome) -> None:
+    def apply_main_thread(
+        model_entrypoint: CoreSignalEmitter, outcome: TOutcome
+    ) -> None:
         """Emit on the core bus / mutate entrypoint; call only from the Qt main thread."""
         ...
 
     @staticmethod
     @abstractmethod
     def apply_failure_main_thread(
-        model_entrypoint: ModelEntrypoint, error: BaseException
+        model_entrypoint: CoreSignalEmitter, error: BaseException
     ) -> None:
         """Handle worker failure on the Qt main thread (via :meth:`~core.entrypoint.ModelEntrypoint.apply_failure`)."""
         ...
 
     @staticmethod
     def emit_generic_error(
-        model_entrypoint: ModelEntrypoint,
+        model_entrypoint: CoreSignalEmitter,
         *,
         source: str,
         message: str,

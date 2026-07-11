@@ -6,8 +6,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import cast
 
+from core.entrypoint_protocol import CoreSignalEmitter, SimulationLookupEntrypoint
 from core.exceptions import CoreException
 from core.geo.renderer import MapRenderer
 from core.signals import (
@@ -17,9 +18,6 @@ from core.signals import (
 )
 from core.work.core_runtime_work import CoreRuntimeWork, CoreRuntimeWorkOutcome
 from logger import logger
-
-if TYPE_CHECKING:
-    from core.entrypoint import ModelEntrypoint
 
 
 class RenderMapError(CoreException):
@@ -86,14 +84,11 @@ class RenderMapWork(CoreRuntimeWork[RenderMapOutcome]):
 
     @staticmethod
     def apply_main_thread(
-        model_entrypoint: ModelEntrypoint,
+        model_entrypoint: CoreSignalEmitter,
         outcome: RenderMapOutcome,
     ) -> None:
-        from core.entrypoint import ModelEntrypoint as _ModelEntrypoint
-
-        if not isinstance(model_entrypoint, _ModelEntrypoint):
-            raise TypeError("apply_main_thread() requires ModelEntrypoint")
-        simulation = model_entrypoint.get_simulation(outcome.simulation_id)
+        lookup_entrypoint = cast(SimulationLookupEntrypoint, model_entrypoint)
+        simulation = lookup_entrypoint.get_simulation(outcome.simulation_id)
         if simulation is None:
             try:
                 outcome.html_path.unlink(missing_ok=True)
@@ -110,7 +105,7 @@ class RenderMapWork(CoreRuntimeWork[RenderMapOutcome]):
             )
             return
         simulation.map_file = outcome.html_path
-        model_entrypoint.emit_core_signal(
+        lookup_entrypoint.emit_core_signal(
             CoreSignals.MAP_RENDERED,
             MapRenderedPayload(
                 simulation_id=outcome.simulation_id,
@@ -120,17 +115,14 @@ class RenderMapWork(CoreRuntimeWork[RenderMapOutcome]):
 
     @staticmethod
     def apply_failure_main_thread(
-        model_entrypoint: ModelEntrypoint, error: BaseException
+        model_entrypoint: CoreSignalEmitter, error: BaseException
     ) -> None:
-        from core.entrypoint import ModelEntrypoint as _ModelEntrypoint
-
-        if not isinstance(model_entrypoint, _ModelEntrypoint):
-            raise TypeError("apply_failure_main_thread() requires ModelEntrypoint")
+        lookup_entrypoint = cast(SimulationLookupEntrypoint, model_entrypoint)
         if isinstance(error, RenderMapError):
-            simulation = model_entrypoint.get_simulation(error.simulation_id)
+            simulation = lookup_entrypoint.get_simulation(error.simulation_id)
             if simulation is not None:
                 simulation.map_file = None
-                model_entrypoint.emit_core_signal(
+                lookup_entrypoint.emit_core_signal(
                     CoreSignals.MAP_RENDER_FAILED,
                     MapRenderFailedPayload(
                         simulation_id=error.simulation_id,

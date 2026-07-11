@@ -76,6 +76,17 @@ def _view_mock(subcontroller: SimulationSubController) -> MagicMock:
     return cast(MagicMock, cast(_AppProbe, subcontroller._app).view)
 
 
+def _simulation_metadata_path(
+    model_entrypoint: ModelEntrypoint, simulation_id: str
+) -> Path:
+    return (
+        model_entrypoint.application_dir
+        / "simulations"
+        / simulation_id
+        / "simulation.json"
+    )
+
+
 def _create_simulation_id(model_entrypoint: ModelEntrypoint, device_id: str) -> str:
     """Create a simulation and return its id via SIMULATION_CREATED."""
     captured: list[str] = []
@@ -149,13 +160,20 @@ def test_device_selection_confirmed_creates_simulation_and_waits_for_signal(
     )
     subcontroller = _make_subcontroller(model_entrypoint)
     _patch_controller_type_checks(monkeypatch, subcontroller._app)
+    captured: list[str] = []
+
+    def capture(payload: SimulationCreatedPayload) -> None:
+        captured.append(payload.simulation_id)
+
+    model_entrypoint.signal_bus.subscribe(CoreSignals.SIMULATION_CREATED, capture)
 
     subcontroller._on_device_selection_confirmed("device-1", "Pixel")
 
-    simulations = list(model_entrypoint._simulations)
-    assert len(simulations) == 1
-    assert simulations[0].device is not None
-    assert simulations[0].device.id == "device-1"
+    assert len(captured) == 1
+    simulation = model_entrypoint.get_simulation(captured[0])
+    assert simulation is not None
+    assert simulation.device is not None
+    assert simulation.device.id == "device-1"
     view = _view_mock(subcontroller)
     view.forward_device_selection_succeeded.assert_not_called()
     view.forward_device_selection_failed.assert_not_called()
@@ -168,10 +186,16 @@ def test_device_selection_confirmed_forwards_failure_when_device_is_unknown(
     subcontroller = _make_subcontroller(model_entrypoint)
     _patch_controller_type_checks(monkeypatch, subcontroller._app)
     subcontroller.connect_model_signals()
+    created_ids: list[str] = []
+
+    def capture(payload: SimulationCreatedPayload) -> None:
+        created_ids.append(payload.simulation_id)
+
+    model_entrypoint.signal_bus.subscribe(CoreSignals.SIMULATION_CREATED, capture)
 
     subcontroller._on_device_selection_confirmed("missing-device", "Ghost")
 
-    assert list(model_entrypoint._simulations) == []
+    assert created_ids == []
     view = _view_mock(subcontroller)
     view.forward_device_selection_failed.assert_called_once_with(
         "missing-device", "missing-device"
@@ -321,9 +345,7 @@ def test_run_persists_active_state_to_metadata(tmp_path: Path) -> None:
 
     subcontroller.run(simulation_id)
 
-    metadata_path = model_entrypoint._simulations.simulation_metadata_file(
-        simulation_id
-    )
+    metadata_path = _simulation_metadata_path(model_entrypoint, simulation_id)
     payload = json.loads(metadata_path.read_text(encoding="utf-8"))
     assert payload["active"] is True
 
@@ -339,9 +361,7 @@ def test_set_simulation_spoofed_location_persists_metadata(tmp_path: Path) -> No
 
     model_entrypoint.set_simulation_spoofed_location(simulation_id, lat, lon)
 
-    metadata_path = model_entrypoint._simulations.simulation_metadata_file(
-        simulation_id
-    )
+    metadata_path = _simulation_metadata_path(model_entrypoint, simulation_id)
     payload = json.loads(metadata_path.read_text(encoding="utf-8"))
     assert payload["spoofed_location"] == {
         "lat": lat,
@@ -436,9 +456,7 @@ def test_simulation_location_validated_updates_spoofed_location_and_persists(
     assert simulation.spoofed_location.poi is not None
     assert simulation.spoofed_location.poi.id == "001000-1-1"
     assert simulation.spoofed_location.poi.is_validated
-    metadata_path = model_entrypoint._simulations.simulation_metadata_file(
-        simulation_id
-    )
+    metadata_path = _simulation_metadata_path(model_entrypoint, simulation_id)
     persisted = json.loads(metadata_path.read_text(encoding="utf-8"))
     assert persisted["spoofed_location"]["lat"] == pytest.approx(payload.lat)
     assert persisted["spoofed_location"]["lon"] == pytest.approx(payload.lon)

@@ -8,6 +8,8 @@ import pytest
 
 from core.work.startup_work import _resolve_adb_binary_path
 
+pytest_plugins = ["core.tests.geo_fixtures"]
+
 
 @pytest.fixture(scope="session")
 def adb_binary_path() -> Path:

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
 from pathlib import Path
 from unittest.mock import patch
 
@@ -11,29 +10,24 @@ import pytest
 from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
 from core.devices import Phone
 from core.entrypoint import ModelEntrypoint
-from core.geo.element import clear_lignes_par_type_cache
 from core.signals import (
     CoreSignals,
     SimulationCreatedPayload,
     SimulationLocationRejectedPayload,
     SimulationLocationValidatedPayload,
 )
+from core.tests.geo_fixtures import (
+    SAMPLE_LATITUDE,
+    SAMPLE_LINE_CODE,
+    SAMPLE_LINE_TRONCON,
+    SAMPLE_LONGITUDE,
+)
 from core.tests.signal_test_helpers import seed_adb_startup_for_entrypoint
 from core.work.validate_simulation_marker_location_work import (
     ValidateSimulationMarkerLocationOutcome,
 )
 
-_LINE_CODE = "001000"
-_LINE_TRONCON = 1
-_LAT = 48.88533318609319
-_LON = 2.363530409238113
-
-
-@pytest.fixture(autouse=True)
-def _clear_lignes_cache() -> Iterator[None]:
-    clear_lignes_par_type_cache()
-    yield
-    clear_lignes_par_type_cache()
+pytestmark = pytest.mark.usefixtures("clear_lignes_cache")
 
 
 def _make_model(tmp_path: Path) -> tuple[ModelEntrypoint, str]:
@@ -75,10 +69,10 @@ def test_validate_simulation_marker_location_emits_validated_payload(
     outcome = model_entrypoint.validate_simulation_marker_location(
         simulation_id,
         1,
-        _LINE_CODE,
-        _LINE_TRONCON,
-        _LAT,
-        _LON,
+        SAMPLE_LINE_CODE,
+        SAMPLE_LINE_TRONCON,
+        SAMPLE_LATITUDE,
+        SAMPLE_LONGITUDE,
     )
     assert isinstance(outcome, ValidateSimulationMarkerLocationOutcome)
     model_entrypoint.apply_result(outcome)
@@ -86,10 +80,10 @@ def test_validate_simulation_marker_location_emits_validated_payload(
     assert len(captured) == 1
     assert captured[0].simulation_id == simulation_id
     assert captured[0].km == 1
-    assert captured[0].line_code == _LINE_CODE
-    assert captured[0].line_troncon == _LINE_TRONCON
-    assert captured[0].lat == pytest.approx(_LAT)
-    assert captured[0].lon == pytest.approx(_LON)
+    assert captured[0].line_code == SAMPLE_LINE_CODE
+    assert captured[0].line_troncon == SAMPLE_LINE_TRONCON
+    assert captured[0].lat == pytest.approx(SAMPLE_LATITUDE)
+    assert captured[0].lon == pytest.approx(SAMPLE_LONGITUDE)
 
 
 def test_validate_simulation_marker_location_missing_simulation_raises(
@@ -110,10 +104,10 @@ def test_validate_simulation_marker_location_missing_simulation_raises(
         model_entrypoint.validate_simulation_marker_location(
             "missing",
             1,
-            _LINE_CODE,
-            _LINE_TRONCON,
-            _LAT,
-            _LON,
+            SAMPLE_LINE_CODE,
+            SAMPLE_LINE_TRONCON,
+            SAMPLE_LATITUDE,
+            SAMPLE_LONGITUDE,
         )
 
     assert captured == []
@@ -144,8 +138,8 @@ def test_validate_simulation_marker_location_invalid_marker_emits_rejected_paylo
     outcome = model_entrypoint.validate_simulation_marker_location(
         simulation_id,
         999,
-        _LINE_CODE,
-        _LINE_TRONCON,
+        SAMPLE_LINE_CODE,
+        SAMPLE_LINE_TRONCON,
         0.0,
         0.0,
     )
@@ -155,8 +149,8 @@ def test_validate_simulation_marker_location_invalid_marker_emits_rejected_paylo
     assert len(rejected) == 1
     assert rejected[0].simulation_id == simulation_id
     assert rejected[0].km == 999
-    assert rejected[0].line_code == _LINE_CODE
-    assert rejected[0].line_troncon == _LINE_TRONCON
+    assert rejected[0].line_code == SAMPLE_LINE_CODE
+    assert rejected[0].line_troncon == SAMPLE_LINE_TRONCON
     assert "Unknown milestone" in rejected[0].reason
 
 
@@ -167,10 +161,10 @@ def test_set_simulation_spoofed_location_from_validated_payload_updates_without_
     outcome = model_entrypoint.validate_simulation_marker_location(
         simulation_id,
         1,
-        _LINE_CODE,
-        _LINE_TRONCON,
-        _LAT,
-        _LON,
+        SAMPLE_LINE_CODE,
+        SAMPLE_LINE_TRONCON,
+        SAMPLE_LATITUDE,
+        SAMPLE_LONGITUDE,
     )
     assert outcome.validated is not None
     payload = outcome.validated

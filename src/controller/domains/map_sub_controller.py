@@ -113,9 +113,9 @@ class MapSubController(AppSubController):
             simulation_id=simulation_id,
         )
         simulation_preflight = self._simulation_exists_preflight(simulation_id)
-        if not simulation_preflight():
-            return
         if self.model_entrypoint.is_map_rendered_for_simulation(simulation_id):
+            if not simulation_preflight():
+                return
             html_path = self.model_entrypoint.get_map_file_for_simulation(simulation_id)
             if html_path is None:
                 logger.error(

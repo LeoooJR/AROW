@@ -58,7 +58,7 @@ def test_create_simulation_missing_device_emits_creation_failed(
     assert payload.device_id == "missing-device"
     assert payload.device_name == "missing-device"
     assert "not found" in payload.reason
-    assert list(model_entrypoint._simulations) == []
+    assert model_entrypoint.get_simulation("missing-device") is None
 
 
 def test_delete_simulation_for_device_emits_deleted_with_device_id(

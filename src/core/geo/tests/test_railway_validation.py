@@ -1,22 +1,15 @@
-"""Tests for railway validation in core.geo.element."""
+"""Tests for railway validation in core.geo.railway."""
 
 from __future__ import annotations
-
-from collections.abc import Iterator
 
 import pytest
 from shapely.geometry import LineString
 
 from core.geo.datasets import DatasetManager
-from core.geo.element import Railway, clear_lignes_par_type_cache
 from core.geo.exceptions import RailwayValidationError
+from core.geo.railway import Railway
 
-
-@pytest.fixture(autouse=True)
-def _clear_lignes_cache() -> Iterator[None]:
-    clear_lignes_par_type_cache()
-    yield
-    clear_lignes_par_type_cache()
+pytestmark = pytest.mark.usefixtures("clear_lignes_cache")
 
 
 def test_railway_validate_by_code_returns_segment_linestring() -> None:

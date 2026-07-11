@@ -7,8 +7,9 @@ from typing import cast
 import pytest
 from shapely.geometry import Point
 
-from core.geo.element import Milestone, Railway
 from core.geo.location import Location
+from core.geo.milestone import Milestone
+from core.geo.railway import Railway
 
 
 def test_location_payload_round_trip_without_poi() -> None:

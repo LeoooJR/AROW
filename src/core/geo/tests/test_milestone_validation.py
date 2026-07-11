@@ -1,12 +1,13 @@
-"""Tests for milestone validation in core.geo.element."""
+"""Tests for milestone validation in core.geo.milestone."""
 
 from __future__ import annotations
 
 import pytest
 from shapely.geometry import LineString, Point
 
-from core.geo.element import Milestone, Railway
 from core.geo.exceptions import MilestoneValidationError
+from core.geo.milestone import Milestone
+from core.geo.railway import Railway
 
 
 def test_milestone_validate_returns_canonical_referentiel_coords() -> None:
