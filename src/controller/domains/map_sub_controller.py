@@ -7,6 +7,7 @@ applied on the main thread and forwarded to the view.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Slot
@@ -19,10 +20,13 @@ from controller.domains.app_sub_controller import AppSubController
 from controller.helper import validate_model_entrypoint, validate_view
 from controller.runner import JobHandler
 from core.signals import (
-    CoreSignal,
+    CoreSignals,
     MapRenderedPayload,
     MapRenderFailedPayload,
     SimulationDeletedPayload,
+    SimulationLocationRejectedPayload,
+    SimulationLocationValidatedPayload,
+    SimulationLocationValidationRequestedPayload,
 )
 from gui.signals import signals
 from logger import logger
@@ -50,23 +54,54 @@ class MapSubController(AppSubController):
     def _submit_model_entrypoint_async_call(self, *args, **kwargs):
         return self._app._submit_model_entrypoint_async_call(*args, **kwargs)
 
+    def _simulation_exists_preflight(self, simulation_id: str) -> Callable[[], bool]:
+        """Return a preflight gate that confirms the simulation still exists."""
+
+        def _preflight() -> bool:
+            if self.model_entrypoint.get_simulation(simulation_id) is None:
+                logger.error(
+                    "MapSubController: simulation not found",
+                    simulation_id=simulation_id,
+                )
+                return False
+            return True
+
+        return _preflight
+
     def connect_view_signals(self) -> None:
         """Connect map-relevant :data:`gui.signals.signals` when map UI is ready."""
         signals.UI.RenderMapRequested.connect(self._on_render_map_requested)
+        signals.SIMULATION.SimulationLocationRequested.connect(
+            self._on_simulation_location_requested
+        )
 
     def persist_simulation_repository(self) -> None:
         """Persist map-aware simulation metadata at shutdown."""
         self.model_entrypoint.persist_simulations()
 
     def connect_model_signals(self) -> None:
-        """Subscribe to map-relevant :class:`CoreSignal` values when needed."""
-        self.model_entrypoint.subscribe(CoreSignal.MAP_RENDERED, self._on_map_rendered)
-        self.model_entrypoint.subscribe(
-            CoreSignal.MAP_RENDER_FAILED, self._on_map_render_failed
+        """Subscribe to map-relevant :class:`CoreSignals` values when needed."""
+        self.model_entrypoint.signal_bus.subscribe(
+            CoreSignals.MAP_RENDERED, self._on_map_rendered
         )
-        self.model_entrypoint.subscribe(
-            CoreSignal.SIMULATION_DELETED,
+        self.model_entrypoint.signal_bus.subscribe(
+            CoreSignals.MAP_RENDER_FAILED, self._on_map_render_failed
+        )
+        self.model_entrypoint.signal_bus.subscribe(
+            CoreSignals.SIMULATION_DELETED,
             self._on_simulation_deleted,
+        )
+        self.model_entrypoint.signal_bus.subscribe(
+            CoreSignals.SIMULATION_LOCATION_VALIDATION_REQUESTED,
+            self._on_simulation_location_validation_requested,
+        )
+        self.model_entrypoint.signal_bus.subscribe(
+            CoreSignals.SIMULATION_LOCATION_VALIDATED,
+            self._on_simulation_location_validated,
+        )
+        self.model_entrypoint.signal_bus.subscribe(
+            CoreSignals.SIMULATION_LOCATION_REJECTED,
+            self._on_simulation_location_rejected,
         )
 
     @validate_model_entrypoint
@@ -77,21 +112,17 @@ class MapSubController(AppSubController):
             "MapSubController: render map requested",
             simulation_id=simulation_id,
         )
-        application_dir = self.model_entrypoint.application_dir
-        simulation = self.model_entrypoint.get_simulation(simulation_id)
-        if simulation is None:
-            logger.warning(
-                "MapSubController: simulation not found",
-                simulation_id=simulation_id,
-            )
-            return
-        # Check if map already exists, if so, lazy load it
-        html_path = simulation.map_file
-        if html_path is not None and html_path.exists():
-            logger.debug(
-                "MapSubController: map already rendered",
-                simulation_id=simulation_id,
-            )
+        simulation_preflight = self._simulation_exists_preflight(simulation_id)
+        if self.model_entrypoint.is_map_rendered_for_simulation(simulation_id):
+            if not simulation_preflight():
+                return
+            html_path = self.model_entrypoint.get_map_file_for_simulation(simulation_id)
+            if html_path is None:
+                logger.error(
+                    "MapSubController: map file not found",
+                    simulation_id=simulation_id,
+                )
+                return
             self.view.forward_map_rendered(
                 simulation_id,
                 html_path,
@@ -107,6 +138,7 @@ class MapSubController(AppSubController):
                     simulation_id=simulation_id,
                 )
                 return
+            application_dir = self.model_entrypoint.application_dir
             handle = self._submit_model_entrypoint_async_call(
                 name="render_map",
                 fn=self.model_entrypoint.render_map,
@@ -114,6 +146,7 @@ class MapSubController(AppSubController):
                 description="Render Folium map HTML for simulation",
                 job_type="process",
                 coalesce_key=f"render_map:{simulation_id}",
+                preflight=simulation_preflight,
                 on_completed=render_callbacks.on_completed,
                 on_failed=render_callbacks.on_failed,
                 on_cancelled=render_callbacks.on_cancelled,
@@ -121,6 +154,132 @@ class MapSubController(AppSubController):
             if handle is not None:
                 render_callbacks.bind_job(handle)
                 self._render_jobs_by_simulation_id[simulation_id] = handle
+
+    @validate_model_entrypoint
+    @Slot(str, int, str, int, float, float)
+    def _on_simulation_location_requested(
+        self,
+        simulation_id: str,
+        km: int,
+        line_code: str,
+        line_troncon: int,
+        latitude: float,
+        longitude: float,
+    ) -> None:
+        """Validate a map milestone selection for the given simulation."""
+        logger.debug(
+            "MapSubController: simulation location requested",
+            simulation_id=simulation_id,
+            km=km,
+            line_code=line_code,
+            line_troncon=line_troncon,
+            latitude=latitude,
+            longitude=longitude,
+        )
+        self._submit_simulation_location_validation(
+            simulation_id=simulation_id,
+            km=km,
+            line_code=line_code,
+            line_troncon=line_troncon,
+            latitude=latitude,
+            longitude=longitude,
+        )
+
+    @validate_model_entrypoint
+    def _on_simulation_location_validation_requested(
+        self, payload: SimulationLocationValidationRequestedPayload
+    ) -> None:
+        """Submit async validation when the model requests restored-marker revalidation."""
+        logger.debug(
+            "MapSubController: simulation location validation requested",
+            simulation_id=payload.simulation_id,
+            km=payload.km,
+            line=f"{payload.line_code}-{payload.line_troncon}",
+            lat=payload.lat,
+            lon=payload.lon,
+        )
+        self._submit_simulation_location_validation(
+            simulation_id=payload.simulation_id,
+            km=payload.km,
+            line_code=payload.line_code,
+            line_troncon=payload.line_troncon,
+            latitude=payload.lat,
+            longitude=payload.lon,
+        )
+
+    def _submit_simulation_location_validation(
+        self,
+        *,
+        simulation_id: str,
+        km: int,
+        line_code: str,
+        line_troncon: int,
+        latitude: float,
+        longitude: float,
+    ) -> None:
+        """Shared AsyncRunner submission for map and restored-marker validation."""
+        location_callbacks = (
+            self._async_job_callbacks.validate_simulation_marker_location
+        )
+        self._submit_model_entrypoint_async_call(
+            name="validate_simulation_marker_location",
+            fn=self.model_entrypoint.validate_simulation_marker_location,
+            args=(simulation_id, km, line_code, line_troncon, latitude, longitude),
+            description="Validate map milestone location for simulation",
+            job_type="thread",
+            coalesce_key=f"validate_simulation_marker_location:{simulation_id}",
+            preflight=self._simulation_exists_preflight(simulation_id),
+            on_completed=location_callbacks.on_completed,
+            on_failed=location_callbacks.on_failed,
+        )
+
+    @validate_view
+    def _on_simulation_location_validated(
+        self, payload: SimulationLocationValidatedPayload
+    ) -> None:
+        """Forward validated simulation location to the map view."""
+        logger.debug(
+            "MapSubController: simulation location validated",
+            simulation_id=payload.simulation_id,
+            km=payload.km,
+            line=f"{payload.line_code}-{payload.line_troncon}",
+            type=payload.milestone_type,
+            lat=payload.lat,
+            lon=payload.lon,
+        )
+        self.view.forward_simulation_location_validated(
+            simulation_id=payload.simulation_id,
+            km=payload.km,
+            line_code=payload.line_code,
+            line_troncon=payload.line_troncon,
+            lat=payload.lat,
+            lon=payload.lon,
+            label=payload.label,
+        )
+
+    @validate_view
+    def _on_simulation_location_rejected(
+        self, payload: SimulationLocationRejectedPayload
+    ) -> None:
+        logger.warning(
+            "MapSubController: simulation location rejected",
+            simulation_id=payload.simulation_id,
+            km=payload.km,
+            line_code=payload.line_code,
+            line_troncon=payload.line_troncon,
+            lat=payload.lat,
+            lon=payload.lon,
+            reason=payload.reason,
+        )
+        self.view.forward_simulation_location_rejected(
+            simulation_id=payload.simulation_id,
+            km=payload.km,
+            line_code=payload.line_code,
+            line_troncon=payload.line_troncon,
+            lat=payload.lat,
+            lon=payload.lon,
+            reason=payload.reason,
+        )
 
     def _clear_render_job_if_current(
         self, simulation_id: str, job_id: str | None

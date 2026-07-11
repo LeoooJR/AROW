@@ -19,6 +19,9 @@ from core.work.host_install_identity_work import HostInstallIdentityOutcome
 from core.work.refresh_known_devices_work import RefreshKnownDevicesOutcome
 from core.work.render_map_work import RenderMapOutcome
 from core.work.startup_work import StartupOutcome
+from core.work.validate_simulation_marker_location_work import (
+    ValidateSimulationMarkerLocationOutcome,
+)
 from logger import logger
 
 if TYPE_CHECKING:
@@ -233,6 +236,41 @@ class CloseCoreRuntimeCallback:
         self._consume_pending_after_close_apply()
 
 
+def log_validate_simulation_marker_location_job_failure(error: JobError) -> None:
+    """Log a failed validate-simulation-marker-location async job."""
+    logger.error(
+        "MapSubController: validate_simulation_marker_location job failed",
+        message=error.message,
+        return_code=error.return_code,
+        traceback=error.traceback or None,
+    )
+
+
+class ValidateSimulationMarkerLocationCallback:
+    """Callback for the validate simulation marker location job."""
+
+    __slots__ = ("_subcontroller", "__weakref__")
+
+    def __init__(self, subcontroller: MapSubController) -> None:
+        self._subcontroller = subcontroller
+
+    @validate_model_entrypoint
+    def on_completed(self, result: object) -> None:
+        model_entrypoint = self._subcontroller.model_entrypoint
+        if not isinstance(result, ValidateSimulationMarkerLocationOutcome):
+            logger.error(
+                "MapSubController: unexpected validate_simulation_marker_location result type",
+                result_type=type(result).__name__,
+            )
+            return
+        model_entrypoint.apply_result(result)
+
+    @validate_model_entrypoint
+    def on_failed(self, error: JobError) -> None:
+        log_validate_simulation_marker_location_job_failure(error)
+        self._subcontroller.model_entrypoint.apply_failure(error)
+
+
 def log_render_map_job_failure(error: JobError) -> None:
     """Log a failed render-map async job."""
     logger.error(
@@ -359,6 +397,7 @@ class MapAsyncJobCallbacks:
     """AsyncRunner outcome callbacks on :class:`MapSubController`."""
 
     render_map_for_simulation: Callable[[str], RenderMapSimulationCallback]
+    validate_simulation_marker_location: ValidateSimulationMarkerLocationCallback
 
     @classmethod
     def for_subcontroller(cls, subcontroller: MapSubController) -> MapAsyncJobCallbacks:
@@ -366,5 +405,8 @@ class MapAsyncJobCallbacks:
             render_map_for_simulation=lambda simulation_id: _render_map_for_simulation(
                 subcontroller,
                 simulation_id,
+            ),
+            validate_simulation_marker_location=ValidateSimulationMarkerLocationCallback(
+                subcontroller
             ),
         )

@@ -10,18 +10,15 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import cast
 
 from core.application_paths import get_or_create_application_dir
 from core.devices import compute_computer_stable_key
+from core.entrypoint_protocol import CoreSignalEmitter, HostIdentityEntrypoint
 from core.exceptions import CoreException
-from core.signals import CoreSignal, HostComputerIdentityPayload
 from core.work.core_runtime_work import CoreRuntimeWork, CoreRuntimeWorkOutcome
 from core.work.helper import preflight
 from logger import logger
-
-if TYPE_CHECKING:
-    from core.entrypoint import ModelEntrypoint
 
 _INSTALL_IDENTITY_FILENAME = "install_identity"
 
@@ -124,12 +121,9 @@ class HostInstallIdentityWork(CoreRuntimeWork[HostInstallIdentityOutcome]):
 
     @staticmethod
     def apply_main_thread(
-        model_entrypoint: ModelEntrypoint, outcome: HostInstallIdentityOutcome
+        model_entrypoint: CoreSignalEmitter, outcome: HostInstallIdentityOutcome
     ) -> None:
-        from core.entrypoint import ModelEntrypoint as _ModelEntrypoint
-
-        if not isinstance(model_entrypoint, _ModelEntrypoint):
-            raise TypeError("apply_main_thread() requires ModelEntrypoint")
+        host_entrypoint = cast(HostIdentityEntrypoint, model_entrypoint)
         token = (outcome.install_token or "").strip()
         if not token:
             logger.warning(
@@ -137,23 +131,15 @@ class HostInstallIdentityWork(CoreRuntimeWork[HostInstallIdentityOutcome]):
             )
             return
         key = compute_computer_stable_key(token)
-        model_entrypoint._host.descriptor.stable_key = key
-        model_entrypoint._signal_bus.emit(
-            CoreSignal.HOST_COMPUTER_IDENTITY_UPDATED,
-            HostComputerIdentityPayload(stable_key=key),
-        )
+        host_entrypoint.set_host_identity(key)
         logger.debug(
             "HostInstallIdentityWork: host install identity applied (stable_key redacted in extras by default)",
         )
 
     @staticmethod
     def apply_failure_main_thread(
-        model_entrypoint: ModelEntrypoint, error: BaseException
+        model_entrypoint: CoreSignalEmitter, error: BaseException
     ) -> None:
-        from core.entrypoint import ModelEntrypoint as _ModelEntrypoint
-
-        if not isinstance(model_entrypoint, _ModelEntrypoint):
-            raise TypeError("apply_failure_main_thread() requires ModelEntrypoint")
         HostInstallIdentityWork.emit_generic_error(
             model_entrypoint,
             source="HostInstallIdentityWork",

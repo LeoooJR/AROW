@@ -104,6 +104,7 @@ class Controller(ABC):
         priority: int = 0,
         coalesce_key: str | None = None,
         at_most_once: bool = False,
+        preflight: Callable[[], bool] | None = None,
     ) -> JobHandler | None:
         """
         Submit a model-entrypoint async job and bind any provided callbacks.
@@ -127,6 +128,8 @@ class Controller(ABC):
             priority: Priority of the job (0-100).
             coalesce_key: Key to coalesce the job (none, location, network, device).
             at_most_once: At most one job running with the same coalesce key.
+            preflight: Optional gate evaluated before a worker is opened; False skips
+                submission quietly without job callbacks.
         Returns:
             JobHandler | None: JobHandler for the job. This can be used to cancel the job. None if the job was not submitted.
         """
@@ -141,6 +144,7 @@ class Controller(ABC):
             coalesce_key=coalesce_key,
             type=job_type,
             at_most_once=at_most_once,
+            preflight=preflight,
         )
         handle = self.runner.submit(job)
         if handle is None:

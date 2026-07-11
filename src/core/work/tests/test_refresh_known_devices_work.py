@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -9,7 +10,12 @@ import pytest
 from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
 from core.devices import Phone, serialize_phone_collection
 from core.entrypoint import ModelEntrypoint
-from core.signals import CoreSignal, DevicesUpdatedPayload
+from core.signals import (
+    CoreSignal,
+    CoreSignals,
+    DevicesUpdatedPayload,
+    SimulationDeleteSkippedPayload,
+)
 from core.work.refresh_known_devices_work import (
     RefreshKnownDevicesOutcome,
     RefreshKnownDevicesWork,
@@ -93,15 +99,17 @@ def test_refresh_known_devices_apply_replaces_devices_and_emits_update() -> None
     server = MockAdbServer(state=state)
     client = MockAdbClient(state=state)
     model_entrypoint = ModelEntrypoint()
-    model_entrypoint._adb_server = server
-    model_entrypoint._adb_client = client
+    model_entrypoint.adb_server = server
+    model_entrypoint.adb_client = client
     stale_phone = Phone(id="stale-device", state="device")
     refreshed_phone = Phone(id="fresh-device", state="device")
     server.paired_devices.add(stale_phone)
-    emitted: list[tuple[CoreSignal, object]] = []
-    model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
-        (signal, payload)
-    )
+    emitted: list[tuple[CoreSignal[Any], object]] = []
+
+    def fake_emit(signal: CoreSignal[Any], payload: object) -> None:
+        emitted.append((signal, payload))
+
+    model_entrypoint.emit_core_signal = fake_emit  # type: ignore[method-assign]
 
     outcome = RefreshKnownDevicesOutcome(devices=[refreshed_phone])
     RefreshKnownDevicesWork.apply_main_thread(model_entrypoint, outcome)
@@ -110,11 +118,18 @@ def test_refresh_known_devices_apply_replaces_devices_and_emits_update() -> None
     assert server.paired_devices.get("fresh-device") is refreshed_phone
     assert emitted == [
         (
-            CoreSignal.DEVICES_UPDATED,
+            CoreSignals.SIMULATION_DELETE_SKIPPED,
+            SimulationDeleteSkippedPayload(
+                device_id="stale-device",
+                reason="Simulation for device with id stale-device not found",
+            ),
+        ),
+        (
+            CoreSignals.DEVICES_UPDATED,
             DevicesUpdatedPayload(
                 devices=serialize_phone_collection([refreshed_phone]),
             ),
-        )
+        ),
     ]
 
 
@@ -124,8 +139,8 @@ def test_refresh_known_devices_apply_emits_safe_device_id_rebindings() -> None:
     server = MockAdbServer(state=state)
     client = MockAdbClient(state=state)
     model_entrypoint = ModelEntrypoint()
-    model_entrypoint._adb_server = server
-    model_entrypoint._adb_client = client
+    model_entrypoint.adb_server = server
+    model_entrypoint.adb_client = client
     paired_phone = Phone(
         id="192.168.0.10:5555",
         state="device",
@@ -139,8 +154,8 @@ def test_refresh_known_devices_apply_emits_safe_device_id_rebindings() -> None:
         model="Pixel",
     )
     server.paired_devices.add(paired_phone)
-    emitted: list[tuple[CoreSignal, object]] = []
-    model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
+    emitted: list[tuple[CoreSignal[Any], object]] = []
+    model_entrypoint.emit_core_signal = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
         (signal, payload)
     )
 
@@ -151,7 +166,7 @@ def test_refresh_known_devices_apply_emits_safe_device_id_rebindings() -> None:
     assert server.paired_devices.get("192.168.0.10:37849") is paired_phone
     assert emitted == [
         (
-            CoreSignal.DEVICES_UPDATED,
+            CoreSignals.DEVICES_UPDATED,
             DevicesUpdatedPayload(
                 devices=serialize_phone_collection([paired_phone]),
                 device_id_rebindings={"192.168.0.10:5555": "192.168.0.10:37849"},
@@ -166,12 +181,12 @@ def test_refresh_known_devices_apply_skips_emit_when_devices_unchanged() -> None
     server = MockAdbServer(state=state)
     client = MockAdbClient(state=state)
     model_entrypoint = ModelEntrypoint()
-    model_entrypoint._adb_server = server
-    model_entrypoint._adb_client = client
+    model_entrypoint.adb_server = server
+    model_entrypoint.adb_client = client
     phone = Phone(id="device-1", state="device", model="Pixel")
     server.paired_devices.add(phone)
-    emitted: list[tuple[CoreSignal, object]] = []
-    model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
+    emitted: list[tuple[CoreSignal[Any], object]] = []
+    model_entrypoint.emit_core_signal = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
         (signal, payload)
     )
 

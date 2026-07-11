@@ -307,6 +307,9 @@ class Body(QWidget):
         )
 
         signals.UI.TargetSelectionRequested.connect(self._on_target_selection_requested)
+        signals.SIMULATION.SimulationLocationValidated.connect(
+            self._on_simulation_location_validated
+        )
 
     def _set_alignment(self) -> None:
         pass
@@ -506,6 +509,20 @@ class Body(QWidget):
         self.ui.progress_bar.setValue(0)
         self.ui.tabs.setCurrentIndex(0)
         # self.ui.tabs.setTabVisible(2, False) # TODO: uncomment this when the device tab is implemented
+
+    @Slot(str, int, str, int, float, float, str)
+    def _on_simulation_location_validated(
+        self,
+        simulation_id: str,
+        km: int,
+        line_code: str,
+        line_troncon: int,
+        lat: float,
+        lon: float,
+        label: str,
+    ) -> None:
+        """Handle the simulation location validated."""
+        self.ui.progress_bar.setValue(2)
 
 
 class MainContainer(QWidget):
@@ -834,6 +851,9 @@ class MainWindow(QMainWindow):
         map_render_failed_toast: str = (
             "Failed to render map for simulation {simulation_id}: {reason}."
         )
+        simulation_location_rejected_toast: str = (
+            "Invalid map location for marker {km} on line {line_code}-{line_troncon}: {reason}."
+        )
 
     @dataclass
     class UI:
@@ -1086,6 +1106,76 @@ class MainWindow(QMainWindow):
             html_path=str(html_path),
         )
         signals.UI.MapRendered.emit(simulation_id, html_path)
+
+    def forward_simulation_location_validated(
+        self,
+        simulation_id: str,
+        km: int,
+        line_code: str,
+        line_troncon: int,
+        lat: float,
+        lon: float,
+        label: str,
+    ) -> None:
+        """Forward validated simulation location to map consumers."""
+        logger.info(
+            "MainWindow: simulation location validated",
+            simulation_id=simulation_id,
+            km=km,
+            line_code=line_code,
+            line_troncon=line_troncon,
+            lat=lat,
+            lon=lon,
+        )
+        signals.SIMULATION.SimulationLocationValidated.emit(
+            simulation_id,
+            km,
+            line_code,
+            line_troncon,
+            lat,
+            lon,
+            label,
+        )
+
+    def forward_simulation_location_rejected(
+        self,
+        simulation_id: str,
+        km: int,
+        line_code: str,
+        line_troncon: int,
+        lat: float,
+        lon: float,
+        reason: str,
+    ) -> None:
+        """Notify the user when map milestone validation fails."""
+        logger.warning(
+            "MainWindow: simulation location rejected",
+            simulation_id=simulation_id,
+            km=km,
+            line_code=line_code,
+            line_troncon=line_troncon,
+            lat=lat,
+            lon=lon,
+            reason=reason,
+        )
+        signals.SIMULATION.SimulationLocationRejected.emit(
+            simulation_id,
+            km,
+            line_code,
+            line_troncon,
+            lat,
+            lon,
+            reason,
+        )
+        self.ui.container.post_toast(
+            self.texts.simulation_location_rejected_toast.format(
+                km=km,
+                line_code=line_code,
+                line_troncon=line_troncon,
+                reason=reason,
+            ),
+            level="error",
+        )
 
     def forward_map_render_failed(self, simulation_id: str, reason: str) -> None:
         """Forward map render failure to the map block and notify the user."""

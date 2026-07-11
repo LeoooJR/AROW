@@ -21,7 +21,7 @@ from controller.helper import repeat, validate_model_entrypoint, validate_view
 from core.signals import (
     AdbServerStartedPayload,
     AdbServerStoppedPayload,
-    CoreSignal,
+    CoreSignals,
     DeviceAuthentificationFailedPayload,
     DeviceAuthentificationSucceededPayload,
     DevicesUpdatedPayload,
@@ -66,21 +66,21 @@ class AdbSubController(AppSubController):
 
     def connect_model_signals(self) -> None:
         """Subscribe to core ADB and device events."""
-        self.model_entrypoint.subscribe(
-            CoreSignal.ADB_SERVER_STARTED, self._on_adb_server_started
+        self.model_entrypoint.signal_bus.subscribe(
+            CoreSignals.ADB_SERVER_STARTED, self._on_adb_server_started
         )
-        self.model_entrypoint.subscribe(
-            CoreSignal.ADB_SERVER_STOPPED, self._on_adb_server_stopped
+        self.model_entrypoint.signal_bus.subscribe(
+            CoreSignals.ADB_SERVER_STOPPED, self._on_adb_server_stopped
         )
-        self.model_entrypoint.subscribe(
-            CoreSignal.DEVICES_UPDATED, self._on_devices_updated
+        self.model_entrypoint.signal_bus.subscribe(
+            CoreSignals.DEVICES_UPDATED, self._on_devices_updated
         )
-        self.model_entrypoint.subscribe(
-            CoreSignal.DEVICE_AUTHENTIFICATION_SUCCEEDED,
+        self.model_entrypoint.signal_bus.subscribe(
+            CoreSignals.DEVICE_AUTHENTIFICATION_SUCCEEDED,
             self._on_device_authentification_succeeded,
         )
-        self.model_entrypoint.subscribe(
-            CoreSignal.DEVICE_AUTHENTIFICATION_FAILED,
+        self.model_entrypoint.signal_bus.subscribe(
+            CoreSignals.DEVICE_AUTHENTIFICATION_FAILED,
             self._on_device_authentification_failed,
         )
 

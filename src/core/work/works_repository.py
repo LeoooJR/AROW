@@ -29,6 +29,10 @@ from core.work.refresh_known_devices_work import (
 )
 from core.work.render_map_work import RenderMapOutcome, RenderMapWork
 from core.work.startup_work import StartupCoreRuntimeWork, StartupOutcome
+from core.work.validate_simulation_marker_location_work import (
+    ValidateSimulationMarkerLocationOutcome,
+    ValidateSimulationMarkerLocationWork,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,6 +93,15 @@ class CoreRuntimeWorksRepository(Repository[CoreRuntimeWorkCatalogEntry]):
                 outcome_cls=RenderMapOutcome,
                 job_origin="render_map",
                 entrypoint_methods=("ModelEntrypoint.render_map",),
+            ),
+            CoreRuntimeWorkCatalogEntry(
+                id="core-runtime.validate-simulation-marker-location",
+                work_cls=ValidateSimulationMarkerLocationWork,
+                outcome_cls=ValidateSimulationMarkerLocationOutcome,
+                job_origin="validate_simulation_marker_location",
+                entrypoint_methods=(
+                    "ModelEntrypoint.validate_simulation_marker_location",
+                ),
             ),
         )
         self.add_all(list(entries))

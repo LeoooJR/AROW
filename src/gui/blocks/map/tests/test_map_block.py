@@ -11,6 +11,7 @@ from PySide6.QtWebEngineCore import QWebEngineSettings
 
 from gui.blocks.map.map import (
     _INVALIDATE_LEAFLET_MAPS_JS,
+    Bridge,
     Canvas,
     MapBlock,
 )
@@ -169,7 +170,7 @@ def test_map_block_connection_succeeded_updates_placeholder_and_animates(
     assert block._placeholder_helper_anim.state() == QAbstractAnimation.State.Running
 
 
-def test_map_block_load_map_html_shows_canvas_and_loads_local_file(
+def test_map_block_load_map_html_from_path_shows_canvas_and_loads_local_file(
     monkeypatch, qtbot, tmp_path: Path
 ) -> None:
     block = MapBlock()
@@ -182,9 +183,8 @@ def test_map_block_load_map_html_shows_canvas_and_loads_local_file(
     monkeypatch.setattr(block.ui.canvas, "load", load)
     show_map_canvas = MagicMock()
     monkeypatch.setattr(block, "show_map_canvas", show_map_canvas)
-    monkeypatch.setattr(block, "_map_html_path", lambda simulation_id: html_path)
 
-    block._load_map_html("sim-1")
+    block._load_map_html_from_path("sim-1", html_path)
     qtbot.waitUntil(lambda: load.call_count == 1, timeout=1000)
 
     show_map_canvas.assert_called_once_with()
@@ -193,7 +193,7 @@ def test_map_block_load_map_html_shows_canvas_and_loads_local_file(
     assert loaded_url.toLocalFile() == str(html_path.resolve())
 
 
-def test_map_block_load_map_html_noops_when_rendered_file_is_missing(
+def test_map_block_load_map_html_from_path_noops_when_rendered_file_is_missing(
     monkeypatch, qtbot, tmp_path: Path
 ) -> None:
     block = MapBlock()
@@ -205,9 +205,8 @@ def test_map_block_load_map_html_noops_when_rendered_file_is_missing(
     monkeypatch.setattr(block.ui.canvas, "load", load)
     show_map_canvas = MagicMock()
     monkeypatch.setattr(block, "show_map_canvas", show_map_canvas)
-    monkeypatch.setattr(block, "_map_html_path", lambda simulation_id: missing_path)
 
-    block._load_map_html("sim-1")
+    block._load_map_html_from_path("sim-1", missing_path)
 
     show_map_canvas.assert_not_called()
     load.assert_not_called()
@@ -220,15 +219,9 @@ def test_map_block_device_selection_success_requests_render_only(
     qtbot.addWidget(block)
     block.show()
     events: list[tuple[str, str]] = []
-    load_calls: list[str] = []
 
     def capture_render(simulation_id: str) -> None:
         events.append(("render", simulation_id))
-
-    def capture_load(simulation_id: str) -> None:
-        load_calls.append(simulation_id)
-
-    monkeypatch.setattr(block, "_load_map_html", capture_load)
 
     signals.UI.RenderMapRequested.connect(capture_render)
     try:
@@ -239,7 +232,6 @@ def test_map_block_device_selection_success_requests_render_only(
     assert block.placeholder.currentWidget() is block.ui.map_loading_placeholder
     assert block._pending_render_simulation_id == "sim-1"
     assert events == [("render", "sim-1")]
-    assert load_calls == []
 
 
 def test_map_block_map_rendered_slot_loads_html_from_path(
@@ -432,3 +424,91 @@ def test_map_block_placeholder_helper_animation_noops_when_canvas_visible(
     qtbot.wait(0)
 
     assert block._placeholder_helper_anim is None
+
+
+def test_location_set_coordinates_preserves_title_labels(qtbot) -> None:
+    block = MapBlock()
+    qtbot.addWidget(block)
+    location = block.ui.coordinates.spoofed_location_widget
+    latitude_title = location.ui.latitude_label.text()
+    longitude_title = location.ui.longitude_label.text()
+
+    location.set_coordinates(48.885333, 2.363530)
+    location.clear_coordinates()
+
+    assert location.ui.latitude_label.text() == latitude_title
+    assert location.ui.longitude_label.text() == longitude_title
+    assert location.ui.latitude_value_label.text() == location.texts.empty_value
+    assert location.ui.longitude_value_label.text() == location.texts.empty_value
+
+
+def test_bridge_normalizes_numeric_line_code() -> None:
+    bridge = Bridge()
+    received: list[tuple[int, str, int, float, float]] = []
+    bridge.markerClicked.connect(
+        lambda km, line_code, line_troncon, latitude, longitude: received.append(
+            (km, line_code, line_troncon, latitude, longitude)
+        )
+    )
+
+    bridge.onMarkerClicked(1, "1000", 1, 48.885333, 2.363530)
+
+    assert received == [(1, "001000", 1, 48.885333, 2.363530)]
+
+
+def test_bridge_preserves_non_numeric_line_code() -> None:
+    bridge = Bridge()
+    received: list[tuple[int, str, int, float, float]] = []
+    bridge.markerClicked.connect(
+        lambda km, line_code, line_troncon, latitude, longitude: received.append(
+            (km, line_code, line_troncon, latitude, longitude)
+        )
+    )
+
+    bridge.onMarkerClicked(1, " ABC ", 2, 48.0, 2.0)
+
+    assert received == [(1, "ABC", 2, 48.0, 2.0)]
+
+
+def test_map_block_simulation_location_validated_updates_simulated_row(qtbot) -> None:
+    block = MapBlock()
+    qtbot.addWidget(block)
+    block._active_simulation_id = "sim-1"
+
+    signals.SIMULATION.SimulationLocationValidated.emit(
+        "sim-1",
+        1,
+        "001000",
+        1,
+        48.88533318609319,
+        2.363530409238113,
+        "001+000",
+    )
+    qtbot.wait(0)
+
+    simulated = block.ui.coordinates.spoofed_location_widget
+    assert simulated.ui.latitude_value_label.text() == str(48.88533318609319)
+    assert simulated.ui.longitude_value_label.text() == str(2.363530409238113)
+
+
+def test_map_block_simulation_location_validated_ignores_stale_simulation_id(
+    qtbot,
+) -> None:
+    block = MapBlock()
+    qtbot.addWidget(block)
+    block._active_simulation_id = "sim-1"
+    simulated = block.ui.coordinates.spoofed_location_widget
+
+    signals.SIMULATION.SimulationLocationValidated.emit(
+        "sim-2",
+        1,
+        "001000",
+        1,
+        48.88533318609319,
+        2.363530409238113,
+        "001+000",
+    )
+    qtbot.wait(0)
+
+    assert simulated.ui.latitude_value_label.text() == simulated.texts.empty_value
+    assert simulated.ui.longitude_value_label.text() == simulated.texts.empty_value

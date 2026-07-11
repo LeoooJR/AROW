@@ -14,6 +14,7 @@ from PySide6.QtWidgets import QApplication
 from controller.core_work_callbacks import (
     RenderMapCallback,
     RenderMapSimulationCallback,
+    ValidateSimulationMarkerLocationCallback,
 )
 from controller.domains.map_sub_controller import MapSubController
 from controller.orchestration.app_controller import AppController
@@ -23,9 +24,15 @@ from core.signals import (
     MapRenderedPayload,
     MapRenderFailedPayload,
     SimulationDeletedPayload,
+    SimulationLocationRejectedPayload,
+    SimulationLocationValidatedPayload,
+    SimulationLocationValidationRequestedPayload,
 )
 from core.simulation import Simulation
 from core.work.render_map_work import RenderMapOutcome
+from core.work.validate_simulation_marker_location_work import (
+    ValidateSimulationMarkerLocationOutcome,
+)
 
 pytestmark = [pytest.mark.async_jobs]
 
@@ -53,7 +60,10 @@ class _AppStub:
         self.runner = MagicMock()
         self.runner.cancel = lambda job_id: self.cancelled_job_ids.append(job_id)
 
-    def _submit_model_entrypoint_async_call(self, **kwargs: Any) -> JobHandler:
+    def _submit_model_entrypoint_async_call(self, **kwargs: Any) -> JobHandler | None:
+        preflight = kwargs.get("preflight")
+        if preflight is not None and not preflight():
+            return None
         self.submitted.append(kwargs)
         return JobHandler(job_id="job-1", name=kwargs.get("name", ""))
 
@@ -78,11 +88,22 @@ def _make_map_sub_controller(app: _AppStub) -> MapSubController:
     return MapSubController(cast(AppController, app))
 
 
+def _simulation_metadata_path(
+    model_entrypoint: ModelEntrypoint, simulation_id: str
+) -> Path:
+    return (
+        model_entrypoint.application_dir
+        / "simulations"
+        / simulation_id
+        / "simulation.json"
+    )
+
+
 def _add_simulation(
     model_entrypoint: ModelEntrypoint, simulation_id: str
 ) -> Simulation:
     simulation = Simulation(id=simulation_id)
-    model_entrypoint._simulations.add(simulation)
+    model_entrypoint.restore_persisted_simulation(simulation)
     return simulation
 
 
@@ -100,6 +121,8 @@ def test_on_render_map_requested_submits_process_job(tmp_path: Path) -> None:
     assert submit_kwargs["coalesce_key"] == "render_map:sim-1"
     assert submit_kwargs["fn"] == app.model_entrypoint.render_map
     assert submit_kwargs["args"] == ("sim-1", app.model_entrypoint.application_dir)
+    assert callable(submit_kwargs["preflight"])
+    assert submit_kwargs["preflight"]() is True
     assert map_controller._render_jobs_by_simulation_id["sim-1"].job_id == "job-1"
     on_completed = submit_kwargs["on_completed"]
     on_failed = submit_kwargs["on_failed"]
@@ -139,6 +162,15 @@ def test_on_render_map_requested_skips_when_simulation_missing() -> None:
 
     assert app.submitted == []
     app.view.forward_map_rendered.assert_not_called()
+
+
+def test_simulation_exists_preflight_rejects_missing_simulation() -> None:
+    app = _AppStub()
+    map_controller = _make_map_sub_controller(app)
+
+    preflight = map_controller._simulation_exists_preflight("sim-1")
+
+    assert preflight() is False
 
 
 def test_render_callback_on_completed_applies_result() -> None:
@@ -324,5 +356,208 @@ def test_persist_simulation_repository_delegates_to_model_entrypoint(
 
     map_controller.persist_simulation_repository()
 
-    metadata_path = app.model_entrypoint._simulations.simulation_metadata_file("sim-1")
+    metadata_path = _simulation_metadata_path(app.model_entrypoint, "sim-1")
     assert metadata_path.is_file()
+
+
+def test_on_simulation_location_requested_submits_thread_job(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    app = _AppStub(tmp_path)
+    _patch_controller_type_checks(monkeypatch, app)
+    map_controller = _make_map_sub_controller(app)
+    _add_simulation(app.model_entrypoint, "sim-1")
+
+    map_controller._on_simulation_location_requested(
+        "sim-1",
+        1,
+        "001000",
+        1,
+        48.88533318609319,
+        2.363530409238113,
+    )
+
+    assert len(app.submitted) == 1
+    submit_kwargs = app.submitted[0]
+    assert submit_kwargs["name"] == "validate_simulation_marker_location"
+    assert submit_kwargs["job_type"] == "thread"
+    assert submit_kwargs["coalesce_key"] == "validate_simulation_marker_location:sim-1"
+    assert (
+        submit_kwargs["fn"] == app.model_entrypoint.validate_simulation_marker_location
+    )
+    assert submit_kwargs["args"] == (
+        "sim-1",
+        1,
+        "001000",
+        1,
+        48.88533318609319,
+        2.363530409238113,
+    )
+    assert callable(submit_kwargs["preflight"])
+    assert submit_kwargs["preflight"]() is True
+    on_completed = submit_kwargs["on_completed"]
+    on_failed = submit_kwargs["on_failed"]
+    assert isinstance(on_completed.__self__, ValidateSimulationMarkerLocationCallback)
+    assert isinstance(on_failed.__self__, ValidateSimulationMarkerLocationCallback)
+
+
+def test_on_simulation_location_requested_skips_when_simulation_missing(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    app = _AppStub(tmp_path)
+    _patch_controller_type_checks(monkeypatch, app)
+    map_controller = _make_map_sub_controller(app)
+
+    map_controller._on_simulation_location_requested(
+        "sim-1",
+        1,
+        "001000",
+        1,
+        48.88533318609319,
+        2.363530409238113,
+    )
+
+    assert app.submitted == []
+
+
+def test_validate_simulation_marker_location_callback_on_completed_applies_result() -> (
+    None
+):
+    app = _AppStub()
+    map_controller = _make_map_sub_controller(app)
+    apply_calls: list[object] = []
+    app.model_entrypoint.apply_result = lambda result: apply_calls.append(result)  # type: ignore[method-assign]
+    callback = ValidateSimulationMarkerLocationCallback(map_controller)
+    outcome = ValidateSimulationMarkerLocationOutcome(
+        rejected=SimulationLocationRejectedPayload(
+            simulation_id="sim-1",
+            km=1,
+            line_code="001000",
+            line_troncon=1,
+            lat=0.0,
+            lon=0.0,
+            reason="bad",
+        ),
+    )
+
+    callback.on_completed(outcome)
+
+    assert apply_calls == [outcome]
+
+
+def test_validate_simulation_marker_location_callback_on_failed_delegates_to_apply_failure() -> (
+    None
+):
+    app = _AppStub()
+    map_controller = _make_map_sub_controller(app)
+    apply_calls: list[object] = []
+    app.model_entrypoint.apply_failure = lambda error: apply_calls.append(error)  # type: ignore[method-assign]
+    callback = ValidateSimulationMarkerLocationCallback(map_controller)
+    error = JobError(
+        message="Job failed: validate_simulation_marker_location: boom",
+        traceback="",
+        origin="validate_simulation_marker_location",
+    )
+
+    callback.on_failed(error)
+
+    assert apply_calls == [error]
+
+
+def test_on_simulation_location_rejected_forwards_to_view(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    app = _AppStub(tmp_path)
+    _patch_controller_type_checks(monkeypatch, app)
+    map_controller = _make_map_sub_controller(app)
+    payload = SimulationLocationRejectedPayload(
+        simulation_id="sim-1",
+        km=1,
+        line_code="001000",
+        line_troncon=1,
+        lat=0.0,
+        lon=0.0,
+        reason="invalid marker",
+    )
+
+    map_controller._on_simulation_location_rejected(payload)
+
+    app.view.forward_simulation_location_rejected.assert_called_once_with(
+        simulation_id=payload.simulation_id,
+        km=payload.km,
+        line_code="001000",
+        line_troncon=1,
+        lat=payload.lat,
+        lon=payload.lon,
+        reason=payload.reason,
+    )
+
+
+def test_on_simulation_location_validated_forwards_to_view(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    app = _AppStub(tmp_path)
+    _patch_controller_type_checks(monkeypatch, app)
+    map_controller = _make_map_sub_controller(app)
+    payload = SimulationLocationValidatedPayload(
+        simulation_id="sim-1",
+        lat=48.88533318609319,
+        lon=2.363530409238113,
+        km=1,
+        line_id="line-id",
+        line_code="001000",
+        line_troncon=1,
+        line_type="type",
+        line_label="label",
+        label="001+000",
+        milestone_type="Kilometer",
+        line_geometry_wkb_b64="",
+    )
+
+    map_controller._on_simulation_location_validated(payload)
+
+    app.view.forward_simulation_location_validated.assert_called_once_with(
+        simulation_id=payload.simulation_id,
+        km=1,
+        line_code="001000",
+        line_troncon=1,
+        lat=payload.lat,
+        lon=payload.lon,
+        label="001+000",
+    )
+
+
+def test_on_simulation_location_validation_requested_submits_async_job(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    app = _AppStub(tmp_path)
+    _patch_controller_type_checks(monkeypatch, app)
+    map_controller = _make_map_sub_controller(app)
+    _add_simulation(app.model_entrypoint, "sim-1")
+    payload = SimulationLocationValidationRequestedPayload(
+        simulation_id="sim-1",
+        km=1,
+        line_code="001000",
+        line_troncon=1,
+        lat=48.88533318609319,
+        lon=2.363530409238113,
+    )
+
+    map_controller._on_simulation_location_validation_requested(payload)
+
+    assert len(app.submitted) == 1
+    submit_kwargs = app.submitted[0]
+    assert submit_kwargs["name"] == "validate_simulation_marker_location"
+    assert submit_kwargs["args"] == (
+        "sim-1",
+        1,
+        "001000",
+        1,
+        48.88533318609319,
+        2.363530409238113,
+    )

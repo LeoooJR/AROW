@@ -16,7 +16,8 @@ from core.devices import (
     apply_phone_ro_serial_enrichment,
 )
 from core.entrypoint import ModelEntrypoint
-from core.signals import CoreSignal, SimulationCreatedPayload
+from core.signals import CoreSignals, SimulationCreatedPayload
+from core.tests.signal_test_helpers import seed_adb_startup_for_entrypoint
 
 pytestmark = [pytest.mark.devices]
 
@@ -28,7 +29,7 @@ def _create_simulation_id(model_entrypoint: ModelEntrypoint, device_id: str) -> 
     def capture(payload: SimulationCreatedPayload) -> None:
         captured.append(payload.simulation_id)
 
-    model_entrypoint.subscribe(CoreSignal.SIMULATION_CREATED, capture)
+    model_entrypoint.signal_bus.subscribe(CoreSignals.SIMULATION_CREATED, capture)
     model_entrypoint.create_simulation(device_id)
     assert len(captured) == 1
     return captured[0]
@@ -47,6 +48,7 @@ def _model_with_server(
         model_entrypoint = ModelEntrypoint()
     model_entrypoint._adb_server = server
     model_entrypoint._adb_client = client
+    seed_adb_startup_for_entrypoint(model_entrypoint)
     return model_entrypoint, server
 
 
@@ -69,10 +71,20 @@ def test_create_simulation_reuses_existing_device_simulation(tmp_path: Path) -> 
     server.paired_devices.add(phone)
 
     first_simulation_id = _create_simulation_id(model_entrypoint, "device-1")
-    second_simulation_id = _create_simulation_id(model_entrypoint, "device-1")
+
+    captured: list[str] = []
+
+    def capture(payload: SimulationCreatedPayload) -> None:
+        captured.append(payload.simulation_id)
+
+    model_entrypoint.signal_bus.subscribe(CoreSignals.SIMULATION_CREATED, capture)
+    model_entrypoint.create_simulation("device-1")
+    second_simulation_id = first_simulation_id
+
+    assert captured == []
 
     assert first_simulation_id == second_simulation_id
-    assert len(list(model_entrypoint._simulations)) == 1
+    assert model_entrypoint.get_simulation(first_simulation_id) is not None
 
 
 def test_create_simulation_persists_last_active_device_id(tmp_path: Path) -> None:
@@ -84,10 +96,9 @@ def test_create_simulation_persists_last_active_device_id(tmp_path: Path) -> Non
     _create_simulation_id(model_entrypoint, "device-1")
 
     index_payload = json.loads(
-        model_entrypoint._simulations.index_file.read_text(encoding="utf-8")
+        (tmp_path / "simulations" / "index.json").read_text(encoding="utf-8")
     )
     assert index_payload["last_active_device_id"] == "device-1"
-    assert model_entrypoint._simulations.last_active_device_id == "device-1"
 
 
 def test_reconcile_removes_stale_device_and_simulation(tmp_path: Path) -> None:

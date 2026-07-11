@@ -1,17 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import cast
 
 from core.adb.server import AdbServer
+from core.entrypoint_protocol import AdbRuntimeEntrypoint, CoreSignalEmitter
 from core.exceptions import CoreException
-from core.signals import AdbServerStoppedPayload, CoreSignal
+from core.signals import AdbServerStoppedPayload, CoreSignals
 from core.work.core_runtime_work import CoreRuntimeWork, CoreRuntimeWorkOutcome
 from core.work.helper import preflight
 from logger import logger
-
-if TYPE_CHECKING:
-    from core.entrypoint import ModelEntrypoint
 
 
 class CloseCoreRuntimeError(CoreException):
@@ -70,23 +68,21 @@ class CloseCoreRuntimeWork(CoreRuntimeWork[CloseOutcome]):
 
     @staticmethod
     def apply_main_thread(
-        model_entrypoint: ModelEntrypoint, result: CloseOutcome
+        model_entrypoint: CoreSignalEmitter, result: CloseOutcome
     ) -> None:
         """
         Apply the result of the close job to the entrypoint in the main thread.
         """
-        from core.entrypoint import ModelEntrypoint as _ModelEntrypoint
-
-        if not isinstance(model_entrypoint, _ModelEntrypoint):
-            raise TypeError("apply_main_thread() requires ModelEntrypoint")
         if result.adb_server is None:
             logger.warning(
                 "ModelEntrypoint: close apply skipped stop signal (no stopped server)",
             )
             return
-        model_entrypoint._adb_server = None
-        model_entrypoint._signal_bus.emit(
-            CoreSignal.ADB_SERVER_STOPPED,
+        adb_entrypoint = cast(AdbRuntimeEntrypoint, model_entrypoint)
+        adb_entrypoint.adb_server = None
+        adb_entrypoint.adb_client = None
+        adb_entrypoint.emit_core_signal(
+            CoreSignals.ADB_SERVER_STOPPED,
             AdbServerStoppedPayload(
                 adb_binary_path=str(result.adb_server.binary.path),
             ),
@@ -94,12 +90,8 @@ class CloseCoreRuntimeWork(CoreRuntimeWork[CloseOutcome]):
 
     @staticmethod
     def apply_failure_main_thread(
-        model_entrypoint: ModelEntrypoint, error: BaseException
+        model_entrypoint: CoreSignalEmitter, error: BaseException
     ) -> None:
-        from core.entrypoint import ModelEntrypoint as _ModelEntrypoint
-
-        if not isinstance(model_entrypoint, _ModelEntrypoint):
-            raise TypeError("apply_failure_main_thread() requires ModelEntrypoint")
         CloseCoreRuntimeWork.emit_generic_error(
             model_entrypoint,
             source="CloseCoreRuntimeWork",
