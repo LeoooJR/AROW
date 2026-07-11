@@ -36,7 +36,7 @@ from core.adb.command import (
 )
 from core.adb.exceptions import AdbClientException
 from core.devices import Phone
-from core.location import Location
+from core.geo.location import Location
 from logger import logger
 
 

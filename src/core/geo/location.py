@@ -1,0 +1,53 @@
+"""Location domain types and referentiel marker validation."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import cast
+
+from core.geo.milestone import Milestone
+from core.payload import Payload
+
+
+@dataclass(frozen=True, unsafe_hash=True)
+class Location(Payload):
+    """Location."""
+
+    lat: float = field(
+        metadata={"description": "The latitude of the location"}, default=0.0
+    )
+    lon: float = field(
+        metadata={"description": "The longitude of the location"}, default=0.0
+    )
+    poi: Milestone | None = field(
+        metadata={"description": "The point of interest at the given location"},
+        default=None,
+    )
+
+    def is_default(self) -> bool:
+        """Return True if the location is the default location."""
+        return self.lat == 0.0 and self.lon == 0.0 and self.poi is None
+
+    def serialize(self, **kwargs) -> dict[str, object]:
+        """Convert the location to a serialized dictionary."""
+        return {
+            "lat": self.lat,
+            "lon": self.lon,
+            "poi": (self.poi.serialize(**kwargs) if self.poi is not None else None),
+        }
+
+    @classmethod
+    def deserialize(cls, payload: dict[str, object], **kwargs) -> Location:
+        """Create a location from a serialized dictionary."""
+        poi_payload = payload.get("poi")
+        poi: Milestone | None = None
+        if isinstance(poi_payload, dict):
+            poi = Milestone.deserialize(
+                cast(dict[str, object], poi_payload),
+                **kwargs,
+            )
+        return cls(
+            lat=float(cast(float | int | str, payload.get("lat", 0.0))),
+            lon=float(cast(float | int | str, payload.get("lon", 0.0))),
+            poi=poi,
+        )

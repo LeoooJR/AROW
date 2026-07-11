@@ -20,6 +20,7 @@ jobstatus = Literal["pending", "running", "completed", "cancelled", "failed"]
 jobpriority = Literal["low", "medium", "high"]
 jobcoalescekey = Literal["none", "location", "network", "device"]
 jobtimeout = Literal["none", "short", "medium", "long"]
+jobpreflight = Callable[[], bool]
 
 
 class CancelledError(Exception):
@@ -147,6 +148,13 @@ class JobSpecification:
     at_most_once: bool = field(
         metadata={"description": "At most one job running with the same coalesce key"},
         default=False,
+    )
+    preflight: jobpreflight | None = field(
+        metadata={
+            "description": "Optional gate evaluated before a worker is opened; "
+            "False skips submission quietly"
+        },
+        default=None,
     )
 
 
@@ -481,6 +489,15 @@ class AsyncRunner(QObject):
         """
         if job.fn is None:
             raise ValueError("JobSpecification.fn must be set (callable)")
+
+        if job.preflight is not None and not job.preflight():
+            logger.info(
+                "Async job preflight rejected submission",
+                name=job.name,
+                coalesce_key=job.coalesce_key,
+                job_type=job.type,
+            )
+            return None
 
         job_id: str = uuid.uuid4().hex
         cancel_token = CancelToken()

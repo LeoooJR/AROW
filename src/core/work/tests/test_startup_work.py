@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -13,8 +14,10 @@ from core.entrypoint import ModelEntrypoint
 from core.signals import (
     AdbServerStartedPayload,
     CoreSignal,
+    CoreSignals,
     DevicesUpdatedPayload,
     SimulationCreatedPayload,
+    SimulationRestoredPayload,
 )
 from core.simulation import Simulation, SimulationRepository
 from core.work import startup_work
@@ -238,17 +241,17 @@ def test_startup_apply_restores_last_active_device_when_online(
     def capture(payload: SimulationCreatedPayload) -> None:
         simulation_created.append(payload.simulation_id)
 
-    model_entrypoint._signal_bus.subscribe(
-        CoreSignal.SIMULATION_CREATED,
+    model_entrypoint.signal_bus.subscribe(
+        CoreSignals.SIMULATION_CREATED,
         capture,
     )
 
     StartupCoreRuntimeWork.apply_main_thread(model_entrypoint, second_outcome)
 
     assert model_entrypoint.adb_server is second_outcome.adb_server
-    assert model_entrypoint._simulations.get("sim-1") is not None
-    assert model_entrypoint._simulations.last_active_device_id == phone.id
-    assert simulation_created == ["sim-1"]
+    restored = model_entrypoint.get_simulation("sim-1")
+    assert restored is not None
+    assert simulation_created == []
     assert second_outcome.adb_server is not None
     working_device = second_outcome.adb_server.get_working_device()
     assert working_device is not None
@@ -287,18 +290,20 @@ def test_startup_apply_restores_last_active_device_after_adb_id_rebind(
     monkeypatch.setattr(startup_work, "_start_adb_server", lambda: rebound_server)
     monkeypatch.setattr(startup_work, "_create_adb_client", lambda: rebound_client)
     monkeypatch.setattr(
-        startup_work, "enrich_phones_with_adb_shell_properties", lambda _client, _phones: None
+        startup_work,
+        "enrich_phones_with_adb_shell_properties",
+        lambda _client, _phones: None,
     )
 
     second_outcome = StartupCoreRuntimeWork(use_mock_adb=False).run()
     model_entrypoint = ModelEntrypoint()
-    simulation_created: list[str] = []
+    simulation_restored: list[str] = []
 
-    def capture(payload: SimulationCreatedPayload) -> None:
-        simulation_created.append(payload.simulation_id)
+    def capture(payload: SimulationRestoredPayload) -> None:
+        simulation_restored.append(payload.simulation_id)
 
-    model_entrypoint._signal_bus.subscribe(
-        CoreSignal.SIMULATION_CREATED,
+    model_entrypoint.signal_bus.subscribe(
+        CoreSignals.SIMULATION_RESTORED,
         capture,
     )
     StartupCoreRuntimeWork.apply_main_thread(model_entrypoint, second_outcome)
@@ -306,8 +311,11 @@ def test_startup_apply_restores_last_active_device_after_adb_id_rebind(
     assert second_outcome.last_active_device_id == rebound_phone.id
     assert len(second_outcome.simulations) == 1
     assert second_outcome.simulations[0].device is rebound_phone
-    assert model_entrypoint._simulations.last_active_device_id == rebound_phone.id
-    assert simulation_created == ["sim-1"]
+    repository = SimulationRepository(
+        startup_work.get_or_create_application_dir() / "simulations"
+    )
+    assert repository.last_active_device_id == rebound_phone.id
+    assert simulation_restored == ["sim-1"]
     working_device = rebound_server.get_working_device()
     assert working_device is rebound_phone
 
@@ -339,15 +347,16 @@ def test_startup_apply_skips_last_active_device_when_offline(
     def capture(payload: SimulationCreatedPayload) -> None:
         simulation_created.append(payload.simulation_id)
 
-    model_entrypoint._signal_bus.subscribe(
-        CoreSignal.SIMULATION_CREATED,
+    model_entrypoint.signal_bus.subscribe(
+        CoreSignals.SIMULATION_CREATED,
         capture,
     )
 
     StartupCoreRuntimeWork.apply_main_thread(model_entrypoint, second_outcome)
 
     assert simulation_created == []
-    assert model_entrypoint._simulations.last_active_device_id == phone.id
+    third_outcome = StartupCoreRuntimeWork(use_mock_adb=True).run()
+    assert third_outcome.last_active_device_id == phone.id
 
 
 def test_startup_apply_binds_mock_runtime_and_emits_startup_signals() -> None:
@@ -356,8 +365,8 @@ def test_startup_apply_binds_mock_runtime_and_emits_startup_signals() -> None:
     client = MockAdbClient(state=state)
     devices = server.get_known_devices()
     model_entrypoint = ModelEntrypoint()
-    emitted: list[tuple[CoreSignal, object]] = []
-    model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
+    emitted: list[tuple[CoreSignal[Any], object]] = []
+    model_entrypoint.emit_core_signal = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
         (signal, payload)
     )
 
@@ -367,14 +376,14 @@ def test_startup_apply_binds_mock_runtime_and_emits_startup_signals() -> None:
     )
 
     assert model_entrypoint.adb_server is server
-    assert model_entrypoint._adb_client is client
+    assert model_entrypoint.adb_client is client
     assert emitted == [
         (
-            CoreSignal.ADB_SERVER_STARTED,
+            CoreSignals.ADB_SERVER_STARTED,
             AdbServerStartedPayload(adb_binary_path=str(server.binary.path)),
         ),
         (
-            CoreSignal.DEVICES_UPDATED,
+            CoreSignals.DEVICES_UPDATED,
             DevicesUpdatedPayload(
                 devices=serialize_phone_collection(devices),
             ),
@@ -401,7 +410,7 @@ def test_startup_apply_restores_persisted_simulations() -> None:
         ),
     )
 
-    restored = model_entrypoint._simulations.get("sim-1")
+    restored = model_entrypoint.get_simulation("sim-1")
     assert restored is simulation
     assert restored is not None
     assert restored.device is phone

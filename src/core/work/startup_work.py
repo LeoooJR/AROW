@@ -11,7 +11,7 @@ import os
 import platform
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import cast
 
 from core.adb.adb_mock import (
     DEFAULT_MOCK_ADB_BINARY_PATH,
@@ -25,10 +25,11 @@ from core.adb.client import AdbClient
 from core.adb.server import AdbServer
 from core.application_paths import get_or_create_application_dir
 from core.devices import Phone, serialize_phone_collection
+from core.entrypoint_protocol import CoreSignalEmitter, StartupRuntimeEntrypoint
 from core.exceptions import CoreException
 from core.signals import (
     AdbServerStartedPayload,
-    CoreSignal,
+    CoreSignals,
     DevicesUpdatedPayload,
 )
 from core.simulation import PersistedSimulationState, Simulation, SimulationDiskStore
@@ -36,9 +37,6 @@ from core.work.core_runtime_work import CoreRuntimeWork, CoreRuntimeWorkOutcome
 from core.work.helper import preflight
 from core.work.refresh_known_devices_work import enrich_phones_with_adb_shell_properties
 from logger import logger
-
-if TYPE_CHECKING:
-    from core.entrypoint import ModelEntrypoint
 
 
 def _use_mock_adb_effective(cli_or_model_flag: bool) -> bool:
@@ -264,45 +262,33 @@ class StartupCoreRuntimeWork(CoreRuntimeWork[StartupOutcome]):
 
     @staticmethod
     def apply_main_thread(
-        model_entrypoint: ModelEntrypoint, result: StartupOutcome
+        model_entrypoint: CoreSignalEmitter, result: StartupOutcome
     ) -> None:
         """
         Own server/client state and emit on the bus (Qt main thread; AsyncRunner
         completion runs there).
         """
-        from core.entrypoint import ModelEntrypoint as _ModelEntrypoint
-
-        if not isinstance(model_entrypoint, _ModelEntrypoint):
-            raise TypeError("apply_main_thread() requires ModelEntrypoint")
+        startup_entrypoint = cast(StartupRuntimeEntrypoint, model_entrypoint)
         if result.adb_server is not None:
-            model_entrypoint._adb_server = result.adb_server
+            startup_entrypoint.adb_server = result.adb_server
         if result.adb_client is not None:
-            model_entrypoint._adb_client = result.adb_client
+            startup_entrypoint.adb_client = result.adb_client
         for simulation in result.simulations:
-            try:
-                model_entrypoint._simulations.restore(simulation)
-            except ValueError as error:
-                logger.warning(
-                    "startup_work: failed to restore persisted simulation",
-                    simulation_id=simulation.id,
-                    error=str(error),
-                )
+            startup_entrypoint.restore_persisted_simulation(simulation)
         if result.adb_server is not None:
-            model_entrypoint._signal_bus.emit(
-                CoreSignal.ADB_SERVER_STARTED,
+            startup_entrypoint.emit_core_signal(
+                CoreSignals.ADB_SERVER_STARTED,
                 AdbServerStartedPayload(
                     adb_binary_path=str(result.adb_server.binary.path),
                 ),
             )
-            model_entrypoint._signal_bus.emit(
-                CoreSignal.DEVICES_UPDATED,
+            startup_entrypoint.emit_core_signal(
+                CoreSignals.DEVICES_UPDATED,
                 DevicesUpdatedPayload(
                     devices=serialize_phone_collection(result.devices),
                 ),
             )
-        model_entrypoint._simulations.sync_last_active_device_id(
-            result.last_active_device_id
-        )
+        startup_entrypoint.sync_last_active_device_id(result.last_active_device_id)
         if result.last_active_device_id is not None:
             paired_device = (
                 result.adb_server.paired_devices.get(result.last_active_device_id)
@@ -311,7 +297,7 @@ class StartupCoreRuntimeWork(CoreRuntimeWork[StartupOutcome]):
             )
             if paired_device is not None and paired_device.state == "device":
                 try:
-                    model_entrypoint.create_simulation(result.last_active_device_id)
+                    startup_entrypoint.create_simulation(result.last_active_device_id)
                 except (AttributeError, ValueError) as error:
                     logger.warning(
                         "startup_work: failed to restore last active device",
@@ -321,12 +307,8 @@ class StartupCoreRuntimeWork(CoreRuntimeWork[StartupOutcome]):
 
     @staticmethod
     def apply_failure_main_thread(
-        model_entrypoint: ModelEntrypoint, error: BaseException
+        model_entrypoint: CoreSignalEmitter, error: BaseException
     ) -> None:
-        from core.entrypoint import ModelEntrypoint as _ModelEntrypoint
-
-        if not isinstance(model_entrypoint, _ModelEntrypoint):
-            raise TypeError("apply_failure_main_thread() requires ModelEntrypoint")
         StartupCoreRuntimeWork.emit_generic_error(
             model_entrypoint,
             source="StartupCoreRuntimeWork",

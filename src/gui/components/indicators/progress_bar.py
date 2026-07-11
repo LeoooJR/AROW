@@ -10,7 +10,6 @@ from PySide6.QtWidgets import QProgressBar, QSizePolicy, QWidget
 from gui.colors import Theme
 from gui.components.base.component import Component
 from gui.components.indicators.indicator_settings import indicator_settings
-from gui.settings import Settings
 
 
 class ProgressBar(QProgressBar, Component):

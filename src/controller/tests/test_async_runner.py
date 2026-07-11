@@ -554,6 +554,77 @@ class TestAsyncRunnerProcessAndCoalesce:
         runner.shutdown()
 
 
+class TestAsyncRunnerPreflight:
+    def test_preflight_false_skips_submission_without_side_effects(
+        self,
+        runner_factory: Callable[..., AsyncRunner],
+    ) -> None:
+        runner = runner_factory()
+        preflight_calls: list[str] = []
+
+        def _reject() -> bool:
+            preflight_calls.append("called")
+            return False
+
+        handle = runner.submit(
+            JobSpecification(
+                name="preflight-rejected",
+                description="",
+                fn=_return_value,
+                args=("unused",),
+                kwargs={},
+                timeout=None,
+                priority=0,
+                coalesce_key="preflight-test",
+                type="thread",
+                preflight=_reject,
+            )
+        )
+
+        assert handle is None
+        assert preflight_calls == ["called"]
+        assert runner.history == {}
+        assert "preflight-test" not in runner._coalesce_latest
+
+        runner.shutdown()
+
+    def test_preflight_true_submits_normally(
+        self,
+        runner_factory: Callable[..., AsyncRunner],
+    ) -> None:
+        pending: dict[str, Callable[[], None]] = {}
+        runner = runner_factory(thread_pending=pending)
+        completed: list[tuple[str, object]] = []
+        runner.signals.Completed.connect(
+            lambda job_id, result: completed.append((job_id, result))
+        )
+
+        handle = runner.submit(
+            JobSpecification(
+                name="preflight-accepted",
+                description="",
+                fn=_return_value,
+                args=("accepted-result",),
+                kwargs={},
+                timeout=None,
+                priority=0,
+                coalesce_key=None,
+                type="thread",
+                preflight=lambda: True,
+            )
+        )
+
+        assert handle is not None
+        assert handle.job_id in runner.history
+        assert handle.job_id in pending
+
+        pending[handle.job_id]()
+        _process_events_until(lambda: len(completed) == 1)
+        assert completed[0] == (handle.job_id, "accepted-result")
+
+        runner.shutdown()
+
+
 class TestProcessPoolLogging:
     def test_process_pool_uses_setup_logger_initializer(
         self,

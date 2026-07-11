@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -12,6 +13,7 @@ from core.devices import Phone
 from core.entrypoint import ModelEntrypoint
 from core.signals import (
     CoreSignal,
+    CoreSignals,
     DeviceAuthentificationFailedPayload,
     DeviceAuthentificationSucceededPayload,
     ErrorRaisedPayload,
@@ -234,8 +236,8 @@ def test_mock_authenticate_non_protocol_failure_raises() -> None:
 
 def test_authenticate_apply_failure_emits_device_authentification_failed() -> None:
     model_entrypoint = ModelEntrypoint()
-    emitted: list[tuple[CoreSignal, object]] = []
-    model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
+    emitted: list[tuple[CoreSignal[Any], object]] = []
+    model_entrypoint.emit_core_signal = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
         (signal, payload)
     )
     error = DeviceAuthentificationError(
@@ -249,7 +251,7 @@ def test_authenticate_apply_failure_emits_device_authentification_failed() -> No
 
     assert emitted == [
         (
-            CoreSignal.DEVICE_AUTHENTIFICATION_FAILED,
+            CoreSignals.DEVICE_AUTHENTIFICATION_FAILED,
             DeviceAuthentificationFailedPayload(
                 ip="10.30.40.52",
                 port=40406,
@@ -262,8 +264,8 @@ def test_authenticate_apply_failure_emits_device_authentification_failed() -> No
 
 def test_authenticate_apply_failure_emits_error_raised_for_generic_exception() -> None:
     model_entrypoint = ModelEntrypoint()
-    emitted: list[tuple[CoreSignal, object]] = []
-    model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
+    emitted: list[tuple[CoreSignal[Any], object]] = []
+    model_entrypoint.emit_core_signal = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
         (signal, payload)
     )
     error = RuntimeError("unexpected")
@@ -272,7 +274,7 @@ def test_authenticate_apply_failure_emits_error_raised_for_generic_exception() -
 
     assert len(emitted) == 1
     signal, payload = emitted[0]
-    assert signal == CoreSignal.ERROR_RAISED
+    assert signal == CoreSignals.ERROR_RAISED
     assert isinstance(payload, ErrorRaisedPayload)
     assert payload.source == "AuthenticateDeviceWork"
     assert payload.error_type == "RuntimeError"
@@ -283,10 +285,10 @@ def test_authenticate_apply_success_adds_phone_and_emits_signal() -> None:
     state = MockAdbState(seed=444, initial_devices=0)
     server = MockAdbServer(state=state)
     model_entrypoint = ModelEntrypoint()
-    model_entrypoint._adb_server = server
+    model_entrypoint.adb_server = server
     phone = Phone(id="paired-phone", state="device")
-    emitted: list[tuple[CoreSignal, object]] = []
-    model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
+    emitted: list[tuple[CoreSignal[Any], object]] = []
+    model_entrypoint.emit_core_signal = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
         (signal, payload)
     )
 
@@ -297,9 +299,9 @@ def test_authenticate_apply_success_adds_phone_and_emits_signal() -> None:
     assert server.paired_devices.get("paired-phone") is phone
     assert emitted == [
         (
-            CoreSignal.DEVICE_AUTHENTIFICATION_SUCCEEDED,
+            CoreSignals.DEVICE_AUTHENTIFICATION_SUCCEEDED,
             DeviceAuthentificationSucceededPayload(
-                device=phone.to_payload(),
+                device=phone.serialize(),
             ),
         )
     ]

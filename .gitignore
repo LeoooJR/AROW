@@ -218,3 +218,6 @@ __marimo__/
 
 # Agents output
 tasks/**/*.png
+
+# SQL files
+*.sql

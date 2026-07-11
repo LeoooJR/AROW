@@ -9,15 +9,18 @@ from typing import Final, cast
 from PySide6.QtCore import (
     QAbstractAnimation,
     QEasingCurve,
+    QObject,
     QParallelAnimationGroup,
     QPropertyAnimation,
     QSequentialAnimationGroup,
     Qt,
     QTimer,
     QUrl,
+    Signal,
     Slot,
 )
 from PySide6.QtGui import QFont
+from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtWebEngineCore import QWebEngineSettings
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWidgets import (
@@ -31,7 +34,6 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from core.application_paths import get_or_create_application_dir
 from gui.blocks.map.device_required_placeholder import DeviceRequiredMapPlaceholder
 from gui.blocks.map.map_loading_placeholder import MapLoadingPlaceholder
 from gui.blocks.map.map_render_failed_placeholder import MapRenderFailedPlaceholder
@@ -61,6 +63,34 @@ _INVALIDATE_LEAFLET_MAPS_JS = """
   }
 })();
 """
+
+
+class Bridge(QObject):
+    """
+    Bridge between JavaScript and Python.
+    """
+
+    markerClicked = Signal(
+        int, str, int, float, float
+    )  # km, line_code, line_troncon, latitude, longitude
+
+    @Slot(
+        int, str, int, float, float
+    )  # Take arguments from JavaScript, the slot is called from the JS code snippet in core/geo/bridge.py
+    def onMarkerClicked(
+        self,
+        km: int,
+        line_code: str,
+        line_troncon: int,
+        latitude: float,
+        longitude: float,
+    ) -> None:
+        normalized_line_code = str(line_code).strip()
+        if normalized_line_code.isdigit():
+            normalized_line_code = normalized_line_code.zfill(6)
+        self.markerClicked.emit(
+            km, normalized_line_code, line_troncon, latitude, longitude
+        )
 
 
 class Canvas(QWebEngineView):
@@ -103,6 +133,12 @@ class Canvas(QWebEngineView):
             QWebEngineSettings.WebAttribute.LocalContentCanAccessFileUrls,
             True,
         )
+
+        self.bridge = Bridge()
+        self.channel = QWebChannel(self.page())
+        self.channel.registerObject("bridge", self.bridge)
+        self.page().setWebChannel(self.channel)
+
         self.loadFinished.connect(self._on_load_finished)
         self._leaflet_page_ready: bool = False
 
@@ -148,7 +184,24 @@ class Canvas(QWebEngineView):
 
     def _connect_signals(self) -> None:
         """Connect signals for the canvas."""
-        pass
+        self.bridge.markerClicked.connect(self._on_marker_clicked)
+
+    @Slot(int, str, int, float, float)
+    def _on_marker_clicked(
+        self,
+        km: int,
+        line_code: str,
+        line_troncon: int,
+        latitude: float,
+        longitude: float,
+    ) -> None:
+        """Handle marker click event."""
+        logger.info(
+            f"Marker clicked: {km}, {line_code}, {line_troncon}, {latitude}, {longitude}"
+        )
+        signals.UI.MapMarkerClicked.emit(
+            km, line_code, line_troncon, latitude, longitude
+        )
 
 
 class Legend(QFrame):
@@ -276,6 +329,7 @@ class Location(QWidget):
 
         latitude_label: Final[str] = "Latitude"
         longitude_label: Final[str] = "Longitude"
+        empty_value: Final[str] = "--"
         crosshair_button_tooltip: Final[str] = "Center map on current location"
 
     @dataclass
@@ -284,8 +338,10 @@ class Location(QWidget):
 
         latitude_widget: QWidget
         latitude_label: QLabel
+        latitude_value_label: QLabel
         longitude_widget: QWidget
         longitude_label: QLabel
+        longitude_value_label: QLabel
         crosshair_button: ToolButton
 
     def __init__(self, parent: QWidget | None = None, icon_path: str | None = None):
@@ -333,6 +389,12 @@ class Location(QWidget):
 
         latitude_widget.layout().addWidget(latitude_label)
 
+        latitude_value_label = QLabel(self.texts.empty_value, self)
+        latitude_value_label.setFont(
+            QFont(Settings.FONT.FAMILY, Settings.FONT.SIZE_DEFAULT, QFont.Weight.Normal)
+        )
+        latitude_widget.layout().addWidget(latitude_value_label)
+
         longitude_widget = QWidget(self)
         longitude_widget.setObjectName("location-longitude-widget")
         longitude_widget.setMinimumWidth(map_settings.COORDINATE_WIDGET_MIN_WIDTH)
@@ -352,6 +414,12 @@ class Location(QWidget):
         )
         longitude_widget.layout().addWidget(longitude_label)
 
+        longitude_value_label = QLabel(self.texts.empty_value, self)
+        longitude_value_label.setFont(
+            QFont(Settings.FONT.FAMILY, Settings.FONT.SIZE_DEFAULT, QFont.Weight.Normal)
+        )
+        longitude_widget.layout().addWidget(longitude_value_label)
+
         layout.addWidget(latitude_widget)
         layout.addWidget(longitude_widget)
 
@@ -368,8 +436,10 @@ class Location(QWidget):
         self.ui = Location.UI(
             latitude_widget=latitude_widget,
             latitude_label=latitude_label,
+            latitude_value_label=latitude_value_label,
             longitude_widget=longitude_widget,
             longitude_label=longitude_label,
+            longitude_value_label=longitude_value_label,
             crosshair_button=crosshair_button,
         )
         self._finalize_ui_hooks()
@@ -421,31 +491,36 @@ class Location(QWidget):
             self.ui.crosshair_button, Qt.AlignmentFlag.AlignCenter
         )
 
-    def set_latitude(self, latitude: float):
-        """Append a latitude value label inside the latitude stack.
+    def set_coordinates(self, latitude: float, longitude: float) -> None:
+        """Update coordinate value labels while preserving axis title labels."""
+        logger.info(
+            "Setting coordinates",
+            latitude=latitude,
+            longitude=longitude,
+        )
+        self.set_latitude(latitude)
+        self.set_longitude(longitude)
 
-        Args:
-            latitude: Latitude value to display as text.
-        """
-        logger.info(f"Setting latitude to {latitude}.")
-        self.ui.latitude_widget.layout().addWidget(QLabel(str(latitude)))
+    def set_latitude(self, latitude: float) -> None:
+        """Update the latitude value label only."""
+        self.ui.latitude_value_label.setText(str(latitude))
 
-    def set_longitude(self, longitude: float):
-        """Append a longitude value label inside the longitude stack.
+    def set_longitude(self, longitude: float) -> None:
+        """Update the longitude value label only."""
+        self.ui.longitude_value_label.setText(str(longitude))
 
-        Args:
-            longitude: Longitude value to display as text.
-        """
-        logger.info(f"Setting longitude to {longitude}.")
-        self.ui.longitude_widget.layout().addWidget(QLabel(str(longitude)))
+    def clear_latitude(self) -> None:
+        """Reset the latitude value label without touching the title."""
+        self.ui.latitude_value_label.setText(self.texts.empty_value)
 
-    def clear_latitude(self):
-        """Clear latitude values from this location row placeholder."""
-        pass
+    def clear_longitude(self) -> None:
+        """Reset the longitude value label without touching the title."""
+        self.ui.longitude_value_label.setText(self.texts.empty_value)
 
-    def clear_longitude(self):
-        """Clear longitude values from this location row placeholder."""
-        pass
+    def clear_coordinates(self) -> None:
+        """Reset both coordinate value labels without touching the titles."""
+        self.clear_latitude()
+        self.clear_longitude()
 
 
 class Coordinates(QFrame):
@@ -467,7 +542,7 @@ class Coordinates(QFrame):
         simulation_state_off: LeadingIconLabel
         simulation_state_on: LeadingIconLabel
         location_widget: Location
-        simulated_location_widget: Location
+        spoofed_location_widget: Location
         play_button: ToolButton
 
     def __init__(self, parent: QWidget = None):
@@ -527,7 +602,7 @@ class Coordinates(QFrame):
             tooltip=self.texts.play_button_tooltip,
             icon_size=button_settings.TOOLBUTTON_PROMINENT_ICON_SIZE,
         )
-        play_button.setEnabled(True)
+        play_button.setEnabled(False)
         play_button.setProperty("toggle", False)
         play_button.setProperty("simulation-control", True)
         play_button.clicked.connect(self._on_play_button_clicked)
@@ -536,10 +611,10 @@ class Coordinates(QFrame):
         location_widget = Location(self, icon_qt_path(GenericIcons.LOCATION))
         layout.addWidget(location_widget)
 
-        simulated_location_widget = Location(
+        spoofed_location_widget = Location(
             self, icon_qt_path(GenericIcons.FAKE_LOCATION)
         )
-        layout.addWidget(simulated_location_widget)
+        layout.addWidget(spoofed_location_widget)
 
         self.setLayout(layout)
 
@@ -549,7 +624,7 @@ class Coordinates(QFrame):
             simulation_state_off=simulation_state_off,
             simulation_state_on=simulation_state_on,
             location_widget=location_widget,
-            simulated_location_widget=simulated_location_widget,
+            spoofed_location_widget=spoofed_location_widget,
             play_button=play_button,
         )
         self._finalize_ui_hooks()
@@ -562,7 +637,7 @@ class Coordinates(QFrame):
         pb.set_icon(GenericIcons.PAUSE if pb.property("toggle") else GenericIcons.PLAY)
         pb.apply_theme_icons(theme)
         self.ui.location_widget.apply_row_icons(theme, GenericIcons.LOCATION)
-        self.ui.simulated_location_widget.apply_row_icons(
+        self.ui.spoofed_location_widget.apply_row_icons(
             theme, GenericIcons.FAKE_LOCATION
         )
 
@@ -577,9 +652,9 @@ class Coordinates(QFrame):
         return self.ui.location_widget
 
     @property
-    def simulated_location_widget(self) -> Location:
+    def spoofed_location_widget(self) -> Location:
         """Return the simulated-location coordinate widget."""
-        return self.ui.simulated_location_widget
+        return self.ui.spoofed_location_widget
 
     def _finalize_ui_hooks(self) -> None:
         """Run the final UI setup hooks for the coordinates section."""
@@ -605,8 +680,16 @@ class Coordinates(QFrame):
             self.ui.location_widget, Qt.AlignmentFlag.AlignCenter
         )
         self.layout().setAlignment(
-            self.ui.simulated_location_widget, Qt.AlignmentFlag.AlignCenter
+            self.ui.spoofed_location_widget, Qt.AlignmentFlag.AlignCenter
         )
+
+    def unlock_play_button(self) -> None:
+        """Unlock the play button."""
+        self.ui.play_button.setEnabled(True)
+
+    def lock_play_button(self) -> None:
+        """Lock the play button."""
+        self.ui.play_button.setEnabled(False)
 
     def set_simulation_state(self, state: bool) -> None:
         """Animate and reflect active vs inactive simulation in the UI.
@@ -751,8 +834,12 @@ class MapBlock(QWidget):
             map_render_failed_placeholder=map_render_failed_placeholder,
         )
         self._placeholder_helper_anim: QSequentialAnimationGroup | None = None
-        self._pending_render_simulation_id: str | None = None
-        self._active_simulation_id: str | None = None
+        self._pending_render_simulation_id: str | None = (
+            None  # The simulation id of the map that is currently being rendered
+        )
+        self._active_simulation_id: str | None = (
+            None  # Map block is associated with a simulation
+        )
 
         self._finalize_ui_hooks()
 
@@ -793,6 +880,10 @@ class MapBlock(QWidget):
         )
         signals.UI.MapRendered.connect(self._on_map_rendered)
         signals.UI.MapRenderFailed.connect(self._on_map_render_failed)
+        signals.UI.MapMarkerClicked.connect(self._on_map_marker_clicked)
+        signals.SIMULATION.SimulationLocationValidated.connect(
+            self._on_simulation_location_validated
+        )
         signals.SIMULATION.SimulationDeleted.connect(self._on_simulation_deleted)
 
     def is_canvas_visible(self) -> bool:
@@ -853,20 +944,6 @@ class MapBlock(QWidget):
         self.show_device_required_placeholder()
         self._on_run_helper_animation()
 
-    def _map_html_path(self, simulation_id: str) -> Path:
-        """Return the expected on-disk HTML path for a simulation map."""
-        return (
-            get_or_create_application_dir()
-            / "simulations"
-            / simulation_id
-            / "map"
-            / f"{simulation_id}.html"
-        )
-
-    def _load_map_html(self, simulation_id: str) -> None:
-        """Load the rendered map HTML into the canvas when available."""
-        self._load_map_html_from_path(simulation_id, self._map_html_path(simulation_id))
-
     def _load_map_html_from_path(self, simulation_id: str, html_path: Path) -> None:
         """Load map HTML from a concrete on-disk path into the canvas."""
         if not html_path.is_file():
@@ -908,6 +985,7 @@ class MapBlock(QWidget):
         self._pending_render_simulation_id = simulation_id
         self.show_map_loading_placeholder()
         self._on_run_helper_animation()
+        self.ui.coordinates.spoofed_location_widget.clear_coordinates()
         signals.UI.RenderMapRequested.emit(simulation_id)
 
     def _is_stale_render_update(self, simulation_id: str) -> bool:
@@ -948,6 +1026,54 @@ class MapBlock(QWidget):
         self.show_map_render_failed_placeholder()
         self._on_run_helper_animation()
 
+    @Slot(int, str, int, float, float)
+    def _on_map_marker_clicked(
+        self,
+        km: int,
+        line_code: str,
+        line_troncon: int,
+        latitude: float,
+        longitude: float,
+    ) -> None:
+        """Handle marker click event."""
+        if self._active_simulation_id is not None:
+            signals.SIMULATION.SimulationLocationRequested.emit(
+                self._active_simulation_id,
+                km,
+                line_code,
+                line_troncon,
+                latitude,
+                longitude,
+            )
+
+    @Slot(str, int, str, int, float, float, str)
+    def _on_simulation_location_validated(
+        self,
+        simulation_id: str,
+        km: int,
+        line_code: str,
+        line_troncon: int,
+        latitude: float,
+        longitude: float,
+        label: str,
+    ) -> None:
+        """Update the simulated location row after core validation succeeds."""
+        if simulation_id != self._active_simulation_id:
+            logger.debug(
+                "MapBlock: ignoring stale simulation location validation",
+                simulation_id=simulation_id,
+                active_simulation_id=self._active_simulation_id,
+                km=km,
+                line_code=line_code,
+                line_troncon=line_troncon,
+            )
+            return
+        self.ui.coordinates.spoofed_location_widget.set_coordinates(
+            latitude,
+            longitude,
+        )
+        self.ui.coordinates.unlock_play_button()
+
     @Slot(str, str)
     def _on_device_selection_failed(self, device_id: str, device_name: str) -> None:
         """Pulse placeholder when device selection fails."""
@@ -962,6 +1088,7 @@ class MapBlock(QWidget):
     def _on_remove_active_device_succeeded(self, device_id: str) -> None:
         """Reset placeholder when the active device is removed."""
         self._reset_to_device_required_placeholder()
+        self.ui.coordinates.lock_play_button()
 
     @Slot(str)
     def _on_simulation_deleted(self, simulation_id: str) -> None:
@@ -972,6 +1099,7 @@ class MapBlock(QWidget):
         ):
             return
         self._reset_to_device_required_placeholder()
+        self.ui.coordinates.lock_play_button()
 
     @Slot()
     def _on_run_helper_animation(self) -> None:

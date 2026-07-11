@@ -11,11 +11,16 @@ from PySide6.QtCore import Slot
 from controller.domains.app_sub_controller import AppSubController
 from controller.helper import validate_model_entrypoint, validate_view
 from core.signals import (
-    CoreSignal,
+    CoreSignals,
     MapRenderedPayload,
     SimulationCreatedPayload,
+    SimulationCreationFailedPayload,
+    SimulationDeletedPayload,
+    SimulationDeleteSkippedPayload,
+    SimulationLocationValidatedPayload,
     SimulationMapFileChangedPayload,
     SimulationPositionChangedPayload,
+    SimulationRestoredPayload,
     SimulationStateChangedPayload,
 )
 from gui.signals import signals
@@ -40,25 +45,45 @@ class SimulationSubController(AppSubController):
         )  # Ensuring no simulation is running before device is removed by adb subcontroller
 
     def connect_model_signals(self) -> None:
-        self.model_entrypoint.subscribe(
-            CoreSignal.SIMULATION_CREATED,
+        self.model_entrypoint.signal_bus.subscribe(
+            CoreSignals.SIMULATION_CREATED,
             self._on_simulation_created,
         )
-        self.model_entrypoint.subscribe(
-            CoreSignal.MAP_RENDERED,
+        self.model_entrypoint.signal_bus.subscribe(
+            CoreSignals.SIMULATION_RESTORED,
+            self._on_simulation_restored,
+        )
+        self.model_entrypoint.signal_bus.subscribe(
+            CoreSignals.SIMULATION_CREATION_FAILED,
+            self._on_simulation_creation_failed,
+        )
+        self.model_entrypoint.signal_bus.subscribe(
+            CoreSignals.SIMULATION_DELETED,
+            self._on_simulation_deleted,
+        )
+        self.model_entrypoint.signal_bus.subscribe(
+            CoreSignals.SIMULATION_DELETE_SKIPPED,
+            self._on_simulation_delete_skipped,
+        )
+        self.model_entrypoint.signal_bus.subscribe(
+            CoreSignals.MAP_RENDERED,
             self._on_map_rendered,
         )
-        self.model_entrypoint.subscribe(
-            CoreSignal.SIMULATION_STATE_CHANGED,
+        self.model_entrypoint.signal_bus.subscribe(
+            CoreSignals.SIMULATION_STATE_CHANGED,
             self._on_simulation_state_changed,
         )
-        self.model_entrypoint.subscribe(
-            CoreSignal.SIMULATION_POSITION_CHANGED,
+        self.model_entrypoint.signal_bus.subscribe(
+            CoreSignals.SIMULATION_POSITION_CHANGED,
             self._on_simulation_position_changed,
         )
-        self.model_entrypoint.subscribe(
-            CoreSignal.SIMULATION_MAP_FILE_CHANGED,
+        self.model_entrypoint.signal_bus.subscribe(
+            CoreSignals.SIMULATION_MAP_FILE_CHANGED,
             self._on_simulation_map_file_changed,
+        )
+        self.model_entrypoint.signal_bus.subscribe(
+            CoreSignals.SIMULATION_LOCATION_VALIDATED,
+            self._on_simulation_location_validated,
         )
 
     @validate_model_entrypoint
@@ -86,6 +111,18 @@ class SimulationSubController(AppSubController):
     ) -> None:
         """Refresh persisted metadata when simulation map file changes."""
         self.model_entrypoint.persist_simulation(payload.simulation_id)
+
+    @validate_model_entrypoint
+    def _on_simulation_location_validated(
+        self, payload: SimulationLocationValidatedPayload
+    ) -> None:
+        """Apply validated map milestone selection to simulation spoofed location."""
+        self.model_entrypoint.set_simulation_spoofed_location(
+            payload.simulation_id,
+            payload.lat,
+            payload.lon,
+            payload,
+        )
 
     def is_simulation_active(self, id: str) -> bool:
         """Check if the simulation is active."""
@@ -160,41 +197,16 @@ class SimulationSubController(AppSubController):
             input_device_id=device_id,
             input_device_name=device_name,
         )
-        try:
-            self.model_entrypoint.create_simulation(device_id=device_id)
-        except (
-            AttributeError,
-            ValueError,
-        ) as e:  # AttributeError: Device not found, ValueError: Device not in ADB server paired devices repository
-            logger.error(
-                "SimulationSubController: failed to create simulation",
-                error=str(e),
-                device_id=device_id,
-            )
-            self.view.forward_device_selection_failed(device_id, device_name)
+        self.model_entrypoint.create_simulation(device_id=device_id)
 
     @Slot(str)
     def _on_remove_device_requested(self, device_id: str) -> None:
         """Handle the remove device requested event."""
-        try:
-            self.model_entrypoint.delete_simulation_for_device(device_id)
-            self.view.forward_remove_active_device_succeeded(device_id)
-        except (
-            ValueError
-        ) as e:  # Simulation for device not found, the device was not active
-            logger.debug(
-                "SimulationSubController: no simulation found for device, safely ignoring",
-                error=str(e),
-                device_id=device_id,
-            )
-            return
-        except Exception as e:
-            logger.error(
-                "SimulationSubController: failed to delete simulation for device",
-                error=str(e),
-                device_id=device_id,
-            )
-            return
+        logger.debug(
+            "SimulationSubController: remove device requested",
+            device_id=device_id,
+        )
+        self.model_entrypoint.delete_simulation_for_device(device_id)
 
     def _on_simulation_created(self, payload: SimulationCreatedPayload) -> None:
         """Handle the simulation created event."""
@@ -206,6 +218,69 @@ class SimulationSubController(AppSubController):
             return
         logger.success(
             "SimulationSubController: simulation created",
+            simulation_id=payload.simulation_id,
+            device_id=payload.device_id,
+            device_name=payload.device_name,
+        )
+        self.view.forward_device_selection_succeeded(
+            payload.simulation_id,
+            payload.device_id,
+            payload.device_name,
+        )
+
+    @validate_view
+    def _on_simulation_creation_failed(
+        self, payload: SimulationCreationFailedPayload
+    ) -> None:
+        """Forward simulation creation failure to the device selection UI."""
+        logger.error(
+            "SimulationSubController: simulation creation failed",
+            device_id=payload.device_id,
+            device_name=payload.device_name,
+            reason=payload.reason,
+        )
+        self.view.forward_device_selection_failed(
+            payload.device_id,
+            payload.device_name,
+        )
+
+    @validate_view
+    def _on_simulation_deleted(self, payload: SimulationDeletedPayload) -> None:
+        """Forward active-device removal success when the payload carries device context."""
+        if payload.device_id is None:
+            logger.warning(
+                "SimulationSubController: simulation deleted without device id",
+                simulation_id=payload.simulation_id,
+            )
+            return
+        logger.info(
+            "SimulationSubController: simulation deleted for device",
+            simulation_id=payload.simulation_id,
+            device_id=payload.device_id,
+        )
+        self.view.forward_remove_active_device_succeeded(payload.device_id)
+
+    @validate_view
+    def _on_simulation_delete_skipped(
+        self, payload: SimulationDeleteSkippedPayload
+    ) -> None:
+        """Keep remove-device requests quiet when no active simulation exists."""
+        logger.debug(
+            "SimulationSubController: simulation delete skipped",
+            device_id=payload.device_id,
+            reason=payload.reason,
+        )
+
+    def _on_simulation_restored(self, payload: SimulationRestoredPayload) -> None:
+        """Handle the simulation restored event."""
+        if not payload.device_id:
+            logger.error(
+                "SimulationSubController: simulation restored without device",
+                simulation_id=payload.simulation_id,
+            )
+            return
+        logger.success(
+            "SimulationSubController: simulation restored",
             simulation_id=payload.simulation_id,
             device_id=payload.device_id,
             device_name=payload.device_name,

@@ -2,7 +2,7 @@ from abc import ABC
 from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
-from typing import Any, Callable, Literal, Mapping, overload
+from typing import Callable, Literal, Mapping, Tuple, TypeVar
 
 from core.adb.client import AdbClient
 from core.adb.server import AdbServer
@@ -20,30 +20,19 @@ from core.devices import (
     phone_stable_key_is_collision_resistant,
     serialize_phone_collection,
 )
-from core.location import Location
+from core.signal_bus import InMemoryCoreSignalBus
 from core.signals import (
     ActivityLogFileUpdatedPayload,
     AdbServerStartedPayload,
-    AdbServerStateChangedPayload,
     AdbServerStoppedPayload,
     CoreSignal,
-    DeviceAuthentificationFailedPayload,
-    DeviceAuthentificationSucceededPayload,
+    CoreSignals,
     DevicesUpdatedPayload,
-    ErrorRaisedPayload,
     HostComputerIdentityPayload,
-    InMemoryCoreSignalBus,
-    LogMessagePayload,
-    MapRenderedPayload,
-    MapRenderFailedPayload,
-    SignalHandler,
-    SimulationCreatedPayload,
-    SimulationDeletedPayload,
-    SimulationMapFileChangedPayload,
-    SimulationPositionChangedPayload,
-    SimulationStateChangedPayload,
+    SimulationLocationValidatedPayload,
 )
-from core.simulation import Simulation, SimulationRepository
+from core.simulation import Simulation
+from core.simulation_service import SimulationService
 from core.work.authentificate_device_work import (
     AuthenticateDeviceWork,
     AuthentificateDeviceOutcome,
@@ -61,8 +50,14 @@ from core.work.refresh_known_devices_work import (
 )
 from core.work.render_map_work import RenderMapOutcome, RenderMapWork
 from core.work.startup_work import StartupCoreRuntimeWork, StartupOutcome
+from core.work.validate_simulation_marker_location_work import (
+    ValidateSimulationMarkerLocationOutcome,
+    ValidateSimulationMarkerLocationWork,
+)
 from core.work.works_repository import CORE_RUNTIME_WORKS
 from logger import logger
+
+PayloadT = TypeVar("PayloadT")
 
 # Main-thread appliers keyed by exact worker outcome type (AsyncRunner completion).
 CoreRuntimeResultApplier = Callable[["ModelEntrypoint", CoreRuntimeWorkOutcome], None]
@@ -111,6 +106,19 @@ class Entrypoint(ABC):
 
         self._signal_bus: InMemoryCoreSignalBus = InMemoryCoreSignalBus()
 
+    @property
+    def signal_bus(self) -> InMemoryCoreSignalBus:
+        """Return the core domain signal bus."""
+        return self._signal_bus
+
+    def emit_core_signal(
+        self,
+        signal: CoreSignal[PayloadT],
+        payload: PayloadT,
+    ) -> None:
+        """Publish one typed payload on the core signal bus."""
+        self.signal_bus.emit(signal, payload)
+
     @cached_property
     def config_dir(self) -> Path:
         return get_or_create_config_dir()
@@ -118,258 +126,6 @@ class Entrypoint(ABC):
     @cached_property
     def application_dir(self) -> Path:
         return get_or_create_application_dir()
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.ADB_SERVER_STARTED],
-        handler: SignalHandler[AdbServerStartedPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.ADB_SERVER_STOPPED],
-        handler: SignalHandler[AdbServerStoppedPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.ADB_SERVER_STATE_CHANGED],
-        handler: SignalHandler[AdbServerStateChangedPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.DEVICE_AUTHENTIFICATION_SUCCEEDED],
-        handler: SignalHandler[DeviceAuthentificationSucceededPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.DEVICE_AUTHENTIFICATION_FAILED],
-        handler: SignalHandler[DeviceAuthentificationFailedPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.DEVICES_UPDATED],
-        handler: SignalHandler[DevicesUpdatedPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.SIMULATION_CREATED],
-        handler: SignalHandler[SimulationCreatedPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.SIMULATION_DELETED],
-        handler: SignalHandler[SimulationDeletedPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.SIMULATION_STATE_CHANGED],
-        handler: SignalHandler[SimulationStateChangedPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.SIMULATION_POSITION_CHANGED],
-        handler: SignalHandler[SimulationPositionChangedPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.SIMULATION_MAP_FILE_CHANGED],
-        handler: SignalHandler[SimulationMapFileChangedPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.ERROR_RAISED],
-        handler: SignalHandler[ErrorRaisedPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.LOG_MESSAGE],
-        handler: SignalHandler[LogMessagePayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.HOST_COMPUTER_IDENTITY_UPDATED],
-        handler: SignalHandler[HostComputerIdentityPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.ACTIVITY_LOG_FILE_UPDATED],
-        handler: SignalHandler[ActivityLogFileUpdatedPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.MAP_RENDERED],
-        handler: SignalHandler[MapRenderedPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.MAP_RENDER_FAILED],
-        handler: SignalHandler[MapRenderFailedPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(self, signal: CoreSignal, handler: SignalHandler[object]) -> None: ...
-
-    def subscribe(self, signal: CoreSignal, handler: SignalHandler[Any]) -> None:
-        self._signal_bus.subscribe(signal, handler)
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.ADB_SERVER_STARTED],
-        handler: SignalHandler[AdbServerStartedPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.ADB_SERVER_STOPPED],
-        handler: SignalHandler[AdbServerStoppedPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.ADB_SERVER_STATE_CHANGED],
-        handler: SignalHandler[AdbServerStateChangedPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.DEVICE_AUTHENTIFICATION_SUCCEEDED],
-        handler: SignalHandler[DeviceAuthentificationSucceededPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.DEVICE_AUTHENTIFICATION_FAILED],
-        handler: SignalHandler[DeviceAuthentificationFailedPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.DEVICES_UPDATED],
-        handler: SignalHandler[DevicesUpdatedPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.SIMULATION_CREATED],
-        handler: SignalHandler[SimulationCreatedPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.SIMULATION_DELETED],
-        handler: SignalHandler[SimulationDeletedPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.SIMULATION_STATE_CHANGED],
-        handler: SignalHandler[SimulationStateChangedPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.SIMULATION_POSITION_CHANGED],
-        handler: SignalHandler[SimulationPositionChangedPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.SIMULATION_MAP_FILE_CHANGED],
-        handler: SignalHandler[SimulationMapFileChangedPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.ERROR_RAISED],
-        handler: SignalHandler[ErrorRaisedPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.LOG_MESSAGE],
-        handler: SignalHandler[LogMessagePayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.HOST_COMPUTER_IDENTITY_UPDATED],
-        handler: SignalHandler[HostComputerIdentityPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.ACTIVITY_LOG_FILE_UPDATED],
-        handler: SignalHandler[ActivityLogFileUpdatedPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.MAP_RENDERED],
-        handler: SignalHandler[MapRenderedPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.MAP_RENDER_FAILED],
-        handler: SignalHandler[MapRenderFailedPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self, signal: CoreSignal, handler: SignalHandler[object]
-    ) -> None: ...
-
-    def unsubscribe(self, signal: CoreSignal, handler: SignalHandler[Any]) -> None:
-        self._signal_bus.unsubscribe(signal, handler)
 
 
 class ModelEntrypoint(Entrypoint):
@@ -388,8 +144,9 @@ class ModelEntrypoint(Entrypoint):
         self._use_mock_adb: bool = use_mock_adb
         self._activity_log_file: Path | None = None
         self._resolve_activity_log_file()
-        self._simulations: SimulationRepository = SimulationRepository(
-            self.application_dir / "simulations"
+        self._simulation_service = SimulationService(
+            self,
+            save_dir=self.application_dir / "simulations",
         )
 
     @property
@@ -402,6 +159,43 @@ class ModelEntrypoint(Entrypoint):
         """Return the active ADB server instance if available."""
         return self._adb_server
 
+    @adb_server.setter
+    def adb_server(self, value: AdbServer | None) -> None:
+        """Bind or clear the active ADB server instance."""
+        self._adb_server = value
+
+    @property
+    def adb_client(self) -> AdbClient | None:
+        """Return the active ADB client instance if available."""
+        return self._adb_client
+
+    @adb_client.setter
+    def adb_client(self, value: AdbClient | None) -> None:
+        """Bind or clear the active ADB client instance."""
+        self._adb_client = value
+
+    def register_paired_device(self, phone: Phone) -> None:
+        """Add one paired phone to the active ADB server repository."""
+        if self._adb_server is None:
+            return
+        self._adb_server.paired_devices.add(phone)
+
+    def restore_persisted_simulation(self, simulation: Simulation) -> None:
+        """Restore one persisted simulation into the in-memory repository."""
+        self._simulation_service.restore_persisted_simulation(simulation)
+
+    def sync_last_active_device_id(self, device_id: str | None) -> None:
+        """Update the persisted last-active device selection."""
+        self._simulation_service.sync_last_active_device_id(device_id)
+
+    def set_host_identity(self, stable_key: str) -> None:
+        """Apply persisted install identity to the host descriptor and emit."""
+        self._host.descriptor.stable_key = stable_key
+        self.emit_core_signal(
+            CoreSignals.HOST_COMPUTER_IDENTITY_UPDATED,
+            HostComputerIdentityPayload(stable_key=stable_key),
+        )
+
     @property
     def activity_log_file(self) -> Path | None:
         """Return the current app-wide activity log path, creating a default when unset."""
@@ -411,8 +205,8 @@ class ModelEntrypoint(Entrypoint):
     def activity_log_file(self, value: Path) -> None:
         """Set the current app-wide activity log path."""
         self._activity_log_file = value
-        self._signal_bus.emit(
-            CoreSignal.ACTIVITY_LOG_FILE_UPDATED,
+        self.emit_core_signal(
+            CoreSignals.ACTIVITY_LOG_FILE_UPDATED,
             ActivityLogFileUpdatedPayload(path=value),
         )
 
@@ -422,8 +216,8 @@ class ModelEntrypoint(Entrypoint):
             self._activity_log_file = default_activity_log_file_path(
                 self.application_dir
             )
-            self._signal_bus.emit(
-                CoreSignal.ACTIVITY_LOG_FILE_UPDATED,
+            self.emit_core_signal(
+                CoreSignals.ACTIVITY_LOG_FILE_UPDATED,
                 ActivityLogFileUpdatedPayload(path=self._activity_log_file),
             )
         return self._activity_log_file
@@ -518,8 +312,8 @@ class ModelEntrypoint(Entrypoint):
         Restart the ADB server and keep the instance in entrypoint state.
         """
         if self._adb_server is not None:
-            self._signal_bus.emit(
-                CoreSignal.ADB_SERVER_STOPPED,
+            self.emit_core_signal(
+                CoreSignals.ADB_SERVER_STOPPED,
                 AdbServerStoppedPayload(
                     adb_binary_path=str(self._adb_server.binary.path),
                 ),
@@ -529,14 +323,14 @@ class ModelEntrypoint(Entrypoint):
                 "ModelEntrypoint: ADB server restarted",
                 adb_path=str(self._adb_server.binary.path),
             )
-            self._signal_bus.emit(
-                CoreSignal.ADB_SERVER_STARTED,
+            self.emit_core_signal(
+                CoreSignals.ADB_SERVER_STARTED,
                 AdbServerStartedPayload(
                     adb_binary_path=str(self._adb_server.binary.path),
                 ),
             )
-            self._signal_bus.emit(
-                CoreSignal.DEVICES_UPDATED,
+            self.emit_core_signal(
+                CoreSignals.DEVICES_UPDATED,
                 DevicesUpdatedPayload(
                     devices=serialize_phone_collection(self.get_known_devices()),
                 ),
@@ -646,14 +440,9 @@ class ModelEntrypoint(Entrypoint):
             paired_devices.remove(
                 paired
             )  # Remove the device from the paired devices, it is not in the newly discovered devices
-            try:
-                self.delete_simulation_for_device(
-                    paired.id
-                )  # Delete the simulation for the device
-            except (
-                ValueError
-            ):  # The simulation for the device was not found, it was not active
-                pass
+            self.delete_simulation_for_device(
+                paired.id
+            )  # Delete the simulation for the device (emits skipped when absent)
             changed = True  # At least one device was removed, UI needs to be refreshed
 
         if changed:
@@ -668,180 +457,88 @@ class ModelEntrypoint(Entrypoint):
         )
 
     def create_simulation(self, device_id: str) -> None:
-        """
-        Create a new simulation.
-
-        Emits a SIMULATION_CREATED signal.
-
-        Args:
-            device_id: The id of the device to create the simulation for.
-
-        Returns:
-            None
-
-        Raises:
-            AttributeError: If the device is not found.
-            ValueError: If the device is not in the repository.
-        """
-        device: Phone | None = self.get_device(device_id)
-        if device is None:
-            raise AttributeError(f"Device with id {device_id} not found")
-        if self._adb_server is None:
-            raise AttributeError(
-                "ADB server must be initialized before creating a simulation"
-            )
-        self._adb_server.set_working_device(device)
-        simulation: Simulation | None = self._get_simulation_for_device(device_id)
-        if simulation is None:
-            simulation = Simulation(device=device)
-            self._simulations.add(simulation)
-        else:
-            logger.info(
-                "ModelEntrypoint: reusing existing simulation for device",
-                simulation_id=simulation.id,
-                device_id=device_id,
-            )
-        self._signal_bus.emit(
-            CoreSignal.SIMULATION_CREATED,
-            SimulationCreatedPayload(
-                simulation_id=simulation.id,
-                device_id=device.id,
-                device_name=device.name,
-            ),
-        )
-        self._simulations.last_active_device_id = device_id
+        """Create a new simulation or restore an existing one for a paired device."""
+        self._simulation_service.create_simulation(device_id)
 
     def get_simulation(self, id: str) -> Simulation | None:
-        """
-        Get a simulation by id.
-        """
-        return self._simulations.get(id)
+        """Get a simulation by id."""
+        return self._simulation_service.get_simulation(id)
 
     def is_simulation_active(self, id: str) -> bool:
-        """
-        Check if a simulation is active.
-        """
-        simulation: Simulation | None = self._simulations.get(id)
-        if simulation is None:
-            raise ValueError(f"Simulation with id {id} not found")
-        return simulation.active
+        """Check if a simulation is active."""
+        return self._simulation_service.is_simulation_active(id)
 
     def set_simulation_active(self, id: str, active: bool) -> None:
-        """
-        Set a simulation active or inactive.
-        """
-        simulation: Simulation | None = self._simulations.get(id)
-        if simulation is None:
-            raise ValueError(f"Simulation with id {id} not found")
-        if simulation.active == active:
-            return
-        simulation.active = active
-        self._signal_bus.emit(
-            CoreSignal.SIMULATION_STATE_CHANGED,
-            SimulationStateChangedPayload(
-                simulation_id=simulation.id,
-                active=simulation.active,
-            ),
+        """Set a simulation active or inactive."""
+        self._simulation_service.set_simulation_active(id, active)
+
+    def set_simulation_real_location(
+        self, simulation_id: str, lat: float, lon: float
+    ) -> None:
+        """Set the simulation real device location and emit position changed."""
+        self._simulation_service.set_simulation_real_location(simulation_id, lat, lon)
+
+    def set_simulation_spoofed_location(
+        self,
+        simulation_id: str,
+        lat: float,
+        lon: float,
+        marker: SimulationLocationValidatedPayload | None = None,
+    ) -> None:
+        """Set the simulation spoofed location and emit position changed."""
+        self._simulation_service.set_simulation_spoofed_location(
+            simulation_id,
+            lat,
+            lon,
+            marker,
         )
 
-    def update_simulation(self, id: str, **kwargs: Any) -> None:
-        """
-        Update a simulation.
-        """
-        simulation: Simulation | None = self._simulations.get(id)
+    def set_simulation_map_file(self, simulation_id: str, map_file: Path) -> None:
+        """Set the simulation map file path and emit map-file changed."""
+        self._simulation_service.set_simulation_map_file(simulation_id, map_file)
+
+    def validate_simulation_marker_location(
+        self,
+        simulation_id: str,
+        km: int,
+        line_code: str,
+        line_troncon: int,
+        latitude: float,
+        longitude: float,
+    ) -> ValidateSimulationMarkerLocationOutcome:
+        """Validate a map milestone (worker thread). Apply via :meth:`apply_result`."""
+        simulation = self.get_simulation(simulation_id)
         if simulation is None:
-            raise ValueError(f"Simulation with id {id} not found")
-        for key, value in kwargs.items():
-            if key not in simulation.__class__.__dataclass_fields__:
-                raise ValueError(f"Unknown simulation field: {key}")
-            current = getattr(simulation, key)
-            if current == value:
-                continue
-            setattr(simulation, key, value)
-            if key == "active":
-                self._signal_bus.emit(
-                    CoreSignal.SIMULATION_STATE_CHANGED,
-                    SimulationStateChangedPayload(
-                        simulation_id=simulation.id,
-                        active=simulation.active,
-                    ),
-                )
-            elif key in ("real_location", "fake_location"):
-                if isinstance(value, Location):
-                    self._signal_bus.emit(
-                        CoreSignal.SIMULATION_POSITION_CHANGED,
-                        SimulationPositionChangedPayload(
-                            simulation_id=simulation.id,
-                            lat=value.lat,
-                            lon=value.lon,
-                            label=value.label,
-                        ),
-                    )
-                else:
-                    raise ValueError(f"Invalid location: {value}")
-            elif key == "map_file":
-                if isinstance(value, Path):
-                    self._signal_bus.emit(
-                        CoreSignal.SIMULATION_MAP_FILE_CHANGED,
-                        SimulationMapFileChangedPayload(
-                            simulation_id=simulation.id,
-                            map_file_path=value,
-                        ),
-                    )
-                else:
-                    raise ValueError(f"Invalid map file: {value}")
+            raise ValueError(f"Simulation with id {simulation_id} not found")
+
+        return ValidateSimulationMarkerLocationWork(
+            simulation_id=simulation_id,
+            km=km,
+            line_code=line_code,
+            line_troncon=line_troncon,
+            latitude=latitude,
+            longitude=longitude,
+        ).run()
 
     def persist_simulation(self, simulation_id: str) -> None:
         """Write one simulation metadata file to disk."""
-        simulation = self._simulations.get(simulation_id)
-        if simulation is None:
-            logger.warning(
-                "ModelEntrypoint: persist_simulation skipped (simulation not found)",
-                simulation_id=simulation_id,
-            )
-            return
-        self._simulations.write_simulation(simulation)
+        self._simulation_service.persist_simulation(simulation_id)
 
     def delete_simulation(self, simulation: Simulation) -> None:
-        """
-        Delete a simulation by id.
-        """
-        return self._simulations.remove(simulation)
+        """Delete a simulation by id."""
+        self._simulation_service.delete_simulation(simulation)
 
     def persist_simulations(self) -> None:
         """Persist every simulation and the repository index to disk."""
-        self._simulations.write_all()
+        self._simulation_service.persist_simulations()
 
     def _get_simulation_for_device(self, device_id: str) -> Simulation | None:
         """Return the existing simulation for a device when one is already tracked."""
-        for simulation in self._simulations:
-            device = simulation.device
-            if device is not None and device.id == device_id:
-                return simulation
-        return None
+        return self._simulation_service._get_simulation_for_device(device_id)
 
     def delete_simulation_for_device(self, device_id: str) -> None:
-        """
-        Delete a simulation for a device by id.
-        """
-        simulation = self._get_simulation_for_device(device_id)
-        if simulation is not None:
-            simulation_id = simulation.id
-            self.delete_simulation(simulation)
-            self._signal_bus.emit(
-                CoreSignal.SIMULATION_DELETED,
-                SimulationDeletedPayload(simulation_id=simulation_id),
-            )
-            if self._adb_server is not None:
-                working_device = self._adb_server.get_working_device()
-                if working_device is not None and working_device.id == device_id:
-                    self._adb_server.clear_working_device()
-            if self._simulations.last_active_device_id == device_id:
-                self._simulations.last_active_device_id = None
-            return
-        raise ValueError(
-            f"Simulation for device with id {device_id} not found or working device not cleared"
-        )
+        """Delete a simulation for a device by id."""
+        self._simulation_service.delete_simulation_for_device(device_id)
 
     @staticmethod
     def render_map(simulation_id: str, application_dir: Path) -> RenderMapOutcome:
@@ -869,6 +566,24 @@ class ModelEntrypoint(Entrypoint):
             simulation_id=simulation_id,
             application_dir=application_dir,
         ).run()
+
+    def get_map_file_for_simulation(self, simulation_id: str) -> Path | None:
+        """
+        Get the map file for a simulation.
+        """
+        simulation = self.get_simulation(simulation_id)
+        if simulation is None:
+            return None
+        return simulation.map_file
+
+    def is_map_rendered_for_simulation(self, simulation_id: str) -> bool:
+        """
+        Check if the map is rendered for a simulation.
+        """
+        simulation = self.get_simulation(simulation_id)
+        if simulation is None:
+            return False
+        return simulation.map_file is not None and simulation.map_file.exists()
 
     def apply_result(self, result: CoreRuntimeWorkOutcome) -> None:
         """

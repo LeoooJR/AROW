@@ -1,18 +1,16 @@
 """
-Core domain signal bus: identifiers, typed payloads, and in-memory dispatch.
+Core domain signals: typed payloads and signal token definitions.
 
 When adding a new core signal:
-1. Add a ``CoreSignal`` enum member.
-2. Add the payload dataclass.
-3. Register the pair in ``CORE_SIGNAL_PAYLOAD_TYPES``.
-4. Add matching ``@overload`` entries for ``subscribe``, ``unsubscribe``, and ``emit``
-   on ``CoreSignalBus`` / ``InMemoryCoreSignalBus`` and ``Entrypoint``.
+1. Add the payload dataclass.
+2. Add a constant on :class:`CoreSignals`.
+3. Register scope/dependency metadata when the signal participates in those rules.
 
 Payload design rules (controllers must not depend on live core domain objects):
 - Prefer the smallest set of primitive fields (``str``, ``int``, ``float``, ``bool``).
 - ``pathlib.Path`` is allowed for filesystem resources; it is not a custom core domain type.
 - When a custom core object must be represented, serialize it (for example via
-  ``to_payload()``) into a ``dict`` and carry only that dict in the payload.
+  ``serialize()``) into a ``dict`` and carry only that dict in the payload.
 - Do not place live core domain instances (``Phone``, ``Simulation``, ``Location``,
   ``AdbBinary``, ``Exception``, etc.) on core signal payloads.
 - When a signal payload changes, update every emitter, subscriber, controller bridge,
@@ -21,43 +19,27 @@ Payload design rules (controllers must not depend on live core domain objects):
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from enum import StrEnum
 from pathlib import Path
-from typing import Any, Literal, Protocol, TypeVar, overload
+from typing import Any, Generic, Literal, TypeVar
 
-from logger import logger
+PayloadT = TypeVar("PayloadT")
 
 
-class CoreSignal(StrEnum):
+@dataclass(frozen=True, slots=True)
+class CoreSignal(Generic[PayloadT]):
     """
-    Canonical event identifiers emitted by the core domain layer.
+    Typed signal token binding a stable string identifier to one payload type.
 
-    Why this shape:
-    - StrEnum keeps string interoperability while preventing magic literals.
-    - A flat namespace is cheap to compare/hash and easy to route in a bus.
-    - Names are domain-oriented (not UI-oriented) so controllers can adapt them.
+    Generic typing lets callers subscribe and emit without overload boilerplate.
     """
 
-    ADB_SERVER_STARTED = "adb.server.started"
-    ADB_SERVER_STOPPED = "adb.server.stopped"
-    ADB_SERVER_STATE_CHANGED = "adb.server.state.changed"
-    DEVICE_AUTHENTIFICATION_SUCCEEDED = "device.authentification.succeeded"
-    DEVICE_AUTHENTIFICATION_FAILED = "device.authentification.failed"
-    DEVICES_UPDATED = "devices.updated"
-    SIMULATION_CREATED = "simulation.created"
-    SIMULATION_DELETED = "simulation.deleted"
-    SIMULATION_STATE_CHANGED = "simulation.state.changed"
-    SIMULATION_POSITION_CHANGED = "simulation.position.changed"
-    SIMULATION_MAP_FILE_CHANGED = "simulation.map.file.changed"
-    ERROR_RAISED = "error.raised"
-    LOG_MESSAGE = "log.message"
-    HOST_COMPUTER_IDENTITY_UPDATED = "host.computer.identity.updated"
-    ACTIVITY_LOG_FILE_UPDATED = "activity.log.file.updated"
-    MAP_RENDERED = "map.rendered"
-    MAP_RENDER_FAILED = "map.render.failed"
+    value: str
+    payload_type: type[PayloadT]
+
+    def __str__(self) -> str:
+        return self.value
 
 
 @dataclass(frozen=True, slots=True)
@@ -116,10 +98,37 @@ class SimulationCreatedPayload:
 
 
 @dataclass(frozen=True, slots=True)
+class SimulationRestoredPayload:
+    """Payload emitted when a simulation is restored."""
+
+    simulation_id: str
+    device_id: str
+    device_name: str
+
+
+@dataclass(frozen=True, slots=True)
 class SimulationDeletedPayload:
     """Payload emitted when a simulation is deleted."""
 
     simulation_id: str
+    device_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class SimulationCreationFailedPayload:
+    """Payload emitted when simulation creation is rejected."""
+
+    device_id: str
+    device_name: str
+    reason: str
+
+
+@dataclass(frozen=True, slots=True)
+class SimulationDeleteSkippedPayload:
+    """Payload emitted when simulation deletion is a no-op for a device."""
+
+    device_id: str
+    reason: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -135,9 +144,49 @@ class SimulationPositionChangedPayload:
     """Payload emitted when the effective simulation position changes."""
 
     simulation_id: str
+
+
+@dataclass(frozen=True, slots=True)
+class SimulationLocationValidationRequestedPayload:
+    """Payload requesting async validation of a map milestone for a simulation."""
+
+    simulation_id: str
+    km: int
+    line_code: str
+    line_troncon: int
     lat: float
     lon: float
-    label: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class SimulationLocationValidatedPayload:
+    """Payload emitted when a map milestone location passes referentiel validation."""
+
+    simulation_id: str
+    lat: float
+    lon: float
+    km: int
+    line_id: str
+    line_code: str
+    line_troncon: int
+    line_type: str
+    line_label: str
+    label: str
+    milestone_type: Literal["Kilometer", "Hectometer"]
+    line_geometry_wkb_b64: str
+
+
+@dataclass(frozen=True, slots=True)
+class SimulationLocationRejectedPayload:
+    """Payload emitted when a map milestone location is rejected."""
+
+    simulation_id: str
+    km: int
+    line_code: str
+    line_troncon: int
+    lat: float
+    lon: float
+    reason: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -196,896 +245,215 @@ class MapRenderFailedPayload:
     reason: str
 
 
-CORE_SIGNAL_PAYLOAD_TYPES: Mapping[CoreSignal, type[object]] = {
-    CoreSignal.ADB_SERVER_STARTED: AdbServerStartedPayload,
-    CoreSignal.ADB_SERVER_STOPPED: AdbServerStoppedPayload,
-    CoreSignal.ADB_SERVER_STATE_CHANGED: AdbServerStateChangedPayload,
-    CoreSignal.DEVICE_AUTHENTIFICATION_SUCCEEDED: DeviceAuthentificationSucceededPayload,
-    CoreSignal.DEVICE_AUTHENTIFICATION_FAILED: DeviceAuthentificationFailedPayload,
-    CoreSignal.DEVICES_UPDATED: DevicesUpdatedPayload,
-    CoreSignal.SIMULATION_CREATED: SimulationCreatedPayload,
-    CoreSignal.SIMULATION_DELETED: SimulationDeletedPayload,
-    CoreSignal.SIMULATION_STATE_CHANGED: SimulationStateChangedPayload,
-    CoreSignal.SIMULATION_POSITION_CHANGED: SimulationPositionChangedPayload,
-    CoreSignal.SIMULATION_MAP_FILE_CHANGED: SimulationMapFileChangedPayload,
-    CoreSignal.ERROR_RAISED: ErrorRaisedPayload,
-    CoreSignal.LOG_MESSAGE: LogMessagePayload,
-    CoreSignal.HOST_COMPUTER_IDENTITY_UPDATED: HostComputerIdentityPayload,
-    CoreSignal.ACTIVITY_LOG_FILE_UPDATED: ActivityLogFileUpdatedPayload,
-    CoreSignal.MAP_RENDERED: MapRenderedPayload,
-    CoreSignal.MAP_RENDER_FAILED: MapRenderFailedPayload,
+class CoreSignals:
+    """Namespace of typed core signal tokens."""
+
+    ADB_SERVER_STARTED = CoreSignal("adb.server.started", AdbServerStartedPayload)
+    ADB_SERVER_STOPPED = CoreSignal("adb.server.stopped", AdbServerStoppedPayload)
+    ADB_SERVER_STATE_CHANGED = CoreSignal(
+        "adb.server.state.changed", AdbServerStateChangedPayload
+    )
+    DEVICE_AUTHENTIFICATION_SUCCEEDED = CoreSignal(
+        "device.authentification.succeeded",
+        DeviceAuthentificationSucceededPayload,
+    )
+    DEVICE_AUTHENTIFICATION_FAILED = CoreSignal(
+        "device.authentification.failed",
+        DeviceAuthentificationFailedPayload,
+    )
+    DEVICES_UPDATED = CoreSignal("devices.updated", DevicesUpdatedPayload)
+    SIMULATION_CREATED = CoreSignal("simulation.created", SimulationCreatedPayload)
+    SIMULATION_RESTORED = CoreSignal("simulation.restored", SimulationRestoredPayload)
+    SIMULATION_DELETED = CoreSignal("simulation.deleted", SimulationDeletedPayload)
+    SIMULATION_CREATION_FAILED = CoreSignal(
+        "simulation.creation.failed",
+        SimulationCreationFailedPayload,
+    )
+    SIMULATION_DELETE_SKIPPED = CoreSignal(
+        "simulation.delete.skipped",
+        SimulationDeleteSkippedPayload,
+    )
+    SIMULATION_STATE_CHANGED = CoreSignal(
+        "simulation.state.changed", SimulationStateChangedPayload
+    )
+    SIMULATION_POSITION_CHANGED = CoreSignal(
+        "simulation.position.changed", SimulationPositionChangedPayload
+    )
+    SIMULATION_LOCATION_VALIDATION_REQUESTED = CoreSignal(
+        "simulation.location.validation.requested",
+        SimulationLocationValidationRequestedPayload,
+    )
+    SIMULATION_LOCATION_VALIDATED = CoreSignal(
+        "simulation.location.validated",
+        SimulationLocationValidatedPayload,
+    )
+    SIMULATION_LOCATION_REJECTED = CoreSignal(
+        "simulation.location.rejected",
+        SimulationLocationRejectedPayload,
+    )
+    SIMULATION_MAP_FILE_CHANGED = CoreSignal(
+        "simulation.map.file.changed",
+        SimulationMapFileChangedPayload,
+    )
+    ERROR_RAISED = CoreSignal("error.raised", ErrorRaisedPayload)
+    LOG_MESSAGE = CoreSignal("log.message", LogMessagePayload)
+    HOST_COMPUTER_IDENTITY_UPDATED = CoreSignal(
+        "host.computer.identity.updated",
+        HostComputerIdentityPayload,
+    )
+    ACTIVITY_LOG_FILE_UPDATED = CoreSignal(
+        "activity.log.file.updated",
+        ActivityLogFileUpdatedPayload,
+    )
+    MAP_RENDERED = CoreSignal("map.rendered", MapRenderedPayload)
+    MAP_RENDER_FAILED = CoreSignal("map.render.failed", MapRenderFailedPayload)
+
+
+class CoreSignalDependencyError(RuntimeError):
+    """Raised when a core signal is emitted without required prior emissions."""
+
+    def __init__(
+        self,
+        *,
+        signal: CoreSignal[Any],
+        missing: tuple[CoreSignal[Any], ...],
+        scope: str | None = None,
+    ) -> None:
+        self.signal = signal
+        self.missing = missing
+        self.scope = scope
+        if scope is None:
+            message = (
+                f"Cannot emit {signal!s}: requires prior "
+                f"{', '.join(str(item) for item in missing)}"
+            )
+        else:
+            message = (
+                f"Cannot emit {signal!s} for scope {scope!r}: requires prior "
+                f"{', '.join(str(item) for item in missing)} with the same scope"
+            )
+        super().__init__(message)
+
+
+@dataclass(frozen=True, slots=True)
+class CoreSignalDependencyRule:
+    """One dependency requirement: any listed signal may satisfy the rule."""
+
+    any_of: tuple[CoreSignal[Any], ...]
+    match_scope_from: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class CoreSignalEmission:
+    """One recorded core signal emission for debugging and dependency checks."""
+
+    signal: CoreSignal[Any]
+    payload: object
+    scope: str | None = None
+
+
+# Payload field used to index scoped emissions for dependency checks.
+CORE_SIGNAL_SCOPE_FIELDS: Mapping[CoreSignal[Any], str] = {
+    CoreSignals.ADB_SERVER_STARTED: "adb_binary_path",
+    CoreSignals.ADB_SERVER_STOPPED: "adb_binary_path",
+    CoreSignals.SIMULATION_CREATED: "simulation_id",
+    CoreSignals.SIMULATION_RESTORED: "simulation_id",
+    CoreSignals.SIMULATION_DELETED: "simulation_id",
+    CoreSignals.SIMULATION_STATE_CHANGED: "simulation_id",
+    CoreSignals.SIMULATION_POSITION_CHANGED: "simulation_id",
+    CoreSignals.SIMULATION_LOCATION_VALIDATION_REQUESTED: "simulation_id",
+    CoreSignals.SIMULATION_LOCATION_VALIDATED: "simulation_id",
+    CoreSignals.SIMULATION_LOCATION_REJECTED: "simulation_id",
+    CoreSignals.SIMULATION_MAP_FILE_CHANGED: "simulation_id",
+    CoreSignals.MAP_RENDERED: "simulation_id",
+    CoreSignals.MAP_RENDER_FAILED: "simulation_id",
+}
+
+# Required prior emissions before a signal may be published on the core bus.
+CORE_SIGNAL_DEPENDENCIES: Mapping[
+    CoreSignal[Any], tuple[CoreSignalDependencyRule, ...]
+] = {
+    CoreSignals.ADB_SERVER_STOPPED: (
+        CoreSignalDependencyRule(
+            any_of=(CoreSignals.ADB_SERVER_STARTED,),
+            match_scope_from="adb_binary_path",
+        ),
+    ),
+    CoreSignals.DEVICE_AUTHENTIFICATION_SUCCEEDED: (
+        CoreSignalDependencyRule(any_of=(CoreSignals.ADB_SERVER_STARTED,)),
+    ),
+    CoreSignals.DEVICES_UPDATED: (
+        CoreSignalDependencyRule(any_of=(CoreSignals.ADB_SERVER_STARTED,)),
+    ),
+    CoreSignals.SIMULATION_CREATED: (
+        CoreSignalDependencyRule(any_of=(CoreSignals.DEVICES_UPDATED,)),
+    ),
+    CoreSignals.SIMULATION_RESTORED: (
+        CoreSignalDependencyRule(any_of=(CoreSignals.DEVICES_UPDATED,)),
+    ),
+    CoreSignals.SIMULATION_DELETED: (
+        CoreSignalDependencyRule(
+            any_of=(CoreSignals.SIMULATION_CREATED, CoreSignals.SIMULATION_RESTORED),
+            match_scope_from="simulation_id",
+        ),
+    ),
+    CoreSignals.SIMULATION_STATE_CHANGED: (
+        CoreSignalDependencyRule(
+            any_of=(CoreSignals.SIMULATION_CREATED, CoreSignals.SIMULATION_RESTORED),
+            match_scope_from="simulation_id",
+        ),
+    ),
+    CoreSignals.SIMULATION_POSITION_CHANGED: (
+        CoreSignalDependencyRule(
+            any_of=(CoreSignals.SIMULATION_CREATED, CoreSignals.SIMULATION_RESTORED),
+            match_scope_from="simulation_id",
+        ),
+    ),
+    CoreSignals.SIMULATION_LOCATION_VALIDATION_REQUESTED: (
+        CoreSignalDependencyRule(
+            any_of=(CoreSignals.SIMULATION_CREATED, CoreSignals.SIMULATION_RESTORED),
+            match_scope_from="simulation_id",
+        ),
+    ),
+    CoreSignals.SIMULATION_LOCATION_VALIDATED: (
+        CoreSignalDependencyRule(
+            any_of=(CoreSignals.SIMULATION_CREATED, CoreSignals.SIMULATION_RESTORED),
+            match_scope_from="simulation_id",
+        ),
+    ),
+    CoreSignals.SIMULATION_LOCATION_REJECTED: (
+        CoreSignalDependencyRule(
+            any_of=(CoreSignals.SIMULATION_CREATED, CoreSignals.SIMULATION_RESTORED),
+            match_scope_from="simulation_id",
+        ),
+    ),
+    CoreSignals.SIMULATION_MAP_FILE_CHANGED: (
+        CoreSignalDependencyRule(
+            any_of=(CoreSignals.SIMULATION_CREATED, CoreSignals.SIMULATION_RESTORED),
+            match_scope_from="simulation_id",
+        ),
+    ),
+    CoreSignals.MAP_RENDERED: (
+        CoreSignalDependencyRule(
+            any_of=(CoreSignals.SIMULATION_CREATED, CoreSignals.SIMULATION_RESTORED),
+            match_scope_from="simulation_id",
+        ),
+    ),
+    CoreSignals.MAP_RENDER_FAILED: (
+        CoreSignalDependencyRule(
+            any_of=(CoreSignals.SIMULATION_CREATED, CoreSignals.SIMULATION_RESTORED),
+            match_scope_from="simulation_id",
+        ),
+    ),
 }
 
 
-PayloadT = TypeVar("PayloadT", contravariant=True)
-
-
-class SignalHandler(Protocol[PayloadT]):
-    """
-    Contract for callback functions handling a given payload type.
-
-    This protocol keeps handlers strongly typed while allowing plain callables.
-    """
-
-    def __call__(self, payload: PayloadT) -> None:
-        """Handle one payload emitted for a signal."""
-        pass
-
-
-class CoreSignalBus(ABC):
-    """
-    Abstract, high-performance-friendly signal bus contract.
-
-    This class intentionally defines the API only:
-    - no storage strategy
-    - no threading model
-    - no dispatch implementation
-
-    Concrete implementations can optimize for sync dispatch, async dispatch,
-    lock-free reads, or thread-safe observer management.
-    """
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.ADB_SERVER_STARTED],
-        handler: SignalHandler[AdbServerStartedPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.ADB_SERVER_STOPPED],
-        handler: SignalHandler[AdbServerStoppedPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.ADB_SERVER_STATE_CHANGED],
-        handler: SignalHandler[AdbServerStateChangedPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.DEVICE_AUTHENTIFICATION_SUCCEEDED],
-        handler: SignalHandler[DeviceAuthentificationSucceededPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.DEVICE_AUTHENTIFICATION_FAILED],
-        handler: SignalHandler[DeviceAuthentificationFailedPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.DEVICES_UPDATED],
-        handler: SignalHandler[DevicesUpdatedPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.SIMULATION_CREATED],
-        handler: SignalHandler[SimulationCreatedPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.SIMULATION_DELETED],
-        handler: SignalHandler[SimulationDeletedPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.SIMULATION_STATE_CHANGED],
-        handler: SignalHandler[SimulationStateChangedPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.SIMULATION_POSITION_CHANGED],
-        handler: SignalHandler[SimulationPositionChangedPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.SIMULATION_MAP_FILE_CHANGED],
-        handler: SignalHandler[SimulationMapFileChangedPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.ERROR_RAISED],
-        handler: SignalHandler[ErrorRaisedPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.LOG_MESSAGE],
-        handler: SignalHandler[LogMessagePayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.HOST_COMPUTER_IDENTITY_UPDATED],
-        handler: SignalHandler[HostComputerIdentityPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.ACTIVITY_LOG_FILE_UPDATED],
-        handler: SignalHandler[ActivityLogFileUpdatedPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.MAP_RENDERED],
-        handler: SignalHandler[MapRenderedPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.MAP_RENDER_FAILED],
-        handler: SignalHandler[MapRenderFailedPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(self, signal: CoreSignal, handler: SignalHandler[object]) -> None: ...
-
-    @abstractmethod
-    def subscribe(self, signal: CoreSignal, handler: SignalHandler[Any]) -> None:
-        """
-        Register a handler for one core signal.
-
-        Implementations should make subscription idempotency/duplication behavior
-        explicit (allow duplicates vs reject duplicates).
-        """
-        ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.ADB_SERVER_STARTED],
-        handler: SignalHandler[AdbServerStartedPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.ADB_SERVER_STOPPED],
-        handler: SignalHandler[AdbServerStoppedPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.ADB_SERVER_STATE_CHANGED],
-        handler: SignalHandler[AdbServerStateChangedPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.DEVICE_AUTHENTIFICATION_SUCCEEDED],
-        handler: SignalHandler[DeviceAuthentificationSucceededPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.DEVICE_AUTHENTIFICATION_FAILED],
-        handler: SignalHandler[DeviceAuthentificationFailedPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.DEVICES_UPDATED],
-        handler: SignalHandler[DevicesUpdatedPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.SIMULATION_CREATED],
-        handler: SignalHandler[SimulationCreatedPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.SIMULATION_DELETED],
-        handler: SignalHandler[SimulationDeletedPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.SIMULATION_STATE_CHANGED],
-        handler: SignalHandler[SimulationStateChangedPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.SIMULATION_POSITION_CHANGED],
-        handler: SignalHandler[SimulationPositionChangedPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.SIMULATION_MAP_FILE_CHANGED],
-        handler: SignalHandler[SimulationMapFileChangedPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.ERROR_RAISED],
-        handler: SignalHandler[ErrorRaisedPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.LOG_MESSAGE],
-        handler: SignalHandler[LogMessagePayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.HOST_COMPUTER_IDENTITY_UPDATED],
-        handler: SignalHandler[HostComputerIdentityPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.ACTIVITY_LOG_FILE_UPDATED],
-        handler: SignalHandler[ActivityLogFileUpdatedPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.MAP_RENDERED],
-        handler: SignalHandler[MapRenderedPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.MAP_RENDER_FAILED],
-        handler: SignalHandler[MapRenderFailedPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self, signal: CoreSignal, handler: SignalHandler[object]
-    ) -> None: ...
-
-    @abstractmethod
-    def unsubscribe(self, signal: CoreSignal, handler: SignalHandler[Any]) -> None:
-        """
-        Remove a previously registered handler for one core signal.
-
-        Implementations should define behavior when handler/signal does not exist.
-        """
-        ...
-
-    @overload
-    def emit(
-        self,
-        signal: Literal[CoreSignal.ADB_SERVER_STARTED],
-        payload: AdbServerStartedPayload,
-    ) -> None: ...
-
-    @overload
-    def emit(
-        self,
-        signal: Literal[CoreSignal.ADB_SERVER_STOPPED],
-        payload: AdbServerStoppedPayload,
-    ) -> None: ...
-
-    @overload
-    def emit(
-        self,
-        signal: Literal[CoreSignal.ADB_SERVER_STATE_CHANGED],
-        payload: AdbServerStateChangedPayload,
-    ) -> None: ...
-
-    @overload
-    def emit(
-        self,
-        signal: Literal[CoreSignal.DEVICE_AUTHENTIFICATION_SUCCEEDED],
-        payload: DeviceAuthentificationSucceededPayload,
-    ) -> None: ...
-
-    @overload
-    def emit(
-        self,
-        signal: Literal[CoreSignal.DEVICE_AUTHENTIFICATION_FAILED],
-        payload: DeviceAuthentificationFailedPayload,
-    ) -> None: ...
-
-    @overload
-    def emit(
-        self,
-        signal: Literal[CoreSignal.DEVICES_UPDATED],
-        payload: DevicesUpdatedPayload,
-    ) -> None: ...
-
-    @overload
-    def emit(
-        self,
-        signal: Literal[CoreSignal.SIMULATION_CREATED],
-        payload: SimulationCreatedPayload,
-    ) -> None: ...
-
-    @overload
-    def emit(
-        self,
-        signal: Literal[CoreSignal.SIMULATION_DELETED],
-        payload: SimulationDeletedPayload,
-    ) -> None: ...
-
-    @overload
-    def emit(
-        self,
-        signal: Literal[CoreSignal.SIMULATION_STATE_CHANGED],
-        payload: SimulationStateChangedPayload,
-    ) -> None: ...
-
-    @overload
-    def emit(
-        self,
-        signal: Literal[CoreSignal.SIMULATION_POSITION_CHANGED],
-        payload: SimulationPositionChangedPayload,
-    ) -> None: ...
-
-    @overload
-    def emit(
-        self,
-        signal: Literal[CoreSignal.SIMULATION_MAP_FILE_CHANGED],
-        payload: SimulationMapFileChangedPayload,
-    ) -> None: ...
-
-    @overload
-    def emit(
-        self,
-        signal: Literal[CoreSignal.ERROR_RAISED],
-        payload: ErrorRaisedPayload,
-    ) -> None: ...
-
-    @overload
-    def emit(
-        self,
-        signal: Literal[CoreSignal.LOG_MESSAGE],
-        payload: LogMessagePayload,
-    ) -> None: ...
-
-    @overload
-    def emit(
-        self,
-        signal: Literal[CoreSignal.HOST_COMPUTER_IDENTITY_UPDATED],
-        payload: HostComputerIdentityPayload,
-    ) -> None: ...
-
-    @overload
-    def emit(
-        self,
-        signal: Literal[CoreSignal.ACTIVITY_LOG_FILE_UPDATED],
-        payload: ActivityLogFileUpdatedPayload,
-    ) -> None: ...
-
-    @overload
-    def emit(
-        self,
-        signal: Literal[CoreSignal.MAP_RENDERED],
-        payload: MapRenderedPayload,
-    ) -> None: ...
-
-    @overload
-    def emit(
-        self,
-        signal: Literal[CoreSignal.MAP_RENDER_FAILED],
-        payload: MapRenderFailedPayload,
-    ) -> None: ...
-
-    @overload
-    def emit(self, signal: CoreSignal, payload: Any) -> None: ...
-
-    @abstractmethod
-    def emit(self, signal: CoreSignal, payload: Any) -> None:
-        """
-        Publish one payload to all handlers subscribed to the signal.
-
-        Implementations should document:
-        - ordering guarantees
-        - exception policy (fail-fast vs collect/log and continue)
-        - re-entrancy behavior
-        """
-        ...
-
-
-class InMemoryCoreSignalBus(CoreSignalBus):
-    """
-    Concrete, synchronous in-memory signal bus.
-
-    Design goals:
-    - O(1) signal lookup using a dictionary keyed by CoreSignal.
-    - Stable dispatch order by preserving handler insertion order.
-    - Safe iteration while handlers mutate subscriptions during dispatch by
-      iterating over a shallow snapshot.
-    """
-
-    def __init__(self) -> None:
-        self._subscribers: dict[CoreSignal, list[SignalHandler[Any]]] = {}
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.ADB_SERVER_STARTED],
-        handler: SignalHandler[AdbServerStartedPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.ADB_SERVER_STOPPED],
-        handler: SignalHandler[AdbServerStoppedPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.ADB_SERVER_STATE_CHANGED],
-        handler: SignalHandler[AdbServerStateChangedPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.DEVICE_AUTHENTIFICATION_SUCCEEDED],
-        handler: SignalHandler[DeviceAuthentificationSucceededPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.DEVICE_AUTHENTIFICATION_FAILED],
-        handler: SignalHandler[DeviceAuthentificationFailedPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.DEVICES_UPDATED],
-        handler: SignalHandler[DevicesUpdatedPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.SIMULATION_CREATED],
-        handler: SignalHandler[SimulationCreatedPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.SIMULATION_DELETED],
-        handler: SignalHandler[SimulationDeletedPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.SIMULATION_STATE_CHANGED],
-        handler: SignalHandler[SimulationStateChangedPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.SIMULATION_POSITION_CHANGED],
-        handler: SignalHandler[SimulationPositionChangedPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.SIMULATION_MAP_FILE_CHANGED],
-        handler: SignalHandler[SimulationMapFileChangedPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.ERROR_RAISED],
-        handler: SignalHandler[ErrorRaisedPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.LOG_MESSAGE],
-        handler: SignalHandler[LogMessagePayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.HOST_COMPUTER_IDENTITY_UPDATED],
-        handler: SignalHandler[HostComputerIdentityPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.ACTIVITY_LOG_FILE_UPDATED],
-        handler: SignalHandler[ActivityLogFileUpdatedPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.MAP_RENDERED],
-        handler: SignalHandler[MapRenderedPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(
-        self,
-        signal: Literal[CoreSignal.MAP_RENDER_FAILED],
-        handler: SignalHandler[MapRenderFailedPayload],
-    ) -> None: ...
-
-    @overload
-    def subscribe(self, signal: CoreSignal, handler: SignalHandler[object]) -> None: ...
-
-    def subscribe(self, signal: CoreSignal, handler: SignalHandler[Any]) -> None:
-        """
-        Register a handler for one signal.
-
-        Duplicate registrations are ignored to keep callback cardinality stable.
-        """
-        handlers = self._subscribers.setdefault(signal, [])
-        if handler in handlers:
-            logger.debug(
-                "CoreSignalBus: subscription ignored (duplicate handler)",
-                signal=str(signal),
-            )
-            return
-        handlers.append(handler)
-        logger.debug(
-            "CoreSignalBus: handler subscribed",
-            signal=str(signal),
-            subscriber_count=len(handlers),
-        )
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.ADB_SERVER_STARTED],
-        handler: SignalHandler[AdbServerStartedPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.ADB_SERVER_STOPPED],
-        handler: SignalHandler[AdbServerStoppedPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.ADB_SERVER_STATE_CHANGED],
-        handler: SignalHandler[AdbServerStateChangedPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.DEVICE_AUTHENTIFICATION_SUCCEEDED],
-        handler: SignalHandler[DeviceAuthentificationSucceededPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.DEVICE_AUTHENTIFICATION_FAILED],
-        handler: SignalHandler[DeviceAuthentificationFailedPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.DEVICES_UPDATED],
-        handler: SignalHandler[DevicesUpdatedPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.SIMULATION_CREATED],
-        handler: SignalHandler[SimulationCreatedPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.SIMULATION_DELETED],
-        handler: SignalHandler[SimulationDeletedPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.SIMULATION_STATE_CHANGED],
-        handler: SignalHandler[SimulationStateChangedPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.SIMULATION_POSITION_CHANGED],
-        handler: SignalHandler[SimulationPositionChangedPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.SIMULATION_MAP_FILE_CHANGED],
-        handler: SignalHandler[SimulationMapFileChangedPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.ERROR_RAISED],
-        handler: SignalHandler[ErrorRaisedPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.LOG_MESSAGE],
-        handler: SignalHandler[LogMessagePayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.HOST_COMPUTER_IDENTITY_UPDATED],
-        handler: SignalHandler[HostComputerIdentityPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.ACTIVITY_LOG_FILE_UPDATED],
-        handler: SignalHandler[ActivityLogFileUpdatedPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.MAP_RENDERED],
-        handler: SignalHandler[MapRenderedPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self,
-        signal: Literal[CoreSignal.MAP_RENDER_FAILED],
-        handler: SignalHandler[MapRenderFailedPayload],
-    ) -> None: ...
-
-    @overload
-    def unsubscribe(
-        self, signal: CoreSignal, handler: SignalHandler[object]
-    ) -> None: ...
-
-    def unsubscribe(self, signal: CoreSignal, handler: SignalHandler[Any]) -> None:
-        """
-        Remove a handler from one signal.
-
-        If the signal or handler does not exist, this method is a no-op.
-        """
-        handlers = self._subscribers.get(signal)
-        if not handlers:
-            return
-        try:
-            handlers.remove(handler)
-        except ValueError:
-            return
-        if not handlers:
-            self._subscribers.pop(signal, None)
-        logger.debug(
-            "CoreSignalBus: handler unsubscribed",
-            signal=str(signal),
-            subscriber_count=len(self._subscribers.get(signal, [])),
-        )
-
-    @overload
-    def emit(
-        self,
-        signal: Literal[CoreSignal.ADB_SERVER_STARTED],
-        payload: AdbServerStartedPayload,
-    ) -> None: ...
-
-    @overload
-    def emit(
-        self,
-        signal: Literal[CoreSignal.ADB_SERVER_STOPPED],
-        payload: AdbServerStoppedPayload,
-    ) -> None: ...
-
-    @overload
-    def emit(
-        self,
-        signal: Literal[CoreSignal.ADB_SERVER_STATE_CHANGED],
-        payload: AdbServerStateChangedPayload,
-    ) -> None: ...
-
-    @overload
-    def emit(
-        self,
-        signal: Literal[CoreSignal.DEVICE_AUTHENTIFICATION_SUCCEEDED],
-        payload: DeviceAuthentificationSucceededPayload,
-    ) -> None: ...
-
-    @overload
-    def emit(
-        self,
-        signal: Literal[CoreSignal.DEVICE_AUTHENTIFICATION_FAILED],
-        payload: DeviceAuthentificationFailedPayload,
-    ) -> None: ...
-
-    @overload
-    def emit(
-        self,
-        signal: Literal[CoreSignal.DEVICES_UPDATED],
-        payload: DevicesUpdatedPayload,
-    ) -> None: ...
-
-    @overload
-    def emit(
-        self,
-        signal: Literal[CoreSignal.SIMULATION_CREATED],
-        payload: SimulationCreatedPayload,
-    ) -> None: ...
-
-    @overload
-    def emit(
-        self,
-        signal: Literal[CoreSignal.SIMULATION_DELETED],
-        payload: SimulationDeletedPayload,
-    ) -> None: ...
-
-    @overload
-    def emit(
-        self,
-        signal: Literal[CoreSignal.SIMULATION_STATE_CHANGED],
-        payload: SimulationStateChangedPayload,
-    ) -> None: ...
-
-    @overload
-    def emit(
-        self,
-        signal: Literal[CoreSignal.SIMULATION_POSITION_CHANGED],
-        payload: SimulationPositionChangedPayload,
-    ) -> None: ...
-
-    @overload
-    def emit(
-        self,
-        signal: Literal[CoreSignal.SIMULATION_MAP_FILE_CHANGED],
-        payload: SimulationMapFileChangedPayload,
-    ) -> None: ...
-
-    @overload
-    def emit(
-        self,
-        signal: Literal[CoreSignal.ERROR_RAISED],
-        payload: ErrorRaisedPayload,
-    ) -> None: ...
-
-    @overload
-    def emit(
-        self,
-        signal: Literal[CoreSignal.LOG_MESSAGE],
-        payload: LogMessagePayload,
-    ) -> None: ...
-
-    @overload
-    def emit(
-        self,
-        signal: Literal[CoreSignal.HOST_COMPUTER_IDENTITY_UPDATED],
-        payload: HostComputerIdentityPayload,
-    ) -> None: ...
-
-    @overload
-    def emit(
-        self,
-        signal: Literal[CoreSignal.ACTIVITY_LOG_FILE_UPDATED],
-        payload: ActivityLogFileUpdatedPayload,
-    ) -> None: ...
-
-    @overload
-    def emit(
-        self,
-        signal: Literal[CoreSignal.MAP_RENDERED],
-        payload: MapRenderedPayload,
-    ) -> None: ...
-
-    @overload
-    def emit(
-        self,
-        signal: Literal[CoreSignal.MAP_RENDER_FAILED],
-        payload: MapRenderFailedPayload,
-    ) -> None: ...
-
-    @overload
-    def emit(self, signal: CoreSignal, payload: Any) -> None: ...
-
-    def emit(self, signal: CoreSignal, payload: Any) -> None:
-        """
-        Emit one payload to all current handlers of a signal.
-
-        Exception policy: log and continue to avoid one faulty callback blocking
-        all downstream handlers.
-        """
-        handlers = self._subscribers.get(signal, [])
-        if not handlers:
-            return
-
-        # Snapshot avoids mutation issues when handlers subscribe/unsubscribe.
-        for handler in tuple(handlers):
-            try:
-                handler(payload)
-            except Exception:
-                logger.exception(
-                    "CoreSignalBus: handler raised during emit",
-                    signal=str(signal),
-                    payload_type=type(payload).__name__,
-                )
+def extract_core_signal_scope(signal: CoreSignal[Any], payload: object) -> str | None:
+    """Return the scoped entity key carried by *payload*, when defined for *signal*."""
+    field_name = CORE_SIGNAL_SCOPE_FIELDS.get(signal)
+    if field_name is None:
+        return None
+    value = getattr(payload, field_name, None)
+    if value is None:
+        return None
+    return str(value)

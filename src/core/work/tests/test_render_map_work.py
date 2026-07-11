@@ -3,12 +3,18 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 from core.entrypoint import ModelEntrypoint
-from core.signals import CoreSignal, MapRenderedPayload, MapRenderFailedPayload
-from core.simulation import Simulation, SimulationRepository
+from core.signals import (
+    CoreSignal,
+    CoreSignals,
+    MapRenderedPayload,
+    MapRenderFailedPayload,
+)
+from core.simulation import Simulation
 from core.work.render_map_work import (
     RenderMapError,
     RenderMapOutcome,
@@ -16,18 +22,14 @@ from core.work.render_map_work import (
 )
 
 
-def _model_entrypoint_with_sims(tmp_path: Path) -> ModelEntrypoint:
-    model_entrypoint = ModelEntrypoint()
-    model_entrypoint._simulations = SimulationRepository(tmp_path / "simulations")
-    return model_entrypoint
-
-
 def _add_simulation(
     model_entrypoint: ModelEntrypoint, simulation_id: str
 ) -> Simulation:
     simulation = Simulation(id=simulation_id)
-    model_entrypoint._simulations.add(simulation)
-    return simulation
+    model_entrypoint.restore_persisted_simulation(simulation)
+    restored = model_entrypoint.get_simulation(simulation_id)
+    assert restored is not None
+    return restored
 
 
 def test_render_map_work_run_returns_outcome(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -95,11 +97,11 @@ def test_model_entrypoint_render_map_delegates_to_work(
     assert calls == [("sim-1", Path("/app"))]
 
 
-def test_apply_main_thread_emits_map_rendered(tmp_path: Path) -> None:
-    model_entrypoint = _model_entrypoint_with_sims(tmp_path)
+def test_apply_main_thread_emits_map_rendered() -> None:
+    model_entrypoint = ModelEntrypoint()
     simulation = _add_simulation(model_entrypoint, "sim-1")
-    emitted: list[tuple[CoreSignal, object]] = []
-    model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
+    emitted: list[tuple[CoreSignal[Any], object]] = []
+    model_entrypoint.emit_core_signal = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
         (signal, payload)
     )
     html_path = Path("/tmp/sim-1.html")
@@ -112,7 +114,7 @@ def test_apply_main_thread_emits_map_rendered(tmp_path: Path) -> None:
     assert simulation.map_file == html_path
     assert emitted == [
         (
-            CoreSignal.MAP_RENDERED,
+            CoreSignals.MAP_RENDERED,
             MapRenderedPayload(simulation_id="sim-1", html_path=html_path),
         )
     ]
@@ -120,8 +122,8 @@ def test_apply_main_thread_emits_map_rendered(tmp_path: Path) -> None:
 
 def test_apply_main_thread_skips_emit_when_simulation_missing(tmp_path: Path) -> None:
     model_entrypoint = ModelEntrypoint()
-    emitted: list[tuple[CoreSignal, object]] = []
-    model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
+    emitted: list[tuple[CoreSignal[Any], object]] = []
+    model_entrypoint.emit_core_signal = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
         (signal, payload)
     )
     html_path = tmp_path / "sim-1.html"
@@ -141,8 +143,8 @@ def test_apply_main_thread_orphan_cleanup_swallows_oserror(
     tmp_path: Path,
 ) -> None:
     model_entrypoint = ModelEntrypoint()
-    emitted: list[tuple[CoreSignal, object]] = []
-    model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
+    emitted: list[tuple[CoreSignal[Any], object]] = []
+    model_entrypoint.emit_core_signal = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
         (signal, payload)
     )
     html_path = tmp_path / "sim-1.html"
@@ -160,12 +162,12 @@ def test_apply_main_thread_orphan_cleanup_swallows_oserror(
     assert emitted == []
 
 
-def test_apply_failure_main_thread_emits_map_render_failed(tmp_path: Path) -> None:
-    model_entrypoint = _model_entrypoint_with_sims(tmp_path)
+def test_apply_failure_main_thread_emits_map_render_failed() -> None:
+    model_entrypoint = ModelEntrypoint()
     simulation = _add_simulation(model_entrypoint, "sim-1")
     simulation.map_file = Path("/tmp/sim-1.html")
-    emitted: list[tuple[CoreSignal, object]] = []
-    model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
+    emitted: list[tuple[CoreSignal[Any], object]] = []
+    model_entrypoint.emit_core_signal = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
         (signal, payload)
     )
 
@@ -177,7 +179,7 @@ def test_apply_failure_main_thread_emits_map_render_failed(tmp_path: Path) -> No
     assert simulation.map_file is None
     assert emitted == [
         (
-            CoreSignal.MAP_RENDER_FAILED,
+            CoreSignals.MAP_RENDER_FAILED,
             MapRenderFailedPayload(simulation_id="sim-1", reason="failed"),
         )
     ]
@@ -185,8 +187,8 @@ def test_apply_failure_main_thread_emits_map_render_failed(tmp_path: Path) -> No
 
 def test_apply_failure_main_thread_skips_emit_when_simulation_missing() -> None:
     model_entrypoint = ModelEntrypoint()
-    emitted: list[tuple[CoreSignal, object]] = []
-    model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
+    emitted: list[tuple[CoreSignal[Any], object]] = []
+    model_entrypoint.emit_core_signal = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
         (signal, payload)
     )
 
@@ -200,12 +202,12 @@ def test_apply_failure_main_thread_skips_emit_when_simulation_missing() -> None:
 
 def test_apply_failure_main_thread_falls_back_to_generic_error() -> None:
     model_entrypoint = ModelEntrypoint()
-    emitted: list[tuple[CoreSignal, object]] = []
-    model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
+    emitted: list[tuple[CoreSignal[Any], object]] = []
+    model_entrypoint.emit_core_signal = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
         (signal, payload)
     )
 
     RenderMapWork.apply_failure_main_thread(model_entrypoint, RuntimeError("boom"))
 
     assert len(emitted) == 1
-    assert emitted[0][0] == CoreSignal.ERROR_RAISED
+    assert emitted[0][0] == CoreSignals.ERROR_RAISED

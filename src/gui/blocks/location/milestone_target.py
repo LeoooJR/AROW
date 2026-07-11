@@ -311,6 +311,15 @@ class MilestoneTargetBlock(VerticalLayoutWrapper, Block):
     def _connect_signals(self) -> None:
         self.ui.target_button.clicked.connect(signals.UI.TargetSelectionRequested.emit)
         signals.UI.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
+        signals.DEVICE.DeviceSelectionSucceeded.connect(
+            self._on_device_selection_succeeded
+        )
+        signals.DEVICE.RemoveActiveDeviceSucceeded.connect(
+            self._on_remove_active_device_succeeded
+        )
+        signals.SIMULATION.SimulationLocationValidated.connect(
+            self._on_simulation_location_validated
+        )
 
     def apply_theme_icons(self, theme: Theme) -> None:
         self.ui.target_button.apply_theme_icons(theme)
@@ -337,8 +346,7 @@ class MilestoneTargetBlock(VerticalLayoutWrapper, Block):
             (source, self.ui.source_item),
         )
         for value, item in updates:
-            if value is not None:
-                item.set_value(value)
+            item.set_value(value)
 
         if status_text is not None or status_kind is not None:
             self.ui.status_badge.set_status(
@@ -346,12 +354,61 @@ class MilestoneTargetBlock(VerticalLayoutWrapper, Block):
                 status_kind or self.ui.status_badge.kind(),
             )
 
+    def clear_target_values(self) -> None:
+        """Clear the target values."""
+        self.set_target_values(
+            line=None,
+            km=None,
+            longitude=None,
+            latitude=None,
+            type_=None,
+            source=None,
+            status_text=self.texts.default_status,
+            status_kind=self.texts.default_status_kind,
+        )
+
     ### Slots ###
 
     @Slot()
     def _on_ui_constraints_disabled(self) -> None:
         """Re-apply placeholder values when UI constraints are disabled."""
         self.set_placeholder_values()
+
+    @Slot(str, int, str, int, float, float, str)
+    def _on_simulation_location_validated(
+        self,
+        simulation_id: str,
+        km: int,
+        line_code: str,
+        line_troncon: int,
+        latitude: float,
+        longitude: float,
+        label: str,
+    ) -> None:
+        """Update the milestone target block when a simulation location is validated."""
+        _ = simulation_id
+        self.set_target_values(
+            line=f"{line_code}-{line_troncon}",
+            km=km,
+            latitude=latitude,
+            longitude=longitude,
+            type_=label,
+            source=None,
+            status_text="Ready",
+            status_kind="ready",
+        )
+
+    @Slot(str, str, str)
+    def _on_device_selection_succeeded(
+        self, simulation_id: str, device_id: str, device_name: str
+    ) -> None:
+        """Update the milestone target block when a device selection succeeds."""
+        self.clear_target_values()
+
+    @Slot(str)
+    def _on_remove_active_device_succeeded(self, device_id: str) -> None:
+        """Update the milestone target block when the active device is removed."""
+        self.clear_target_values()
 
     def set_placeholder_values(self) -> None:
         """Populate the block with generated placeholder milestone values."""

@@ -18,7 +18,7 @@ from controller.domains.map_sub_controller import MapSubController
 from controller.domains.simulation_sub_controller import SimulationSubController
 from controller.helper import validate_model_entrypoint, validate_view, watchdog
 from core.entrypoint import ModelEntrypoint
-from core.signals import ActivityLogFileUpdatedPayload, CoreSignal
+from core.signals import ActivityLogFileUpdatedPayload, CoreSignals
 from gui.signals import signals
 from gui.window import MainWindow
 from logger import logger
@@ -79,8 +79,8 @@ class AppController(Controller):
         self._simulation.connect_model_signals()
         self._adb.connect_model_signals()
         self._map.connect_model_signals()
-        self.model_entrypoint.subscribe(
-            CoreSignal.ACTIVITY_LOG_FILE_UPDATED, self._on_activity_log_file_updated
+        self.model_entrypoint.signal_bus.subscribe(
+            CoreSignals.ACTIVITY_LOG_FILE_UPDATED, self._on_activity_log_file_updated
         )
 
     @validate_model_entrypoint

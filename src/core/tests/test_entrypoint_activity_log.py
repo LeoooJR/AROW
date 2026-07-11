@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 from core.entrypoint import ModelEntrypoint
+from core.signal_bus import InMemoryCoreSignalBus
 from core.signals import (
     ActivityLogFileUpdatedPayload,
     CoreSignal,
-    InMemoryCoreSignalBus,
+    CoreSignals,
 )
 
 
@@ -41,12 +43,12 @@ def test_model_entrypoint_init_emits_activity_log_file_updated(
     application_dir: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    emitted: list[tuple[CoreSignal, object]] = []
+    emitted: list[tuple[CoreSignal[Any], object]] = []
     original_emit = InMemoryCoreSignalBus.emit
 
     def capture_emit(
         self: InMemoryCoreSignalBus,
-        signal: CoreSignal,
+        signal: CoreSignal[Any],
         payload: object,
     ) -> None:
         emitted.append((signal, payload))
@@ -58,7 +60,7 @@ def test_model_entrypoint_init_emits_activity_log_file_updated(
 
     assert len(emitted) == 1
     signal, payload = emitted[0]
-    assert signal == CoreSignal.ACTIVITY_LOG_FILE_UPDATED
+    assert signal == CoreSignals.ACTIVITY_LOG_FILE_UPDATED
     assert isinstance(payload, ActivityLogFileUpdatedPayload)
     assert payload.path == model_entrypoint.activity_log_file
 
@@ -72,7 +74,9 @@ def test_model_entrypoint_activity_log_file_setter_stores_path_and_emits(
     def capture(payload: ActivityLogFileUpdatedPayload) -> None:
         received.append(payload)
 
-    model_entrypoint.subscribe(CoreSignal.ACTIVITY_LOG_FILE_UPDATED, capture)
+    model_entrypoint.signal_bus.subscribe(
+        CoreSignals.ACTIVITY_LOG_FILE_UPDATED, capture
+    )
 
     custom_path = Path("/tmp/custom/activity_20260531.log")
     model_entrypoint.activity_log_file = custom_path

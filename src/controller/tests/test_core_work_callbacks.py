@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import MagicMock
 
 from controller.core_work_callbacks import (
@@ -8,13 +9,17 @@ from controller.core_work_callbacks import (
 )
 from controller.runner import JobError
 from core.entrypoint import ModelEntrypoint
-from core.signals import CoreSignal, DeviceAuthentificationFailedPayload
+from core.signals import (
+    CoreSignal,
+    CoreSignals,
+    DeviceAuthentificationFailedPayload,
+)
 from core.work.authentificate_device_work import DeviceAuthentificationError
 
 
 def test_authentificate_device_on_failed_delegates_to_apply_failure() -> None:
     model_entrypoint = ModelEntrypoint()
-    emitted: list[tuple[CoreSignal, object]] = []
+    emitted: list[tuple[CoreSignal[Any], object]] = []
     model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
         (signal, payload)
     )
@@ -39,7 +44,7 @@ def test_authentificate_device_on_failed_delegates_to_apply_failure() -> None:
 
     assert emitted == [
         (
-            CoreSignal.DEVICE_AUTHENTIFICATION_FAILED,
+            CoreSignals.DEVICE_AUTHENTIFICATION_FAILED,
             DeviceAuthentificationFailedPayload(
                 ip="10.0.0.5",
                 port=37777,

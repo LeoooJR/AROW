@@ -12,6 +12,7 @@ from loguru import logger
 
 from core.collection import Repository
 from core.network import is_non_loopback_ipv4
+from core.payload import Payload
 
 # Prefixes so stored keys remain version-migratable and distinguish Tier 1 vs Tier 2.
 _STABLE_HW_PREFIX = "hw:v1:"
@@ -333,7 +334,7 @@ class Device(ABC, Generic[D]):
         return isinstance(other, Device) and self._descriptor == other._descriptor
 
 
-class Phone(Device[PhoneDescriptor]):
+class Phone(Device[PhoneDescriptor], Payload):
     """
     Phone device
     """
@@ -475,9 +476,9 @@ class Phone(Device[PhoneDescriptor]):
     def shell_device_name(self) -> str:
         return self._descriptor.shell_device_name
 
-    def to_payload(self, json_compatible: bool = False) -> dict[str, object]:
+    def serialize(self, **kwargs) -> dict[str, object]:
         """
-        Convert the phone to a payload.
+        Convert the phone to a serialized dictionary.
         """
         return {
             "id": self.id,
@@ -489,15 +490,15 @@ class Phone(Device[PhoneDescriptor]):
             "stable_key": self.stable_key,
             "last_communication": (
                 self.last_communication.isoformat()
-                if json_compatible
+                if kwargs.get("json_compatible", False)
                 else self.last_communication
             ),
         }
 
-    @staticmethod
-    def from_payload(payload: dict[str, object]) -> Phone:
+    @classmethod
+    def deserialize(cls, payload: dict[str, object], **kwargs) -> Phone:
         """
-        Create a phone from a persisted payload written by :meth:`to_payload`.
+        Create a phone from a persisted dictionary written by :meth:`serialize`.
         """
         port_raw = payload.get("port")
         port: int | None = None
@@ -516,7 +517,7 @@ class Phone(Device[PhoneDescriptor]):
             last_communication = datetime.datetime.fromisoformat(last_communication_raw)
         elif isinstance(last_communication_raw, datetime.datetime):
             last_communication = last_communication_raw
-        phone = Phone(
+        phone = cls(
             id=str(payload["id"]),
             name=str(name_raw) if name_raw is not None else None,
             os=str(os_raw) if os_raw is not None else None,
@@ -533,7 +534,7 @@ class Phone(Device[PhoneDescriptor]):
 
 def serialize_phone_collection(phones: Iterable[Phone]) -> list[dict[str, object]]:
     """Serialize handsets for lightweight core signal payloads."""
-    return [phone.to_payload(json_compatible=False) for phone in phones]
+    return [phone.serialize(json_compatible=False) for phone in phones]
 
 
 # Descriptor fields refreshed from a newly listed Phone during paired-device reconcile.

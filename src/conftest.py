@@ -5,6 +5,8 @@ import os
 
 from logger import setup_logger
 
+pytest_plugins = ["core.tests.geo_fixtures"]
+
 
 def pytest_configure() -> None:
     """Ensure file sink and format are active before importing modules that log at import time."""

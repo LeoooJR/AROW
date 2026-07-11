@@ -7,9 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from core.devices import Phone, PhoneRepository
-from core.devices import compute_phone_stable_key
-from core.location import Location
+from core.devices import Phone, PhoneRepository, compute_phone_stable_key
+from core.geo.location import Location
 from core.simulation import (
     INDEX_FILENAME,
     SIMULATION_FILENAME,
@@ -136,8 +135,8 @@ def test_add_only_survives_reload_without_write_all(tmp_path: Path) -> None:
 
 def test_phone_from_payload_rebuilds_persisted_fields() -> None:
     phone = Phone(id="device-1", name="Pixel", state="device", ip="10.0.0.5", port=5555)
-    payload = phone.to_payload(json_compatible=False)
-    restored = Phone.from_payload(payload)
+    payload = phone.serialize(json_compatible=False)
+    restored = Phone.deserialize(payload)
 
     assert restored.id == phone.id
     assert restored.name == phone.name
@@ -160,20 +159,20 @@ def test_simulation_from_payload_rebuilds_fields(tmp_path: Path) -> None:
     simulation = Simulation(
         id="sim-1",
         device=device,
-        real_location=Location(lat=1.0, lon=2.0, label="real"),
-        fake_location=Location(lat=3.0, lon=4.0, label="fake"),
+        real_location=Location(lat=1.0, lon=2.0, poi=None),
+        spoofed_location=Location(lat=3.0, lon=4.0, poi=None),
         map_file=map_file,
         log_file=log_file,
         active=True,
     )
-    payload = simulation.to_payload(simulation_dir, json_compatible=True)
-    restored = Simulation.from_payload(payload, simulation_dir)
+    payload = simulation.serialize(simulation_dir, json_compatible=True)
+    restored = Simulation.deserialize(payload, simulation_dir)
 
     assert restored.id == "sim-1"
     assert restored.device is not None
     assert restored.device.id == "device-1"
     assert restored.real_location == simulation.real_location
-    assert restored.fake_location == simulation.fake_location
+    assert restored.spoofed_location == simulation.spoofed_location
     assert restored.map_file == map_file
     assert restored.log_file == log_file
     assert restored.active is True
@@ -196,8 +195,8 @@ def test_simulation_payload_round_trips_external_artifact_paths(
         log_file=log_file,
     )
 
-    payload = simulation.to_payload(simulation_dir, json_compatible=True)
-    restored = Simulation.from_payload(payload, simulation_dir)
+    payload = simulation.serialize(simulation_dir, json_compatible=True)
+    restored = Simulation.deserialize(payload, simulation_dir)
 
     assert payload["map_file"] == str(map_file)
     assert payload["log_file"] == str(log_file)
@@ -342,7 +341,9 @@ def test_load_all_for_devices_deletes_stale_simulation(tmp_path: Path) -> None:
     assert index_payload["simulations"] == []
 
 
-def test_load_all_for_devices_deletes_invalid_persisted_simulation(tmp_path: Path) -> None:
+def test_load_all_for_devices_deletes_invalid_persisted_simulation(
+    tmp_path: Path,
+) -> None:
     save_dir = tmp_path / "simulations"
     repository = SimulationRepository(save_dir)
     paired_phone = Phone(id="device-1", name="Pixel", state="device")
@@ -424,8 +425,8 @@ def test_write_all_writes_simulation_json_and_index_last(tmp_path: Path) -> None
     simulation_one = Simulation(
         id="sim-1",
         device=device,
-        real_location=Location(lat=1.0, lon=2.0, label="real"),
-        fake_location=Location(lat=3.0, lon=4.0, label="fake"),
+        real_location=Location(lat=1.0, lon=2.0, poi=None),
+        spoofed_location=Location(lat=3.0, lon=4.0, poi=None),
         active=True,
     )
     simulation_two = Simulation(id="sim-2")
@@ -446,18 +447,9 @@ def test_write_all_writes_simulation_json_and_index_last(tmp_path: Path) -> None
     assert simulation_payload == {
         "schema_version": SIMULATION_REPOSITORY_SCHEMA_VERSION,
         "id": "sim-1",
-        "device": {
-            "id": "device-1",
-            "name": "Pixel",
-            "os": "",
-            "ip": "",
-            "port": None,
-            "state": "device",
-            "stable_key": device.stable_key,
-            "last_communication": device.last_communication.isoformat(),
-        },
-        "real_location": {"lat": 1.0, "lon": 2.0, "label": "real"},
-        "fake_location": {"lat": 3.0, "lon": 4.0, "label": "fake"},
+        "device": device.serialize(json_compatible=True),
+        "real_location": {"lat": 1.0, "lon": 2.0, "poi": None},
+        "spoofed_location": {"lat": 3.0, "lon": 4.0, "poi": None},
         "map_file": "map/sim-1.html",
         "log_file": "sim-1.log",
         "active": True,
