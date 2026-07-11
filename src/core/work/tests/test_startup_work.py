@@ -17,6 +17,7 @@ from core.signals import (
     CoreSignals,
     DevicesUpdatedPayload,
     SimulationCreatedPayload,
+    SimulationRestoredPayload,
 )
 from core.simulation import Simulation, SimulationRepository
 from core.work import startup_work
@@ -255,6 +256,68 @@ def test_startup_apply_restores_last_active_device_when_online(
     working_device = second_outcome.adb_server.get_working_device()
     assert working_device is not None
     assert working_device.id == phone.id
+
+
+def test_startup_apply_restores_last_active_device_after_adb_id_rebind(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    phone = Phone(
+        id="device-old",
+        name="Pixel",
+        os="14",
+        state="device",
+        hardware_serial="SER-123",
+    )
+    repository = SimulationRepository(
+        startup_work.get_or_create_application_dir() / "simulations"
+    )
+    simulation = Simulation(id="sim-1", device=phone, active=True)
+    repository.add(simulation)
+    repository.last_active_device_id = phone.id
+    repository.write_all()
+
+    rebound_phone = Phone(
+        id="device-new",
+        name=phone.name,
+        state="device",
+        hardware_serial=phone.hardware_serial,
+    )
+    rebound_phone.descriptor.os = phone.os
+    rebound_state = MockAdbState(seed=222, initial_devices=0)
+    rebound_server = MockAdbServer(state=rebound_state)
+    rebound_server.paired_devices.add(rebound_phone)
+    rebound_client = MockAdbClient(state=rebound_state)
+    monkeypatch.setattr(startup_work, "_start_adb_server", lambda: rebound_server)
+    monkeypatch.setattr(startup_work, "_create_adb_client", lambda: rebound_client)
+    monkeypatch.setattr(
+        startup_work,
+        "enrich_phones_with_adb_shell_properties",
+        lambda _client, _phones: None,
+    )
+
+    second_outcome = StartupCoreRuntimeWork(use_mock_adb=False).run()
+    model_entrypoint = ModelEntrypoint()
+    simulation_restored: list[str] = []
+
+    def capture(payload: SimulationRestoredPayload) -> None:
+        simulation_restored.append(payload.simulation_id)
+
+    model_entrypoint.signal_bus.subscribe(
+        CoreSignals.SIMULATION_RESTORED,
+        capture,
+    )
+    StartupCoreRuntimeWork.apply_main_thread(model_entrypoint, second_outcome)
+
+    assert second_outcome.last_active_device_id == rebound_phone.id
+    assert len(second_outcome.simulations) == 1
+    assert second_outcome.simulations[0].device is rebound_phone
+    repository = SimulationRepository(
+        startup_work.get_or_create_application_dir() / "simulations"
+    )
+    assert repository.last_active_device_id == rebound_phone.id
+    assert simulation_restored == ["sim-1"]
+    working_device = rebound_server.get_working_device()
+    assert working_device is rebound_phone
 
 
 def test_startup_apply_skips_last_active_device_when_offline(

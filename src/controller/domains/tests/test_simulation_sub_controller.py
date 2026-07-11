@@ -18,10 +18,12 @@ from core.devices import Phone
 from core.entrypoint import ModelEntrypoint
 from core.signals import (
     CoreSignals,
+    MapRenderedPayload,
     SimulationCreatedPayload,
     SimulationCreationFailedPayload,
     SimulationDeletedPayload,
     SimulationLocationValidatedPayload,
+    SimulationMapFileChangedPayload,
     SimulationPositionChangedPayload,
     SimulationStateChangedPayload,
 )
@@ -368,6 +370,70 @@ def test_set_simulation_spoofed_location_persists_metadata(tmp_path: Path) -> No
         "lon": lon,
         "poi": None,
     }
+
+
+def test_map_rendered_persists_latest_map_file_to_metadata(tmp_path: Path) -> None:
+    model_entrypoint = _make_model(
+        tmp_path, device=Phone(id="device-1", state="device", model="Pixel")
+    )
+    subcontroller = _make_subcontroller(model_entrypoint)
+    subcontroller.connect_model_signals()
+    simulation_id = _create_simulation_id(model_entrypoint, "device-1")
+    html_path = tmp_path / "rendered" / "sim-1.html"
+    html_path.parent.mkdir(parents=True, exist_ok=True)
+    html_path.write_text("<html></html>", encoding="utf-8")
+
+    model_entrypoint.set_simulation_map_file(simulation_id, html_path)
+    subcontroller._on_map_rendered(
+        MapRenderedPayload(simulation_id=simulation_id, html_path=html_path)
+    )
+
+    metadata_path = _simulation_metadata_path(model_entrypoint, simulation_id)
+    payload = json.loads(metadata_path.read_text(encoding="utf-8"))
+    assert payload["map_file"] == str(html_path)
+
+
+def test_set_simulation_map_file_emits_map_file_changed_with_simulation_id(
+    tmp_path: Path,
+) -> None:
+    model_entrypoint = _make_model(
+        tmp_path, device=Phone(id="device-1", state="device", model="Pixel")
+    )
+    simulation_id = _create_simulation_id(model_entrypoint, "device-1")
+    html_path = tmp_path / "rendered" / "sim-1.html"
+    captured: list[SimulationMapFileChangedPayload] = []
+
+    def capture_map_file(payload: SimulationMapFileChangedPayload) -> None:
+        captured.append(payload)
+
+    model_entrypoint.signal_bus.subscribe(
+        CoreSignals.SIMULATION_MAP_FILE_CHANGED,
+        capture_map_file,
+    )
+
+    model_entrypoint.set_simulation_map_file(simulation_id, html_path)
+
+    assert len(captured) == 1
+    assert captured[0].simulation_id == simulation_id
+    assert captured[0].map_file_path == html_path
+
+
+def test_set_simulation_map_file_persists_metadata(tmp_path: Path) -> None:
+    model_entrypoint = _make_model(
+        tmp_path, device=Phone(id="device-1", state="device", model="Pixel")
+    )
+    subcontroller = _make_subcontroller(model_entrypoint)
+    subcontroller.connect_model_signals()
+    simulation_id = _create_simulation_id(model_entrypoint, "device-1")
+    html_path = tmp_path / "rendered" / "sim-2.html"
+    html_path.parent.mkdir(parents=True, exist_ok=True)
+    html_path.write_text("<html></html>", encoding="utf-8")
+
+    model_entrypoint.set_simulation_map_file(simulation_id, html_path)
+
+    metadata_path = _simulation_metadata_path(model_entrypoint, simulation_id)
+    payload = json.loads(metadata_path.read_text(encoding="utf-8"))
+    assert payload["map_file"] == str(html_path)
 
 
 def test_set_simulation_active_emits_state_changed_with_simulation_id(
