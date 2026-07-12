@@ -1,0 +1,1313 @@
+./adb devices -l
+List of devices attached
+adb-AYLVBB5220900344-bReb3a._adb-tls-connect._tcp device product:ALT-NX1EEA model:ALT_NX1 device:HNALT-Q1 transport_id:1
+
+./adb shell getprop ro.build.version.release
+15
+./adb shell get-serialno
+./adb shell get-serialno
+./adb get-serialno
+adb-AYLVBB5220900344-bReb3a._adb-tls-connect._tcp
+./adb shell dumpsys battery
+Current Battery Service state:
+  AC powered: false
+  USB powered: false
+  Wireless powered: false
+  Dock powered: false
+  Max charging current: 0
+  Max charging voltage: 0
+  Charge counter: 2848000
+  status: 3
+  health: 2
+  present: true
+  level: 54
+  scale: 100
+  voltage: 3906
+  temperature: 220
+  technology: Li-ion
+  Charging state: 0
+  Charging policy: 0
+./adb shell getprop ro.product.model
+ALT-NX1
+./adb shell getprop ro.product.manufacturer
+HONOR
+./adb shell getprop device_name
+
+./adb shell getprop ro.build.version.sdk
+35
+./adb shell settings get secure location_mode
+3
+./adb shell dumpsys window
+
+WINDOW MANAGER LAST ANR (dumpsys window lastanr)
+  <no ANR has occurred since boot>
+
+WINDOW MANAGER POLICY STATE (dumpsys window policy)
+    mSafeMode=false mSystemReady=true mSystemBooted=true
+    mCameraLensCoverState=CAMERA_LENS_COVER_ABSENT
+    mWakeGestureEnabledSetting=true
+    mUiMode=UI_MODE_TYPE_NORMALmEnableCarDockHomeCapture=false
+    mLidKeyboardAccessibility=0 mLidNavigationAccessibility=0 getLidBehavior=LID_BEHAVIOR_NONE
+    mLongPressOnBackBehavior=LONG_PRESS_BACK_NOTHING
+    mLongPressOnHomeBehavior=LONG_PRESS_HOME_ASSIST
+    mDoubleTapOnHomeBehavior=DOUBLE_TAP_HOME_NOTHING
+    mShortPressOnPowerBehavior=SHORT_PRESS_POWER_GO_TO_SLEEP
+    mLongPressOnPowerBehavior=LONG_PRESS_POWER_GO_TO_VOICE_ASSIST
+    mSettingsKeyBehavior=SETTINGS_KEY_BEHAVIOR_SETTINGS_ACTIVITY
+    mLongPressOnPowerAssistantTimeoutMs=500
+    mVeryLongPressOnPowerBehavior=VERY_LONG_PRESS_POWER_GLOBAL_ACTIONS
+    mDoublePressOnPowerBehavior=13
+    mTriplePressOnPowerBehavior=MULTI_PRESS_POWER_NOTHING
+    mSupportShortPressPowerWhenDefaultDisplayOn=false
+    mPowerVolUpBehavior=3
+    mShortPressOnSleepBehavior=SHORT_PRESS_SLEEP_GO_TO_SLEEP
+    mShortPressOnWindowBehavior=SHORT_PRESS_WINDOW_PICTURE_IN_PICTURE
+    mShortPressOnStemPrimaryBehavior=SHORT_PRESS_PRIMARY_NOTHING
+    mDoublePressOnStemPrimaryBehavior=DOUBLE_PRESS_PRIMARY_NOTHING
+    mTriplePressOnStemPrimaryBehavior=TRIPLE_PRESS_PRIMARY_NOTHING
+    mLongPressOnStemPrimaryBehavior=LONG_PRESS_PRIMARY_NOTHING
+    mAllowStartActivityForLongPressOnPowerDuringSetup=false
+    mHasSoftInput=true
+    mDismissImeOnBackKeyPressed=false mIncallPowerBehavior=sleep
+    mIncallBackBehavior=<nothing> mEndcallBehavior=sleep
+    mDisplayHomeButtonHandlers=
+      mDisplayId = 0, mHomePressed = false
+    mKeyguardOccluded=false mKeyguardOccludedChanged=false mPendingKeyguardOccluded=false
+    mAllowLockscreenWhenOnDisplays=false mLockScreenTimeout=120000 mLockScreenTimerActive=false
+    mKidsModeEnabled=false
+mHapticTextHandleEnabled=false
+    mKeyMapping.size=0
+    KeyCombination rules:
+      KEYCODE_VOLUME_DOWN + KEYCODE_POWER
+      KEYCODE_VOLUME_DOWN + KEYCODE_VOLUME_UP
+      KEYCODE_VOLUME_UP + KEYCODE_POWER
+    SingleKey rules:
+      KeyCode=KEYCODE_POWER, LongPress=true, VeryLongPress=true, MaxMultiPressCount=2
+    Deferred key action executor:
+      empty
+    WakeGestureListener
+      mTriggerRequested=false
+      mSensor=null
+    KeyguardServiceDelegate
+      showing=true
+      inputRestricted=false
+      occluded=false
+      secure=true
+      dreaming=false
+      systemIsReady=true
+      deviceHasKeyguard=true
+      enabled=true
+      offReason=OFF_BECAUSE_OF_TIMEOUT
+      currentUser=-10000
+      bootCompleted=true
+      screenState=SCREEN_STATE_OFF
+      interactiveState=INTERACTIVE_STATE_SLEEP
+      KeyguardStateMonitor
+        mIsShowing=true
+        mSimSecure=false
+        mInputRestricted=true
+        mTrusted=false
+        mCurrentUserId=0
+    Looper state:
+      Looper (android.ui, tid 22) {eea3f6b}
+        (Total messages: 0, polling=true, quitting=false)
+
+WINDOW MANAGER ANIMATOR STATE (dumpsys window animator)
+    Display{#0 state=OFF size=1080x2412 ROTATION_0}:
+      Window #0: WindowStateAnimator{2e4525f com.android.systemui.wallpapers.ImageWallpaper}
+      Window #1: WindowStateAnimator{6af8f1 com.android.systemui.wallpapers.ImageWallpaper}
+      Window #2: WindowStateAnimator{29ce9f5 com.orange.mail.fr/com.orange.mail.fr.mail.app.MailListActivity}
+      Window #3: WindowStateAnimator{8b20473 com.whatsapp/com.whatsapp.home.ui.HomeActivity}
+      Window #4: WindowStateAnimator{d1b6900 com.whatsapp/com.whatsapp.Conversation}
+      Window #5: WindowStateAnimator{9f4d896 com.hihonor.android.launcher/com.hihonor.android.launcher.unihome.UniHomeLauncher}
+      Window #6: WindowStateAnimator{ae0ef45 com.hihonor.android.launcher/com.hihonor.android.launcher.unihome.UniHomeLauncher}
+      Window #7: WindowStateAnimator{a00349c com.android.settings/com.android.settings.HWSettings}
+      Window #8: WindowStateAnimator{4b4a6a7 com.android.settings/com.android.settings.Settings$HwSystemDashboardActivity}
+      Window #9: WindowStateAnimator{1904e12 com.android.settings/com.android.settings.Settings$DevelopmentSettingsActivity}
+      Window #10: WindowStateAnimator{4fa69e7 com.android.settings/com.hihonor.settingslib.SubSettings}
+      Window #11: WindowStateAnimator{9844294 ShellDropTarget}
+      Window #12: WindowStateAnimator{61f0634 InputMethod}
+      Window #13: WindowStateAnimator{d222fd3 StatusBar}
+      Window #14: WindowStateAnimator{65635c2 NotificationShade}
+      Window #15: WindowStateAnimator{c11a13d HeadsupCardListWindow}
+      Window #16: WindowStateAnimator{4d06d32 AssistPreviewPanel}
+      Window #17: WindowStateAnimator{c2e8ffa NavigationBar0}
+      Window #18: WindowStateAnimator{4afea83 GestureSildeOut}
+      Window #19: WindowStateAnimator{367b7ac GestureNavAnim}
+      Window #20: WindowStateAnimator{6f3d3c ScreenDecorDotViewOverlay}
+      Window #21: WindowStateAnimator{c85cc12 ScreenDecorOverlay}
+
+
+
+WINDOW MANAGER SESSIONS (dumpsys window sessions)
+  Session Session{7d5323 3523:1001}:
+    numWindow=0 mCanAddInternalSystemWindow=true mAlertWindowSurfaces={} mClientDead=false mSurfaceSession=android.view.SurfaceSession@cacf400
+    mPackageName=com.android.phone
+  Session Session{15822fc 7216:u0a10105}:
+    numWindow=1 mCanAddInternalSystemWindow=true mAlertWindowSurfaces={} mClientDead=false mSurfaceSession=android.view.SurfaceSession@ffc1439
+    mPackageName=com.hihonor.android.launcher
+  Session Session{1a702d4 7990:1000}:
+    numWindow=4 mCanAddInternalSystemWindow=true mAlertWindowSurfaces={} mClientDead=false mSurfaceSession=android.view.SurfaceSession@9942a7e
+    mPackageName=com.android.settings
+  Session Session{25cd859 26366:u0a10187}:
+    numWindow=1 mCanAddInternalSystemWindow=false mAlertWindowSurfaces={} mClientDead=false mSurfaceSession=android.view.SurfaceSession@47cabdf
+    mPackageName=com.google.android.inputmethod.latin
+  Session Session{3453cab 26924:u0a10137}:
+    numWindow=1 mCanAddInternalSystemWindow=false mAlertWindowSurfaces={} mClientDead=false mSurfaceSession=android.view.SurfaceSession@2ed502c
+    mPackageName=com.google.android.googlequicksearchbox
+  Session Session{45af483 32143:u0a10217}:
+    numWindow=2 mCanAddInternalSystemWindow=false mAlertWindowSurfaces={} mClientDead=false mSurfaceSession=android.view.SurfaceSession@b80baf5
+    mPackageName=com.whatsapp
+  Session Session{5b798d9 19669:u0a10210}:
+    numWindow=1 mCanAddInternalSystemWindow=false mAlertWindowSurfaces={} mClientDead=false mSurfaceSession=android.view.SurfaceSession@d44708a
+    mPackageName=com.orange.mail.fr
+  Session Session{b3a8b39 3535:u0a10077}:
+    numWindow=10 mCanAddInternalSystemWindow=true mAlertWindowSurfaces={} mClientDead=false mSurfaceSession=android.view.SurfaceSession@52a26fb
+    mPackageName=com.android.systemui
+  Session Session{cffb359 2377:1000}:
+    numWindow=2 mCanAddInternalSystemWindow=true mAlertWindowSurfaces={} mClientDead=false mSurfaceSession=android.view.SurfaceSession@bf54318
+    mPackageName=android
+
+WINDOW MANAGER DISPLAY CONTENTS (dumpsys window displays)
+  Display: mDisplayId=0 (organized)
+    init=1080x2412 480dpi mMinSizeOfResizeableTaskDp=220 cur=1080x2412 app=1080x2412 rng=1080x1080-2412x2412
+    deferred=false mLayoutNeeded=false
+  mLastOrientationSource=WindowedMagnification:0:31@92082119
+  deepestLastOrientationSource=Window{bdf3658 u0 NotificationShade}
+  overrideConfig={1.0 208mcc1mnc [fr_FR] ldltr sw360dp w360dp h804dp 480dpi nrml long port finger -keyb/v/h -nav/h winConfig={ mBounds=Rect(0, 0 - 1080, 2412) mAppBounds=Rect(0, 0 - 1080, 2412) mMaxBounds=Rect(0, 0 - 1080, 2412) mDisplayRotation=ROTATION_0 mWindowingMode=fullscreen mActivityType=undefined mAlwaysOnTop=undefined mRotation=ROTATION_0 mPopOverMode=undefined} suim:1 fontWeightScale:100 changeUserFlag:0 changeUiModeFlag:0 fullScreenVideoFlag:0 splitScreenState:0 landScapeFreeformFlag:1 hoverMode:0 changeIconStyleFlag:0 changeThemeStyleFlag:0 s.15736 fontWeightAdjustment=0}
+  mLayoutSeq=100207
+  mCurrentFocus=Window{bdf3658 u0 NotificationShade}
+  mFocusedApp=ActivityRecord{3e3682b u0 com.android.settings/com.hihonor.settingslib.SubSettings t1019}
+
+  mHoldScreenWindow=null
+  mObscuringWindow=Window{c9d3608 u0 com.android.systemui.wallpapers.ImageWallpaper}
+  mLastWakeLockHoldingWindow=null
+  mLastWakeLockObscuringWindow=null
+
+  displayId=0
+  mWallpaperTarget=Window{bdf3658 u0 NotificationShade}
+  mLastWallpaperZoomOut=0.0
+  token WallpaperWindowToken{4e59159 token=android.os.Binder@ec7b1a0}:
+    canShowWhenLocked=false
+    mWallpaperX=0.5
+    mWallpaperY=0.5
+    mWallpaperXStep=NA
+    mWallpaperYStep=NA
+    mWallpaperDisplayOffsetX=NA
+    mWallpaperDisplayOffsetY=NA
+  token WallpaperWindowToken{bff5e1d token=android.os.Binder@9ab40c7}:
+    canShowWhenLocked=true
+    mWallpaperX=NA
+    mWallpaperY=NA
+    mWallpaperXStep=NA
+    mWallpaperYStep=NA
+    mWallpaperDisplayOffsetX=NA
+    mWallpaperDisplayOffsetY=NA
+
+  mDeferUpdateImeTargetCount=0
+
+  mSystemGestureExclusion=SkRegion()
+
+  Display areas in top down Z order:
+    * Leaf:40:40
+    * HideDisplayCutout:32:39
+      * OneHanded:32:39 (organized)
+        * FullscreenMagnification:33:39
+          * Leaf:33:39
+        * Leaf:32:32
+    * WindowedMagnification:0:31
+      * HideDisplayCutout:26:31
+        * OneHanded:29:31 (organized)
+          * FullscreenMagnification:29:31
+            * Leaf:29:31
+        * Leaf:28:28
+        * OneHanded:26:27 (organized)
+          * FullscreenMagnification:26:27
+            * Leaf:26:27
+      * OneHanded:24:25 (organized)
+        * Leaf:24:25
+      * HideDisplayCutout:18:23
+        * OneHanded:18:23 (organized)
+          * FullscreenMagnification:18:23
+            * Leaf:18:23
+      * OneHanded:17:17 (organized)
+        * FullscreenMagnification:17:17
+          * Leaf:17:17
+      * HideDisplayCutout:16:16
+        * OneHanded:16:16 (organized)
+          * FullscreenMagnification:16:16
+            * Leaf:16:16
+      * OneHanded:15:15 (organized)
+        * FullscreenMagnification:15:15
+          * Leaf:15:15
+      * HideDisplayCutout:0:14
+        * OneHanded:0:14 (organized)
+          * ImePlaceholder:13:14
+            * ImeContainer
+          * FullscreenMagnification:0:12
+            * Leaf:3:12
+            * DefaultTaskDisplayArea (organized)
+            * Leaf:0:1
+
+  Task display areas in top down Z order:
+    TaskDisplayArea DefaultTaskDisplayArea
+      overrideConfig={0.0 ?mcc0mnc ?localeList ?layoutDir ?swdp ?wdp ?hdp ?density ?lsize ?long ?ldr ?wideColorGamut ?orien ?uimode ?night ?touch ?keyb/?/? ?nav/? winConfig={ mBounds=Rect(0, 0 - 0, 0) mAppBounds=null mMaxBounds=Rect(0, 0 - 0, 0) mDisplayRotation=undefined mWindowingMode=fullscreen mActivityType=undefined mAlwaysOnTop=undefined mRotation=undefined mPopOverMode=undefined} changeUserFlag:0 changeUiModeFlag:0 fullScreenVideoFlag:0 splitScreenState:-1 landScapeFreeformFlag:1 hoverMode:0 changeIconStyleFlag:0 changeThemeStyleFlag:0 ?fontWeightAdjustment}
+      mPreferredTopFocusableRootTask=Task{44833 #1019 type=standard A=1000:com.android.settings}
+      mLastFocusedRootTask=Task{44833 #1019 type=standard A=1000:com.android.settings}
+      Application tokens in top down Z order:
+      * Task{44833 #1019 type=standard A=1000:com.android.settings U=0 visible=true visibleRequested=false mode=fullscreen translucent=false embedded=false sz=4}
+        bounds=[0,0][1080,2412]
+        * ActivityRecord{3e3682b u0 com.android.settings/com.hihonor.settingslib.SubSettings t1019}
+        * ActivityRecord{eef691c u0 com.android.settings/.Settings$DevelopmentSettingsActivity t1019}
+        * ActivityRecord{242ba06 u0 com.android.settings/.Settings$HwSystemDashboardActivity t1019}
+        * ActivityRecord{1066784 u0 com.android.settings/.HWSettings t1019}
+      * Task{aebff7d #251 type=home U=0 visible=false visibleRequested=false mode=fullscreen translucent=true embedded=false sz=1}
+        bounds=[0,0][1080,2412]
+        * Task{45e9fbe #252 type=home A=10105:com.hihonor.android.launcher U=0 rootTaskId=251 visible=false visibleRequested=false mode=fullscreen translucent=true embedded=false sz=1}
+          bounds=[0,0][1080,2412]
+          * ActivityRecord{d7312c3 u0 com.hihonor.android.launcher/.unihome.UniHomeLauncher t252}
+      * Task{f87781a #1017 type=standard A=10217:com.whatsapp U=0 visible=false visibleRequested=false mode=fullscreen translucent=true embedded=false sz=2}
+        bounds=[0,0][1080,2412]
+        * ActivityRecord{1ad6bd0 u0 com.whatsapp/.Conversation t1017}
+        * ActivityRecord{c7dbc34 u0 com.whatsapp/.home.ui.HomeActivity t1017}
+      * Task{6fa8782 #1018 type=standard I=com.orange.mail.fr/.mail.app.MailListActivity U=0 visible=false visibleRequested=false mode=fullscreen translucent=true embedded=false sz=1}
+        bounds=[0,0][1080,2412]
+        * ActivityRecord{6d441f6 u0 com.orange.mail.fr/.mail.app.MailListActivity t1018}
+      * Task{96ce8e3 #1010 type=standard A=10195:com.google.android.dialer U=0 visible=false visibleRequested=false mode=fullscreen translucent=true embedded=false sz=1}
+        bounds=[0,0][1080,2412]
+        * ActivityRecord{f5f9f47 u0 com.google.android.dialer/.extensions.GoogleDialtactsActivity t1010}
+      * Task{b3602eb #3 type=undefined U=0 visible=false visibleRequested=false mode=fullscreen translucent=true embedded=false sz=2}
+        bounds=[0,0][1080,2412]
+        * Task{1403d08 #5 type=undefined U=0 rootTaskId=3 visible=false visibleRequested=false mode=multi-window translucent=true embedded=false sz=0}
+          bounds=[0,2412][1080,3618]
+        * Task{d54a292 #4 type=undefined U=0 rootTaskId=3 visible=false visibleRequested=false mode=multi-window translucent=true embedded=false sz=0}
+          bounds=[0,0][1080,2412]
+
+  no ScreenRotationAnimation 
+
+  rootHomeTask=Task=251
+
+  PinnedTaskController
+    mIsImeShowing=false
+    mImeHeight=0
+    mMinAspectRatio=0.41841003
+    mMaxAspectRatio=2.39
+
+  DisplayFrames w=1080 h=2412 r=0
+
+  DisplayPolicy
+    mCarDockEnablesAccelerometer=true mDeskDockEnablesAccelerometer=true
+    mDockMode=EXTRA_DOCK_STATE_UNDOCKED mLidState=LID_ABSENT
+    mAwake=false mScreenOnEarly=false mScreenOnFully=false
+    mKeyguardDrawComplete=false mWindowManagerDrawComplete=false
+ mKeyguardTransparencyComplete=false
+    mHdmiPlugged=false
+    mLastBehavior=SHOW_TRANSIENT_BARS_BY_SWIPE
+    mShowingDream=false mDreamingLockscreen=true
+    mStatusBar=Window{cccdda0 u0 StatusBar}
+    mExpandedPanel=Window{bdf3658 u0 NotificationShade}
+    isKeyguardShowing=true
+    mNavigationBar=Window{ec84063 u0 NavigationBar0}
+    mNavBarOpacityMode=0
+    mNavigationBarCanMove=true
+    mNavigationBarPosition=4
+    mTopGestureHost=Window{cccdda0 u0 StatusBar}
+    mFocusedWindow=Window{bdf3658 u0 NotificationShade}
+    mLastStatusBarAppearanceRegions=
+    mLastLetterboxDetails=
+    mTopIsFullscreen=false
+    mImeInsetsConsumed=false
+    mForceShowNavigationBarEnabled=false mAllowLockscreenWhenOn=false
+    mRemoteInsetsControllerControlsSystemBars=false
+    mDecorInsetsInfo:
+      ROTATION_0={nonDecorInsets=[0,0][0,0], overrideNonDecorInsets=[0,108][0,114], configInsets=[0,0][0,0], overrideConfigInsets=[0,108][0,114], nonDecorFrame=[0,0][1080,2412], overrideNonDecorFrame=[0,108][1080,2298], configFrame=[0,0][1080,2412], overrideConfigFrame=[0,108][1080,2298]}
+      ROTATION_90={nonDecorInsets=[0,0][0,0], overrideNonDecorInsets=[108,0][114,0], configInsets=[0,0][0,0], overrideConfigInsets=[108,108][114,0], nonDecorFrame=[0,0][2412,1080], overrideNonDecorFrame=[108,0][2298,1080], configFrame=[0,0][2412,1080], overrideConfigFrame=[108,108][2298,1080]}
+      ROTATION_180={nonDecorInsets=[0,0][0,0], overrideNonDecorInsets=[0,0][0,222], configInsets=[0,0][0,0], overrideConfigInsets=[0,108][0,222], nonDecorFrame=[0,0][1080,2412], overrideNonDecorFrame=[0,0][1080,2190], configFrame=[0,0][1080,2412], overrideConfigFrame=[0,108][1080,2190]}
+      ROTATION_270={nonDecorInsets=[0,0][0,0], overrideNonDecorInsets=[0,0][222,0], configInsets=[0,0][0,0], overrideConfigInsets=[0,108][222,0], nonDecorFrame=[0,0][2412,1080], overrideNonDecorFrame=[0,0][2190,1080], configFrame=[0,0][2412,1080], overrideConfigFrame=[0,108][2190,1080]}
+    SystemGestures:
+      mDisplayCutoutTouchableRegionSize=0
+      mSwipeStartThreshold=Rect(72, 108 - 72, 72)
+      mSwipeDistanceThreshold=72
+
+  DisplayRotation
+    mCurrentAppOrientation=SCREEN_ORIENTATION_NOSENSOR
+    mLastOrientation=5
+    mRotation=0 mDeferredRotationPauseCount=0
+    mLandscapeRotation=ROTATION_90 mSeascapeRotation=ROTATION_270
+    mPortraitRotation=ROTATION_0 mUpsideDownRotation=ROTATION_180
+    mSupportAutoRotation=true
+    WindowOrientationListener
+      mEnabled=false
+      mCurrentRotation=ROTATION_0
+      mSensorType=null
+      mSensor=null
+      mRate=0
+
+    mCarDockRotation=-1 mDeskDockRotation=-1
+    mUserRotationMode=USER_ROTATION_FREE mUserRotation=ROTATION_0 mCameraRotationMode=0 mAllowAllRotations=false
+    mDemoHdmiRotation=ROTATION_90 mDemoHdmiRotationLock=false mUndockedHdmiRotation=-1
+    mLidOpenRotation=-1
+    mFixedToUserRotation=false
+  FoldController
+    mPauseAutorotationDuringUnfolding=false
+    mShouldDisableRotationSensor=false
+    mShouldIgnoreSensorRotation=false
+    mLastDisplaySwitchTime=0
+    mLastHingeAngleEventTime=0
+    mDeviceState=UNKNOWN
+
+    RotationHistory
+      03-25 16:10:46.035 ROTATION_0 to ROTATION_90
+        source=ActivityRecord{637fa36 u0 com.whatsapp/.Conversation t978} SCREEN_ORIENTATION_UNSPECIFIED
+        mode=USER_ROTATION_FREE user=ROTATION_0 sensor=ROTATION_90
+       halfFoldSavedRotation=-1 mInHalfFoldTransition=false mFoldState=UNKNOWN
+       reversionSlots= NOSENSOR false, CAMERA false HALF_FOLD false
+      03-25 16:10:47.077 ROTATION_90 to ROTATION_0
+        source=ActivityRecord{637fa36 u0 com.whatsapp/.Conversation t978} SCREEN_ORIENTATION_UNSPECIFIED
+        mode=USER_ROTATION_FREE user=ROTATION_0 sensor=ROTATION_0
+       halfFoldSavedRotation=-1 mInHalfFoldTransition=false mFoldState=UNKNOWN
+       reversionSlots= NOSENSOR false, CAMERA false HALF_FOLD false
+      03-25 21:16:27.746 ROTATION_0 to ROTATION_270
+        source=ActivityRecord{ecd09e9 u0 com.whatsapp/.Conversation t978} SCREEN_ORIENTATION_UNSPECIFIED
+        mode=USER_ROTATION_FREE user=ROTATION_0 sensor=ROTATION_270
+       halfFoldSavedRotation=-1 mInHalfFoldTransition=false mFoldState=UNKNOWN
+       reversionSlots= NOSENSOR false, CAMERA false HALF_FOLD false
+      03-25 21:16:29.743 ROTATION_270 to ROTATION_0
+        source=ActivityRecord{ecd09e9 u0 com.whatsapp/.Conversation t978} SCREEN_ORIENTATION_UNSPECIFIED
+        mode=USER_ROTATION_FREE user=ROTATION_0 sensor=ROTATION_0
+       halfFoldSavedRotation=-1 mInHalfFoldTransition=false mFoldState=UNKNOWN
+       reversionSlots= NOSENSOR false, CAMERA false HALF_FOLD false
+      03-25 22:52:46.813 ROTATION_0 to ROTATION_90
+        source=ActivityRecord{eb2e602 u0 com.whatsapp/.home.ui.HomeActivity t991} SCREEN_ORIENTATION_UNSPECIFIED
+        mode=USER_ROTATION_FREE user=ROTATION_0 sensor=ROTATION_90
+       halfFoldSavedRotation=-1 mInHalfFoldTransition=false mFoldState=UNKNOWN
+       reversionSlots= NOSENSOR false, CAMERA false HALF_FOLD false
+      03-25 22:53:34.372 ROTATION_90 to ROTATION_0
+        source=ActivityRecord{eb2e602 u0 com.whatsapp/.home.ui.HomeActivity t991} SCREEN_ORIENTATION_UNSPECIFIED
+        mode=USER_ROTATION_FREE user=ROTATION_0 sensor=ROTATION_0
+       halfFoldSavedRotation=-1 mInHalfFoldTransition=false mFoldState=UNKNOWN
+       reversionSlots= NOSENSOR false, CAMERA false HALF_FOLD false
+      03-25 22:53:39.860 ROTATION_0 to ROTATION_90
+        source=ActivityRecord{eb2e602 u0 com.whatsapp/.home.ui.HomeActivity t991} SCREEN_ORIENTATION_UNSPECIFIED
+        mode=USER_ROTATION_FREE user=ROTATION_0 sensor=ROTATION_90
+       halfFoldSavedRotation=-1 mInHalfFoldTransition=false mFoldState=UNKNOWN
+       reversionSlots= NOSENSOR false, CAMERA false HALF_FOLD false
+      03-25 22:54:40.640 ROTATION_90 to ROTATION_0
+        source=Window{bdf3658 u0 NotificationShade} SCREEN_ORIENTATION_NOSENSOR
+        mode=USER_ROTATION_FREE user=ROTATION_0 sensor=-2
+       halfFoldSavedRotation=-1 mInHalfFoldTransition=false mFoldState=UNKNOWN
+       reversionSlots= NOSENSOR false, CAMERA false HALF_FOLD false
+
+  InputConsumers:
+    name=recents_animation_input_consumer pid=7216 user=UserHandle{0}
+
+  WindowInsetsStateController
+    InsetsState
+      mDisplayFrame=Rect(0, 0 - 1080, 2412)
+      mDisplayCutout=DisplayCutout{insets=Rect(0, 108 - 0, 0) waterfall=Insets{left=0, top=0, right=0, bottom=0} decoRect=null decoSafeInset=null boundingRect={Bounds=[Rect(0, 0 - 0, 0), Rect(500, 0 - 580, 108), Rect(0, 0 - 0, 0), Rect(0, 0 - 0, 0)]} cutoutPathParserInfo={CutoutPathParserInfo{displayWidth=1080 displayHeight=2412 physicalDisplayWidth=1080 physicalDisplayHeight=2412 density={3.0} cutoutSpec={M-40,0h80v108h-80z} rotation={0} scale={1.0} physicalPixelDisplaySizeRatio={1.0}}} sideOverrides={}}
+      mRoundedCorners=RoundedCorners{[RoundedCorner{position=TopLeft, radius=105, center=Point(105, 105)}, RoundedCorner{position=TopRight, radius=105, center=Point(975, 105)}, RoundedCorner{position=BottomRight, radius=105, center=Point(975, 2307)}, RoundedCorner{position=BottomLeft, radius=105, center=Point(105, 2307)}]}
+      mRoundedCornerFrame=Rect(0, 0 - 0, 0)
+      mPrivacyIndicatorBounds=PrivacyIndicatorBounds {static bounds=Rect(852, 0 - 1092, 108) rotation=0}
+      mDisplayShape=DisplayShape{ spec=-1063678173 displayWidth=1080 displayHeight=2412 physicalPixelDisplaySizeRatio=1.0 rotation=0 offsetX=0 offsetY=0 scale=1.0}
+        InsetsSource id=90990001 type=navigationBars frame=[0,2298][1080,2412] visible=false flags= sideHint=BOTTOM boundingRects=null
+        InsetsSource id=90990004 type=systemGestures frame=[0,0][0,0] visible=true flags= sideHint=NONE boundingRects=null
+        InsetsSource id=90990005 type=mandatorySystemGestures frame=[0,0][0,0] visible=true flags= sideHint=NONE boundingRects=null
+        InsetsSource id=90990006 type=tappableElement frame=[0,2298][1080,2412] visible=true flags= sideHint=BOTTOM boundingRects=null
+        InsetsSource id=90990024 type=systemGestures frame=[0,0][0,0] visible=true flags= sideHint=NONE boundingRects=null
+        InsetsSource id=3 type=ime frame=[0,0][0,0] visibleFrame=[0,2412][1080,2412] visible=false flags= sideHint=NONE boundingRects=null
+        InsetsSource id=27 type=displayCutout frame=[0,0][1080,108] visible=true flags= sideHint=TOP boundingRects=null
+        InsetsSource id=14400000 type=statusBars frame=[0,0][1080,108] visible=true flags= sideHint=TOP boundingRects=null
+        InsetsSource id=14400005 type=mandatorySystemGestures frame=[0,0][1080,108] visible=true flags= sideHint=TOP boundingRects=null
+        InsetsSource id=14400006 type=tappableElement frame=[0,0][1080,108] visible=true flags= sideHint=TOP boundingRects=null
+    Control map:
+      Window{bdf3658 u0 NotificationShade}:
+        InsetsSourceControl: {90990001 mType=navigationBars initiallyVisible mSurfacePosition=Point(0, 2298) mInsetsHint=Insets{left=0, top=0, right=0, bottom=114}}
+        InsetsSourceControl: {14400000 mType=statusBars initiallyVisible mSurfacePosition=Point(0, 0) mInsetsHint=Insets{left=0, top=108, right=0, bottom=0}}
+      Window{b2985cd u0 com.android.settings/com.hihonor.settingslib.SubSettings}:
+        InsetsSourceControl: {3 mType=ime mSurfacePosition=Point(0, 108) mInsetsHint=Insets{left=0, top=0, right=0, bottom=879}}
+    InsetsSourceProviders:
+      InsetsSourceProvider
+        mSource=InsetsSource id=14400006 type=tappableElement frame=[0,0][1080,108] visible=true flags= sideHint=TOP boundingRects=null
+        mSourceFrame=Rect(0, 0 - 1080, 108)
+        mIsLeashReadyForDispatching=true mHasPendingPosition=false
+        mWindowContainer=Window{cccdda0 u0 StatusBar}
+      InsetsSourceProvider
+        mSource=InsetsSource id=14400005 type=mandatorySystemGestures frame=[0,0][1080,108] visible=true flags= sideHint=TOP boundingRects=null
+        mSourceFrame=Rect(0, 0 - 1080, 108)
+        mIsLeashReadyForDispatching=true mHasPendingPosition=false
+        mWindowContainer=Window{cccdda0 u0 StatusBar}
+      InsetsSourceProvider
+        mSource=InsetsSource id=14400000 type=statusBars frame=[0,0][1080,108] visible=true flags= sideHint=TOP boundingRects=null
+        mSourceFrame=Rect(0, 0 - 1080, 108)
+        mControl=InsetsSourceControl mId=14400000 mType=statusBars mLeash=Surface(name=Surface(name=cccdda0 StatusBar)/@0xd995737 - animation-leash of insets_animation)/@0xc1253ad mInitiallyVisible=true mSurfacePosition=Point(0, 0) mInsetsHint=Insets{left=0, top=108, right=0, bottom=0} mSkipAnimationOnce=false
+        mInsetsHint=Insets{left=0, top=108, right=0, bottom=0}
+        mIsLeashReadyForDispatching=true mHasPendingPosition=false
+        mWindowContainer=Window{cccdda0 u0 StatusBar}
+        mAdapter=ControlAdapter mCapturedLeash=Surface(name=Surface(name=cccdda0 StatusBar)/@0xd995737 - animation-leash of insets_animation)/@0xc1253ad
+        mControlTarget=Window{bdf3658 u0 NotificationShade}
+      ImeInsetsSourceProvider
+        mSource=InsetsSource id=3 type=ime frame=[0,0][0,0] visibleFrame=[0,2412][1080,2412] visible=false flags= sideHint=NONE boundingRects=null
+        mSourceFrame=Rect(0, 2412 - 1080, 2412)
+        mControl=InsetsSourceControl mId=3 mType=ime mLeash=Surface(name=Surface(name=8d97739 InputMethod)/@0x52471fb - animation-leash of insets_animation)/@0x910aedf mInitiallyVisible=false mSurfacePosition=Point(0, 108) mInsetsHint=Insets{left=0, top=0, right=0, bottom=879} mSkipAnimationOnce=false
+        mInsetsHint=Insets{left=0, top=0, right=0, bottom=879} stale
+        mIsLeashReadyForDispatching=true mHasPendingPosition=false
+        mWindowContainer=Window{8d97739 u0 InputMethod}
+        mAdapter=ControlAdapter mCapturedLeash=Surface(name=Surface(name=8d97739 InputMethod)/@0x52471fb - animation-leash of insets_animation)/@0x910aedf
+        mControlTarget=Window{b2985cd u0 com.android.settings/com.hihonor.settingslib.SubSettings}
+        mImeShowing=false        showImePostLayout not scheduled, mImeRequester=null
+
+      InsetsSourceProvider
+        mSource=InsetsSource id=90990024 type=systemGestures frame=[0,0][0,0] visible=true flags= sideHint=NONE boundingRects=null
+        mSourceFrame=Rect(0, 0 - 0, 0)
+        mIsLeashReadyForDispatching=true mHasPendingPosition=false
+        mWindowContainer=Window{ec84063 u0 NavigationBar0}
+      InsetsSourceProvider
+        mSource=InsetsSource id=90990006 type=tappableElement frame=[0,2298][1080,2412] visible=true flags= sideHint=BOTTOM boundingRects=null
+        mSourceFrame=Rect(0, 2298 - 1080, 2412)
+        mIsLeashReadyForDispatching=true mHasPendingPosition=false
+        mWindowContainer=Window{ec84063 u0 NavigationBar0}
+      InsetsSourceProvider
+        mSource=InsetsSource id=90990005 type=mandatorySystemGestures frame=[0,0][0,0] visible=true flags= sideHint=NONE boundingRects=null
+        mSourceFrame=Rect(0, 0 - 0, 0)
+        mIsLeashReadyForDispatching=true mHasPendingPosition=false
+        mWindowContainer=Window{ec84063 u0 NavigationBar0}
+      InsetsSourceProvider
+        mSource=InsetsSource id=90990004 type=systemGestures frame=[0,0][0,0] visible=true flags= sideHint=NONE boundingRects=null
+        mSourceFrame=Rect(0, 0 - 0, 0)
+        mIsLeashReadyForDispatching=true mHasPendingPosition=false
+        mWindowContainer=Window{ec84063 u0 NavigationBar0}
+      InsetsSourceProvider
+        mSource=InsetsSource id=90990001 type=navigationBars frame=[0,2298][1080,2412] visible=false flags= sideHint=BOTTOM boundingRects=null
+        mSourceFrame=Rect(0, 2298 - 1080, 2412)
+        mOverrideFrames={2011=Rect(0, 2298 - 1080, 2412)}
+        mControl=InsetsSourceControl mId=90990001 mType=navigationBars mLeash=Surface(name=Surface(name=ec84063 NavigationBar0)/@0xe6714a4 - animation-leash of insets_animation)/@0xe1a86e2 mInitiallyVisible=true mSurfacePosition=Point(0, 2298) mInsetsHint=Insets{left=0, top=0, right=0, bottom=114} mSkipAnimationOnce=false
+        mInsetsHint=Insets{left=0, top=0, right=0, bottom=114}
+        mIsLeashReadyForDispatching=true mHasPendingPosition=false
+        mWindowContainer=Window{ec84063 u0 NavigationBar0}
+        mAdapter=ControlAdapter mCapturedLeash=Surface(name=Surface(name=ec84063 NavigationBar0)/@0xe6714a4 - animation-leash of insets_animation)/@0xe1a86e2
+        mControlTarget=Window{bdf3658 u0 NotificationShade}
+  isAllSubFeatureEnabled: false
+  isVolumeEnabled: false
+  isGameLREnabled: false
+  isCameraEnable: false
+  isAccessibilityEnabled: false
+  InsetsPolicy
+    status: WINDOW_STATE_SHOWING
+    nav: WINDOW_STATE_HIDDEN
+
+
+WINDOW MANAGER TOKENS (dumpsys window tokens)
+  All tokens:
+  Display #0
+    mInTouchMode=true
+  ActivityRecord{f5f9f47 u0 com.google.android.dialer/.extensions.GoogleDialtactsActivity t1010}
+  WindowToken{9afe39 type=2019 android.os.BinderProxy@5b5eb3d}
+  WindowToken{f3ad234 type=2000 android.os.BinderProxy@ee60d2b}
+  WindowToken{3722935 type=2040 android.os.BinderProxy@84e601f}
+  ActivityRecord{6d441f6 u0 com.orange.mail.fr/.mail.app.MailListActivity t1018}
+  ActivityRecord{242ba06 u0 com.android.settings/.Settings$HwSystemDashboardActivity t1019}
+  WindowToken{865e3f4 type=2038 android.os.BinderProxy@2c9a917}
+  ActivityRecord{eef691c u0 com.android.settings/.Settings$DevelopmentSettingsActivity t1019}
+  WindowToken{682cbd6 type=2024 android.os.BinderProxy@d583f1}
+  WallpaperWindowToken{4e59159 token=android.os.Binder@ec7b1a0}
+  ActivityRecord{c7dbc34 u0 com.whatsapp/.home.ui.HomeActivity t1017}
+  ActivityRecord{3e3682b u0 com.android.settings/com.hihonor.settingslib.SubSettings t1019}
+  WindowToken{9fb49dc type=2011 android.os.Binder@164be4f}
+  WallpaperWindowToken{bff5e1d token=android.os.Binder@9ab40c7}
+  WindowToken{572d894 type=2024 android.view.ViewRootImpl$W@a8af4e7}
+  WindowToken{8733c9d type=2024 android.os.BinderProxy@e07af74}
+  WindowToken{3e7256d type=2033 android.os.BinderProxy@9e4c397}
+  ActivityRecord{1066784 u0 com.android.settings/.HWSettings t1019}
+  ActivityRecord{d7312c3 u0 com.hihonor.android.launcher/.unihome.UniHomeLauncher t252}
+  WindowToken{3670593 type=2038 android.os.BinderProxy@775ca82}
+  WindowToken{7f492b6 type=2024 android.view.ViewRootImpl$W@c289a51}
+  ActivityRecord{1ad6bd0 u0 com.whatsapp/.Conversation t1017}
+  WindowToken{e5670f5 type=2017 android.os.BinderProxy@dc26a39}
+
+WINDOW MANAGER WINDOWS (dumpsys window windows)
+  Window #0 Window{d502e57 u0 ScreenDecorOverlay}:
+    mDisplayId=0 rootTaskId=251 mSession=Session{b3a8b39 3535:u0a10077} mClient=android.os.BinderProxy@d583f1
+    mOwnerUid=10077 showForAllUsers=true package=com.android.systemui appop=NONE
+    mAttrs={(0,0)(fillxwrap) gr=TOP CENTER_VERTICAL sim={adjust=pan} layoutInDisplayCutoutMode=always ty=NAVIGATION_BAR_PANEL hwFlags=#0 hnPrivateFlags=#0 hnNoFreezeConfigChanges=#0 isMagicStyle=0 statusBarColor=#0 navigationBarColor=#0 fmt=TRANSLUCENT
+      fl=NOT_FOCUSABLE NOT_TOUCH_MODAL LAYOUT_IN_SCREEN SPLIT_TOUCH FLAG_SLIPPERY
+      pfl=SHOW_FOR_ALL_USERS NO_MOVE_ANIMATION IS_ROUNDED_CORNERS_OVERLAY COLOR_SPACE_AGNOSTIC FIT_INSETS_CONTROLLED TRUSTED_OVERLAY
+      vsysui=LAYOUT_STABLE
+      bhv=DEFAULT
+      frameRateBoostOnTouch=true
+      dvrrWindowFrameRateHint=true}
+    Requested w=1080 h=0 mLayoutSeq=97683
+    mHasSurface=false isReadyForDisplay()=false mWindowRemovalAllowed=false
+    WindowStateAnimator{c85cc12 ScreenDecorOverlay}:
+    mForceSeamlesslyRotate=true seamlesslyRotate: pending=null
+    mSurfacePosition=Point(0, 0)
+    isOnScreen=false
+    isVisible=false
+    canReceiveKeys=false
+    hwNotchSupport=false
+    keepClearAreas: restricted=[], unrestricted=[]
+    mEnforceSizeCompat=false
+    mInvGlobalScale=1.0
+    mGlobalScale=1.0
+    mInputWindowHandle=d502e57 ScreenDecorOverlay, frame=[Rect(0, 0 - 0, 0)], touchableRegion=SkRegion(), scaleFactor=1.0, transform=null, windowToken=android.os.BinderProxy@d583f1, displayId=0, isClone=false, contentSize=0x0, alpha=0.0, canOccludePresentation=false, changed=false
+    isNeedWaitBaseActivityShown=false
+    mPrepareSyncSeqId=0
+  Window #1 Window{2f064e3 u0 ScreenDecorDotViewOverlay}:
+    mDisplayId=0 rootTaskId=251 mSession=Session{b3a8b39 3535:u0a10077} mClient=android.os.BinderProxy@e07af74
+    mOwnerUid=10077 showForAllUsers=true package=com.android.systemui appop=NONE
+    mAttrs={(0,0)(fillx108) gr=TOP START CENTER sim={adjust=pan} layoutInDisplayCutoutMode=always layoutInDisplaySideMode=always ty=NAVIGATION_BAR_PANEL hwFlags=#0 hnPrivateFlags=#0 hnNoFreezeConfigChanges=#0 isMagicStyle=0 statusBarColor=#0 navigationBarColor=#0 fmt=TRANSLUCENT
+      fl=NOT_FOCUSABLE NOT_TOUCH_MODAL LAYOUT_IN_SCREEN SPLIT_TOUCH FLAG_SLIPPERY
+      pfl=SHOW_FOR_ALL_USERS NO_MOVE_ANIMATION
+      vsysui=LAYOUT_STABLE
+      bhv=DEFAULT
+      fitTypes=NAVIGATION_BARS CAPTION_BAR
+      frameRateBoostOnTouch=true
+      dvrrWindowFrameRateHint=true}
+    Requested w=1080 h=108 mLayoutSeq=99585
+    mHasSurface=false isReadyForDisplay()=false mWindowRemovalAllowed=false
+    WindowStateAnimator{6f3d3c ScreenDecorDotViewOverlay}:
+    mForceSeamlesslyRotate=false seamlesslyRotate: pending=null
+    mSurfacePosition=Point(0, 0)
+    isOnScreen=false
+    isVisible=false
+    canReceiveKeys=false
+    hwNotchSupport=false
+    keepClearAreas: restricted=[], unrestricted=[]
+    mEnforceSizeCompat=false
+    mInvGlobalScale=1.0
+    mGlobalScale=1.0
+    mInputWindowHandle=2f064e3 ScreenDecorDotViewOverlay, frame=[Rect(0, 0 - 0, 0)], touchableRegion=SkRegion(), scaleFactor=1.0, transform=null, windowToken=android.os.BinderProxy@e07af74, displayId=0, isClone=false, contentSize=0x0, alpha=0.0, canOccludePresentation=false, changed=false
+    isNeedWaitBaseActivityShown=false
+    mPrepareSyncSeqId=0
+  Window #2 Window{69a1bb7 u0 GestureNavAnim}:
+    mDisplayId=0 rootTaskId=251 mSession=Session{cffb359 2377:1000} mClient=android.view.ViewRootImpl$W@c289a51
+    mOwnerUid=1000 showForAllUsers=true package=android appop=NONE
+    mAttrs={(0,1318)(162x415) gr=TOP START CENTER sim={state=unchanged adjust=nothing} ty=NAVIGATION_BAR_PANEL hwFlags=#10000 hnPrivateFlags=#0 hnNoFreezeConfigChanges=#0 isMagicStyle=0 statusBarColor=#0 navigationBarColor=#0 fmt=TRANSPARENT
+      fl=NOT_FOCUSABLE NOT_TOUCHABLE NOT_TOUCH_MODAL LAYOUT_IN_SCREEN LAYOUT_NO_LIMITS HARDWARE_ACCELERATED
+      bhv=DEFAULT
+      fitTypes=NAVIGATION_BARS CAPTION_BAR
+      frameRateBoostOnTouch=true
+      dvrrWindowFrameRateHint=true}
+    Requested w=162 h=415 mLayoutSeq=93097
+    mHasSurface=false isReadyForDisplay()=false mWindowRemovalAllowed=false
+    WindowStateAnimator{367b7ac GestureNavAnim}:
+    mForceSeamlesslyRotate=false seamlesslyRotate: pending=null
+    mSurfacePosition=Point(0, 1318)
+    isOnScreen=false
+    isVisible=false
+    canReceiveKeys=false
+    hwNotchSupport=true(hwflag support)
+    keepClearAreas: restricted=[], unrestricted=[]
+    mEnforceSizeCompat=false
+    mInvGlobalScale=1.0
+    mGlobalScale=1.0
+    mInputWindowHandle=69a1bb7 GestureNavAnim, frame=[Rect(0, 0 - 0, 0)], touchableRegion=SkRegion((0,0,162,415)), scaleFactor=1.0, transform=null, windowToken=android.view.ViewRootImpl$W@c289a51, displayId=0, isClone=false, contentSize=0x0, alpha=0.0, canOccludePresentation=false, changed=false
+    isNeedWaitBaseActivityShown=false
+    mPrepareSyncSeqId=0
+  Window #3 Window{be7f332 u0 GestureSildeOut}:
+    mDisplayId=0 rootTaskId=251 mSession=Session{cffb359 2377:1000} mClient=android.view.ViewRootImpl$W@a8af4e7
+    mOwnerUid=1000 showForAllUsers=true package=android appop=NONE
+    mAttrs={(0,0)(fillxfill) gr=BOTTOM START CENTER sim={state=unchanged adjust=nothing} ty=NAVIGATION_BAR_PANEL hwFlags=#0 hnPrivateFlags=#0 hnNoFreezeConfigChanges=#0 isMagicStyle=0 statusBarColor=#0 navigationBarColor=#0 fmt=TRANSLUCENT wanim=0x1030310
+      fl=LAYOUT_IN_SCREEN ALT_FOCUSABLE_IM SPLIT_TOUCH HARDWARE_ACCELERATED
+      bhv=DEFAULT
+      fitTypes=NAVIGATION_BARS CAPTION_BAR
+      frameRateBoostOnTouch=true
+      dvrrWindowFrameRateHint=true}
+    Requested w=-1 h=-1 mLayoutSeq=2
+    mHasSurface=false isReadyForDisplay()=false mWindowRemovalAllowed=false
+    WindowStateAnimator{4afea83 GestureSildeOut}:
+      mShownAlpha=0.0 mAlpha=1.0 mLastAlpha=0.0
+    mForceSeamlesslyRotate=false seamlesslyRotate: pending=null
+    mSurfacePosition=Point(0, 108)
+    isOnScreen=false
+    isVisible=false
+    canReceiveKeys=false
+    hwNotchSupport=false
+    keepClearAreas: restricted=[], unrestricted=[]
+    mEnforceSizeCompat=false
+    mInvGlobalScale=1.0
+    mGlobalScale=1.0
+    mInputWindowHandle=be7f332 GestureSildeOut, frame=[Rect(0, 0 - 0, 0)], touchableRegion=SkRegion(), scaleFactor=0.0, transform=null, windowToken=null, displayId=0, isClone=false, contentSize=0x0, alpha=0.0, canOccludePresentation=false, changed=true
+    isNeedWaitBaseActivityShown=false
+    mPrepareSyncSeqId=0
+  Window #4 Window{ec84063 u0 NavigationBar0}:
+    mDisplayId=0 rootTaskId=251 mSession=Session{b3a8b39 3535:u0a10077} mClient=android.os.BinderProxy@a4fef32
+    mOwnerUid=10077 showForAllUsers=true package=com.android.systemui appop=NONE
+    mAttrs={(0,0)(fillx114) gr=BOTTOM CENTER_VERTICAL sim={adjust=pan} layoutInDisplayCutoutMode=always ty=NAVIGATION_BAR hwFlags=#0 hnPrivateFlags=#0 hnNoFreezeConfigChanges=#0 isMagicStyle=0 statusBarColor=#0 navigationBarColor=#0 fmt=TRANSLUCENT
+      fl=NOT_FOCUSABLE NOT_TOUCH_MODAL TOUCHABLE_WHEN_WAKING WATCH_OUTSIDE_TOUCH SPLIT_TOUCH FLAG_SLIPPERY
+      pfl=LAYOUT_SIZE_EXTENDED_BY_CUTOUT COLOR_SPACE_AGNOSTIC FIT_INSETS_CONTROLLED TRUSTED_OVERLAY
+      bhv=DEFAULT
+      providedInsets:
+        InsetsFrameProvider: {id=#90990001, index=0, type=navigationBars, source=FRAME, flags=[], insetsSize=Insets{left=0, top=0, right=0, bottom=114}, insetsSizeOverrides=[TypedInsetsSize: {windowType=INPUT_METHOD, insetsSize=null}]}
+        InsetsFrameProvider: {id=#90990006, index=0, type=tappableElement, source=FRAME, flags=[]}
+        InsetsFrameProvider: {id=#90990005, index=0, type=mandatorySystemGestures, source=FRAME, flags=[], insetsSize=Insets{left=0, top=0, right=0, bottom=0}}
+        InsetsFrameProvider: {id=#90990004, index=0, type=systemGestures, source=DISPLAY, flags=[], insetsSize=Insets{left=0, top=0, right=0, bottom=0}}
+        InsetsFrameProvider: {id=#90990024, index=1, type=systemGestures, source=DISPLAY, flags=[], insetsSize=Insets{left=0, top=0, right=0, bottom=0}}
+      frameRateBoostOnTouch=true
+      dvrrWindowFrameRateHint=true
+      paramsForRotation:
+        ROTATION_0={(0,0)(fillx114) gr=BOTTOM CENTER_VERTICAL layoutInDisplayCutoutMode=always ty=NAVIGATION_BAR hwFlags=#0 hnPrivateFlags=#0 hnNoFreezeConfigChanges=#0 isMagicStyle=0 statusBarColor=#0 navigationBarColor=#0 fmt=TRANSLUCENT
+          fl=NOT_FOCUSABLE NOT_TOUCH_MODAL TOUCHABLE_WHEN_WAKING WATCH_OUTSIDE_TOUCH SPLIT_TOUCH FLAG_SLIPPERY
+          pfl=LAYOUT_SIZE_EXTENDED_BY_CUTOUT COLOR_SPACE_AGNOSTIC FIT_INSETS_CONTROLLED TRUSTED_OVERLAY
+          bhv=DEFAULT
+          providedInsets:
+            InsetsFrameProvider: {id=#90990001, index=0, type=navigationBars, source=FRAME, flags=[], insetsSize=Insets{left=0, top=0, right=0, bottom=114}, insetsSizeOverrides=[TypedInsetsSize: {windowType=INPUT_METHOD, insetsSize=null}]}
+            InsetsFrameProvider: {id=#90990006, index=0, type=tappableElement, source=FRAME, flags=[]}
+            InsetsFrameProvider: {id=#90990005, index=0, type=mandatorySystemGestures, source=FRAME, flags=[], insetsSize=Insets{left=0, top=0, right=0, bottom=0}}
+            InsetsFrameProvider: {id=#90990004, index=0, type=systemGestures, source=DISPLAY, flags=[], insetsSize=Insets{left=0, top=0, right=0, bottom=0}}
+            InsetsFrameProvider: {id=#90990024, index=1, type=systemGestures, source=DISPLAY, flags=[], insetsSize=Insets{left=0, top=0, right=0, bottom=0}}
+          frameRateBoostOnTouch=true
+          dvrrWindowFrameRateHint=true}
+        ROTATION_90={(0,0)(114xfill) gr=RIGHT CENTER_HORIZONTAL layoutInDisplayCutoutMode=always ty=NAVIGATION_BAR hwFlags=#0 hnPrivateFlags=#0 hnNoFreezeConfigChanges=#0 isMagicStyle=0 statusBarColor=#0 navigationBarColor=#0 fmt=TRANSLUCENT
+          fl=NOT_FOCUSABLE NOT_TOUCH_MODAL TOUCHABLE_WHEN_WAKING WATCH_OUTSIDE_TOUCH SPLIT_TOUCH FLAG_SLIPPERY
+          pfl=LAYOUT_SIZE_EXTENDED_BY_CUTOUT COLOR_SPACE_AGNOSTIC FIT_INSETS_CONTROLLED TRUSTED_OVERLAY
+          bhv=DEFAULT
+          providedInsets:
+            InsetsFrameProvider: {id=#90990001, index=0, type=navigationBars, source=FRAME, flags=[], insetsSizeOverrides=[TypedInsetsSize: {windowType=INPUT_METHOD, insetsSize=null}]}
+            InsetsFrameProvider: {id=#90990006, index=0, type=tappableElement, source=FRAME, flags=[]}
+            InsetsFrameProvider: {id=#90990005, index=0, type=mandatorySystemGestures, source=FRAME, flags=[], insetsSize=Insets{left=0, top=0, right=0, bottom=0}}
+            InsetsFrameProvider: {id=#90990004, index=0, type=systemGestures, source=DISPLAY, flags=[], insetsSize=Insets{left=0, top=0, right=0, bottom=0}}
+            InsetsFrameProvider: {id=#90990024, index=1, type=systemGestures, source=DISPLAY, flags=[], insetsSize=Insets{left=0, top=0, right=0, bottom=0}}
+          frameRateBoostOnTouch=true
+          dvrrWindowFrameRateHint=true}
+        ROTATION_180={(0,0)(fillx114) gr=BOTTOM CENTER_VERTICAL layoutInDisplayCutoutMode=always ty=NAVIGATION_BAR hwFlags=#0 hnPrivateFlags=#0 hnNoFreezeConfigChanges=#0 isMagicStyle=0 statusBarColor=#0 navigationBarColor=#0 fmt=TRANSLUCENT
+          fl=NOT_FOCUSABLE NOT_TOUCH_MODAL TOUCHABLE_WHEN_WAKING WATCH_OUTSIDE_TOUCH SPLIT_TOUCH FLAG_SLIPPERY
+          pfl=LAYOUT_SIZE_EXTENDED_BY_CUTOUT COLOR_SPACE_AGNOSTIC FIT_INSETS_CONTROLLED TRUSTED_OVERLAY
+          bhv=DEFAULT
+          providedInsets:
+            InsetsFrameProvider: {id=#90990001, index=0, type=navigationBars, source=FRAME, flags=[], insetsSize=Insets{left=0, top=0, right=0, bottom=114}, insetsSizeOverrides=[TypedInsetsSize: {windowType=INPUT_METHOD, insetsSize=null}]}
+            InsetsFrameProvider: {id=#90990006, index=0, type=tappableElement, source=FRAME, flags=[]}
+            InsetsFrameProvider: {id=#90990005, index=0, type=mandatorySystemGestures, source=FRAME, flags=[], insetsSize=Insets{left=0, top=0, right=0, bottom=0}}
+            InsetsFrameProvider: {id=#90990004, index=0, type=systemGestures, source=DISPLAY, flags=[], insetsSize=Insets{left=0, top=0, right=0, bottom=0}}
+            InsetsFrameProvider: {id=#90990024, index=1, type=systemGestures, source=DISPLAY, flags=[], insetsSize=Insets{left=0, top=0, right=0, bottom=0}}
+          frameRateBoostOnTouch=true
+          dvrrWindowFrameRateHint=true}
+        ROTATION_270={(0,0)(114xfill) gr=RIGHT CENTER_HORIZONTAL layoutInDisplayCutoutMode=always ty=NAVIGATION_BAR hwFlags=#0 hnPrivateFlags=#0 hnNoFreezeConfigChanges=#0 isMagicStyle=0 statusBarColor=#0 navigationBarColor=#0 fmt=TRANSLUCENT
+          fl=NOT_FOCUSABLE NOT_TOUCH_MODAL TOUCHABLE_WHEN_WAKING WATCH_OUTSIDE_TOUCH SPLIT_TOUCH FLAG_SLIPPERY
+          pfl=LAYOUT_SIZE_EXTENDED_BY_CUTOUT COLOR_SPACE_AGNOSTIC FIT_INSETS_CONTROLLED TRUSTED_OVERLAY
+          bhv=DEFAULT
+          providedInsets:
+            InsetsFrameProvider: {id=#90990001, index=0, type=navigationBars, source=FRAME, flags=[], insetsSizeOverrides=[TypedInsetsSize: {windowType=INPUT_METHOD, insetsSize=null}]}
+            InsetsFrameProvider: {id=#90990006, index=0, type=tappableElement, source=FRAME, flags=[]}
+            InsetsFrameProvider: {id=#90990005, index=0, type=mandatorySystemGestures, source=FRAME, flags=[], insetsSize=Insets{left=0, top=0, right=0, bottom=0}}
+            InsetsFrameProvider: {id=#90990004, index=0, type=systemGestures, source=DISPLAY, flags=[], insetsSize=Insets{left=0, top=0, right=0, bottom=0}}
+            InsetsFrameProvider: {id=#90990024, index=1, type=systemGestures, source=DISPLAY, flags=[], insetsSize=Insets{left=0, top=0, right=0, bottom=0}}
+          frameRateBoostOnTouch=true
+          dvrrWindowFrameRateHint=true}}
+    Requested w=1080 h=114 mLayoutSeq=100207
+    mHasSurface=true isReadyForDisplay()=false mWindowRemovalAllowed=false
+    ContainerAnimator:
+      mLeash=Surface(name=Surface(name=ec84063 NavigationBar0)/@0xe6714a4 - animation-leash of insets_animation)/@0xe1a86e2 mAnimationType=insets_animation
+      Animation: com.android.server.wm.InsetsSourceProvider$ControlAdapter@72d7da9
+        ControlAdapter mCapturedLeash=Surface(name=Surface(name=ec84063 NavigationBar0)/@0xe6714a4 - animation-leash of insets_animation)/@0xe1a86e2
+    WindowStateAnimator{c2e8ffa NavigationBar0}:
+      Surface: shown=true    mForceSeamlesslyRotate=false seamlesslyRotate: pending=null
+    mSurfacePosition=Point(0, 2298)
+    isOnScreen=true
+    isVisible=false
+    canReceiveKeys=false
+    hwNotchSupport=false
+    keepClearAreas: restricted=[], unrestricted=[]
+    mEnforceSizeCompat=false
+    mInvGlobalScale=1.0
+    mGlobalScale=1.0
+    mInputWindowHandle=ec84063 NavigationBar0, frame=[Rect(0, 0 - 0, 0)], touchableRegion=SkRegion((0,0,1080,114)), scaleFactor=1.0, transform=null, windowToken=android.os.BinderProxy@a4fef32, displayId=0, isClone=false, contentSize=0x0, alpha=0.0, canOccludePresentation=false, changed=false
+    isNeedWaitBaseActivityShown=false
+    mPrepareSyncSeqId=0
+  Window #5 Window{62055a2 u0 AssistPreviewPanel}:
+    mDisplayId=0 rootTaskId=251 mSession=Session{b3a8b39 3535:u0a10077} mClient=android.os.BinderProxy@7c97984
+    mOwnerUid=10077 showForAllUsers=false package=com.android.systemui appop=NONE
+    mAttrs={(0,0)(fillx750) gr=BOTTOM START CENTER sim={state=unchanged adjust=nothing} ty=VOICE_INTERACTION_STARTING hwFlags=#0 hnPrivateFlags=#0 hnNoFreezeConfigChanges=#0 isMagicStyle=0 statusBarColor=#0 navigationBarColor=#0 fmt=TRANSLUCENT
+      fl=NOT_FOCUSABLE NOT_TOUCHABLE LAYOUT_IN_SCREEN HARDWARE_ACCELERATED
+      vsysui=LAYOUT_STABLE LAYOUT_HIDE_NAVIGATION LAYOUT_FULLSCREEN
+      bhv=DEFAULT
+      frameRateBoostOnTouch=true
+      dvrrWindowFrameRateHint=true}
+    Requested w=-1 h=-1 mLayoutSeq=97683
+    mHasSurface=false isReadyForDisplay()=false mWindowRemovalAllowed=false
+    WindowStateAnimator{4d06d32 AssistPreviewPanel}:
+      mShownAlpha=0.0 mAlpha=1.0 mLastAlpha=0.0
+    mForceSeamlesslyRotate=false seamlesslyRotate: pending=null
+    mSurfacePosition=Point(0, 0)
+    isOnScreen=false
+    isVisible=false
+    canReceiveKeys=false
+    hwNotchSupport=false
+    keepClearAreas: restricted=[], unrestricted=[]
+    mEnforceSizeCompat=false
+    mInvGlobalScale=1.0
+    mGlobalScale=1.0
+    mInputWindowHandle=62055a2 AssistPreviewPanel, frame=[Rect(0, 0 - 0, 0)], touchableRegion=SkRegion(), scaleFactor=0.0, transform=null, windowToken=null, displayId=0, isClone=false, contentSize=0x0, alpha=0.0, canOccludePresentation=false, changed=true
+    isNeedWaitBaseActivityShown=false
+    mPrepareSyncSeqId=0
+  Window #6 Window{a4dccfb u0 HeadsupCardListWindow}:
+    mDisplayId=0 rootTaskId=251 mSession=Session{b3a8b39 3535:u0a10077} mClient=android.os.BinderProxy@dc26a39
+    mOwnerUid=10077 showForAllUsers=true package=com.android.systemui appop=NONE
+    mAttrs={(0,0)(fillxfill) gr=TOP CENTER sim={adjust=pan} layoutInDisplayCutoutMode=shortEdges ty=STATUS_BAR_SUB_PANEL hwFlags=#0 hnPrivateFlags=#0 hnNoFreezeConfigChanges=#0 isMagicStyle=0 statusBarColor=#0 navigationBarColor=#0 fmt=TRANSLUCENT
+      fl=NOT_FOCUSABLE NOT_TOUCH_MODAL LAYOUT_IN_SCREEN LAYOUT_NO_LIMITS WATCH_OUTSIDE_TOUCH SPLIT_TOUCH HARDWARE_ACCELERATED
+      pfl=TRUSTED_OVERLAY
+      bhv=DEFAULT
+      fitTypes=NAVIGATION_BARS CAPTION_BAR
+      frameRateBoostOnTouch=true
+      dvrrWindowFrameRateHint=true}
+    Requested w=1080 h=2412 mLayoutSeq=32
+    mHasSurface=false isReadyForDisplay()=false mWindowRemovalAllowed=false
+    WindowStateAnimator{c11a13d HeadsupCardListWindow}:
+      mShownAlpha=0.0 mAlpha=1.0 mLastAlpha=0.0
+    mForceSeamlesslyRotate=false seamlesslyRotate: pending=null
+    mSurfacePosition=Point(0, 0)
+    isOnScreen=false
+    isVisible=false
+    canReceiveKeys=false
+    hwNotchSupport=false
+    keepClearAreas: restricted=[], unrestricted=[]
+    mEnforceSizeCompat=false
+    mInvGlobalScale=1.0
+    mGlobalScale=1.0
+    mInputWindowHandle=a4dccfb HeadsupCardListWindow, frame=[Rect(0, 0 - 0, 0)], touchableRegion=SkRegion(), scaleFactor=0.0, transform=null, windowToken=null, displayId=0, isClone=false, contentSize=0x0, alpha=0.0, canOccludePresentation=false, changed=true
+    isNeedWaitBaseActivityShown=false
+    mPrepareSyncSeqId=0
+  Window #7 Window{bdf3658 u0 NotificationShade}:
+    mDisplayId=0 rootTaskId=251 mSession=Session{b3a8b39 3535:u0a10077} mClient=android.os.BinderProxy@1a28f6c
+    mOwnerUid=10077 showForAllUsers=true package=com.android.systemui appop=NONE
+    mAttrs={(0,0)(fillxfill) gr=TOP CENTER_VERTICAL sim={adjust=resize} layoutInDisplayCutoutMode=always layoutInDisplaySideMode=always ty=NOTIFICATION_SHADE hwFlags=#8080000 hnPrivateFlags=#0 hnNoFreezeConfigChanges=#0 isMagicStyle=0 statusBarColor=#0 navigationBarColor=#0 fmt=TRANSLUCENT or=SCREEN_ORIENTATION_NOSENSOR if=INPUT_FEATURE_DISABLE_USER_ACTIVITY userActivityTimeout=10000
+      fl=TOUCHABLE_WHEN_WAKING ALT_FOCUSABLE_IM WATCH_OUTSIDE_TOUCH SHOW_WALLPAPER SPLIT_TOUCH HARDWARE_ACCELERATED DRAWS_SYSTEM_BAR_BACKGROUNDS
+      pfl=FIT_INSETS_CONTROLLED
+      bhv=SHOW_TRANSIENT_BARS_BY_SWIPE
+      forciblyShownTypes=navigationBars
+      frameRateBoostOnTouch=true
+      dvrrWindowFrameRateHint=true}
+    Requested w=1080 h=2412 mLayoutSeq=100207
+    mHasSurface=true isReadyForDisplay()=true mWindowRemovalAllowed=false
+    WindowStateAnimator{65635c2 NotificationShade}:
+      Surface: shown=true    mForceSeamlesslyRotate=false seamlesslyRotate: pending=null
+    mWallpaperX=0.5 mWallpaperY=0.5
+    mSurfacePosition=Point(0, 0)
+    isOnScreen=true
+    isVisible=true
+    canReceiveKeys=true
+    hwNotchSupport=false
+    keepClearAreas: restricted=[], unrestricted=[]
+    mEnforceSizeCompat=false
+    mInvGlobalScale=1.0
+    mGlobalScale=1.0
+    mInputWindowHandle=bdf3658 NotificationShade, frame=[Rect(0, 0 - 0, 0)], touchableRegion=SkRegion((-1080,-2412,2160,4824)), scaleFactor=1.0, transform=null, windowToken=android.os.BinderProxy@1a28f6c, displayId=0, isClone=false, contentSize=0x0, alpha=0.0, canOccludePresentation=false, changed=false
+    isNeedWaitBaseActivityShown=false
+    mPrepareSyncSeqId=0
+  Window #8 Window{cccdda0 u0 StatusBar}:
+    mDisplayId=0 rootTaskId=251 mSession=Session{b3a8b39 3535:u0a10077} mClient=android.os.BinderProxy@a38e588
+    mOwnerUid=10077 showForAllUsers=true package=com.android.systemui appop=NONE
+    mAttrs={(0,0)(fillx108) gr=TOP CENTER_VERTICAL sim={adjust=pan} layoutInDisplayCutoutMode=always layoutInDisplaySideMode=always ty=STATUS_BAR hwFlags=#8080000 hnPrivateFlags=#0 hnNoFreezeConfigChanges=#0 isMagicStyle=0 statusBarColor=#0 navigationBarColor=#0 fmt=TRANSLUCENT
+      fl=NOT_FOCUSABLE SPLIT_TOUCH HARDWARE_ACCELERATED DRAWS_SYSTEM_BAR_BACKGROUNDS
+      pfl=COLOR_SPACE_AGNOSTIC FIT_INSETS_CONTROLLED
+      bhv=DEFAULT
+      providedInsets:
+        InsetsFrameProvider: {id=#14400000, index=0, type=statusBars, source=FRAME, flags=[]}
+        InsetsFrameProvider: {id=#14400006, index=0, type=tappableElement, source=FRAME, flags=[]}
+        InsetsFrameProvider: {id=#14400005, index=0, type=mandatorySystemGestures, source=FRAME, flags=[]}
+      frameRateBoostOnTouch=true
+      dvrrWindowFrameRateHint=true
+      paramsForRotation:
+        ROTATION_0={(0,0)(fillx108) gr=TOP CENTER_VERTICAL layoutInDisplayCutoutMode=always ty=STATUS_BAR hwFlags=#0 hnPrivateFlags=#0 hnNoFreezeConfigChanges=#0 isMagicStyle=0 statusBarColor=#0 navigationBarColor=#0 fmt=TRANSLUCENT
+          fl=NOT_FOCUSABLE SPLIT_TOUCH DRAWS_SYSTEM_BAR_BACKGROUNDS
+          pfl=COLOR_SPACE_AGNOSTIC FIT_INSETS_CONTROLLED
+          bhv=DEFAULT
+          providedInsets:
+            InsetsFrameProvider: {id=#14400000, index=0, type=statusBars, source=FRAME, flags=[]}
+            InsetsFrameProvider: {id=#14400006, index=0, type=tappableElement, source=FRAME, flags=[]}
+            InsetsFrameProvider: {id=#14400005, index=0, type=mandatorySystemGestures, source=FRAME, flags=[]}
+          frameRateBoostOnTouch=true
+          dvrrWindowFrameRateHint=true}
+        ROTATION_90={(0,0)(fillx108) gr=TOP CENTER_VERTICAL layoutInDisplayCutoutMode=always ty=STATUS_BAR hwFlags=#0 hnPrivateFlags=#0 hnNoFreezeConfigChanges=#0 isMagicStyle=0 statusBarColor=#0 navigationBarColor=#0 fmt=TRANSLUCENT
+          fl=NOT_FOCUSABLE SPLIT_TOUCH DRAWS_SYSTEM_BAR_BACKGROUNDS
+          pfl=COLOR_SPACE_AGNOSTIC FIT_INSETS_CONTROLLED
+          bhv=DEFAULT
+          providedInsets:
+            InsetsFrameProvider: {id=#14400000, index=0, type=statusBars, source=FRAME, flags=[]}
+            InsetsFrameProvider: {id=#14400006, index=0, type=tappableElement, source=FRAME, flags=[]}
+            InsetsFrameProvider: {id=#14400005, index=0, type=mandatorySystemGestures, source=FRAME, flags=[]}
+          frameRateBoostOnTouch=true
+          dvrrWindowFrameRateHint=true}
+        ROTATION_180={(0,0)(fillx108) gr=TOP CENTER_VERTICAL layoutInDisplayCutoutMode=always ty=STATUS_BAR hwFlags=#0 hnPrivateFlags=#0 hnNoFreezeConfigChanges=#0 isMagicStyle=0 statusBarColor=#0 navigationBarColor=#0 fmt=TRANSLUCENT
+          fl=NOT_FOCUSABLE SPLIT_TOUCH DRAWS_SYSTEM_BAR_BACKGROUNDS
+          pfl=COLOR_SPACE_AGNOSTIC FIT_INSETS_CONTROLLED
+          bhv=DEFAULT
+          providedInsets:
+            InsetsFrameProvider: {id=#14400000, index=0, type=statusBars, source=FRAME, flags=[]}
+            InsetsFrameProvider: {id=#14400006, index=0, type=tappableElement, source=FRAME, flags=[]}
+            InsetsFrameProvider: {id=#14400005, index=0, type=mandatorySystemGestures, source=FRAME, flags=[]}
+          frameRateBoostOnTouch=true
+          dvrrWindowFrameRateHint=true}
+        ROTATION_270={(0,0)(fillx108) gr=TOP CENTER_VERTICAL layoutInDisplayCutoutMode=always ty=STATUS_BAR hwFlags=#0 hnPrivateFlags=#0 hnNoFreezeConfigChanges=#0 isMagicStyle=0 statusBarColor=#0 navigationBarColor=#0 fmt=TRANSLUCENT
+          fl=NOT_FOCUSABLE SPLIT_TOUCH DRAWS_SYSTEM_BAR_BACKGROUNDS
+          pfl=COLOR_SPACE_AGNOSTIC FIT_INSETS_CONTROLLED
+          bhv=DEFAULT
+          providedInsets:
+            InsetsFrameProvider: {id=#14400000, index=0, type=statusBars, source=FRAME, flags=[]}
+            InsetsFrameProvider: {id=#14400006, index=0, type=tappableElement, source=FRAME, flags=[]}
+            InsetsFrameProvider: {id=#14400005, index=0, type=mandatorySystemGestures, source=FRAME, flags=[]}
+          frameRateBoostOnTouch=true
+          dvrrWindowFrameRateHint=true}}
+    Requested w=1080 h=108 mLayoutSeq=100207
+    mHasSurface=true isReadyForDisplay()=true mWindowRemovalAllowed=false
+    ContainerAnimator:
+      mLeash=Surface(name=Surface(name=cccdda0 StatusBar)/@0xd995737 - animation-leash of insets_animation)/@0xc1253ad mAnimationType=insets_animation
+      Animation: com.android.server.wm.InsetsSourceProvider$ControlAdapter@45e2f2e
+        ControlAdapter mCapturedLeash=Surface(name=Surface(name=cccdda0 StatusBar)/@0xd995737 - animation-leash of insets_animation)/@0xc1253ad
+    WindowStateAnimator{d222fd3 StatusBar}:
+      Surface: shown=true    mForceSeamlesslyRotate=false seamlesslyRotate: pending=null
+    mSurfacePosition=Point(0, 0)
+    isOnScreen=true
+    isVisible=true
+    canReceiveKeys=false
+    hwNotchSupport=false
+    keepClearAreas: restricted=[], unrestricted=[]
+    mEnforceSizeCompat=false
+    mInvGlobalScale=1.0
+    mGlobalScale=1.0
+    mInputWindowHandle=cccdda0 StatusBar, frame=[Rect(0, 0 - 0, 0)], touchableRegion=SkRegion((0,0,1080,108)), scaleFactor=1.0, transform=null, windowToken=android.os.BinderProxy@a38e588, displayId=0, isClone=false, contentSize=0x0, alpha=0.0, canOccludePresentation=false, changed=false
+    isNeedWaitBaseActivityShown=false
+    mPrepareSyncSeqId=0
+  Window #9 Window{8d97739 u0 InputMethod}:
+    mDisplayId=0 rootTaskId=251 mSession=Session{25cd859 26366:u0a10187} mClient=android.os.BinderProxy@e60300
+    mOwnerUid=10187 showForAllUsers=false package=com.google.android.inputmethod.latin appop=NONE
+    mAttrs={(0,0)(fillxfill) gr=BOTTOM CENTER_VERTICAL sim={adjust=pan} layoutInDisplaySideMode=always ty=INPUT_METHOD hwFlags=#0 hnPrivateFlags=#0 hnNoFreezeConfigChanges=#0 isMagicStyle=-2147483647 statusBarColor=#ffffffff navigationBarColor=#ffe9efec fmt=TRANSPARENT wanim=0x1030056 receive insets ignoring z-order
+      fl=NOT_FOCUSABLE LAYOUT_IN_SCREEN SPLIT_TOUCH HARDWARE_ACCELERATED DRAWS_SYSTEM_BAR_BACKGROUNDS
+      pfl=FIT_INSETS_CONTROLLED
+      vsysui=LIGHT_STATUS_BAR LIGHT_NAVIGATION_BAR
+      apr=LIGHT_STATUS_BARS LIGHT_NAVIGATION_BARS
+      bhv=DEFAULT
+      fitTypes=STATUS_BARS NAVIGATION_BARS
+      fitSides=LEFT TOP RIGHT
+      dvrrWindowFrameRateHint=true}
+    Requested w=1080 h=2304 mLayoutSeq=100042
+    mIsImWindow=true mIsWallpaper=false mIsFloatingLayer=true
+    mPolicyVisibility=false mLegacyPolicyVisibilityAfterAnim=false mAppOpVisibility=true parentHidden=false mPermanentlyHidden=false mHiddenWhileSuspended=false mForceHideNonSystemOverlayWindow=false
+    mHasSurface=false isReadyForDisplay()=false mWindowRemovalAllowed=false
+    ContainerAnimator:
+      mLeash=Surface(name=Surface(name=8d97739 InputMethod)/@0x52471fb - animation-leash of insets_animation)/@0x910aedf mAnimationType=insets_animation
+      Animation: com.android.server.wm.InsetsSourceProvider$ControlAdapter@a0e4acf
+        ControlAdapter mCapturedLeash=Surface(name=Surface(name=8d97739 InputMethod)/@0x52471fb - animation-leash of insets_animation)/@0x910aedf
+    WindowStateAnimator{61f0634 InputMethod}:
+    mForceSeamlesslyRotate=false seamlesslyRotate: pending=null
+    mSurfacePosition=Point(0, 108)
+    isOnScreen=false
+    isVisible=false
+    canReceiveKeys=false
+    hwNotchSupport=false
+    keepClearAreas: restricted=[], unrestricted=[]
+    mEnforceSizeCompat=false
+    mInvGlobalScale=1.0
+    mGlobalScale=1.0
+    mInputWindowHandle=8d97739 InputMethod, frame=[Rect(0, 0 - 0, 0)], touchableRegion=SkRegion((0,1425,1080,2190)), scaleFactor=1.0, transform=null, windowToken=android.os.BinderProxy@e60300, displayId=0, isClone=false, contentSize=0x0, alpha=0.0, canOccludePresentation=false, changed=false
+    isNeedWaitBaseActivityShown=false
+    mPrepareSyncSeqId=0
+  Window #10 Window{568455c u0 ShellDropTarget}:
+    mDisplayId=0 rootTaskId=251 mSession=Session{b3a8b39 3535:u0a10077} mClient=android.os.BinderProxy@4c2f02e
+    mOwnerUid=10077 showForAllUsers=true package=com.android.systemui appop=SYSTEM_ALERT_WINDOW
+    mAttrs={(0,0)(fillxfill) sim={adjust=pan} layoutInDisplayCutoutMode=always ty=APPLICATION_OVERLAY hwFlags=#0 hnPrivateFlags=#0 hnNoFreezeConfigChanges=#0 isMagicStyle=0 statusBarColor=#0 navigationBarColor=#0 fmt=TRANSLUCENT
+      fl=NOT_FOCUSABLE HARDWARE_ACCELERATED
+      pfl=SHOW_FOR_ALL_USERS NO_MOVE_ANIMATION FIT_INSETS_CONTROLLED INTERCEPT_GLOBAL_DRAG_AND_DROP
+      bhv=DEFAULT
+      frameRateBoostOnTouch=true
+      dvrrWindowFrameRateHint=true}
+    Requested w=1080 h=2412 mLayoutSeq=17
+    mPolicyVisibility=false mLegacyPolicyVisibilityAfterAnim=false mAppOpVisibility=true parentHidden=false mPermanentlyHidden=false mHiddenWhileSuspended=false mForceHideNonSystemOverlayWindow=false
+    mHasSurface=false isReadyForDisplay()=false mWindowRemovalAllowed=false
+    WindowStateAnimator{9844294 ShellDropTarget}:
+      mShownAlpha=0.0 mAlpha=1.0 mLastAlpha=0.0
+    mForceSeamlesslyRotate=false seamlesslyRotate: pending=null
+    mSurfacePosition=Point(0, 0)
+    isOnScreen=false
+    isVisible=false
+    canReceiveKeys=false
+    hwNotchSupport=false
+    keepClearAreas: restricted=[], unrestricted=[]
+    mEnforceSizeCompat=false
+    mInvGlobalScale=1.0
+    mGlobalScale=1.0
+    mInputWindowHandle=568455c ShellDropTarget, frame=[Rect(0, 0 - 0, 0)], touchableRegion=SkRegion(), scaleFactor=0.0, transform=null, windowToken=null, displayId=0, isClone=false, contentSize=0x0, alpha=0.0, canOccludePresentation=false, changed=true
+    isNeedWaitBaseActivityShown=false
+    mPrepareSyncSeqId=0
+  Window #11 Window{b2985cd u0 com.android.settings/com.hihonor.settingslib.SubSettings}:
+    mDisplayId=0 rootTaskId=1019 mSession=Session{1a702d4 7990:1000} mClient=android.os.BinderProxy@bc054f7
+    mOwnerUid=1000 showForAllUsers=false package=com.android.settings appop=NONE
+    mAttrs={(0,0)(fillxfill) sim={adjust=pan} layoutInDisplayCutoutMode=always layoutInDisplaySideMode=always ty=BASE_APPLICATION hwFlags=#0 hnPrivateFlags=#800 hnNoFreezeConfigChanges=#0 isMagicStyle=1 statusBarColor=#0 navigationBarColor=#0 wanim=0x1030304
+      fl=LAYOUT_IN_SCREEN LAYOUT_INSET_DECOR SPLIT_TOUCH HARDWARE_ACCELERATED DRAWS_SYSTEM_BAR_BACKGROUNDS
+      pfl=NO_MOVE_ANIMATION EDGE_TO_EDGE_ENFORCED FORCE_DRAW_STATUS_BAR_BACKGROUND FIT_INSETS_CONTROLLED
+      vsysui=LAYOUT_STABLE LAYOUT_HIDE_NAVIGATION LAYOUT_FULLSCREEN IMMERSIVE
+      apr=LIGHT_STATUS_BARS
+      bhv=DEFAULT
+      fitSides=
+      frameRateBoostOnTouch=true
+      dvrrWindowFrameRateHint=true}
+    Requested w=1080 h=2412 mLayoutSeq=100196
+    mHasSurface=false isReadyForDisplay()=false mWindowRemovalAllowed=false
+    WindowStateAnimator{4fa69e7 com.android.settings/com.hihonor.settingslib.SubSettings}:
+    mForceSeamlesslyRotate=false seamlesslyRotate: pending=null
+    mSurfacePosition=Point(0, 0)
+    isOnScreen=false
+    isVisible=false
+    canReceiveKeys=false
+    hwNotchSupport=true(metadata support)
+    keepClearAreas: restricted=[], unrestricted=[]
+    mEnforceSizeCompat=false
+    mInvGlobalScale=1.0
+    mGlobalScale=1.0
+    mInputWindowHandle=b2985cd com.android.settings/com.hihonor.settingslib.SubSettings, frame=[Rect(0, 0 - 0, 0)], touchableRegion=SkRegion(), scaleFactor=1.0, transform=null, windowToken=android.os.BinderProxy@bc054f7, displayId=0, isClone=false, contentSize=0x0, alpha=0.0, canOccludePresentation=false, changed=false
+    isNeedWaitBaseActivityShown=false
+    mPrepareSyncSeqId=0
+  Window #12 Window{f677ab0 u0 com.android.settings/com.android.settings.Settings$DevelopmentSettingsActivity}:
+    mDisplayId=0 rootTaskId=1019 mSession=Session{1a702d4 7990:1000} mClient=android.os.BinderProxy@7910862
+    mOwnerUid=1000 showForAllUsers=false package=com.android.settings appop=NONE
+    mAttrs={(0,0)(fillxfill) sim={adjust=pan} layoutInDisplayCutoutMode=always layoutInDisplaySideMode=always ty=BASE_APPLICATION hwFlags=#0 hnPrivateFlags=#800 hnNoFreezeConfigChanges=#0 isMagicStyle=1 statusBarColor=#0 navigationBarColor=#0 wanim=0x1030304
+      fl=LAYOUT_IN_SCREEN LAYOUT_INSET_DECOR SPLIT_TOUCH HARDWARE_ACCELERATED DRAWS_SYSTEM_BAR_BACKGROUNDS
+      pfl=NO_MOVE_ANIMATION EDGE_TO_EDGE_ENFORCED FORCE_DRAW_STATUS_BAR_BACKGROUND FIT_INSETS_CONTROLLED
+      vsysui=LAYOUT_STABLE LAYOUT_HIDE_NAVIGATION LAYOUT_FULLSCREEN IMMERSIVE
+      apr=LIGHT_STATUS_BARS
+      bhv=DEFAULT
+      fitSides=
+      frameRateBoostOnTouch=true
+      dvrrWindowFrameRateHint=true}
+    Requested w=1080 h=2412 mLayoutSeq=100092
+    mHasSurface=false isReadyForDisplay()=false mWindowRemovalAllowed=false
+    WindowStateAnimator{1904e12 com.android.settings/com.android.settings.Settings$DevelopmentSettingsActivity}:
+    mForceSeamlesslyRotate=false seamlesslyRotate: pending=null
+    mSurfacePosition=Point(0, 0)
+    isOnScreen=false
+    isVisible=false
+    canReceiveKeys=false
+    hwNotchSupport=true(metadata support)
+    keepClearAreas: restricted=[], unrestricted=[]
+    mEnforceSizeCompat=false
+    mInvGlobalScale=1.0
+    mGlobalScale=1.0
+    mInputWindowHandle=f677ab0 com.android.settings/com.android.settings.Settings$DevelopmentSettingsActivity, frame=[Rect(0, 0 - 0, 0)], touchableRegion=SkRegion(), scaleFactor=1.0, transform=null, windowToken=android.os.BinderProxy@7910862, displayId=0, isClone=false, contentSize=0x0, alpha=0.0, canOccludePresentation=false, changed=false
+    isNeedWaitBaseActivityShown=false
+    mPrepareSyncSeqId=0
+  Window #13 Window{b9de1b7 u0 com.android.settings/com.android.settings.Settings$HwSystemDashboardActivity}:
+    mDisplayId=0 rootTaskId=1019 mSession=Session{1a702d4 7990:1000} mClient=android.os.BinderProxy@6997051
+    mOwnerUid=1000 showForAllUsers=false package=com.android.settings appop=NONE
+    mAttrs={(0,0)(fillxfill) sim={adjust=pan} layoutInDisplayCutoutMode=always layoutInDisplaySideMode=always ty=BASE_APPLICATION hwFlags=#0 hnPrivateFlags=#800 hnNoFreezeConfigChanges=#0 isMagicStyle=1 statusBarColor=#0 navigationBarColor=#0 wanim=0x1030304
+      fl=LAYOUT_IN_SCREEN LAYOUT_INSET_DECOR SPLIT_TOUCH HARDWARE_ACCELERATED DRAWS_SYSTEM_BAR_BACKGROUNDS
+      pfl=NO_MOVE_ANIMATION EDGE_TO_EDGE_ENFORCED FORCE_DRAW_STATUS_BAR_BACKGROUND FIT_INSETS_CONTROLLED
+      vsysui=LAYOUT_STABLE LAYOUT_HIDE_NAVIGATION LAYOUT_FULLSCREEN IMMERSIVE
+      apr=LIGHT_STATUS_BARS
+      bhv=DEFAULT
+      fitSides=
+      frameRateBoostOnTouch=true
+      dvrrWindowFrameRateHint=true}
+    Requested w=1080 h=2412 mLayoutSeq=100086
+    mHasSurface=false isReadyForDisplay()=false mWindowRemovalAllowed=false
+    WindowStateAnimator{4b4a6a7 com.android.settings/com.android.settings.Settings$HwSystemDashboardActivity}:
+    mForceSeamlesslyRotate=false seamlesslyRotate: pending=null
+    mSurfacePosition=Point(0, 0)
+    isOnScreen=false
+    isVisible=false
+    canReceiveKeys=false
+    hwNotchSupport=true(metadata support)
+    keepClearAreas: restricted=[], unrestricted=[]
+    mEnforceSizeCompat=false
+    mInvGlobalScale=1.0
+    mGlobalScale=1.0
+    mInputWindowHandle=b9de1b7 com.android.settings/com.android.settings.Settings$HwSystemDashboardActivity, frame=[Rect(0, 0 - 0, 0)], touchableRegion=SkRegion(), scaleFactor=1.0, transform=null, windowToken=android.os.BinderProxy@6997051, displayId=0, isClone=false, contentSize=0x0, alpha=0.0, canOccludePresentation=false, changed=false
+    isNeedWaitBaseActivityShown=false
+    mPrepareSyncSeqId=0
+  Window #14 Window{5db7840 u0 com.android.settings/com.android.settings.HWSettings}:
+    mDisplayId=0 rootTaskId=1019 mSession=Session{1a702d4 7990:1000} mClient=android.os.BinderProxy@b37c772
+    mOwnerUid=1000 showForAllUsers=false package=com.android.settings appop=NONE
+    mAttrs={(0,0)(fillxfill) sim={adjust=pan} layoutInDisplayCutoutMode=always layoutInDisplaySideMode=always ty=BASE_APPLICATION hwFlags=#0 hnPrivateFlags=#800 hnNoFreezeConfigChanges=#0 isMagicStyle=1 statusBarColor=#0 navigationBarColor=#0 wanim=0x1030304
+      fl=LAYOUT_IN_SCREEN LAYOUT_INSET_DECOR SPLIT_TOUCH HARDWARE_ACCELERATED DRAWS_SYSTEM_BAR_BACKGROUNDS
+      pfl=NO_MOVE_ANIMATION EDGE_TO_EDGE_ENFORCED FORCE_DRAW_STATUS_BAR_BACKGROUND FIT_INSETS_CONTROLLED
+      vsysui=LAYOUT_STABLE LAYOUT_HIDE_NAVIGATION LAYOUT_FULLSCREEN IMMERSIVE
+      apr=LIGHT_STATUS_BARS
+      bhv=DEFAULT
+      fitSides=
+      frameRateBoostOnTouch=true
+      dvrrWindowFrameRateHint=true}
+    Requested w=1080 h=2412 mLayoutSeq=100079
+    mHasSurface=false isReadyForDisplay()=false mWindowRemovalAllowed=false
+    WindowStateAnimator{a00349c com.android.settings/com.android.settings.HWSettings}:
+    mForceSeamlesslyRotate=false seamlesslyRotate: pending=null
+    mSurfacePosition=Point(0, 0)
+    isOnScreen=false
+    isVisible=false
+    canReceiveKeys=false
+    hwNotchSupport=true(metadata support)
+    keepClearAreas: restricted=[], unrestricted=[]
+    mEnforceSizeCompat=false
+    mInvGlobalScale=1.0
+    mGlobalScale=1.0
+    mInputWindowHandle=5db7840 com.android.settings/com.android.settings.HWSettings, frame=[Rect(0, 0 - 0, 0)], touchableRegion=SkRegion(), scaleFactor=1.0, transform=null, windowToken=android.os.BinderProxy@b37c772, displayId=0, isClone=false, contentSize=0x0, alpha=0.0, canOccludePresentation=false, changed=false
+    isNeedWaitBaseActivityShown=false
+    mPrepareSyncSeqId=0
+  Window #15 Window{35e717f u0 com.hihonor.android.launcher/com.hihonor.android.launcher.unihome.UniHomeLauncher}:
+    mDisplayId=0 rootTaskId=251 mSession=Session{3453cab 26924:u0a10137} mClient=android.os.BinderProxy@4e2b8d9
+    mOwnerUid=10137 showForAllUsers=false package=com.hihonor.android.launcher appop=NONE
+    mAttrs={(0,0)(fillxfill) gr=LEFT CENTER_HORIZONTAL sim={adjust=resize} layoutInDisplayCutoutMode=always layoutInDisplaySideMode=always ty=DRAWN_APPLICATION hwFlags=#0 hnPrivateFlags=#8000802 hnNoFreezeConfigChanges=#0 isMagicStyle=-1 statusBarColor=#0 navigationBarColor=#0 fmt=TRANSPARENT wanim=0x1030304 alpha=0.0
+      fl=NOT_FOCUSABLE NOT_TOUCHABLE LAYOUT_IN_SCREEN LAYOUT_INSET_DECOR WATCH_OUTSIDE_TOUCH SPLIT_TOUCH HARDWARE_ACCELERATED DRAWS_SYSTEM_BAR_BACKGROUNDS
+      pfl=NO_MOVE_ANIMATION EDGE_TO_EDGE_ENFORCED FORCE_DRAW_STATUS_BAR_BACKGROUND FIT_INSETS_CONTROLLED
+      vsysui=LIGHT_STATUS_BAR LIGHT_NAVIGATION_BAR
+      bhv=DEFAULT
+      fitSides=
+      frameRateBoostOnTouch=true
+      dvrrWindowFrameRateHint=true}
+    Requested w=1080 h=2412 mLayoutSeq=100067
+    mHasSurface=false isReadyForDisplay()=false mWindowRemovalAllowed=false
+    WindowStateAnimator{ae0ef45 com.hihonor.android.launcher/com.hihonor.android.launcher.unihome.UniHomeLauncher}:
+      mShownAlpha=0.0 mAlpha=0.0 mLastAlpha=0.0
+    mForceSeamlesslyRotate=false seamlesslyRotate: pending=null
+    mSurfacePosition=Point(0, 0)
+    isOnScreen=false
+    isVisible=false
+    canReceiveKeys=false
+    hwNotchSupport=false
+    keepClearAreas: restricted=[], unrestricted=[]
+    mEnforceSizeCompat=false
+    mInvGlobalScale=1.0
+    mGlobalScale=1.0
+    mInputWindowHandle=35e717f com.hihonor.android.launcher/com.hihonor.android.launcher.unihome.UniHomeLauncher, frame=[Rect(0, 0 - 0, 0)], touchableRegion=SkRegion(), scaleFactor=1.0, transform=null, windowToken=android.os.BinderProxy@4e2b8d9, displayId=0, isClone=false, contentSize=0x0, alpha=0.0, canOccludePresentation=false, changed=false
+    isNeedWaitBaseActivityShown=false
+    mPrepareSyncSeqId=0
+  Window #16 Window{dfdcd01 u0 com.hihonor.android.launcher/com.hihonor.android.launcher.unihome.UniHomeLauncher}:
+    mDisplayId=0 rootTaskId=251 mSession=Session{15822fc 7216:u0a10105} mClient=android.os.BinderProxy@911f40b
+    mOwnerUid=10105 showForAllUsers=false package=com.hihonor.android.launcher appop=NONE
+    mAttrs={(0,0)(fillxfill) sim={state=always_hidden adjust=pan forwardNavigation} layoutInDisplayCutoutMode=always layoutInDisplaySideMode=always ty=BASE_APPLICATION hwFlags=#0 hnPrivateFlags=#8000802 hnNoFreezeConfigChanges=#0 isMagicStyle=-1 statusBarColor=#0 navigationBarColor=#0 fmt=TRANSPARENT wanim=0x1030304
+      fl=LAYOUT_IN_SCREEN LAYOUT_INSET_DECOR SHOW_WALLPAPER SPLIT_TOUCH HARDWARE_ACCELERATED DRAWS_SYSTEM_BAR_BACKGROUNDS
+      pfl=NO_MOVE_ANIMATION EDGE_TO_EDGE_ENFORCED FORCE_DRAW_STATUS_BAR_BACKGROUND FIT_INSETS_CONTROLLED
+      vsysui=LAYOUT_STABLE LAYOUT_HIDE_NAVIGATION LAYOUT_FULLSCREEN LIGHT_STATUS_BAR LIGHT_NAVIGATION_BAR
+      apr=LIGHT_STATUS_BARS LIGHT_NAVIGATION_BARS
+      bhv=SHOW_TRANSIENT_BARS_BY_SWIPE
+      fitSides=
+      frameRateBoostOnTouch=true
+      dvrrWindowFrameRateHint=true}
+    Requested w=1080 h=2412 mLayoutSeq=100067
+    mHasSurface=false isReadyForDisplay()=false mWindowRemovalAllowed=false
+    WindowStateAnimator{9f4d896 com.hihonor.android.launcher/com.hihonor.android.launcher.unihome.UniHomeLauncher}:
+    mForceSeamlesslyRotate=false seamlesslyRotate: pending=null
+    mWallpaperX=0.5 mWallpaperY=0.5
+    mSurfacePosition=Point(0, 0)
+    isOnScreen=false
+    isVisible=false
+    canReceiveKeys=false
+    hwNotchSupport=false
+    keepClearAreas: restricted=[], unrestricted=[]
+    mEnforceSizeCompat=false
+    mInvGlobalScale=1.0
+    mGlobalScale=1.0
+    mInputWindowHandle=dfdcd01 com.hihonor.android.launcher/com.hihonor.android.launcher.unihome.UniHomeLauncher, frame=[Rect(0, 0 - 0, 0)], touchableRegion=SkRegion(), scaleFactor=1.0, transform=null, windowToken=android.os.BinderProxy@911f40b, displayId=0, isClone=false, contentSize=0x0, alpha=0.0, canOccludePresentation=false, changed=false
+    isNeedWaitBaseActivityShown=false
+    mPrepareSyncSeqId=0
+  Window #17 Window{7f2e4e8 u0 com.whatsapp/com.whatsapp.Conversation}:
+    mDisplayId=0 rootTaskId=1017 mSession=Session{45af483 32143:u0a10217} mClient=android.os.BinderProxy@a30a9da
+    mOwnerUid=10217 showForAllUsers=false package=com.whatsapp appop=NONE
+    mAttrs={(0,0)(fillxfill) sim={state=always_visible adjust=pan} layoutInDisplayCutoutMode=always ty=BASE_APPLICATION hwFlags=#0 hnPrivateFlags=#800 hnNoFreezeConfigChanges=#0 isMagicStyle=0 statusBarColor=#0 navigationBarColor=#0 wanim=0x103030a
+      fl=LAYOUT_IN_SCREEN LAYOUT_INSET_DECOR SPLIT_TOUCH HARDWARE_ACCELERATED DRAWS_SYSTEM_BAR_BACKGROUNDS
+      pfl=NO_MOVE_ANIMATION EDGE_TO_EDGE_ENFORCED FORCE_DRAW_STATUS_BAR_BACKGROUND FIT_INSETS_CONTROLLED
+      vsysui=LIGHT_STATUS_BAR LIGHT_NAVIGATION_BAR
+      apr=LIGHT_STATUS_BARS LIGHT_NAVIGATION_BARS
+      bhv=DEFAULT
+      fitSides=
+      frameRateBoostOnTouch=true
+      dvrrWindowFrameRateHint=true}
+    Requested w=1080 h=2412 mLayoutSeq=100027
+    mHasSurface=false isReadyForDisplay()=false mWindowRemovalAllowed=false
+    WindowStateAnimator{d1b6900 com.whatsapp/com.whatsapp.Conversation}:
+    mForceSeamlesslyRotate=false seamlesslyRotate: pending=null
+    mSurfacePosition=Point(0, 0)
+    isOnScreen=false
+    isVisible=false
+    canReceiveKeys=false
+    hwNotchSupport=false
+    keepClearAreas: restricted=[], unrestricted=[]
+    mEnforceSizeCompat=false
+    mInvGlobalScale=1.0
+    mGlobalScale=1.0
+    mInputWindowHandle=7f2e4e8 com.whatsapp/com.whatsapp.Conversation, frame=[Rect(0, 0 - 0, 0)], touchableRegion=SkRegion(), scaleFactor=1.0, transform=null, windowToken=android.os.BinderProxy@a30a9da, displayId=0, isClone=false, contentSize=0x0, alpha=0.0, canOccludePresentation=false, changed=false
+    isNeedWaitBaseActivityShown=false
+    mPrepareSyncSeqId=0
+  Window #18 Window{4ce55df u0 com.whatsapp/com.whatsapp.home.ui.HomeActivity}:
+    mDisplayId=0 rootTaskId=1017 mSession=Session{45af483 32143:u0a10217} mClient=android.os.BinderProxy@5272e39
+    mOwnerUid=10217 showForAllUsers=false package=com.whatsapp appop=NONE
+    mAttrs={(0,0)(fillxfill) sim={adjust=pan} layoutInDisplayCutoutMode=always ty=BASE_APPLICATION hwFlags=#0 hnPrivateFlags=#800 hnNoFreezeConfigChanges=#0 isMagicStyle=0 statusBarColor=#0 navigationBarColor=#0 fmt=TRANSPARENT wanim=0x103030a
+      fl=LAYOUT_IN_SCREEN LAYOUT_INSET_DECOR SPLIT_TOUCH HARDWARE_ACCELERATED DRAWS_SYSTEM_BAR_BACKGROUNDS
+      pfl=NO_MOVE_ANIMATION EDGE_TO_EDGE_ENFORCED FORCE_DRAW_STATUS_BAR_BACKGROUND FIT_INSETS_CONTROLLED
+      vsysui=LAYOUT_FULLSCREEN LIGHT_STATUS_BAR LIGHT_NAVIGATION_BAR
+      apr=LIGHT_STATUS_BARS LIGHT_NAVIGATION_BARS
+      bhv=DEFAULT
+      fitSides=
+      frameRateBoostOnTouch=true
+      dvrrWindowFrameRateHint=true}
+    Requested w=1080 h=2412 mLayoutSeq=99673
+    mHasSurface=false isReadyForDisplay()=false mWindowRemovalAllowed=false
+    WindowStateAnimator{8b20473 com.whatsapp/com.whatsapp.home.ui.HomeActivity}:
+    mForceSeamlesslyRotate=false seamlesslyRotate: pending=null
+    mSurfacePosition=Point(0, 0)
+    isOnScreen=false
+    isVisible=false
+    canReceiveKeys=false
+    hwNotchSupport=false
+    keepClearAreas: restricted=[], unrestricted=[]
+    mEnforceSizeCompat=false
+    mInvGlobalScale=1.0
+    mGlobalScale=1.0
+    mInputWindowHandle=4ce55df com.whatsapp/com.whatsapp.home.ui.HomeActivity, frame=[Rect(0, 0 - 0, 0)], touchableRegion=SkRegion(), scaleFactor=1.0, transform=null, windowToken=android.os.BinderProxy@5272e39, displayId=0, isClone=false, contentSize=0x0, alpha=0.0, canOccludePresentation=false, changed=false
+    isNeedWaitBaseActivityShown=false
+    mPrepareSyncSeqId=0
+  Window #19 Window{8f6f177 u0 com.orange.mail.fr/com.orange.mail.fr.mail.app.MailListActivity}:
+    mDisplayId=0 rootTaskId=1018 mSession=Session{5b798d9 19669:u0a10210} mClient=android.os.BinderProxy@2428a11
+    mOwnerUid=10210 showForAllUsers=false package=com.orange.mail.fr appop=NONE
+    mAttrs={(0,0)(fillxfill) sim={adjust=pan} layoutInDisplayCutoutMode=always ty=BASE_APPLICATION hwFlags=#0 hnPrivateFlags=#800 hnNoFreezeConfigChanges=#0 isMagicStyle=0 statusBarColor=#0 navigationBarColor=#0 wanim=0x103030a
+      fl=LAYOUT_IN_SCREEN LAYOUT_INSET_DECOR SPLIT_TOUCH HARDWARE_ACCELERATED DRAWS_SYSTEM_BAR_BACKGROUNDS
+      pfl=NO_MOVE_ANIMATION EDGE_TO_EDGE_ENFORCED FORCE_DRAW_STATUS_BAR_BACKGROUND FIT_INSETS_CONTROLLED
+      vsysui=LIGHT_NAVIGATION_BAR
+      apr=LIGHT_NAVIGATION_BARS
+      bhv=DEFAULT
+      fitSides=
+      frameRateBoostOnTouch=true
+      dvrrWindowFrameRateHint=true}
+    Requested w=1080 h=2412 mLayoutSeq=99901
+    mHasSurface=false isReadyForDisplay()=false mWindowRemovalAllowed=false
+    WindowStateAnimator{29ce9f5 com.orange.mail.fr/com.orange.mail.fr.mail.app.MailListActivity}:
+    mForceSeamlesslyRotate=false seamlesslyRotate: pending=null
+    mSurfacePosition=Point(0, 0)
+    isOnScreen=false
+    isVisible=false
+    canReceiveKeys=false
+    hwNotchSupport=false
+    keepClearAreas: restricted=[], unrestricted=[]
+    mEnforceSizeCompat=false
+    mInvGlobalScale=1.0
+    mGlobalScale=1.0
+    mInputWindowHandle=8f6f177 com.orange.mail.fr/com.orange.mail.fr.mail.app.MailListActivity, frame=[Rect(0, 0 - 0, 0)], touchableRegion=SkRegion(), scaleFactor=1.0, transform=null, windowToken=android.os.BinderProxy@2428a11, displayId=0, isClone=false, contentSize=0x0, alpha=0.0, canOccludePresentation=false, changed=false
+    isNeedWaitBaseActivityShown=false
+    mPrepareSyncSeqId=0
+  Window #20 Window{f491e11 u0 com.android.systemui.wallpapers.ImageWallpaper}:
+    mDisplayId=0 rootTaskId=251 mSession=Session{b3a8b39 3535:u0a10077} mClient=android.os.BinderProxy@b331e38
+    mOwnerUid=10077 showForAllUsers=true package=com.android.systemui appop=NONE
+    mAttrs={(0,0)(1080x2412) gr=TOP START CENTER layoutInDisplayCutoutMode=always ty=WALLPAPER hwFlags=#0 hnPrivateFlags=#0 hnNoFreezeConfigChanges=#0 isMagicStyle=0 statusBarColor=#0 navigationBarColor=#0 fmt=RGBX_8888 wanim=0x103031a
+      fl=NOT_FOCUSABLE NOT_TOUCHABLE LAYOUT_IN_SCREEN LAYOUT_NO_LIMITS SCALED LAYOUT_INSET_DECOR
+      pfl=WANTS_OFFSET_NOTIFICATIONS SHOW_FOR_ALL_USERS
+      bhv=DEFAULT
+      frameRateBoostOnTouch=true
+      dvrrWindowFrameRateHint=true}
+    Requested w=1080 h=2412 mLayoutSeq=100070
+    mIsImWindow=false mIsWallpaper=true mIsFloatingLayer=true
+    mHasSurface=true isReadyForDisplay()=false mWindowRemovalAllowed=false
+    WindowStateAnimator{6af8f1 com.android.systemui.wallpapers.ImageWallpaper}:
+      Surface: shown=false    mForceSeamlesslyRotate=false seamlesslyRotate: pending=null
+    mWallpaperX=0.5 mWallpaperY=0.5
+    mSurfacePosition=Point(0, 0)
+    mXOffset=0
+    mYOffset=0
+    mWallpaperZoomOut=0.0
+    isOnScreen=false
+    isVisible=false
+    canReceiveKeys=false
+    hwNotchSupport=false
+    keepClearAreas: restricted=[], unrestricted=[]
+    mEnforceSizeCompat=false
+    mInvGlobalScale=1.0
+    mGlobalScale=1.0
+    mInputWindowHandle=f491e11 com.android.systemui.wallpapers.ImageWallpaper, frame=[Rect(0, 0 - 0, 0)], touchableRegion=SkRegion((0,0,1080,2412)), scaleFactor=1.0, transform=null, windowToken=android.os.BinderProxy@b331e38, displayId=0, isClone=false, contentSize=0x0, alpha=0.0, canOccludePresentation=false, changed=false
+    isNeedWaitBaseActivityShown=false
+    mPrepareSyncSeqId=0
+  Window #21 Window{c9d3608 u0 com.android.systemui.wallpapers.ImageWallpaper}:
+    mDisplayId=0 rootTaskId=251 mSession=Session{b3a8b39 3535:u0a10077} mClient=android.os.BinderProxy@2df4fab
+    mOwnerUid=10077 showForAllUsers=true package=com.android.systemui appop=NONE
+    mAttrs={(0,0)(1080x2412) gr=TOP START CENTER layoutInDisplayCutoutMode=always ty=WALLPAPER hwFlags=#0 hnPrivateFlags=#0 hnNoFreezeConfigChanges=#0 isMagicStyle=0 statusBarColor=#0 navigationBarColor=#0 fmt=RGBX_8888 wanim=0x103031a
+      fl=NOT_FOCUSABLE NOT_TOUCHABLE LAYOUT_IN_SCREEN LAYOUT_NO_LIMITS SCALED LAYOUT_INSET_DECOR
+      pfl=WANTS_OFFSET_NOTIFICATIONS SHOW_FOR_ALL_USERS
+      bhv=DEFAULT
+      frameRateBoostOnTouch=true
+      dvrrWindowFrameRateHint=true}
+    Requested w=1080 h=2412 mLayoutSeq=100207
+    mIsImWindow=false mIsWallpaper=true mIsFloatingLayer=true
+    mHasSurface=true isReadyForDisplay()=true mWindowRemovalAllowed=false
+    WindowStateAnimator{2e4525f com.android.systemui.wallpapers.ImageWallpaper}:
+      Surface: shown=true    mForceSeamlesslyRotate=false seamlesslyRotate: pending=null
+    mWallpaperX=0.0 mWallpaperY=0.5
+    mSurfacePosition=Point(0, 0)
+    mXOffset=0
+    mYOffset=0
+    mWallpaperZoomOut=0.0
+    isOnScreen=true
+    isVisible=true
+    canReceiveKeys=false
+    hwNotchSupport=false
+    keepClearAreas: restricted=[], unrestricted=[]
+    mEnforceSizeCompat=false
+    mInvGlobalScale=1.0
+    mGlobalScale=1.0
+    mInputWindowHandle=c9d3608 com.android.systemui.wallpapers.ImageWallpaper, frame=[Rect(0, 0 - 0, 0)], touchableRegion=SkRegion((0,0,1080,2412)), scaleFactor=1.0, transform=null, windowToken=android.os.BinderProxy@2df4fab, displayId=0, isClone=false, contentSize=0x0, alpha=0.0, canOccludePresentation=false, changed=false
+    isNeedWaitBaseActivityShown=false
+    mPrepareSyncSeqId=0
+
+  mGlobalConfiguration={1.0 208mcc1mnc [fr_FR] ldltr sw360dp w360dp h804dp 480dpi nrml long port finger -keyb/v/h -nav/h winConfig={ mBounds=Rect(0, 0 - 1080, 2412) mAppBounds=Rect(0, 0 - 1080, 2412) mMaxBounds=Rect(0, 0 - 1080, 2412) mDisplayRotation=ROTATION_0 mWindowingMode=fullscreen mActivityType=undefined mAlwaysOnTop=undefined mRotation=ROTATION_0 mPopOverMode=undefined} suim:1 fontWeightScale:100 changeUserFlag:0 changeUiModeFlag:0 fullScreenVideoFlag:0 splitScreenState:-1 landScapeFreeformFlag:1 hoverMode:0 changeIconStyleFlag:0 changeThemeStyleFlag:0 s.15736 fontWeightAdjustment=0}
+  mHasPermanentDpad=false
+  mTopFocusedDisplayId=0
+  imeInputTarget in display# 0 Window{b2985cd u0 com.android.settings/com.hihonor.settingslib.SubSettings}
+  imeControlTarget in display# 0 Window{b2985cd u0 com.android.settings/com.hihonor.settingslib.SubSettings}
+  Minimum task size of display#0 220  mBlurEnabled=false
+  mLastDisplayFreezeDuration=0 due to new-config
+  mDisableSecureWindows=false
+ mHighResSnapshotScale=1.0
+ mSnapshotEnabled=true
+ SnapshotCache Task
+   Entry token=1019
+     topApp=ActivityRecord{3e3682b u0 com.android.settings/com.hihonor.settingslib.SubSettings t1019}
+     snapshot=TaskSnapshot{ mId=1774518175797 mCaptureTime=2159796484093710 mTopActivityComponent=com.android.settings/com.hihonor.settingslib.SubSettings mSnapshot=android.hardware.HardwareBuffer@c972da9 (1080x2412) mColorSpace=sRGB IEC61966-2.1 (id=0, model=RGB) mOrientation=1 mRotation=0 mTaskSize=Point(1080, 2412) mContentInsets=[0,108][0,114] mLetterboxInsets=[0,0][0,0] mIsLowResolution=false mIsRealSnapshot=true mWindowingMode=1 mAppearance=8 mIsTranslucent=false mHasImeSurface=false mIsForceRotate=false mInternalReferences=2
+   Entry token=1018
+     topApp=ActivityRecord{6d441f6 u0 com.orange.mail.fr/.mail.app.MailListActivity t1018}
+     snapshot=TaskSnapshot{ mId=1774516911053 mCaptureTime=2158531732499831 mTopActivityComponent=com.orange.mail.fr/.mail.app.MailListActivity mSnapshot=android.hardware.HardwareBuffer@93d6f64 (1080x2412) mColorSpace=sRGB IEC61966-2.1 (id=0, model=RGB) mOrientation=1 mRotation=0 mTaskSize=Point(1080, 2412) mContentInsets=[0,108][0,114] mLetterboxInsets=[0,0][0,0] mIsLowResolution=false mIsRealSnapshot=true mWindowingMode=1 mAppearance=16 mIsTranslucent=false mHasImeSurface=false mIsForceRotate=false mInternalReferences=2
+   Entry token=1017
+     topApp=ActivityRecord{1ad6bd0 u0 com.whatsapp/.Conversation t1017}
+     snapshot=TaskSnapshot{ mId=1774517731162 mCaptureTime=2159351839194661 mTopActivityComponent=com.whatsapp/.Conversation mSnapshot=android.hardware.HardwareBuffer@90d7002 (1080x2412) mColorSpace=sRGB IEC61966-2.1 (id=0, model=RGB) mOrientation=1 mRotation=0 mTaskSize=Point(1080, 2412) mContentInsets=[0,108][0,114] mLetterboxInsets=[0,0][0,0] mIsLowResolution=false mIsRealSnapshot=true mWindowingMode=1 mAppearance=24 mIsTranslucent=false mHasImeSurface=true mIsForceRotate=false mInternalReferences=2
+   Entry token=252
+     topApp=ActivityRecord{d7312c3 u0 com.hihonor.android.launcher/.unihome.UniHomeLauncher t252}
+     snapshot=TaskSnapshot{ mId=1774512552575 mCaptureTime=2154173259738260 mTopActivityComponent=com.hihonor.android.launcher/.unihome.UniHomeLauncher mSnapshot=android.hardware.HardwareBuffer@be716ad (1080x2412) mColorSpace=sRGB IEC61966-2.1 (id=0, model=RGB) mOrientation=1 mRotation=0 mTaskSize=Point(1080, 2412) mContentInsets=[0,108][0,114] mLetterboxInsets=[0,0][0,0] mIsLowResolution=false mIsRealSnapshot=true mWindowingMode=1 mAppearance=24 mIsTranslucent=true mHasImeSurface=false mIsForceRotate=false mInternalReferences=2
+ mHighResSnapshotScale=0.6
+ mSnapshotEnabled=true
+ SnapshotCache Activity
+   UserSavedFile userId=0
+
+  mHandler:
+    Handler (com.android.server.wm.WindowManagerService$H) {dfb1c5c} @ 415616478
+      Looper (android.display, tid 24) {9bb1403}
+        (Total messages: 0, polling=true, quitting=false)
+WINDOW MANAGER TRACE (dumpsys window trace)
+Status: Disabled
+Log level: 1
+Buffer size: 10485760 bytes
+Buffer usage: 0 bytes
+Elements in the buffer: 0
+WINDOW MANAGER LOGGING (dumpsys window logging)
+WINDOW MANAGER HIGH REFRESH RATE BLACKLIST (dumpsys window refresh)
+High Refresh Rate Denylist
+  Packages:
+INSTALLED PACKAGES HAVING APP-SPECIFIC CONFIGURATIONS
+Current user ID : 0
+
+    PackageName : com.yanstarstudio.joss.undercover
+        NightMode : null
+        Locales : [fr]
+
+    PackageName : com.ingka.ikea.app
+        NightMode : null
+        Locales : [fr_FR]
+WINDOW MANAGER CONSTANTS (dumpsys window constants):
+  system_gesture_exclusion_log_debounce_millis=1500
+  system_gesture_exclusion_limit_dp=200
+  system_gestures_excluded_by_pre_q_sticky_immersive=false
+
+SystemPerformanceHinter:
+  Active sessions (0):
+TrustedPresentationListenerController:
+  Active unique listeners (0):
+SensitiveContentPackages:
+  Packages that should block screen capture (0):
+ScreenRecordingCallbackController:
+  Registered callbacks:
+  Last invoked states:
+./adb shell cmd notification post -t Connected with ARROW -n ARROW
+posting:
+  Notification(channel=*** shortcut=null contentView=null vibrate=null sound=null defaults=0 flags=0 color=0x00000000 vis=PRIVATE)

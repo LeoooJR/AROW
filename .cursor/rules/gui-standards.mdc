@@ -1,0 +1,67 @@
+---
+description: GUI conventions — settings, colors, components, animations, icons, styles, layouts, signals, qrc
+globs: src/gui/**
+alwaysApply: false
+---
+
+# GUI standards
+
+Apply these rules for any task touching the GUI.
+
+## Settings, margins, spacing
+
+- Use values from **`src/gui/settings.py`** for margins, spacing, dimensions, fonts, etc. (e.g. `SpacingSettings`, `DimensionSettings`, `FontSettings`).
+- If a needed value is missing or wrong, **add or update it in `src/gui/settings.py`** instead of hardcoding elsewhere.
+
+## Colors
+
+- Use color values from **`src/gui/colors.py`** (e.g. `Colors.PRIMARY`, `Colors.COMPONENT`).
+- If a needed color is missing or wrong, **add or update it in `src/gui/colors.py`**.
+
+## Generic elements and layouts
+
+- Reusable UI building blocks live in **`src/gui/components/`**, organized by category (e.g. `buttons/`, `labels/`, `inputs/`, `media/`, `containers/`, `dialogs/`).
+- Import from **`gui.components`** (or the relevant category subpackage) in new code.
+- **`src/gui/elements.py`** remains a backward-compatible re-export shim; prefer `gui.components` for new imports.
+- When adding a component, place it in the matching category module under `src/gui/components/` and re-export it from that category's `__init__.py` and from `src/gui/components/__init__.py`.
+- Layout helpers (horizontal, vertical, grid) are in **`src/gui/wrapper.py`** — use `VerticalLayoutWrapper`, `HorizontalLayoutWrapper`, `GridLayoutWrapper` instead of building layouts by hand when they fit.
+
+## Animations
+
+- **Shared / generic animation helpers** (reusable timing curves, pulse levels, property updates, easing snippets used in more than one place) belong in **`src/gui/animation.py`**. Implement new helpers there and import them from widgets or components; do not duplicate the same helper logic across GUI modules.
+
+## Icons
+
+- **GUI icons** (Qt resource paths): **`src/gui/icons.py`** (`GenericIcons`, `OperatingSystemIcons`, `ApplicationIcons`).
+- **Map icons** (folium/Leaflet): **`src/geo/icons.py`** (`Icons`).
+
+## Signals
+
+- View-originating GUI signals are defined in **`src/gui/signals.py`** (`ViewSignals` / `view_signals`). Use these for cross-component communication; do not define new global signals elsewhere.
+
+## Slots
+
+- Any custom method connected via **`.connect(...)`** or **`QTimer.singleShot(...)`** must use **`@Slot(...)`** from `PySide6.QtCore`.
+- Prefer typed signatures aligned with **`src/gui/signals.py`** (e.g. `@Slot(bool)`, `@Slot(str, str, str)`).
+- Use named handler methods instead of lambda slot targets.
+- Do not decorate direct **`.emit`** bridges or Qt built-in methods (`close`, `setChecked`).
+- In **`src/controller`**, decorate handlers wired in **`connect_view_signals()`** and **`AppController._connect_view_signals()`**; do **not** decorate **`model_entrypoint.subscribe(...)`** handlers.
+
+## Styles
+
+- All styling must come from **`src/gui/stylesheet.py`**. Do not set styles (e.g. inline styles or style strings) directly in other Python files; add or extend styles in the stylesheet module.
+
+## Icons and ressources.qrc
+
+When a task involves **adding, updating, removing, or renaming** icons or assets referenced in the resource file, **recompile** `src/gui/ressources.qrc` at the end of the task if completed.
+
+- Assets live in `src/gui/statics/` and are listed in `src/gui/ressources.qrc`.
+- Compiled module: `src/gui/ressources_rc.py` (imported as `gui.ressources_rc`).
+
+**Recompile** (from project root, conda env AROW active):
+
+```bash
+pyside6-rcc src/gui/ressources.qrc -o src/gui/ressources_rc.py
+```
+
+Or from `src/gui/`: `pyside6-rcc ressources.qrc -o ressources_rc.py`

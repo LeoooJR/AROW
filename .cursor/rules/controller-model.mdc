@@ -1,0 +1,69 @@
+---
+description: Controller/model-entrypoint architecture, AsyncRunner jobs, async result application, and where core logic lives
+globs: src/controller/**/*.py, src/core/**/*.py, src/gui/**/*.py
+alwaysApply: false
+---
+
+# Controller and Model Entrypoint Architecture
+
+## Async model entrypoint tasks
+
+- **Create and run model entrypoint tasks** (map creation, heavy work, I/O) via the async framework in `src/controller/runner.py`.
+- Use `JobSpecification` (name, fn, args, kwargs, type, coalesce_key, …) and `AsyncRunner.submit(job)`; get a `JobHandler` and optionally `runner.bind_handle_signals(handle)` for per-job signals.
+- Do not spawn ad-hoc threads or processes for model entrypoint work; route through `AsyncRunner` so coalescing, cancellation, and signals stay consistent.
+- **View `view_signals` from a subcontroller** (e.g. `AdbSubController`, or `AppController` which exposes `_submit_model_entrypoint_async_call`): if a slot runs **blocking I/O** (e.g. pairing, `adb` device list), submit `_submit_model_entrypoint_async_call` with `job_type="thread"` and handle completion in `src/controller/core_work_callbacks.py` (or another narrow job-callback module) so the core bus emits and the view updates on the main thread. Pure in-memory updates can stay on the UI thread (e.g. selecting the active `Phone` in `SimulationSubController` state).
+
+## Async worker result application (controller + core)
+
+Use this pattern when a job runs work on a worker and then **applies** results on the Qt main thread (completion handlers run on the main thread via `AsyncRunner`).
+
+### Controller: per-job outcome handlers
+
+- Put **success / failure callbacks** for each async job in a dedicated module (e.g. `src/controller/core_work_callbacks.py` for ADB jobs), not as a growing list of `_on_*_completed` / `_on_*_failed` methods on a large `AppController` or *SubController.
+- One **narrow class per job** (e.g. `StartupCoreRuntimeJob`) with `on_completed(self, result: object)` and `on_failed(self, error: JobError)` wired to `_submit_model_entrypoint_async_call` / `bind_handle_signals`.
+- **Job-specific failure logging** (e.g. `log_startup_job_failure`) lives next to that job class; avoid duplicating a “startup failed” hook on the model entrypoint that re-raises after log.
+- Keep **core signal subscription** handlers (`subscribe` / `_connect_model_signals` / `_on_adb_server_started`, `_on_devices_updated`, …) in the controller; do not mix them with async job outcome classes.
+
+### Core: paired `run` + `apply`
+
+- For each such job, add a small module under `src/core/work/` (e.g. `src/core/work/startup_work.py`) that holds:
+  - The **outcome dataclass** (subclass of `CoreRuntimeWorkOutcome`, e.g. `StartupOutcome`).
+  - A **`CoreRuntimeWork` subclass** (`src/core/work/core_runtime_work.py`): **instance `run()` → T** (worker thread, may block); **static `apply_main_thread(model_entrypoint, outcome)`** (Qt main thread only).
+- The **canonical list** of work/outcome pairs dispatched through **`ModelEntrypoint.apply_result`** lives in **`src/core/work/works_repository.py`** as **`CORE_RUNTIME_WORKS`** (`Repository` from `src/collection.py`). **`_CORE_RUNTIME_RESULT_APPLIERS`** in **`src/core/entrypoint.py`** is **built from** that catalog (outcome type → `work_cls.apply_main_thread`).
+- **`register_core_runtime_result_applier`** remains for extensions/tests only; **new first-class runtime works add a catalog entry** in **`works_repository.py`** (runtime-only registrations do not appear in **`CORE_RUNTIME_WORKS`**).
+- **Every ADB core-runtime async job** (including **startup, pairing, refresh, host install identity, close**) follows the same **`_submit_model_entrypoint_async_call`** + **`model_entrypoint.apply_result`** path on completion; **close** is additionally awaited from **`QApplication.aboutToQuit`** (`AppController`), then **`AsyncRunner.shutdown()`** runs once apply has finished or a watchdog timeout elapsed.
+- `ModelEntrypoint` exposes thin methods that construct the work object and call **`run()`** (**`apply_result(outcome)`** dispatches **`apply_main_thread`** from the catalog).
+
+### Do not
+
+- Add orchestration or result-dispatch logic to `src/controller/runner.py` for this pattern; keep it in the controller + core API above.
+
+## View signal slots
+
+- Handlers wired in subcontroller **`connect_view_signals()`** and **`AppController._connect_view_signals()`** must use **`@Slot(...)`** from `PySide6.QtCore`, with typed signatures aligned with **`src/gui/signals.py`**.
+- Place **`@Slot`** immediately above **`def`**, with **`@validate_model_entrypoint`** / **`@validate_view`** above **`@Slot`** when both apply.
+- Do **not** decorate **`model_entrypoint.subscribe(...)`** handlers (core bus, not Qt).
+- Controllers remain plain Python classes; they do not need to inherit **`QObject`**.
+
+## Controller logging (`SUCCESS`)
+
+In `src/controller/`, use Loguru’s **`logger.success`** (between INFO and WARNING) so log files are easy to scan for positive outcomes.
+
+- **Async job `on_completed`** in `src/controller/core_work_callbacks.py`: after validating the result and calling **`model_entrypoint.apply_result(result)`**, use **`logger.success`** for completed healthy work (e.g. startup core runtime, known devices listed after refresh, **host install identity** — message only for host identity; do not log raw `stable_key` or other secrets; follow `src/logger.py` redaction for any structured extras).
+- **Avoid duplicate success lines** for the same user-visible event (e.g. do not add success in `AuthentificateDeviceCallback` when `AdbSubController._on_device_authentification_succeeded` already logs success).
+- **Private `_on_*` slots** (user intent / “requested”) and **high-churn state** (e.g. simulation field updates) use **`logger.debug`**; **neutral lifecycle** (devices updated, server started/stopped) stays **`logger.info`** unless a case clearly warrants SUCCESS.
+
+## Where logic lives
+
+| Concern | Location |
+|--------|----------|
+| ADB binary, commands, device communication | `src/core/adb.py` |
+| Network logic | `src/core/network.py` |
+| Device methods, functions, metadata, dataclasses | `src/gui/device.py` |
+
+Keep these boundaries: no ADB calls outside `src/core/adb.py`, no network logic outside `src/core/network.py`, device UI/metadata in `src/gui/device.py`.
+
+## MVC and Qt models
+
+- The project uses **MVC**: model in `src/core`, view in `src/gui`, controller in `src/controller`.
+- When the view needs **lists, tables, or trees**, prefer Qt model classes in `src/core/qt_models.py` (e.g. `QAbstractListModel`, `QAbstractTableModel`) instead of hand-rolled data in the controller. Use the Qt model/view pattern when it is a better fit than plain MVC data passing.

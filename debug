@@ -1,0 +1,3 @@
+[78227:259:0506/104419.401605:ERROR:service_utils.cc(339)] Skia Graphite backend = "" not found - falling back to Ganesh!
+[78227:259:0506/104419.403998:ERROR:service_utils.cc(339)] Skia Graphite backend = "" not found - falling back to Ganesh!
+qt.qpa.fonts: Populating font family aliases took 84 ms. Replace uses of missing font family "Arial, Sans-serif" with one that exists to avoid this cost. 

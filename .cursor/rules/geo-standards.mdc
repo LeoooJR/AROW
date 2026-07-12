@@ -1,0 +1,48 @@
+---
+description: Geo — vectorized tables, pandera validation, Folium maps, fast first paint
+globs: src/geo/**
+alwaysApply: false
+---
+
+# Geo / dataset standards
+
+Apply these rules for any task touching **`src/geo/`**.
+
+## Tabular and spatial data operations
+
+- Treat **`pandas.DataFrame`**, **`geopandas.GeoDataFrame`**, and related structures as columnar data: prefer **vectorized** APIs (`.str`, `.map` on arrays/Series, `numpy` ufuncs, `geopandas`/`shapely` vectorized geometry ops where available) over **row-wise** Python loops (`iterrows`, `apply` with Python callables per row, manual `for` over index).
+- Use **`merge` / `join` / `concat`**, **groupby aggregations**, and **spatial joins** (`sjoin`, `sjoin_nearest`) instead of nested loops when combining or matching features.
+- When a scalar loop is unavoidable (rare third-party APIs), isolate it, document why, and keep the hot path as small as possible.
+
+```python
+# ❌ BAD — per-row Python
+for idx, row in gdf.iterrows():
+    gdf.at[idx, "area_km2"] = row.geometry.area / 1e6
+
+# ✅ GOOD — vectorized
+gdf = gdf.assign(area_km2=gdf.geometry.area / 1e6)
+```
+
+## Dataset validation (pandera)
+
+- **All** dataset shape, dtype, column, and value constraints for geo codepaths must be expressed with **`pandera`** (`pandera.pandas` for `DataFrame`, `pandera.geopandas` for `GeoDataFrame`), e.g. `DataFrameModel` / `GeoDataFrameModel` or explicit `DataFrameSchema` / `GeoDataFrameSchema`.
+- Validate at clear boundaries: after load, before export, or before passing data to the map pipeline — and handle failures with explicit project exceptions (see **`src/geo/exceptions.py`** / `SchemaValidationError` pattern) rather than silent coercion.
+- Reuse or extend existing schema types in **`src/geo/datasets.py`** (or colocated schema modules) instead of ad-hoc `assert`/`if` checks scattered across `geo`.
+
+```python
+# ❌ BAD — one-off checks
+if "geometry" not in gdf.columns:
+    raise ValueError("missing geometry")
+
+# ✅ GOOD — pandera model / schema validate
+schema.validate(gdf, lazy=True)
+```
+
+## Map rendering (Folium)
+
+- **Server-side map HTML** must be built with the **`folium`** package (`import folium`, `folium.Map`, layers/plugins as needed). Do not replace the map stack with ad-hoc Leaflet-only string generation unless there is an explicit project decision to migrate.
+- Anything that affects **initial load** (layer count, geometry complexity, inline GeoJSON size, plugins, custom JS/CSS embedded in the saved HTML) should be tuned for a **small, fast-opening** document: simplify or decimate geometries for display, avoid redundant layers, defer nonessential work to user interaction when the UX allows, and prefer vectorized prep **before** calling Folium so the browser does less work at first paint.
+
+## Dependencies
+
+- Keep **`pandera`** and **`folium`** in project dependencies when extending schemas or maps; align imports with versions pinned in **`requirements.txt`**.

@@ -1,0 +1,84 @@
+---
+description: Cursor workflow
+alwaysApply: true
+---
+
+# AROW — Cursor agent workflow
+
+Treat this file as the project’s operating manual for the AI.
+
+---
+
+## Using this file in Cursor
+
+- **Automatic context:** Move or mirror the sections you want enforced into `.cursor/rules/*.mdc` files with YAML frontmatter. Set `alwaysApply: true` for project-wide behavior, or use `globs` for file-specific rules.
+- **Ad-hoc:** Reference `@rules/cursor.md` (or the path to this file) in a chat when you want a session to follow this workflow.
+- **Keep it maintainable:** Prefer several small `.mdc` files (one main concern each) over one huge rule file.
+
+---
+
+## 1. Workflow orchestration
+
+### 1.1 Plan mode by default
+
+- Enter **Plan mode** for any non-trivial task (roughly three or more steps, unclear requirements, or real architectural choice).
+- If execution goes wrong or assumptions break, **stop and re-plan** instead of stacking patches.
+- Use planning for **verification strategy**, not only for implementation.
+- Write enough of a spec up front to remove ambiguity (interfaces, data flow, failure modes).
+
+### 1.2 Subagents and parallel work
+
+- Use **subagents / the Task tool** liberally so the main conversation stays focused.
+- Offload **research, repo exploration, and parallel analysis** to subagents when it reduces context churn.
+- For harder problems, **parallelize** distinct workstreams (e.g. one agent for tests, one for tracing a subsystem).
+- Give **one clear objective per subagent** so outputs stay actionable.
+
+### 1.3 Self-improvement loop
+
+- After **any user correction** that reflects a repeatable mistake: append a short entry to `tasks/lessons.md` (pattern, fix, rule to follow next time).
+- Prefer **concrete “do / don’t”** notes over vague reminders.
+- Periodically skim `tasks/lessons.md` when starting work on this repo.
+
+### 1.4 Verification before “done”
+
+- Do not treat a task as finished without **evidence**: tests run, key paths exercised, or logs reviewed as appropriate.
+- When behavior should change in a known way, **compare before/after** (diff, test output, or a minimal repro).
+- Ask: **Would a staff engineer be comfortable shipping this?** If not, close the gap.
+
+### 1.5 Elegance (balanced)
+
+- For non-trivial changes, briefly ask whether there is a **simpler or more coherent** approach.
+- If a fix feels brittle, prefer a **clean model** over a pile of special cases—without gold-plating trivial edits.
+
+### 1.6 Autonomous bug fixing
+
+- On a bug report: **investigate and fix**; use logs, stack traces, and failing tests as primary evidence.
+- Minimize back-and-forth: only ask when something is **truly blocked** (missing secrets, product decision, etc.).
+- If CI or tests fail in this repo, **drive them to green** without being asked for each step.
+
+---
+
+## 2. Task management
+
+1. **Plan first:** Write a checkable plan to `tasks/todo.md` when the work spans more than a small edit.
+2. **Verify the plan:** Align on scope or risks before deep implementation when the task is ambiguous or high impact.
+3. **Track progress:** Check items off as you go; keep the list honest.
+4. **Explain changes:** After substantive edits, give a short high-level summary (what/why).
+5. **Document results:** Add a brief review section to `tasks/todo.md` when closing a larger task (outcome, follow-ups).
+6. **Capture lessons:** Update `tasks/lessons.md` after corrections that should change future behavior.
+
+---
+
+## 3. Core principles
+
+- **Simplicity first:** Prefer the smallest change that solves the problem.
+- **No laziness:** Find root causes; avoid “temporary” fixes that become permanent.
+- **Minimal impact:** Touch only what the task requires; avoid drive-by refactors and unrelated churn.
+
+---
+
+## 4. Cursor-specific reminders
+
+- **Rules location:** Project rules belong under `.cursor/rules/` as `.mdc` files; keep them concise and scoped.
+- **Context budget:** Prefer `@` references, focused file reads, and subagents over dumping whole directories into chat.
+- **Terminal:** Run commands in the integrated terminal when validating fixes (tests, linters, app startup).
