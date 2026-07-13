@@ -17,6 +17,7 @@ from core.signals import (
     SimulationCreationFailedPayload,
     SimulationDeletedPayload,
     SimulationDeleteSkippedPayload,
+    SimulationLocationRejectedPayload,
     SimulationLocationValidatedPayload,
     SimulationMapFileChangedPayload,
     SimulationPositionChangedPayload,
@@ -85,6 +86,10 @@ class SimulationSubController(AppSubController):
             CoreSignals.SIMULATION_LOCATION_VALIDATED,
             self._on_simulation_location_validated,
         )
+        self.model_entrypoint.signal_bus.subscribe(
+            CoreSignals.SIMULATION_LOCATION_REJECTED,
+            self._on_simulation_location_rejected,
+        )
 
     @validate_model_entrypoint
     def _on_map_rendered(self, payload: MapRenderedPayload) -> None:
@@ -122,6 +127,49 @@ class SimulationSubController(AppSubController):
             payload.lat,
             payload.lon,
             payload,
+        )
+
+    @validate_model_entrypoint
+    def _on_simulation_location_rejected(
+        self, payload: SimulationLocationRejectedPayload
+    ) -> None:
+        """
+        Clear a stored spoofed milestone when async revalidation rejects it.
+
+        Restored simulations can carry a persisted validated milestone from an
+        older dataset. When the async revalidation path rejects that exact
+        stored marker, drop only the persisted POI so stale metadata is not
+        kept in memory or written back to disk. Ordinary invalid clicks do not
+        match the current stored marker and are ignored here.
+        """
+        simulation = self.model_entrypoint.get_simulation(payload.simulation_id)
+        if simulation is None:
+            return
+        current_location = simulation.spoofed_location
+        current_poi = current_location.poi
+        if current_poi is None:
+            return
+        if current_location.lat != payload.lat or current_location.lon != payload.lon:
+            return
+        if current_poi.km != payload.km:
+            return
+        if current_poi.line.code != payload.line_code:
+            return
+        if current_poi.line.troncon != payload.line_troncon:
+            return
+        logger.info(
+            "SimulationSubController: clearing rejected stored spoofed marker",
+            simulation_id=payload.simulation_id,
+            km=payload.km,
+            line_code=payload.line_code,
+            line_troncon=payload.line_troncon,
+            reason=payload.reason,
+        )
+        self.model_entrypoint.set_simulation_spoofed_location(
+            payload.simulation_id,
+            payload.lat,
+            payload.lon,
+            None,
         )
 
     def is_simulation_active(self, id: str) -> bool:

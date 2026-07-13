@@ -22,11 +22,13 @@ from core.signals import (
     SimulationCreatedPayload,
     SimulationCreationFailedPayload,
     SimulationDeletedPayload,
+    SimulationLocationRejectedPayload,
     SimulationLocationValidatedPayload,
     SimulationMapFileChangedPayload,
     SimulationPositionChangedPayload,
     SimulationStateChangedPayload,
 )
+from core.tests.geo_fixtures import SAMPLE_LATITUDE, SAMPLE_LONGITUDE
 from core.tests.signal_test_helpers import seed_adb_startup_for_entrypoint
 
 
@@ -111,7 +113,7 @@ def test_connect_model_signals_subscribes_to_simulation_events(tmp_path: Path) -
 
     subcontroller.connect_model_signals()
 
-    assert subscribe.call_count == 10
+    assert subscribe.call_count == 11
     subscribe.assert_any_call(
         CoreSignals.SIMULATION_CREATED,
         subcontroller._on_simulation_created,
@@ -151,6 +153,10 @@ def test_connect_model_signals_subscribes_to_simulation_events(tmp_path: Path) -
     subscribe.assert_any_call(
         CoreSignals.SIMULATION_LOCATION_VALIDATED,
         subcontroller._on_simulation_location_validated,
+    )
+    subscribe.assert_any_call(
+        CoreSignals.SIMULATION_LOCATION_REJECTED,
+        subcontroller._on_simulation_location_rejected,
     )
 
 
@@ -528,3 +534,95 @@ def test_simulation_location_validated_updates_spoofed_location_and_persists(
     assert persisted["spoofed_location"]["lon"] == pytest.approx(payload.lon)
     assert persisted["spoofed_location"]["poi"]["km"] == 1
     assert persisted["spoofed_location"]["poi"]["line"]["code"] == "001000"
+
+
+def test_simulation_location_rejected_clears_matching_persisted_marker(
+    tmp_path: Path,
+) -> None:
+    model_entrypoint = _make_model(
+        tmp_path, device=Phone(id="device-1", state="device", model="Pixel")
+    )
+    subcontroller = _make_subcontroller(model_entrypoint)
+    subcontroller.connect_model_signals()
+    simulation_id = _create_simulation_id(model_entrypoint, "device-1")
+    outcome = model_entrypoint.validate_simulation_marker_location(
+        simulation_id,
+        1,
+        "001000",
+        1,
+        SAMPLE_LATITUDE,
+        SAMPLE_LONGITUDE,
+    )
+    assert outcome.validated is not None
+    model_entrypoint.set_simulation_spoofed_location(
+        simulation_id,
+        outcome.validated.lat,
+        outcome.validated.lon,
+        outcome.validated,
+    )
+
+    subcontroller._on_simulation_location_rejected(
+        SimulationLocationRejectedPayload(
+            simulation_id=simulation_id,
+            km=1,
+            line_code="001000",
+            line_troncon=1,
+            lat=SAMPLE_LATITUDE,
+            lon=SAMPLE_LONGITUDE,
+            reason="Unknown milestone after dataset refresh",
+        )
+    )
+
+    simulation = model_entrypoint.get_simulation(simulation_id)
+    assert simulation is not None
+    assert simulation.spoofed_location.lat == pytest.approx(SAMPLE_LATITUDE)
+    assert simulation.spoofed_location.lon == pytest.approx(SAMPLE_LONGITUDE)
+    assert simulation.spoofed_location.poi is None
+    metadata_path = _simulation_metadata_path(model_entrypoint, simulation_id)
+    persisted = json.loads(metadata_path.read_text(encoding="utf-8"))
+    assert persisted["spoofed_location"]["lat"] == pytest.approx(SAMPLE_LATITUDE)
+    assert persisted["spoofed_location"]["lon"] == pytest.approx(SAMPLE_LONGITUDE)
+    assert persisted["spoofed_location"]["poi"] is None
+
+
+def test_simulation_location_rejected_ignores_non_matching_marker(
+    tmp_path: Path,
+) -> None:
+    model_entrypoint = _make_model(
+        tmp_path, device=Phone(id="device-1", state="device", model="Pixel")
+    )
+    subcontroller = _make_subcontroller(model_entrypoint)
+    subcontroller.connect_model_signals()
+    simulation_id = _create_simulation_id(model_entrypoint, "device-1")
+    outcome = model_entrypoint.validate_simulation_marker_location(
+        simulation_id,
+        1,
+        "001000",
+        1,
+        SAMPLE_LATITUDE,
+        SAMPLE_LONGITUDE,
+    )
+    assert outcome.validated is not None
+    model_entrypoint.set_simulation_spoofed_location(
+        simulation_id,
+        outcome.validated.lat,
+        outcome.validated.lon,
+        outcome.validated,
+    )
+
+    subcontroller._on_simulation_location_rejected(
+        SimulationLocationRejectedPayload(
+            simulation_id=simulation_id,
+            km=999,
+            line_code="001000",
+            line_troncon=1,
+            lat=0.0,
+            lon=0.0,
+            reason="User clicked an invalid marker",
+        )
+    )
+
+    simulation = model_entrypoint.get_simulation(simulation_id)
+    assert simulation is not None
+    assert simulation.spoofed_location.poi is not None
+    assert simulation.spoofed_location.poi.id == "001000-1-1"
