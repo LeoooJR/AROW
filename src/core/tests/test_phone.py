@@ -18,8 +18,12 @@ from core.devices.phone import (
     apply_phone_manufacturer_enrichment,
     apply_phone_product_model_enrichment,
     apply_phone_ro_serial_enrichment,
+)
+from core.devices.stable_key import (
+    FirstTierStableKey,
+    SecondTierStableKey,
+    StableKey,
     compute_phone_stable_key,
-    phone_stable_key_is_collision_resistant,
 )
 
 pytestmark = [pytest.mark.devices]
@@ -169,10 +173,10 @@ class TestComputePhoneStableKey:
     """Tests for stable key derivation."""
 
     def test_tier_one_known_serial(self) -> None:
-        assert (
-            compute_phone_stable_key(hardware_serial="SN1", product="x", model="y")
-            == "hw:v1:SN1"
-        )
+        key = compute_phone_stable_key(hardware_serial=" SN1 ", product="x", model="y")
+        assert isinstance(key, FirstTierStableKey)
+        assert key.value == "hw:v1:SN1"
+        assert key.is_collision_resistant() is True
 
     def test_unknown_serial_falls_through(self) -> None:
         """unknown (any case) is not treated as Tier-1."""
@@ -183,14 +187,16 @@ class TestComputePhoneStableKey:
             model="mod",
             fingerprint_when_no_serial=True,
         )
-        assert fp.startswith("fp:v1:")
+        assert isinstance(fp, SecondTierStableKey)
+        assert fp.value.startswith("fp:v1:")
+        assert fp.is_collision_resistant() is False
         fp2 = compute_phone_stable_key(
             hardware_serial="unknown",
             product="prod",
             model="mod",
             fingerprint_when_no_serial=False,
         )
-        assert fp2 == ""
+        assert fp2 is None
 
     def test_fingerprint_stable_for_same_inputs(self) -> None:
         a = compute_phone_stable_key(
@@ -207,21 +213,31 @@ class TestComputePhoneStableKey:
             manufacturer="Fab ",
             fingerprint_when_no_serial=True,
         )
-        assert a == b and a.startswith("fp:v1:")
+        assert isinstance(a, SecondTierStableKey)
+        assert a == b and a.value.startswith("fp:v1:")
 
     @pytest.mark.parametrize(
-        ("stable_key", "expected"),
+        ("stable_key", "expected_type", "expected_collision_resistance"),
         [
-            ("hw:v1:SER-123", True),
-            ("fp:v1:deadbeef", False),
-            ("pc:v1:install:host-token", False),
-            ("", False),
+            ("hw:v1:SER-123", FirstTierStableKey, True),
+            ("fp:v1:" + "a" * 64, SecondTierStableKey, False),
+            ("pc:v1:install:host-token", None, None),
+            ("", None, None),
+            ("fp:v1:not-a-digest", None, None),
         ],
     )
-    def test_collision_resistance_only_allows_tier_one_keys(
-        self, stable_key: str, expected: bool
+    def test_parse_persisted_stable_key(
+        self,
+        stable_key: str,
+        expected_type: type[StableKey] | None,
+        expected_collision_resistance: bool | None,
     ) -> None:
-        assert phone_stable_key_is_collision_resistant(stable_key) is expected
+        parsed = StableKey.from_value(stable_key)
+        if expected_type is None:
+            assert parsed is None
+        else:
+            assert isinstance(parsed, expected_type)
+            assert parsed.is_collision_resistant() is expected_collision_resistance
 
 
 class TestPhoneDescriptorHash:
@@ -235,7 +251,7 @@ class TestPhoneDescriptorHash:
             model="mod",
             fingerprint_when_no_serial=False,
         )
-        assert sk_tier_one == "hw:v1:SN123"
+        assert isinstance(sk_tier_one, FirstTierStableKey)
 
         d1 = PhoneDescriptor(
             id="adb-1",
@@ -249,7 +265,7 @@ class TestPhoneDescriptorHash:
             state="device",
             last_communication=fixed_last,
             hardware_serial="SN123",
-            stable_key=sk_tier_one,
+            stable_key=sk_tier_one.value,
             manufacturer="",
         )
         d2 = PhoneDescriptor(
@@ -264,7 +280,7 @@ class TestPhoneDescriptorHash:
             state="device",
             last_communication=fixed_last,
             hardware_serial="SN123",
-            stable_key=sk_tier_one,
+            stable_key=sk_tier_one.value,
             manufacturer="",
         )
         assert d1 == d2 and hash(d1) == hash(d2)
@@ -276,7 +292,7 @@ class TestPhoneDescriptorHash:
             manufacturer="Fab",
             fingerprint_when_no_serial=True,
         )
-        assert sk_fingerprint.startswith("fp:v1:")
+        assert isinstance(sk_fingerprint, SecondTierStableKey)
         d3 = PhoneDescriptor(
             id="adb-1",
             name="n",
@@ -289,7 +305,7 @@ class TestPhoneDescriptorHash:
             state="device",
             last_communication=fixed_last,
             hardware_serial="",
-            stable_key=sk_fingerprint,
+            stable_key=sk_fingerprint.value,
             manufacturer="Fab",
         )
         assert d3 != d1

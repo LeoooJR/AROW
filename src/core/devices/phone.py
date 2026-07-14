@@ -3,19 +3,16 @@
 from __future__ import annotations
 
 import datetime
-import hashlib
 from dataclasses import dataclass, field
-from typing import Iterable, Optional
+from typing import Iterable
 
 from loguru import logger
 
 from core.collection import Repository
 from core.devices.base import Device, DeviceDescriptor
+from core.devices.stable_key import compute_phone_stable_key
 from core.payload import Payload
 
-_STABLE_HW_PREFIX = "hw:v1:"
-_STABLE_FP_PREFIX = "fp:v1:"
-_FINGERPRINT_V1_MARKER = "|fp|v1|"
 DEFAULT_PHONE_DISPLAY_NAME = "Android device"
 _PHONE_DISPLAY_ID_TAIL_LEN = 8
 
@@ -29,48 +26,6 @@ def _adb_connection_id_is_human_readable(connection_id: str) -> bool:
     if "." in cid:
         return False
     return len(cid) <= 24
-
-
-def _tier1_stable_key_from_serial(normalized_serial: str) -> str:
-    return f"{_STABLE_HW_PREFIX}{normalized_serial}"
-
-
-def _tier2_stable_key(product: str, model: str, manufacturer: Optional[str]) -> str:
-    man = manufacturer or ""
-    payload = (
-        _FINGERPRINT_V1_MARKER
-        + man.strip().lower()
-        + "|"
-        + product.strip().lower()
-        + "|"
-        + model.strip().lower()
-    )
-    return f"{_STABLE_FP_PREFIX}{hashlib.sha256(payload.encode('utf-8')).hexdigest()}"
-
-
-def compute_phone_stable_key(
-    *,
-    hardware_serial: Optional[str],
-    product: str,
-    model: str,
-    manufacturer: Optional[str] = None,
-    fingerprint_when_no_serial: bool = False,
-) -> str:
-    """Return a Tier-1 hardware key or optional Tier-2 SKU fingerprint."""
-    if hardware_serial:
-        candidate = hardware_serial.strip()
-        if candidate and candidate.casefold() != "unknown":
-            return _tier1_stable_key_from_serial(candidate)
-    if fingerprint_when_no_serial and (
-        product.strip() or model.strip() or (manufacturer or "").strip()
-    ):
-        return _tier2_stable_key(product, model, manufacturer)
-    return ""
-
-
-def phone_stable_key_is_collision_resistant(stable_key: str) -> bool:
-    """Whether a key is safe for cross-session handset reconciliation."""
-    return stable_key.startswith(_STABLE_HW_PREFIX)
 
 
 @dataclass(unsafe_hash=True, match_args=True)
@@ -139,6 +94,12 @@ class Phone(Device[PhoneDescriptor], Payload):
         device_column = (device.strip() if device else "") or ""
         if not device_column and name:
             device_column = name.strip()
+        stable_key = compute_phone_stable_key(
+            hardware_serial=serial or None,
+            product=prod,
+            model=mod,
+            manufacturer=man.strip() or None,
+        )
         descriptor = PhoneDescriptor(
             id=id,
             name="",
@@ -152,12 +113,7 @@ class Phone(Device[PhoneDescriptor], Payload):
             state=state or "",
             last_communication=datetime.datetime.now(),
             hardware_serial=serial,
-            stable_key=compute_phone_stable_key(
-                hardware_serial=serial or None,
-                product=prod,
-                model=mod,
-                manufacturer=man.strip() or None,
-            ),
+            stable_key=stable_key.value if stable_key is not None else "",
             manufacturer=man,
             android_api_level=android_api_level,
             shell_device_name="",
@@ -341,13 +297,14 @@ def _recompute_phone_stable_key_descriptor(phone: Phone) -> None:
         descriptor.manufacturer.strip(),
         descriptor.hardware_serial.strip(),
     )
-    descriptor.stable_key = compute_phone_stable_key(
+    stable_key = compute_phone_stable_key(
         hardware_serial=serial or None,
         product=descriptor.product,
         model=descriptor.model,
         manufacturer=manufacturer or None,
         fingerprint_when_no_serial=True,
     )
+    descriptor.stable_key = stable_key.value if stable_key is not None else ""
 
 
 def apply_phone_ro_serial_enrichment(phone: Phone, ro_serial_stdout: str) -> None:
