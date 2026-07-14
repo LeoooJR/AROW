@@ -9,7 +9,7 @@ import pytest
 from core import ADB_BINARY_BUILD_NUMBER, ADB_BINARY_BUILD_VERSION, ADB_BINARY_VERSION
 from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
 from core.adb.binary import AdbBinary
-from core.devices import Phone, serialize_phone_collection
+from core.devices.phone import Phone, serialize_phone_collection
 from core.entrypoint import ModelEntrypoint
 from core.signals import (
     AdbServerStartedPayload,

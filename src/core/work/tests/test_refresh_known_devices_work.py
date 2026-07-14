@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
-from core.devices import Phone, serialize_phone_collection
+from core.devices.phone import Phone, serialize_phone_collection
 from core.entrypoint import ModelEntrypoint
 from core.signals import (
     CoreSignal,

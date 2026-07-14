@@ -11,8 +11,8 @@ from core.application_paths import (
     get_or_create_application_dir,
     get_or_create_config_dir,
 )
-from core.devices import (
-    Computer,
+from core.devices.computer import Computer
+from core.devices.phone import (
     Phone,
     PhoneRepository,
     apply_discovered_phone_state,

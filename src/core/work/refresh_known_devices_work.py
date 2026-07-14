@@ -15,7 +15,7 @@ from typing import cast
 
 from core.adb.client import AdbClient
 from core.adb.server import AdbServer
-from core.devices import (
+from core.devices.phone import (
     Phone,
     apply_phone_android_api_level_enrichment,
     apply_phone_android_release_enrichment,

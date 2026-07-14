@@ -24,7 +24,7 @@ from core.adb.binary import AdbBinary
 from core.adb.client import AdbClient
 from core.adb.server import AdbServer
 from core.application_paths import get_or_create_application_dir
-from core.devices import Phone, serialize_phone_collection
+from core.devices.phone import Phone, serialize_phone_collection
 from core.entrypoint_protocol import CoreSignalEmitter, StartupRuntimeEntrypoint
 from core.exceptions import CoreException
 from core.signals import (

@@ -24,7 +24,7 @@ from core.adb.command import (
 )
 from core.adb.exceptions import AdbClientException, AdbServerException
 from core.adb.server import AdbServer
-from core.devices import Phone
+from core.devices.phone import Phone
 from logger import logger
 
 DEFAULT_MOCK_ADB_BINARY_PATH: Final[Path] = Path("/mock/adb")

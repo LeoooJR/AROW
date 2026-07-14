@@ -8,7 +8,7 @@ from unittest.mock import patch
 import pytest
 
 from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
-from core.devices import Phone
+from core.devices.phone import Phone
 from core.entrypoint import ModelEntrypoint
 from core.signals import (
     CoreSignals,

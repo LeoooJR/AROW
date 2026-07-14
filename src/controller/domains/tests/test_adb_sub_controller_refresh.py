@@ -18,7 +18,7 @@ from controller.domains.adb_sub_controller import (
 )
 from controller.orchestration.app_controller import AppController
 from controller.runner import JobError
-from core.devices import Phone
+from core.devices.phone import Phone
 from core.entrypoint import ModelEntrypoint
 from core.signals import DevicesUpdatedPayload
 from core.work.refresh_known_devices_work import RefreshKnownDevicesOutcome

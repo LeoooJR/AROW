@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Final, Iterable
 
 from core.collection import Repository
-from core.devices import Phone, PhoneRepository, phone_stable_key_is_collision_resistant
+from core.devices.phone import Phone, PhoneRepository, phone_stable_key_is_collision_resistant
 from core.geo.location import Location
 from core.payload import Payload
 from logger import logger

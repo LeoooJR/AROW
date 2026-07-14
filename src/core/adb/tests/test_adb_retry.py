@@ -24,7 +24,7 @@ from core.adb.command import (
 )
 from core.adb.exceptions import AdbClientException, AdbServerException
 from core.adb.server import AdbServer
-from core.devices import Phone, PhoneRepository
+from core.devices.phone import Phone, PhoneRepository
 
 
 def _fast_profile(command: AdbCommand, *, scope: str) -> _AdbRetryProfile:

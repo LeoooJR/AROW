@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
-from core.devices import Phone
+from core.devices.phone import Phone
 from core.geo.location import Location
 from core.geo.milestone import Milestone
 from core.signals import (

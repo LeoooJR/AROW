@@ -12,7 +12,7 @@ from typing import ClassVar, cast
 from core.adb.client import AdbClient
 from core.adb.exceptions import AdbClientException, AdbServerException
 from core.adb.server import AdbServer
-from core.devices import Phone
+from core.devices.phone import Phone
 from core.entrypoint_protocol import CoreSignalEmitter, DeviceRegistrationEntrypoint
 from core.exceptions import CoreException
 from core.signals import (

@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from core.devices import Phone, PhoneRepository, compute_phone_stable_key
+from core.devices.phone import Phone, PhoneRepository, compute_phone_stable_key
 from core.geo.location import Location
 from core.simulation import (
     INDEX_FILENAME,

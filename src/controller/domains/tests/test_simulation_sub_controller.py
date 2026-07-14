@@ -14,7 +14,7 @@ import pytest
 from controller.domains.simulation_sub_controller import SimulationSubController
 from controller.orchestration.app_controller import AppController
 from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
-from core.devices import Phone
+from core.devices.phone import Phone
 from core.entrypoint import ModelEntrypoint
 from core.signals import (
     CoreSignals,

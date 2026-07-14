@@ -9,7 +9,7 @@ from unittest.mock import patch
 import pytest
 
 from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
-from core.devices import (
+from core.devices.phone import (
     Phone,
     apply_phone_manufacturer_enrichment,
     apply_phone_product_model_enrichment,

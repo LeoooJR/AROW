@@ -36,7 +36,7 @@ from tenacity import (
 
 from core.adb.binary import AdbBinary
 from core.adb.exceptions import AdbClientException, AdbServerException
-from core.devices import Phone
+from core.devices.phone import Phone
 from logger import logger
 
 ParserFn = Callable[[str], Any]
