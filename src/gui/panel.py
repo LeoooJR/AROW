@@ -4,16 +4,13 @@ from __future__ import annotations
 
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
-from typing import Any
 
-from PySide6.QtCore import QObject, Qt, Slot
+from PySide6.QtCore import QObject, Qt
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QSizePolicy, QVBoxLayout, QWidget
 
-from gui.animation import animate_widget_visibility
 from gui.colors import Theme
-from gui.components import LeadingIconLabel, ToolButton
-from gui.components.buttons.button_settings import button_settings
+from gui.components import LeadingIconLabel
 from gui.icons import (
     ApplicationIcons,
     GenericIcons,
@@ -33,20 +30,16 @@ PanelIcon = GenericIcons | OperatingSystemIcons | ApplicationIcons
 
 @dataclass(frozen=True)
 class CollapsiblePanelConfig:
-    """Static chrome and visibility behavior for a collapsible side panel."""
+    """Static chrome for a side panel shell."""
 
     object_name: str
     title: str
     title_icon: PanelIcon
-    expanded_icon: PanelIcon
-    collapsed_icon: PanelIcon
-    visibility_signal: Any
-    expand_button_tooltip: str = "Toggle panel visibility"
     body_stretch: int = 1
 
 
 class CollapsiblePanel(QFrame, ABC, metaclass=QtABCMeta):
-    """Common shell for side panels with a title, toggle button, and body."""
+    """Common shell for side panels with a title header and body."""
 
     def __init__(self, config: CollapsiblePanelConfig, parent: QWidget | None = None):
         """Build shared panel chrome and delegate body construction to subclasses."""
@@ -83,13 +76,6 @@ class CollapsiblePanel(QFrame, ABC, metaclass=QtABCMeta):
             constrain_to_size_hint=True,
         )
 
-        self._panel_expand_button = ToolButton(
-            self,
-            icon=config.expanded_icon,
-            tooltip=config.expand_button_tooltip,
-        )
-        self._panel_expand_button.setProperty("toggle", True)
-
         self._panel_header = QWidget(self)
         self._panel_header.setProperty("panel-title", True)
         self._panel_header.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
@@ -97,7 +83,6 @@ class CollapsiblePanel(QFrame, ABC, metaclass=QtABCMeta):
         header_layout.setContentsMargins(*Settings.SPACING.MARGIN_NONE)
         header_layout.setSpacing(Settings.SPACING.NONE)
         header_layout.addWidget(self._panel_title, 1)
-        header_layout.addWidget(self._panel_expand_button)
         layout.addWidget(self._panel_header)
 
         self._panel_body = self._build_body()
@@ -110,11 +95,6 @@ class CollapsiblePanel(QFrame, ABC, metaclass=QtABCMeta):
     def panel_title(self) -> LeadingIconLabel:
         """Return the panel title widget."""
         return self._panel_title
-
-    @property
-    def expand_button(self) -> ToolButton:
-        """Return the panel expand/collapse button."""
-        return self._panel_expand_button
 
     @property
     def header(self) -> QWidget:
@@ -143,90 +123,19 @@ class CollapsiblePanel(QFrame, ABC, metaclass=QtABCMeta):
     def _set_alignment(self) -> None:
         """Align shared chrome, then delegate body-specific alignment."""
         self._panel_header.layout().setAlignment(
-            self._panel_expand_button,
-            Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight,
+            self._panel_title,
+            Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
         )
         self._set_body_alignment()
 
     def _connect_signals(self) -> None:
-        """Wire shared visibility behavior and subclass-specific signals."""
-        self._panel_expand_button.clicked.connect(self.toggle_panel_visibility)
-        self._panel_expand_button.clicked.connect(self._emit_panel_visibility_changed)
+        """Wire subclass-specific signals."""
         self._connect_body_signals()
-
-    def is_panel_visible(self) -> bool:
-        """Return whether the panel body is currently expanded."""
-        return bool(self._panel_expand_button.property("toggle"))
-
-    def show_panel(self) -> None:
-        """Expand the panel body."""
-        if not self.is_panel_visible():
-            self._set_panel_visible(True)
-        self._after_panel_visibility_changed()
-
-    def hide_panel(self) -> None:
-        """Collapse the panel body."""
-        if self.is_panel_visible():
-            self._set_panel_visible(False)
-        self._after_panel_visibility_changed()
-
-    @Slot()
-    def toggle_panel_visibility(self) -> None:
-        """Toggle the panel body visibility."""
-        if self.is_panel_visible():
-            self.hide_panel()
-        else:
-            self.show_panel()
-        self.updateGeometry()
-
-    ### Slots ###
-
-    @Slot()
-    def _emit_panel_visibility_changed(self) -> None:
-        """Emit the panel visibility signal after the toggle state updates."""
-        self._panel_config.visibility_signal.emit(self.is_panel_visible())
 
     def apply_theme_icons(self, theme: Theme) -> None:
         """Refresh shared chrome icons and subclass-owned icons."""
         self._panel_title.apply_theme_icons(theme)
-        self._panel_expand_button.set_icon(self._current_toggle_icon())
-        self._panel_expand_button.apply_theme_icons(theme)
         self._apply_body_theme_icons(theme)
-
-    def _set_panel_visible(self, visible: bool) -> None:
-        """Apply toggle state, icon, and animated body visibility."""
-        self._panel_expand_button.setProperty("toggle", visible)
-        self._panel_expand_button.set_icon(
-            self._panel_config.expanded_icon
-            if visible
-            else self._panel_config.collapsed_icon
-        )
-        animate_widget_visibility(
-            self,
-            visible=visible,
-            axis="vertical",
-            collapsed_size=self._reduced_height(),
-            content_widget=self._panel_body,
-        )
-
-    def _current_toggle_icon(self) -> PanelIcon:
-        """Return the icon matching the current toggle state."""
-        return (
-            self._panel_config.expanded_icon
-            if self.is_panel_visible()
-            else self._panel_config.collapsed_icon
-        )
-
-    def _reduced_height(self) -> int:
-        """Height of the panel when collapsed to its header."""
-        height = self._panel_header.sizeHint().height()
-        if height <= 0:
-            height = button_settings.TOOLBUTTON_HEIGHT
-        return 2 * Settings.PANEL.CONTENT_PADDING + height
-
-    def _after_panel_visibility_changed(self) -> None:
-        """Hook for panels that need post-toggle refresh work."""
-        pass
 
     @abstractmethod
     def _build_body(self) -> QWidget:
