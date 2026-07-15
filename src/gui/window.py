@@ -37,7 +37,6 @@ from gui.components import (
 )
 from gui.device_panel import DevicePairingPanel, DeviceSelectionPanel
 from gui.event_filter import ActivityTracker
-from gui.host_panel import HostPanel
 from gui.icons import (
     ApplicationIcons,
     GenericIcons,
@@ -45,7 +44,6 @@ from gui.icons import (
     icon_qt_path_for_theme,
     icons_need_theme_updates,
 )
-from gui.location_panel import LocationPanel
 from gui.log_panel import LogPanel
 from gui.map import MapPanel
 from gui.settings import Settings
@@ -136,10 +134,8 @@ class Body(QWidget):
         """UI elements used in the body widgets."""
 
         device_selection_panel: DeviceSelectionPanel
-        location_panel: LocationPanel
         map_panel: MapPanel
         device_pairing_panel: DevicePairingPanel
-        host_panel: HostPanel
         log_panel: LogPanel
         tabs: QTabWidget
         progress_bar: ProgressBar
@@ -174,13 +170,10 @@ class Body(QWidget):
         device_selection_panel = DeviceSelectionPanel(None)
         device_selection_panel.setVisible(True)
 
-        location_panel = LocationPanel(None)
-        location_panel.setVisible(True)
-
         # Create left panels wrapper, a vertical layout wrapper that contains the device and location panels
         left_panels_wrapper = VerticalLayoutWrapper(
             self,
-            widgets=[device_selection_panel, location_panel],
+            widgets=[device_selection_panel],
             spacing=Settings.SPACING.SM,
             margins=(0, 0, 0, 0),
         )
@@ -238,10 +231,6 @@ class Body(QWidget):
 
         layout.addWidget(tabs_wrapper, 1)
 
-        host_panel = HostPanel(None)
-        # Visibility are True by default, but set it explicitly to ensure the panel is visible at application start
-        host_panel.setVisible(True)
-
         log_panel = LogPanel(None)
         # Visibility are True by default, but set it explicitly to ensure the panel is visible at application start
         log_panel.setVisible(True)
@@ -249,7 +238,7 @@ class Body(QWidget):
         # Create right panels wrapper, a vertical layout wrapper that contains the host and log panels
         right_panels_wrapper = VerticalLayoutWrapper(
             self,
-            widgets=[host_panel, log_panel],
+            widgets=[log_panel],
             spacing=Settings.SPACING.SM,
             margins=(0, 0, 0, 0),
         )
@@ -262,10 +251,8 @@ class Body(QWidget):
 
         self.ui: Body.UI = Body.UI(
             device_selection_panel=device_selection_panel,
-            location_panel=location_panel,
             map_panel=map_panel,
             device_pairing_panel=device_pairing_panel,
-            host_panel=host_panel,
             log_panel=log_panel,
             tabs=tabs,
             progress_bar=progress_bar,
@@ -284,16 +271,6 @@ class Body(QWidget):
 
     def _connect_signals(self) -> None:
         """Connect body signals. Right sidebar: when one panel is reduced, expand the other. Left sidebar: same."""
-
-        #### Signals for handling the panel visibility requests ####
-        signals.UI.LogPanelVisibilityRequested.connect(self._on_log_panel_toggled)
-        signals.UI.HostPanelVisibilityRequested.connect(self._on_host_panel_toggled)
-        signals.UI.DeviceSelectionPanelVisibilityRequested.connect(
-            self._on_device_selection_panel_toggled
-        )
-        signals.UI.LocationPanelVisibilityRequested.connect(
-            self._on_location_panel_toggled
-        )
 
         #### Signals for handling the tab changes ####
         self.ui.tabs.currentChanged.connect(self._on_tab_changed)
@@ -318,9 +295,6 @@ class Body(QWidget):
         self.ui.tabs.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
-        self.ui.host_panel.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
-        )
         self.ui.log_panel.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
         )
@@ -334,43 +308,6 @@ class Body(QWidget):
         signals.UI.MapTabActivated.emit()
 
     @Slot(bool)
-    def _on_log_panel_toggled(self, visible: bool) -> None:
-        """Handle the log panel visibility request."""
-        if not visible:
-            self.set_host_panel_visibility(
-                True
-            )  # Show host panel when log panel is hidden, one panel must be visible at all times in UI
-            self.ui.host_panel.extend_panel()
-        else:
-            self.ui.host_panel.shorten_panel()
-        self._refresh_log_panel_layout_later()
-
-    @Slot(bool)
-    def _on_host_panel_toggled(self, visible: bool) -> None:
-        """Handle the host panel visibility request."""
-        if not visible:
-            self.set_log_panel_visibility(
-                True
-            )  # Show log panel when host panel is hidden, one panel must be visible at all times in UI
-        self._refresh_log_panel_layout_later()
-
-    @Slot(bool)
-    def _on_device_selection_panel_toggled(self, visible: bool) -> None:
-        """Handle the device panel visibility request."""
-        if not visible:
-            self.set_location_panel_visibility(
-                True
-            )  # Show location panel when device panel is hidden, one panel must be visible at all times in UI
-
-    @Slot(bool)
-    def _on_location_panel_toggled(self, visible: bool) -> None:
-        """Handle the location panel visibility request."""
-        if not visible:
-            self.set_device_selection_panel_visibility(
-                True
-            )  # Show device panel when location panel is hidden, one panel must be visible at all times in UI
-
-    @Slot()
     def _on_target_selection_requested(self) -> None:
         """Route the location panel CTA to the existing map selection surface."""
         if self.ui.tabs.currentIndex() != self.TAB_MAP:
@@ -408,36 +345,6 @@ class Body(QWidget):
             left_visible=self._left_panels_visible,
             right_visible=visible,
         )
-        self._refresh_log_panel_layout_later()
-
-    def set_device_selection_panel_visibility(self, visible: bool) -> None:
-        """Set the device selection panel visibility."""
-        if visible:
-            self.ui.device_selection_panel.show_panel()
-        else:
-            self.ui.device_selection_panel.hide_panel()
-
-    def set_log_panel_visibility(self, visible: bool) -> None:
-        """Set the log panel visibility."""
-        if visible:
-            self.ui.log_panel.show_panel()
-        else:
-            self.ui.log_panel.hide_panel()
-        self._refresh_log_panel_layout_later()
-
-    def set_location_panel_visibility(self, visible: bool) -> None:
-        """Set the location panel visibility."""
-        if visible:
-            self.ui.location_panel.show_panel()
-        else:
-            self.ui.location_panel.hide_panel()
-
-    def set_host_panel_visibility(self, visible: bool) -> None:
-        """Set the host panel visibility."""
-        if visible:
-            self.ui.host_panel.show_panel()
-        else:
-            self.ui.host_panel.hide_panel()
         self._refresh_log_panel_layout_later()
 
     def _refresh_log_panel_layout_later(self) -> None:
@@ -489,8 +396,6 @@ class Body(QWidget):
         self.ui.map_panel.apply_theme_icons(theme)
         self.ui.device_pairing_panel.apply_theme_icons(theme)
         self.ui.device_selection_panel.apply_theme_icons(theme)
-        self.ui.location_panel.apply_theme_icons(theme)
-        self.ui.host_panel.apply_theme_icons(theme)
         self.ui.log_panel.apply_theme_icons(theme)
 
     @Slot(str, str, str)

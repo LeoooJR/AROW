@@ -21,11 +21,10 @@ from gui.blocks.activity import (
     ActivityLogItem,
 )
 from gui.colors import Theme
-from gui.components import File, LeadingIconLabel, List, ToolButton
+from gui.components import File, LeadingIconLabel, List
 from gui.icons import GenericIcons
 from gui.panel import CollapsiblePanel, CollapsiblePanelConfig
 from gui.settings import Settings
-from gui.signals import signals
 from gui.wrapper import VerticalLayoutWrapper
 
 
@@ -35,12 +34,10 @@ class LogPanel(CollapsiblePanel):
     @dataclass(frozen=True)
     class Text:
         title: Final[str] = "Activity log"
-        expand_button_tooltip: Final[str] = "Toggle panel visibility"
 
     @dataclass
     class UI:
         title: LeadingIconLabel
-        expand_button: ToolButton
         header: QWidget
         body: VerticalLayoutWrapper
         activity_log_block: ActivityLogBlock
@@ -54,16 +51,11 @@ class LogPanel(CollapsiblePanel):
                 object_name="log-panel",
                 title=self.texts.title,
                 title_icon=GenericIcons.LOGS,
-                expanded_icon=GenericIcons.LAYOUT_BOTTOMBAR_INSET,
-                collapsed_icon=GenericIcons.LAYOUT_BOTTOMBAR,
-                visibility_signal=signals.UI.LogPanelVisibilityRequested,
-                expand_button_tooltip=self.texts.expand_button_tooltip,
             ),
             parent,
         )
         self.ui = LogPanel.UI(
             title=self.panel_title,
-            expand_button=self.expand_button,
             header=self.header,
             body=self.body,
             activity_log_block=self._activity_log_block,
@@ -99,10 +91,6 @@ class LogPanel(CollapsiblePanel):
     def _apply_body_theme_icons(self, theme: Theme) -> None:
         """Refresh activity log block icons for ``theme``."""
         self._activity_log_block.apply_theme_icons(theme)
-
-    def _after_panel_visibility_changed(self) -> None:
-        """Refresh activity rows after visibility changes."""
-        self.refresh_layout()
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)

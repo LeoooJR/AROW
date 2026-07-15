@@ -22,12 +22,10 @@ from gui.blocks.device import (
 from gui.colors import Theme
 from gui.components import (
     LeadingIconLabel,
-    ToolButton,
 )
 from gui.icons import GenericIcons
 from gui.panel import CollapsiblePanel, CollapsiblePanelConfig
 from gui.settings import Settings
-from gui.signals import signals
 from gui.wrapper import (
     HorizontalLayoutWrapper,
     VerticalLayoutWrapper,
@@ -51,7 +49,7 @@ class DevicePairingPanel(QFrame):
         body: HorizontalLayoutWrapper
 
     def __init__(self, parent: QWidget = None):
-        """Create the pairing panel shell (title + expandable body host).
+        """Create the pairing panel shell (title + body host).
 
         Args:
             parent: Optional Qt parent widget for lifetime and hierarchy.
@@ -150,17 +148,15 @@ class DeviceSelectionPanel(CollapsiblePanel):
 
     @dataclass(frozen=True)
     class Text:
-        """Panel-owned titles and tooltips."""
+        """Panel-owned titles."""
 
         title: Final[str] = "Linked Devices"
-        expand_button_tooltip: Final[str] = "Toggle panel visibility"
 
     @dataclass
     class UI:
         """Panel-owned widgets."""
 
         title: LeadingIconLabel
-        expand_button: ToolButton
         header: QWidget
         body: VerticalLayoutWrapper
         device_selection_block: DeviceSelectionBlock
@@ -179,16 +175,11 @@ class DeviceSelectionPanel(CollapsiblePanel):
                 object_name="device-selection-panel",
                 title=self.texts.title,
                 title_icon=GenericIcons.DEVICE,
-                expanded_icon=GenericIcons.LAYOUT_TOPBAR_INSET,
-                collapsed_icon=GenericIcons.LAYOUT_TOPBAR,
-                visibility_signal=signals.UI.DeviceSelectionPanelVisibilityRequested,
-                expand_button_tooltip=self.texts.expand_button_tooltip,
             ),
             parent,
         )
         self.ui = DeviceSelectionPanel.UI(
             title=self.panel_title,
-            expand_button=self.expand_button,
             header=self.header,
             body=self.body,
             device_selection_block=self._device_selection_block,
