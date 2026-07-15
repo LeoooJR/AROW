@@ -73,30 +73,62 @@ class PhoneDescriptor(DeviceDescriptor):
     _STABLE_KEY_INPUT_FIELDS = frozenset(
         {"hardware_serial", "manufacturer", "product", "model"}
     )
+    _DISPLAY_NAME_INPUT_FIELDS = frozenset(
+        {"id", "product", "model", "device", "manufacturer", "shell_device_name"}
+    )
 
     def __post_init__(self) -> None:
-        """Enable key synchronization after construction preserves ADB-list timing."""
+        """Enable synchronization after construction preserves ADB-list key timing."""
         object.__setattr__(self, "_stable_key_sync_enabled", True)
+        self._sync_display_name()
 
     def __setattr__(self, name: str, value: object) -> None:
-        """Keep the persisted stable key synchronized with identity inputs."""
+        """Synchronize derived stable-key and display-name fields after input changes."""
         object.__setattr__(self, name, value)
-        if name not in self._STABLE_KEY_INPUT_FIELDS or not self.__dict__.get(
-            "_stable_key_sync_enabled", False
-        ):
+        if not self.__dict__.get("_stable_key_sync_enabled", False):
             return
-        stable_key = compute_phone_stable_key(
-            hardware_serial=self.hardware_serial or None,
-            product=self.product,
-            model=self.model,
-            manufacturer=self.manufacturer or None,
-            fingerprint_when_no_serial=True,
+        if name in self._STABLE_KEY_INPUT_FIELDS:
+            stable_key = compute_phone_stable_key(
+                hardware_serial=self.hardware_serial or None,
+                product=self.product,
+                model=self.model,
+                manufacturer=self.manufacturer or None,
+                fingerprint_when_no_serial=True,
+            )
+            object.__setattr__(
+                self,
+                "stable_key",
+                stable_key.value if stable_key is not None else "",
+            )
+        if name in self._DISPLAY_NAME_INPUT_FIELDS:
+            self._sync_display_name()
+
+    def _sync_display_name(self) -> None:
+        """Derive the user-facing label from enriched and ADB-list metadata."""
+        shell, manufacturer, model, product, device = (
+            (self.shell_device_name or "").strip(),
+            (self.manufacturer or "").strip(),
+            (self.model or "").strip(),
+            (self.product or "").strip(),
+            (self.device or "").strip(),
         )
-        object.__setattr__(
-            self,
-            "stable_key",
-            stable_key.value if stable_key is not None else "",
-        )
+        if shell:
+            name = shell
+        elif manufacturer and model:
+            name = f"{manufacturer} {model}"
+        elif model:
+            name = model
+        elif product:
+            name = product
+        elif device:
+            name = device
+        elif self.id and _adb_connection_id_is_human_readable(self.id):
+            name = self.id
+        elif self.id and len(self.id) > _PHONE_DISPLAY_ID_TAIL_LEN:
+            name = f"{DEFAULT_PHONE_DISPLAY_NAME} ({self.id[-_PHONE_DISPLAY_ID_TAIL_LEN:]})"
+        else:
+            name = DEFAULT_PHONE_DISPLAY_NAME if not self.id else self.id
+        object.__setattr__(self, "name", name)
 
     def __str__(self) -> str:
         return f"{self.id} - {self.name} - {self.os} - {self.ip}:{self.port} - {self.product} - {self.model} - {self.transport_id} - {self.state} - {self.hardware_serial} - {self.stable_key} - {self.manufacturer} - {self.android_api_level} - {self.last_communication}"
@@ -156,7 +188,6 @@ class Phone(Device[PhoneDescriptor], Payload):
         super().__init__(
             id=id, name="", os=os or "", ip=ip or "", port=port, descriptor=descriptor
         )
-        sync_phone_display_name(self)
 
     @property
     def product(self) -> str:
@@ -297,35 +328,6 @@ def paired_phone_matches_discovery(paired: Phone, discovered: Phone) -> bool:
     )
 
 
-def sync_phone_display_name(phone: Phone) -> None:
-    descriptor = phone.descriptor
-    shell, manufacturer, model, product, device = (
-        (descriptor.shell_device_name or "").strip(),
-        (descriptor.manufacturer or "").strip(),
-        (descriptor.model or "").strip(),
-        (descriptor.product or "").strip(),
-        (descriptor.device or "").strip(),
-    )
-    if shell:
-        descriptor.name = shell
-    elif manufacturer and model:
-        descriptor.name = f"{manufacturer} {model}"
-    elif model:
-        descriptor.name = model
-    elif product:
-        descriptor.name = product
-    elif device:
-        descriptor.name = device
-    elif descriptor.id and _adb_connection_id_is_human_readable(descriptor.id):
-        descriptor.name = descriptor.id
-    elif descriptor.id and len(descriptor.id) > _PHONE_DISPLAY_ID_TAIL_LEN:
-        descriptor.name = f"{DEFAULT_PHONE_DISPLAY_NAME} ({descriptor.id[-_PHONE_DISPLAY_ID_TAIL_LEN:]})"
-    else:
-        descriptor.name = (
-            DEFAULT_PHONE_DISPLAY_NAME if not descriptor.id else descriptor.id
-        )
-
-
 def apply_phone_ro_serial_enrichment(phone: Phone, ro_serial_stdout: str) -> None:
     raw = (ro_serial_stdout or "").strip()
     if raw and raw.casefold() != "unknown":
@@ -337,7 +339,6 @@ def apply_phone_ro_serial_enrichment(phone: Phone, ro_serial_stdout: str) -> Non
 
 def apply_phone_device_name_enrichment(phone: Phone, value: str) -> None:
     phone.descriptor.shell_device_name = (value or "").strip()
-    sync_phone_display_name(phone)
 
 
 def apply_phone_android_release_enrichment(phone: Phone, value: str) -> None:
@@ -350,14 +351,12 @@ def apply_phone_manufacturer_enrichment(phone: Phone, value: str) -> None:
     value = (value or "").strip()
     if value:
         phone.descriptor.manufacturer = value
-        sync_phone_display_name(phone)
 
 
 def apply_phone_product_model_enrichment(phone: Phone, value: str) -> None:
     value = (value or "").strip()
     if value:
         phone.descriptor.model = value
-        sync_phone_display_name(phone)
 
 
 def apply_phone_android_api_level_enrichment(phone: Phone, value: int | None) -> None:

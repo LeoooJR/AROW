@@ -206,6 +206,43 @@ class TestPhone:
 
         assert phone.stable_key == persisted_key
 
+    def test_descriptor_display_inputs_follow_name_precedence(self) -> None:
+        phone = Phone(id="device-1", device="adb-token")
+        assert phone.name == "adb-token"
+
+        phone.descriptor.product = "ocean"
+        assert phone.name == "ocean"
+
+        phone.descriptor.model = "OceanPhone"
+        assert phone.name == "OceanPhone"
+
+        phone.descriptor.manufacturer = "FabCo"
+        assert phone.name == "FabCo OceanPhone"
+
+        phone.descriptor.shell_device_name = "Living Room Phone"
+        assert phone.name == "Living Room Phone"
+
+    def test_descriptor_id_rebinding_refreshes_connection_name(self) -> None:
+        phone = Phone(id="adb-X9ZZ99000012345678-aBc1dE")
+        assert phone.name == f"{DEFAULT_PHONE_DISPLAY_NAME} (8-aBc1dE)"
+
+        phone.descriptor.id = "emulator-5554"
+
+        assert phone.name == "emulator-5554"
+
+    def test_direct_name_assignment_is_preserved_until_display_input_changes(
+        self,
+    ) -> None:
+        phone = Phone(id="device-1", device="adb-token")
+        phone.descriptor.name = "Persisted label"
+        phone.descriptor.os = "15"
+
+        assert phone.name == "Persisted label"
+
+        phone.descriptor.device = "fresh-adb-token"
+
+        assert phone.name == "fresh-adb-token"
+
 
 class TestComputePhoneStableKey:
     """Tests for stable key derivation."""
