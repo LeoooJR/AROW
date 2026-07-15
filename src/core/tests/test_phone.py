@@ -168,6 +168,44 @@ class TestPhone:
         apply_phone_android_api_level_enrichment(phone, None)
         assert phone.descriptor.android_api_level == 35
 
+    def test_descriptor_identity_assignment_synchronizes_stable_key(self) -> None:
+        phone = Phone(id="device-1", product="ocean", model="OceanPhone")
+        assert phone.stable_key == ""
+
+        phone.descriptor.manufacturer = "FabCo"
+        assert phone.stable_key.startswith("fp:v1:")
+
+        phone.descriptor.hardware_serial = "SERIAL-1"
+        assert phone.stable_key == "hw:v1:SERIAL-1"
+
+    def test_descriptor_non_identity_assignment_preserves_stable_key(self) -> None:
+        phone = Phone(id="device-1", product="ocean", model="OceanPhone")
+        phone.descriptor.manufacturer = "FabCo"
+        stable_key = phone.stable_key
+
+        phone.descriptor.os = "15"
+        phone.descriptor.shell_device_name = "Living Room Phone"
+        phone.descriptor.android_api_level = 35
+
+        assert phone.stable_key == stable_key
+
+    def test_descriptor_constructor_preserves_keyless_discovery_state(self) -> None:
+        descriptor = PhoneDescriptor(
+            product="ocean",
+            model="OceanPhone",
+            manufacturer="FabCo",
+        )
+
+        assert descriptor.stable_key == ""
+
+    def test_direct_persisted_stable_key_assignment_is_preserved(self) -> None:
+        phone = Phone(id="device-1", product="ocean", model="OceanPhone")
+        persisted_key = "hw:v1:PERSISTED-SERIAL"
+
+        phone.descriptor.stable_key = persisted_key
+
+        assert phone.stable_key == persisted_key
+
 
 class TestComputePhoneStableKey:
     """Tests for stable key derivation."""

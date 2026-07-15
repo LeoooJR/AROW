@@ -62,6 +62,41 @@ class PhoneDescriptor(DeviceDescriptor):
     shell_device_name: str = field(
         metadata={"description": "Friendly getprop device name"}, default="", hash=False
     )
+    _stable_key_sync_enabled: bool = field(
+        init=False,
+        default=False,
+        repr=False,
+        compare=False,
+        hash=False,
+    )
+
+    _STABLE_KEY_INPUT_FIELDS = frozenset(
+        {"hardware_serial", "manufacturer", "product", "model"}
+    )
+
+    def __post_init__(self) -> None:
+        """Enable key synchronization after construction preserves ADB-list timing."""
+        object.__setattr__(self, "_stable_key_sync_enabled", True)
+
+    def __setattr__(self, name: str, value: object) -> None:
+        """Keep the persisted stable key synchronized with identity inputs."""
+        object.__setattr__(self, name, value)
+        if name not in self._STABLE_KEY_INPUT_FIELDS or not self.__dict__.get(
+            "_stable_key_sync_enabled", False
+        ):
+            return
+        stable_key = compute_phone_stable_key(
+            hardware_serial=self.hardware_serial or None,
+            product=self.product,
+            model=self.model,
+            manufacturer=self.manufacturer or None,
+            fingerprint_when_no_serial=True,
+        )
+        object.__setattr__(
+            self,
+            "stable_key",
+            stable_key.value if stable_key is not None else "",
+        )
 
     def __str__(self) -> str:
         return f"{self.id} - {self.name} - {self.os} - {self.ip}:{self.port} - {self.product} - {self.model} - {self.transport_id} - {self.state} - {self.hardware_serial} - {self.stable_key} - {self.manufacturer} - {self.android_api_level} - {self.last_communication}"
@@ -291,40 +326,24 @@ def sync_phone_display_name(phone: Phone) -> None:
         )
 
 
-def _recompute_phone_stable_key_descriptor(phone: Phone) -> None:
-    descriptor = phone.descriptor
-    manufacturer, serial = (
-        descriptor.manufacturer.strip(),
-        descriptor.hardware_serial.strip(),
-    )
-    stable_key = compute_phone_stable_key(
-        hardware_serial=serial or None,
-        product=descriptor.product,
-        model=descriptor.model,
-        manufacturer=manufacturer or None,
-        fingerprint_when_no_serial=True,
-    )
-    descriptor.stable_key = stable_key.value if stable_key is not None else ""
-
-
 def apply_phone_ro_serial_enrichment(phone: Phone, ro_serial_stdout: str) -> None:
     raw = (ro_serial_stdout or "").strip()
     if raw and raw.casefold() != "unknown":
         phone.descriptor.hardware_serial = raw
-    _recompute_phone_stable_key_descriptor(phone)
+    elif not phone.descriptor.hardware_serial:
+        # Assigning the known-empty input lets descriptor-level sync derive Tier 2.
+        phone.descriptor.hardware_serial = ""
 
 
 def apply_phone_device_name_enrichment(phone: Phone, value: str) -> None:
     phone.descriptor.shell_device_name = (value or "").strip()
     sync_phone_display_name(phone)
-    _recompute_phone_stable_key_descriptor(phone)
 
 
 def apply_phone_android_release_enrichment(phone: Phone, value: str) -> None:
     value = (value or "").strip()
     if value:
         phone.descriptor.os = value
-        _recompute_phone_stable_key_descriptor(phone)
 
 
 def apply_phone_manufacturer_enrichment(phone: Phone, value: str) -> None:
@@ -332,7 +351,6 @@ def apply_phone_manufacturer_enrichment(phone: Phone, value: str) -> None:
     if value:
         phone.descriptor.manufacturer = value
         sync_phone_display_name(phone)
-        _recompute_phone_stable_key_descriptor(phone)
 
 
 def apply_phone_product_model_enrichment(phone: Phone, value: str) -> None:
@@ -340,13 +358,11 @@ def apply_phone_product_model_enrichment(phone: Phone, value: str) -> None:
     if value:
         phone.descriptor.model = value
         sync_phone_display_name(phone)
-        _recompute_phone_stable_key_descriptor(phone)
 
 
 def apply_phone_android_api_level_enrichment(phone: Phone, value: int | None) -> None:
     if value is not None:
         phone.descriptor.android_api_level = value
-        _recompute_phone_stable_key_descriptor(phone)
 
 
 class PhoneRepository(Repository[Phone]):
