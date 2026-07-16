@@ -48,7 +48,12 @@ class PhoneDescriptor(DeviceDescriptor):
     transport_id: str = field(
         metadata={"description": "The transport id of the phone"}, default=""
     )
-    state: str = field(metadata={"description": "The state of the phone"}, default="")
+    state: str = field(
+        metadata={"description": "The state of the phone"},
+        default="",
+        compare=False,
+        hash=False,
+    )
     last_communication: datetime.datetime = field(
         metadata={"description": "The last communication time of the phone"},
         default_factory=datetime.datetime.now,
@@ -68,7 +73,8 @@ class PhoneDescriptor(DeviceDescriptor):
         metadata={"description": "Android API level"}, default=None
     )
     shell_device_name: str = field(
-        metadata={"description": "Friendly getprop device name"}, default="", hash=False
+        metadata={"description": "Friendly getprop device name"},
+        default="",
     )
     _stable_key_sync_enabled: bool = field(
         init=False,
