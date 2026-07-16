@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import cast
 
 from core.application_paths import get_or_create_application_dir
-from core.devices import compute_computer_stable_key
+from core.devices.computer import compute_computer_stable_key
 from core.entrypoint_protocol import CoreSignalEmitter, HostIdentityEntrypoint
 from core.exceptions import CoreException
 from core.work.core_runtime_work import CoreRuntimeWork, CoreRuntimeWorkOutcome

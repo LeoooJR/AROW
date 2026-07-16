@@ -11,15 +11,14 @@ from core.application_paths import (
     get_or_create_application_dir,
     get_or_create_config_dir,
 )
-from core.devices import (
-    Computer,
+from core.devices.computer import Computer
+from core.devices.phone import (
     Phone,
     PhoneRepository,
     apply_discovered_phone_state,
-    paired_phone_matches_discovery,
-    phone_stable_key_is_collision_resistant,
     serialize_phone_collection,
 )
+from core.devices.stable_key import StableKey
 from core.signal_bus import InMemoryCoreSignalBus
 from core.signals import (
     ActivityLogFileUpdatedPayload,
@@ -243,7 +242,7 @@ class ModelEntrypoint(Entrypoint):
                 "ADB server and client must be initialized before authentification"
             )
         self._host.refresh_network_identity()
-        if not self._host.is_network_available():
+        if not self._host.network_available:
             raise DeviceAuthentificationError(
                 ip=ip,
                 port=port,
@@ -397,14 +396,18 @@ class ModelEntrypoint(Entrypoint):
                 paired is None
             ):  # A reconnect can update the ADB id, but stable key remains the same
                 stable_key = (discovered.stable_key or "").strip()
-                if phone_stable_key_is_collision_resistant(stable_key):
+                parsed_key = StableKey.from_value(stable_key)
+                if parsed_key is not None and parsed_key.is_collision_resistant():
                     paired = paired_by_stable_key.get(stable_key)
 
             if paired is not None:  # A device has been found, by ADB id or stable key
                 matched_paired_ids.add(id(paired))
-                if paired_phone_matches_discovery(
-                    paired, discovered
-                ):  # If no property changed, skip
+                if (
+                    paired.id == discovered.id
+                    and paired.state == discovered.state
+                    and paired == discovered
+                ):
+                    # If no property changed, skip.
                     continue
                 old_connection_id = paired.id
                 if (

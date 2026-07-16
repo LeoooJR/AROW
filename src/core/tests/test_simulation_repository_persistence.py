@@ -7,7 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from core.devices import Phone, PhoneRepository, compute_phone_stable_key
+from core.devices.phone import Phone, PhoneRepository
+from core.devices.stable_key import compute_phone_stable_key
 from core.geo.location import Location
 from core.simulation import (
     INDEX_FILENAME,
@@ -290,13 +291,15 @@ def test_load_all_for_devices_does_not_rebind_by_collision_prone_stable_key(
         model="Pixel 8",
         manufacturer="Google",
     )
-    persisted_phone.descriptor.stable_key = compute_phone_stable_key(
+    stable_key = compute_phone_stable_key(
         hardware_serial=None,
         product=persisted_phone.product,
         model=persisted_phone.model,
         manufacturer=persisted_phone.manufacturer,
         fingerprint_when_no_serial=True,
     )
+    assert stable_key is not None
+    persisted_phone.descriptor.stable_key = stable_key.value
     simulation = Simulation(id="sim-1", device=persisted_phone, active=True)
     repository.add(simulation)
     repository.last_active_device_id = persisted_phone.id

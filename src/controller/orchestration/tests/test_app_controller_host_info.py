@@ -13,9 +13,9 @@ from core.entrypoint import ModelEntrypoint
 class _AppControllerHostInfoProbe:
     def __init__(self) -> None:
         self.model_entrypoint = MagicMock(spec=ModelEntrypoint)
-        self.model_entrypoint.host.get_name.return_value = "MacBook Pro"
-        self.model_entrypoint.host.get_os.return_value = "macOS"
-        self.model_entrypoint.host.get_ip.return_value = "192.168.1.42"
+        self.model_entrypoint.host.name = "MacBook Pro"
+        self.model_entrypoint.host.os = "macOS"
+        self.model_entrypoint.host.ip = "192.168.1.42"
         self.view = MagicMock()
 
 

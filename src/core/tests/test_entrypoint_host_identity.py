@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from core.devices import compute_computer_stable_key
+from core.devices.computer import compute_computer_stable_key
 from core.entrypoint import ModelEntrypoint
 from core.signals import CoreSignals, HostComputerIdentityPayload
 from core.work.host_install_identity_work import HostInstallIdentityOutcome

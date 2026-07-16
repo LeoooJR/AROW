@@ -9,7 +9,7 @@ import pytest
 from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
 from core.adb.binary import AdbBinary
 from core.adb.exceptions import AdbClientException
-from core.devices import Phone
+from core.devices.phone import Phone
 from core.entrypoint import ModelEntrypoint
 from core.signals import (
     CoreSignal,

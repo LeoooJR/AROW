@@ -9,7 +9,8 @@ from pathlib import Path
 from typing import Final, Iterable
 
 from core.collection import Repository
-from core.devices import Phone, PhoneRepository, phone_stable_key_is_collision_resistant
+from core.devices.phone import Phone, PhoneRepository
+from core.devices.stable_key import StableKey
 from core.geo.location import Location
 from core.payload import Payload
 from logger import logger
@@ -335,7 +336,8 @@ class SimulationDiskStore:
             stable_key: paired
             for paired in devices
             for stable_key in [(paired.stable_key or "").strip()]
-            if phone_stable_key_is_collision_resistant(stable_key)
+            if (parsed_key := StableKey.from_value(stable_key)) is not None
+            and parsed_key.is_collision_resistant()
         }
         for simulation_id in self._index_simulation_ids:
             try:
@@ -362,7 +364,8 @@ class SimulationDiskStore:
             paired_device = devices.get(persisted_device_id)
             if paired_device is None:
                 stable_key = (simulation.device.stable_key or "").strip()
-                if phone_stable_key_is_collision_resistant(stable_key):
+                parsed_key = StableKey.from_value(stable_key)
+                if parsed_key is not None and parsed_key.is_collision_resistant():
                     paired_device = paired_by_stable_key.get(stable_key)
             if paired_device is None:
                 logger.info(

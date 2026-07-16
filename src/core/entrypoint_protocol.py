@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Protocol, TypeVar
 if TYPE_CHECKING:
     from core.adb.client import AdbClient
     from core.adb.server import AdbServer
-    from core.devices import Phone
+    from core.devices.phone import Phone
     from core.signals import CoreSignal
     from core.simulation import Simulation
 

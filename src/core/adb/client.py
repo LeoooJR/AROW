@@ -35,7 +35,7 @@ from core.adb.command import (
     return_last_adb_retry_outcome,
 )
 from core.adb.exceptions import AdbClientException
-from core.devices import Phone
+from core.devices.phone import Phone
 from core.geo.location import Location
 from logger import logger
 
