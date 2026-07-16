@@ -32,6 +32,12 @@ def _adb_connection_id_is_human_readable(connection_id: str) -> bool:
 class PhoneDescriptor(DeviceDescriptor):
     """Metadata about an Android phone."""
 
+    id: str = field(
+        metadata={"description": "The id of the device"},
+        default="",
+        compare=False,
+        hash=False,
+    )
     product: str = field(
         metadata={"description": "The product of the phone"}, default=""
     )
@@ -46,6 +52,8 @@ class PhoneDescriptor(DeviceDescriptor):
     last_communication: datetime.datetime = field(
         metadata={"description": "The last communication time of the phone"},
         default_factory=datetime.datetime.now,
+        compare=False,
+        hash=False,
     )
     hardware_serial: str = field(
         metadata={"description": "ro.serialno after enrichment"}, default=""
@@ -188,6 +196,14 @@ class Phone(Device[PhoneDescriptor], Payload):
         super().__init__(
             id=id, name="", os=os or "", ip=ip or "", port=port, descriptor=descriptor
         )
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Phone):
+            return NotImplemented
+        return self.descriptor == other.descriptor
+
+    def __hash__(self) -> int:
+        return hash(self.descriptor)
 
     @property
     def product(self) -> str:
@@ -359,13 +375,6 @@ def apply_discovered_phone_state(paired: Phone, discovered: Phone) -> None:
         )
     paired.descriptor.id = discovered.id
     paired.descriptor.last_communication = discovered.descriptor.last_communication
-
-
-def paired_phone_matches_discovery(paired: Phone, discovered: Phone) -> bool:
-    return paired.id == discovered.id and all(
-        getattr(paired.descriptor, name) == getattr(discovered.descriptor, name)
-        for name in _DISCOVERED_PHONE_DESCRIPTOR_FIELDS
-    )
 
 
 class PhoneRepository(Repository[Phone]):

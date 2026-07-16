@@ -16,7 +16,6 @@ from core.devices.phone import (
     Phone,
     PhoneRepository,
     apply_discovered_phone_state,
-    paired_phone_matches_discovery,
     serialize_phone_collection,
 )
 from core.devices.stable_key import StableKey
@@ -403,9 +402,8 @@ class ModelEntrypoint(Entrypoint):
 
             if paired is not None:  # A device has been found, by ADB id or stable key
                 matched_paired_ids.add(id(paired))
-                if paired_phone_matches_discovery(
-                    paired, discovered
-                ):  # If no property changed, skip
+                if paired.id == discovered.id and paired == discovered:
+                    # If no property changed, skip.
                     continue
                 old_connection_id = paired.id
                 if (

@@ -49,6 +49,28 @@ class TestPhone:
         assert phone.descriptor.port == 9999
         assert phone.descriptor.id == "a"
 
+    def test_phone_equality_ignores_connection_id_and_last_communication(
+        self,
+    ) -> None:
+        paired = Phone(id="old-connection", model="OceanPhone", state="device")
+        discovered = Phone(id="new-connection", model="OceanPhone", state="device")
+        discovered.last_communication = datetime.datetime(2025, 6, 15, 10, 30, 0)
+
+        assert paired == discovered
+        assert hash(paired) == hash(discovered)
+
+    def test_phone_equality_detects_descriptor_changes(self) -> None:
+        paired = Phone(id="connection-a", model="OceanPhone", state="device")
+        discovered = Phone(id="connection-b", model="OceanPhone", state="offline")
+
+        assert paired != discovered
+
+    def test_phone_equality_returns_not_implemented_for_unrelated_types(self) -> None:
+        phone = Phone(id="connection", model="OceanPhone")
+
+        assert phone.__eq__(object()) is NotImplemented
+        assert phone != object()
+
     def test_phone_hardware_serial_derives_stable_key_tier_one(self) -> None:
         """Explicit hardware_serial produces hw:v1: Tier-1 stable_key."""
         phone = Phone(
@@ -369,6 +391,13 @@ class TestPhoneDescriptorHash:
             manufacturer="",
         )
         assert d1 == d2 and hash(d1) == hash(d2)
+
+        d2.id = "adb-2"
+        d2.last_communication = fixed_last + datetime.timedelta(seconds=1)
+        assert d1 == d2 and hash(d1) == hash(d2)
+
+        d2.state = "offline"
+        assert d2 != d1
 
         sk_fingerprint = compute_phone_stable_key(
             hardware_serial=None,
