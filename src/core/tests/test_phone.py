@@ -59,11 +59,12 @@ class TestPhone:
         assert paired == discovered
         assert hash(paired) == hash(discovered)
 
-    def test_phone_equality_detects_descriptor_changes(self) -> None:
+    def test_phone_equality_ignores_state(self) -> None:
         paired = Phone(id="connection-a", model="OceanPhone", state="device")
         discovered = Phone(id="connection-b", model="OceanPhone", state="offline")
 
-        assert paired != discovered
+        assert paired == discovered
+        assert hash(paired) == hash(discovered)
 
     def test_phone_equality_returns_not_implemented_for_unrelated_types(self) -> None:
         phone = Phone(id="connection", model="OceanPhone")
@@ -397,7 +398,8 @@ class TestPhoneDescriptorHash:
         assert d1 == d2 and hash(d1) == hash(d2)
 
         d2.state = "offline"
-        assert d2 != d1
+        assert d2 == d1
+        assert hash(d2) == hash(d1)
 
         sk_fingerprint = compute_phone_stable_key(
             hardware_serial=None,
