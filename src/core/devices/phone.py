@@ -194,6 +194,16 @@ class Phone(Device[PhoneDescriptor], Payload):
         return self._descriptor.product
 
     @property
+    def os(self) -> str:
+        return self._descriptor.os
+
+    @os.setter
+    def os(self, value: str) -> None:
+        value = value.strip()
+        if value:
+            self._descriptor.os = value
+
+    @property
     def state(self) -> str:
         return self._descriptor.state
 
@@ -206,6 +216,12 @@ class Phone(Device[PhoneDescriptor], Payload):
     @property
     def model(self) -> str:
         return self._descriptor.model
+
+    @model.setter
+    def model(self, value: str) -> None:
+        value = value.strip()
+        if value:
+            self._descriptor.model = value
 
     @property
     def last_communication(self) -> datetime.datetime:
@@ -229,17 +245,41 @@ class Phone(Device[PhoneDescriptor], Payload):
     def hardware_serial(self) -> str:
         return self._descriptor.hardware_serial
 
+    @hardware_serial.setter
+    def hardware_serial(self, value: str) -> None:
+        value = value.strip()
+        if value and value.casefold() != "unknown":
+            self._descriptor.hardware_serial = value
+        elif not self._descriptor.hardware_serial:
+            # Assigning the known-empty input lets descriptor-level sync derive Tier 2.
+            self._descriptor.hardware_serial = ""
+
     @property
     def manufacturer(self) -> str:
         return self._descriptor.manufacturer
+
+    @manufacturer.setter
+    def manufacturer(self, value: str) -> None:
+        value = value.strip()
+        if value:
+            self._descriptor.manufacturer = value
 
     @property
     def android_api_level(self) -> int | None:
         return self._descriptor.android_api_level
 
+    @android_api_level.setter
+    def android_api_level(self, value: int | None) -> None:
+        if value is not None:
+            self._descriptor.android_api_level = value
+
     @property
     def shell_device_name(self) -> str:
         return self._descriptor.shell_device_name
+
+    @shell_device_name.setter
+    def shell_device_name(self, value: str) -> None:
+        self._descriptor.shell_device_name = value.strip()
 
     def serialize(self, **kwargs: object) -> dict[str, object]:
         return {
@@ -326,42 +366,6 @@ def paired_phone_matches_discovery(paired: Phone, discovered: Phone) -> bool:
         getattr(paired.descriptor, name) == getattr(discovered.descriptor, name)
         for name in _DISCOVERED_PHONE_DESCRIPTOR_FIELDS
     )
-
-
-def apply_phone_ro_serial_enrichment(phone: Phone, ro_serial_stdout: str) -> None:
-    raw = (ro_serial_stdout or "").strip()
-    if raw and raw.casefold() != "unknown":
-        phone.descriptor.hardware_serial = raw
-    elif not phone.descriptor.hardware_serial:
-        # Assigning the known-empty input lets descriptor-level sync derive Tier 2.
-        phone.descriptor.hardware_serial = ""
-
-
-def apply_phone_device_name_enrichment(phone: Phone, value: str) -> None:
-    phone.descriptor.shell_device_name = (value or "").strip()
-
-
-def apply_phone_android_release_enrichment(phone: Phone, value: str) -> None:
-    value = (value or "").strip()
-    if value:
-        phone.descriptor.os = value
-
-
-def apply_phone_manufacturer_enrichment(phone: Phone, value: str) -> None:
-    value = (value or "").strip()
-    if value:
-        phone.descriptor.manufacturer = value
-
-
-def apply_phone_product_model_enrichment(phone: Phone, value: str) -> None:
-    value = (value or "").strip()
-    if value:
-        phone.descriptor.model = value
-
-
-def apply_phone_android_api_level_enrichment(phone: Phone, value: int | None) -> None:
-    if value is not None:
-        phone.descriptor.android_api_level = value
 
 
 class PhoneRepository(Repository[Phone]):

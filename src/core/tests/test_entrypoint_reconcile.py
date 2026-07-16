@@ -9,12 +9,7 @@ from unittest.mock import patch
 import pytest
 
 from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
-from core.devices.phone import (
-    Phone,
-    apply_phone_manufacturer_enrichment,
-    apply_phone_product_model_enrichment,
-    apply_phone_ro_serial_enrichment,
-)
+from core.devices.phone import Phone
 from core.entrypoint import ModelEntrypoint
 from core.signals import CoreSignals, SimulationCreatedPayload
 from core.tests.signal_test_helpers import seed_adb_startup_for_entrypoint
@@ -200,9 +195,9 @@ def test_reconcile_does_not_merge_devices_on_tier2_stable_key_collision(
     discovered_a = Phone(id="10.0.0.1:44444", state="device", model="Pixel 8")
     discovered_b = Phone(id="10.0.0.2:5555", state="device", model="Pixel 8")
     for phone in (paired_a, paired_b, discovered_a, discovered_b):
-        apply_phone_manufacturer_enrichment(phone, "Google")
-        apply_phone_product_model_enrichment(phone, "Pixel 8")
-        apply_phone_ro_serial_enrichment(phone, "")
+        phone.manufacturer = "Google"
+        phone.model = "Pixel 8"
+        phone.hardware_serial = ""
         assert phone.stable_key.startswith("fp:v1:")
     server.paired_devices.add(paired_a)
     server.paired_devices.add(paired_b)

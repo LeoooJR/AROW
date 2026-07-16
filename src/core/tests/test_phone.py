@@ -12,12 +12,6 @@ from core.devices.phone import (
     DEFAULT_PHONE_DISPLAY_NAME,
     Phone,
     PhoneDescriptor,
-    apply_phone_android_api_level_enrichment,
-    apply_phone_android_release_enrichment,
-    apply_phone_device_name_enrichment,
-    apply_phone_manufacturer_enrichment,
-    apply_phone_product_model_enrichment,
-    apply_phone_ro_serial_enrichment,
 )
 from core.devices.stable_key import (
     FirstTierStableKey,
@@ -68,7 +62,7 @@ class TestPhone:
         assert phone.hardware_serial == "SN999"
         assert phone.stable_key == "hw:v1:SN999"
 
-    def test_apply_phone_ro_serial_enrichment_updates_stable_key(self) -> None:
+    def test_hardware_serial_setter_updates_stable_key(self) -> None:
         phone = Phone(
             id="dev",
             name="Pixel",
@@ -76,11 +70,11 @@ class TestPhone:
             model="mod",
             state="device",
         )
-        apply_phone_ro_serial_enrichment(phone, "ABC123DEVICE\n")
+        phone.hardware_serial = "ABC123DEVICE\n"
         assert phone.hardware_serial == "ABC123DEVICE"
         assert phone.stable_key == "hw:v1:ABC123DEVICE"
 
-    def test_apply_phone_manufacturer_and_model_updates_tier_two_stable_key(
+    def test_manufacturer_and_model_setters_update_tier_two_stable_key(
         self,
     ) -> None:
         """Without serial, manufacturer + model enrichment produces fp:v1: stable_key."""
@@ -88,29 +82,29 @@ class TestPhone:
             id="dev", name="Pixel", product="ocean", model="m1", state="device"
         )
         assert phone.stable_key == ""
-        apply_phone_manufacturer_enrichment(phone, "FabCo")
-        apply_phone_product_model_enrichment(phone, "OceanView")
+        phone.manufacturer = "FabCo"
+        phone.model = "OceanView"
         assert phone.descriptor.manufacturer == "FabCo"
         assert phone.descriptor.model == "OceanView"
         assert phone.stable_key.startswith("fp:v1:")
 
-    def test_apply_shell_property_enrichment_tier_one_unchanged(self) -> None:
+    def test_model_setter_leaves_tier_one_key_unchanged(self) -> None:
         """After Tier-1 serial, model enrichment does not change hw stable_key."""
         phone = Phone(
             id="dev", name="Pixel", product="ocean", model="m1", state="device"
         )
-        apply_phone_ro_serial_enrichment(phone, "SERIALX")
+        phone.hardware_serial = "SERIALX"
         key = phone.stable_key
-        apply_phone_product_model_enrichment(phone, "OceanView")
+        phone.model = "OceanView"
         assert phone.descriptor.model == "OceanView"
         assert phone.stable_key == key == "hw:v1:SERIALX"
 
-    def test_apply_phone_android_release_sets_os(self) -> None:
+    def test_os_setter_applies_android_release(self) -> None:
         phone = Phone(id="x", name="n", os="", state="device")
-        apply_phone_android_release_enrichment(phone, " 15 \n")
+        phone.os = " 15 \n"
         assert phone.descriptor.os == "15"
 
-    def test_apply_phone_device_name_blank_clears_shell_and_recomputes_display(
+    def test_shell_device_name_setter_clears_override_and_recomputes_display(
         self,
     ) -> None:
         """Blank ``device_name`` clears shell override; label falls back to list token / model."""
@@ -120,7 +114,7 @@ class TestPhone:
             model="ModX",
             state="device",
         )
-        apply_phone_device_name_enrichment(phone, "  ")
+        phone.shell_device_name = "  "
         assert phone.descriptor.shell_device_name == ""
         # Model beats legacy name-as-list-token for display.
         assert phone.descriptor.name == "ModX"
@@ -142,13 +136,13 @@ class TestPhone:
             device="Handset1",
             state="device",
         )
-        apply_phone_manufacturer_enrichment(phone, "FabCo")
+        phone.manufacturer = "FabCo"
         assert phone.descriptor.name == "FabCo OceanPhone"
 
     def test_display_name_getprop_overrides_manufacturer_model(self) -> None:
         phone = Phone(id="d", model="X", manufacturer="Fab", state="device")
         assert "Fab" in phone.descriptor.name
-        apply_phone_device_name_enrichment(phone, "Living Room Phone")
+        phone.shell_device_name = "Living Room Phone"
         assert phone.descriptor.name == "Living Room Phone"
         assert phone.descriptor.shell_device_name == "Living Room Phone"
 
@@ -161,12 +155,28 @@ class TestPhone:
         phone = Phone(id="emulator-5554", state="offline")
         assert phone.descriptor.name == "emulator-5554"
 
-    def test_apply_phone_android_api_level(self) -> None:
+    def test_android_api_level_setter(self) -> None:
         phone = Phone(id="x", name="n", state="device")
-        apply_phone_android_api_level_enrichment(phone, 35)
+        phone.android_api_level = 35
         assert phone.descriptor.android_api_level == 35
-        apply_phone_android_api_level_enrichment(phone, None)
+        phone.android_api_level = None
         assert phone.descriptor.android_api_level == 35
+
+    def test_identity_and_os_setters_ignore_blank_values(self) -> None:
+        phone = Phone(
+            id="x",
+            os="14",
+            manufacturer="FabCo",
+            model="OceanPhone",
+        )
+
+        phone.os = "  "
+        phone.manufacturer = "  "
+        phone.model = "  "
+
+        assert phone.os == "14"
+        assert phone.manufacturer == "FabCo"
+        assert phone.model == "OceanPhone"
 
     def test_descriptor_identity_assignment_synchronizes_stable_key(self) -> None:
         phone = Phone(id="device-1", product="ocean", model="OceanPhone")

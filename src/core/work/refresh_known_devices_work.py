@@ -17,12 +17,6 @@ from core.adb.client import AdbClient
 from core.adb.server import AdbServer
 from core.devices.phone import (
     Phone,
-    apply_phone_android_api_level_enrichment,
-    apply_phone_android_release_enrichment,
-    apply_phone_device_name_enrichment,
-    apply_phone_manufacturer_enrichment,
-    apply_phone_product_model_enrichment,
-    apply_phone_ro_serial_enrichment,
     serialize_phone_collection,
 )
 from core.entrypoint_protocol import CoreSignalEmitter, DeviceReconcileEntrypoint
@@ -46,9 +40,7 @@ def enrich_phones_with_manufacturer(adb_client: AdbClient, phones: list[Phone]) 
     for phone in phones:
         if not _phone_is_shell_targetable(phone):
             continue
-        apply_phone_manufacturer_enrichment(
-            phone, adb_client.get_product_manufacturer(phone)
-        )
+        phone.manufacturer = adb_client.get_product_manufacturer(phone)
 
 
 def enrich_phones_with_product_model(
@@ -58,7 +50,7 @@ def enrich_phones_with_product_model(
     for phone in phones:
         if not _phone_is_shell_targetable(phone):
             continue
-        apply_phone_product_model_enrichment(phone, adb_client.get_product_model(phone))
+        phone.model = adb_client.get_product_model(phone)
 
 
 def enrich_phones_with_device_name(adb_client: AdbClient, phones: list[Phone]) -> None:
@@ -66,9 +58,7 @@ def enrich_phones_with_device_name(adb_client: AdbClient, phones: list[Phone]) -
     for phone in phones:
         if not _phone_is_shell_targetable(phone):
             continue
-        apply_phone_device_name_enrichment(
-            phone, adb_client.get_device_name_prop(phone)
-        )
+        phone.shell_device_name = adb_client.get_device_name_prop(phone)
 
 
 def enrich_phones_with_android_release(
@@ -78,9 +68,7 @@ def enrich_phones_with_android_release(
     for phone in phones:
         if not _phone_is_shell_targetable(phone):
             continue
-        apply_phone_android_release_enrichment(
-            phone, adb_client.get_android_release(phone)
-        )
+        phone.os = adb_client.get_android_release(phone)
 
 
 def enrich_phones_with_android_sdk(adb_client: AdbClient, phones: list[Phone]) -> None:
@@ -88,9 +76,7 @@ def enrich_phones_with_android_sdk(adb_client: AdbClient, phones: list[Phone]) -
     for phone in phones:
         if not _phone_is_shell_targetable(phone):
             continue
-        apply_phone_android_api_level_enrichment(
-            phone, adb_client.get_android_sdk_api_level(phone)
-        )
+        phone.android_api_level = adb_client.get_android_sdk_api_level(phone)
 
 
 def enrich_phones_with_ro_serialno(adb_client: AdbClient, phones: list[Phone]) -> None:
@@ -98,23 +84,19 @@ def enrich_phones_with_ro_serialno(adb_client: AdbClient, phones: list[Phone]) -
     for phone in phones:
         if not _phone_is_shell_targetable(phone):
             continue
-        apply_phone_ro_serial_enrichment(phone, adb_client.get_ro_serialno(phone))
+        phone.hardware_serial = adb_client.get_ro_serialno(phone)
 
 
 def _enrich_phone_with_shell_properties(adb_client: AdbClient, phone: Phone) -> None:
     """Apply the batch ADB shell enrichment payload to one targetable phone."""
     props = adb_client.get_shell_enrichment_properties(phone)
-    apply_phone_manufacturer_enrichment(phone, str(props.get("manufacturer") or ""))
-    apply_phone_product_model_enrichment(phone, str(props.get("model") or ""))
-    apply_phone_device_name_enrichment(phone, str(props.get("device_name") or ""))
-    apply_phone_android_release_enrichment(
-        phone, str(props.get("android_release") or "")
-    )
+    phone.manufacturer = str(props.get("manufacturer") or "")
+    phone.model = str(props.get("model") or "")
+    phone.shell_device_name = str(props.get("device_name") or "")
+    phone.os = str(props.get("android_release") or "")
     sdk_value = props.get("sdk")
-    apply_phone_android_api_level_enrichment(
-        phone, sdk_value if isinstance(sdk_value, int) else None
-    )
-    apply_phone_ro_serial_enrichment(phone, str(props.get("ro_serialno") or ""))
+    phone.android_api_level = sdk_value if isinstance(sdk_value, int) else None
+    phone.hardware_serial = str(props.get("ro_serialno") or "")
 
 
 def enrich_phones_with_adb_shell_properties(
