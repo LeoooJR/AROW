@@ -88,9 +88,9 @@ class AppController(Controller):
     def _send_host_device_information(self) -> None:
         """Send the host device information to the view. Run once after the main window is wired."""
         self.view.forward_host_device_information_updated(
-            self.model_entrypoint.host.get_name(),
-            self.model_entrypoint.host.get_os(),
-            self.model_entrypoint.host.get_ip(),
+            self.model_entrypoint.host.name,
+            self.model_entrypoint.host.os,
+            self.model_entrypoint.host.ip,
         )
 
     @validate_model_entrypoint

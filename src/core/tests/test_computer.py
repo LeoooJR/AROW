@@ -43,12 +43,12 @@ class TestComputer:
         assert computer.descriptor.last_communication is now
         assert computer.descriptor.stable_key == ""
         assert computer.stable_key == ""
-        assert computer.is_network_available() is True
+        assert computer.network_available is True
 
     def test_computer_creation_with_loopback_ip_marks_network_unavailable(self) -> None:
         computer = Computer(id="host-1", ip="127.0.0.1")
         assert computer.descriptor.ip == "127.0.0.1"
-        assert computer.is_network_available() is False
+        assert computer.network_available is False
 
     def test_computer_hostname_lookup_sets_network_available(
         self, monkeypatch: pytest.MonkeyPatch
@@ -63,7 +63,7 @@ class TestComputer:
         computer = Computer(id="host-1")
 
         assert computer.descriptor.ip == "192.168.1.10"
-        assert computer.is_network_available() is True
+        assert computer.network_available is True
 
     def test_computer_udp_route_probe_used_after_loopback_hostname(
         self, monkeypatch: pytest.MonkeyPatch
@@ -96,7 +96,7 @@ class TestComputer:
         computer = Computer(id="host-1")
 
         assert computer.descriptor.ip == "10.0.0.42"
-        assert computer.is_network_available() is True
+        assert computer.network_available is True
 
     def test_computer_network_resolution_fallback_marks_unavailable(
         self, monkeypatch: pytest.MonkeyPatch
@@ -128,13 +128,13 @@ class TestComputer:
         computer = Computer(id="host-1")
 
         assert computer.descriptor.ip == "127.0.0.1"
-        assert computer.is_network_available() is False
+        assert computer.network_available is False
 
     def test_refresh_network_identity_updates_previous_unavailable_state(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         computer = Computer(id="host-1", ip="127.0.0.1")
-        assert computer.is_network_available() is False
+        assert computer.network_available is False
 
         monkeypatch.setattr(
             computer, "_resolve_network_identity", lambda: ("192.168.1.10", True)
@@ -142,7 +142,35 @@ class TestComputer:
         computer.refresh_network_identity()
 
         assert computer.descriptor.ip == "192.168.1.10"
-        assert computer.is_network_available() is True
+        assert computer.network_available is True
+
+    def test_computer_properties_update_descriptor_state(self) -> None:
+        computer = Computer(id="host-1", state=None, last_communication=None)
+        now = datetime.datetime(2025, 6, 15, 10, 30, 0)
+
+        computer.state = "online"
+        computer.last_communication = now
+
+        assert computer.state == "online"
+        assert computer.last_communication is now
+
+    def test_computer_equality_and_hash_delegate_to_descriptor(self) -> None:
+        first = Computer(id="host-1", name="Workstation", os="macOS", ip="10.0.0.1")
+        second = Computer(id="host-1", name="Workstation", os="macOS", ip="10.0.0.1")
+
+        assert first == second
+        assert hash(first) == hash(second)
+
+        second.state = "online"
+        assert first != second
+
+    def test_computer_equality_returns_not_implemented_for_unrelated_types(
+        self,
+    ) -> None:
+        computer = Computer(id="host-1", ip="127.0.0.1")
+
+        assert computer.__eq__(object()) is NotImplemented
+        assert computer != object()
 
 
 class TestComputeComputerStableKey:

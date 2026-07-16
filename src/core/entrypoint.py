@@ -242,7 +242,7 @@ class ModelEntrypoint(Entrypoint):
                 "ADB server and client must be initialized before authentification"
             )
         self._host.refresh_network_identity()
-        if not self._host.is_network_available():
+        if not self._host.network_available:
             raise DeviceAuthentificationError(
                 ip=ip,
                 port=port,

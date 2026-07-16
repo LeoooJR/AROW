@@ -96,26 +96,33 @@ class Computer(Device[ComputerDescriptor]):
     def stable_key(self) -> str:
         return self._descriptor.stable_key
 
-    def get_name(self) -> str:
-        return self._descriptor.name
-
-    def get_os(self) -> str:
-        return self._descriptor.os
-
-    def get_ip(self) -> str:
-        return self._descriptor.ip
-
-    def is_network_available(self) -> bool:
-        return self._descriptor.network_available
-
-    def get_port(self) -> int | None:
-        return self._descriptor.port
-
-    def get_state(self) -> str | None:
+    @property
+    def state(self) -> str | None:
         return self._descriptor.state
 
-    def get_last_communication(self) -> datetime.datetime | None:
+    @state.setter
+    def state(self, value: str | None) -> None:
+        self._descriptor.state = value
+
+    @property
+    def last_communication(self) -> datetime.datetime | None:
         return self._descriptor.last_communication
+
+    @last_communication.setter
+    def last_communication(self, value: datetime.datetime | None) -> None:
+        self._descriptor.last_communication = value
+
+    @property
+    def network_available(self) -> bool:
+        return self._descriptor.network_available
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Computer):
+            return NotImplemented
+        return self.descriptor == other.descriptor
+
+    def __hash__(self) -> int:
+        return hash(self.descriptor)
 
     def refresh_network_identity(self) -> None:
         self._descriptor.ip, self._descriptor.network_available = (
