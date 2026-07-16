@@ -402,7 +402,11 @@ class ModelEntrypoint(Entrypoint):
 
             if paired is not None:  # A device has been found, by ADB id or stable key
                 matched_paired_ids.add(id(paired))
-                if paired.id == discovered.id and paired == discovered:
+                if (
+                    paired.id == discovered.id
+                    and paired.state == discovered.state
+                    and paired == discovered
+                ):
                     # If no property changed, skip.
                     continue
                 old_connection_id = paired.id
