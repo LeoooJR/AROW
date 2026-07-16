@@ -162,7 +162,13 @@ class TestComputer:
         assert hash(first) == hash(second)
 
         second.state = "online"
-        assert first != second
+        assert first == second
+        assert hash(first) == hash(second)
+
+        third = Computer(id="host-1", name="Workstation 2", os="macOS", ip="10.0.0.1")
+
+        assert first != third
+        assert hash(first) != hash(third)
 
     def test_computer_equality_returns_not_implemented_for_unrelated_types(
         self,

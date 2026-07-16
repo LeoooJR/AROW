@@ -28,11 +28,16 @@ class ComputerDescriptor(DeviceDescriptor):
     """Metadata about the host computer."""
 
     state: Optional[str] = field(
-        metadata={"description": "The state of the computer"}, default=None
+        metadata={"description": "The state of the computer"},
+        default=None,
+        compare=False,
+        hash=False,
     )
     last_communication: Optional[datetime.datetime] = field(
         metadata={"description": "The last communication time of the computer"},
         default=None,
+        compare=False,
+        hash=False,
     )
     stable_key: str = field(
         metadata={"description": "Stable install-scoped host identity"},
@@ -44,6 +49,8 @@ class ComputerDescriptor(DeviceDescriptor):
             "description": "Whether the host has a usable non-loopback IPv4 address"
         },
         default=False,
+        compare=False,
+        hash=False,
     )
 
     def __str__(self) -> str:
