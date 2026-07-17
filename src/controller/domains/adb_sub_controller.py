@@ -19,6 +19,7 @@ from core.signals import (
     DeviceAuthentificationSucceededPayload,
     DevicesUpdatedPayload,
 )
+from core.work.startup_work import StartupOutcome
 from gui.signals import signals
 from gui.window import MainWindow
 from logger import logger
@@ -186,8 +187,14 @@ class AdbSubController(AppSubController):
             handle_signals.Failed.connect(self._on_close_core_runtime_applied)
 
     @Slot(object)
-    def _on_startup_core_runtime_applied(self, _result: object) -> None:
-        """Chain host identity after the startup result has been applied."""
+    def _on_startup_core_runtime_applied(self, result: object) -> None:
+        """Chain host identity only after a validated startup outcome was applied."""
+        if not isinstance(result, StartupOutcome):
+            logger.error(
+                "AdbSubController: unexpected startup result type; skipping host identity",
+                result_type=type(result).__name__,
+            )
+            return
         self._enqueue_host_install_identity_job()
 
     @Slot(object)

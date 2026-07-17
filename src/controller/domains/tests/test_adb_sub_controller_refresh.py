@@ -21,6 +21,7 @@ from core.devices.phone import Phone
 from core.entrypoint import ModelEntrypoint
 from core.signals import DevicesUpdatedPayload
 from core.work.refresh_known_devices_work import RefreshKnownDevicesOutcome
+from core.work.startup_work import StartupOutcome
 
 pytestmark = [pytest.mark.async_jobs]
 
@@ -176,13 +177,29 @@ def test_startup_applies_before_enqueuing_host_identity(
     app.model_entrypoint.apply_result = lambda result: events.append("applied")  # type: ignore[method-assign]
     adb = _make_adb_sub_controller(app)
     adb._enqueue_host_install_identity_job = lambda: events.append("host-enqueued")  # type: ignore[method-assign]
+    outcome = StartupOutcome()
 
     adb._startup_core_runtime()
-    app.handle_signals["job-1"].Completed.emit(object())
+    app.handle_signals["job-1"].Completed.emit(outcome)
 
     assert events == ["applied", "host-enqueued"]
     assert app.submitted[0]["on_completed"] == app.model_entrypoint.apply_result
     assert app.submitted[0]["on_failed"] == app.model_entrypoint.apply_failure
+
+
+def test_startup_does_not_enqueue_host_identity_for_unsupported_payload(
+    patch_repeat_timer: dict[str, Any],
+) -> None:
+    app = _AppStub()
+    events: list[str] = []
+    app.model_entrypoint.apply_result = lambda result: events.append("applied")  # type: ignore[method-assign]
+    adb = _make_adb_sub_controller(app)
+    adb._enqueue_host_install_identity_job = lambda: events.append("host-enqueued")  # type: ignore[method-assign]
+
+    adb._startup_core_runtime()
+    app.handle_signals["job-1"].Completed.emit(object())
+
+    assert events == ["applied"]
 
 
 @pytest.mark.parametrize("terminal_signal", ["Completed", "Failed"])
