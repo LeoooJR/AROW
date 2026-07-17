@@ -2,7 +2,7 @@
 
 This guide describes the current async job path in AROW: how controllers submit blocking core work, what a `CoreRuntimeWork` must return, how results and failures are applied on the Qt main thread, how process-backed map rendering fits into the same pipeline, and how worker threads/processes share one application log file.
 
-It matches the implementation in `src/controller/runner.py`, `src/controller/core_work_callbacks.py`, `src/controller/domains/adb_sub_controller.py`, `src/core/entrypoint.py`, and `src/core/work/`.
+It matches the implementation in `src/controller/runner.py`, the domain subcontrollers under `src/controller/domains/`, `src/core/entrypoint.py`, and `src/core/work/`.
 
 ## Mental model
 
@@ -21,14 +21,14 @@ Heavy or blocking operations should run **outside** the GUI thread. The app rout
 3. **The runner picks a pool** — thread vs process from `job_type` or `"auto"` (see below).
 4. **The worker runs `JobSpecification.fn`** — usually a `ModelEntrypoint` method that instantiates a `CoreRuntimeWork` and calls its blocking `run()`. This runs in a **worker thread or process**, not on the Qt main thread.
 5. **Completion is marshaled to the main thread** — `AsyncRunner` uses internal Qt signals with `QueuedConnection` so **`Completed`**, **`Failed`**, and **`Cancelled`** slots run on the GUI thread.
-6. **Callbacks update state** — they validate the result type, call `ModelEntrypoint.apply_result(...)` or `apply_failure(...)`, and then the view updates from core-bus signals.
+6. **The core entrypoint applies the outcome** — controller submissions wire completion directly to `ModelEntrypoint.apply_result(...)` and failure directly to `apply_failure(...)`. The entrypoint dispatches to the registered work applier, and the view updates from core-bus signals.
 
 ```mermaid
 flowchart LR
   subgraph ui [Main thread]
     V[View signals]
     C[Controller]
-    CB[on_completed / on_failed]
+    CB["ModelEntrypoint.apply_result / apply_failure"]
     V --> C
     CB --> V
   end
@@ -272,16 +272,16 @@ Map rendering uses a per-simulation coalesce key so repeated requests for the sa
 
 `ProgressEvent` and **`on_progress`** / **`JobHandlerSignals.Progress`** are wired through **`AsyncRunner`**. The standard thread/process **`submit`** path does not inject an automatic progress callback into **`fn`**; emitting progress requires either extending the runner/pools or another agreed mechanism. Connecting **`on_progress`** is correct when you have a source of **`ProgressEvent`** instances.
 
-## Custom callbacks (project pattern)
+## Result dispatch and lifecycle hooks
 
-Existing code keeps completion handlers in dedicated modules (see `src/controller/core_work_callbacks.py`):
+Core runtime submissions use one callback boundary:
 
-1. **Small classes** with `on_completed(self, result: object)` and `on_failed(self, error: JobError)`.
-2. **`__slots__`** plus `__weakref__` when bound methods are used as Qt slots.
-3. **Validate result types** before touching model/view; log unexpected payloads.
-4. **Call `model_entrypoint.apply_result(...)` / `apply_failure(...)`** instead of duplicating per-work logic in the controller.
+1. Wire `on_completed=model_entrypoint.apply_result`.
+2. Wire `on_failed=model_entrypoint.apply_failure`.
+3. Register the work/outcome pair in `core/work/works_repository.py`; `ModelEntrypoint` uses that catalog to select `apply_main_thread` and uses the job origin to select `apply_failure_main_thread`.
+4. Keep orchestration-only behavior in the owning subcontroller. If it must run after core application, bind a second per-job signal after `_submit_model_entrypoint_async_call(...)` returns. Qt invokes slots in connection order, so the entrypoint applier runs first.
 
-`RefreshDeviceListCallback` also clears the subcontroller guard flag on both success and failure so the next refresh request is not blocked indefinitely.
+Examples of controller-owned lifecycle behavior are startup chaining to host identity, releasing the close-time shutdown waiter, and clearing tracked map render handles. These handlers must not duplicate model mutation or core signal emission.
 
 ## Device refresh and reconciliation
 
@@ -289,12 +289,7 @@ The refresh path is no longer “replace whatever list the server had”.
 
 ### Request-side guard
 
-`AdbSubController._on_refresh_device_list_requested()` now uses two protections:
-
-- `_is_refreshing_device_list` blocks concurrent refresh submissions from the timer or UI.
-- `coalesce_key="refresh_device_list"` ensures a later refresh supersedes an older pending one if the runner sees overlap.
-
-The callback resets `_is_refreshing_device_list` on both `on_completed` and `on_failed`.
+`AdbSubController._on_refresh_device_list_requested()` submits with `coalesce_key="refresh_device_list"` and `at_most_once=True`, so timer and UI requests cannot create overlapping refresh jobs.
 
 ### Worker-side behavior
 
@@ -340,14 +335,15 @@ Tests with a fake runner live under **`src/core/tests/test_async_runner.py`** fo
 4. Register the work in `src/core/work/works_repository.py` if it is a built-in entrypoint job.
 5. Expose a `ModelEntrypoint` method that instantiates the work and returns its outcome.
 6. Choose `job_type` and `coalesce_key` deliberately.
-7. Implement controller callbacks that validate the result type and then call `apply_result(...)` / `apply_failure(...)`.
-8. Avoid touching Qt widgets or the core signal bus directly from `run()`.
+7. Wire completion and failure directly to `ModelEntrypoint.apply_result(...)` and `apply_failure(...)`.
+8. Add subcontroller lifecycle handlers only for orchestration that must happen after application or cancellation.
+9. Avoid touching Qt widgets or the core signal bus directly from `run()`.
 
 ## Troubleshooting
 
 | Symptom | What to check |
 |--------|------|
-| Refresh requests stop firing after one failure | Confirm the callback clears `_is_refreshing_device_list` on both success and failure. |
+| Refresh requests are ignored while one is running | This is expected with `at_most_once=True`; confirm the active job eventually leaves runner history. |
 | A work fails before its body runs | Check `@preflight(...)` conditions and the work’s `error_to_raise=` mapping. |
 | `apply_result(...)` logs “unsupported result type” | The returned outcome type is not registered in the built-in work catalog and has no custom applier. |
 | A reconnect creates a second device row instead of updating the existing one | The handset probably lacks a Tier-1 `hw:v1:` stable key, so reconciliation intentionally avoids merging on Tier-2 fingerprint keys. |
