@@ -11,13 +11,12 @@ import pytest
 from PySide6.QtWidgets import QApplication
 
 import controller.domains.adb_sub_controller as adb_sub_controller_module
-from controller.core_work_callbacks import RefreshDeviceListCallback
 from controller.domains.adb_sub_controller import (
     _REFRESH_DEVICE_LIST_INTERVAL_MS,
     AdbSubController,
 )
 from controller.orchestration.app_controller import AppController
-from controller.runner import JobError
+from controller.runner import JobError, JobHandler, JobHandlerSignals
 from core.devices.phone import Phone
 from core.entrypoint import ModelEntrypoint
 from core.signals import DevicesUpdatedPayload
@@ -42,9 +41,25 @@ class _AppStub:
         self.model_entrypoint = ModelEntrypoint()
         self.view = MagicMock()
         self.submitted: list[dict[str, Any]] = []
+        self.handle_signals: dict[str, JobHandlerSignals] = {}
+        self.runner = MagicMock()
+        self.runner.bind_handle_signals = self._bind_handle_signals
 
-    def _submit_model_entrypoint_async_call(self, **kwargs: Any) -> None:
+    def _bind_handle_signals(self, handle: JobHandler) -> JobHandlerSignals:
+        return self.handle_signals[handle.job_id]
+
+    def _submit_model_entrypoint_async_call(self, **kwargs: Any) -> JobHandler:
         self.submitted.append(kwargs)
+        handle = JobHandler(job_id=f"job-{len(self.submitted)}", name=kwargs["name"])
+        signals = JobHandlerSignals()
+        self.handle_signals[handle.job_id] = signals
+        if on_completed := kwargs.get("on_completed"):
+            signals.Completed.connect(on_completed)
+        if on_failed := kwargs.get("on_failed"):
+            signals.Failed.connect(on_failed)
+        if on_cancelled := kwargs.get("on_cancelled"):
+            signals.Cancelled.connect(on_cancelled)
+        return handle
 
 
 def _make_adb_sub_controller(app: _AppStub) -> AdbSubController:
@@ -115,48 +130,83 @@ def test_on_refresh_device_list_requested_submits_async_job(
     assert submit_kwargs["at_most_once"] is True
     assert submit_kwargs["fn"] == app.model_entrypoint.refresh_known_devices
     assert submit_kwargs["description"] == "Refresh device list from ADB"
-    assert (
-        submit_kwargs["on_completed"]
-        == adb._async_job_callbacks.refresh_device_list.on_completed
-    )
-    assert (
-        submit_kwargs["on_failed"]
-        == adb._async_job_callbacks.refresh_device_list.on_failed
-    )
+    assert submit_kwargs["on_completed"] == app.model_entrypoint.apply_result
+    assert submit_kwargs["on_failed"] == app.model_entrypoint.apply_failure
 
 
-def test_refresh_callback_on_completed_applies_result(
+def test_refresh_submission_completed_applies_result(
     patch_repeat_timer: dict[str, Any],
 ) -> None:
     app = _AppStub()
-    adb = _make_adb_sub_controller(app)
     apply_calls: list[object] = []
     app.model_entrypoint.apply_result = lambda result: apply_calls.append(result)  # type: ignore[method-assign]
-    callback = adb._async_job_callbacks.refresh_device_list
+    adb = _make_adb_sub_controller(app)
     outcome = RefreshKnownDevicesOutcome(devices=[Phone(id="device-1", state="device")])
 
-    callback.on_completed(outcome)
+    adb._on_refresh_device_list_requested()
+    app.handle_signals["job-1"].Completed.emit(outcome)
 
     assert apply_calls == [outcome]
 
 
-def test_refresh_callback_on_failed_applies_failure(
+def test_refresh_submission_failed_applies_failure(
     patch_repeat_timer: dict[str, Any],
 ) -> None:
     app = _AppStub()
-    adb = _make_adb_sub_controller(app)
     failure_calls: list[object] = []
     app.model_entrypoint.apply_failure = lambda error: failure_calls.append(error)  # type: ignore[method-assign]
-    callback = RefreshDeviceListCallback(adb)
+    adb = _make_adb_sub_controller(app)
     error = JobError(
         message="Job failed: refresh_device_list: ADB unavailable",
         traceback="",
         origin="refresh_device_list",
     )
 
-    callback.on_failed(error)
+    adb._on_refresh_device_list_requested()
+    app.handle_signals["job-1"].Failed.emit(error)
 
     assert failure_calls == [error]
+
+
+def test_startup_applies_before_enqueuing_host_identity(
+    patch_repeat_timer: dict[str, Any],
+) -> None:
+    app = _AppStub()
+    events: list[str] = []
+    app.model_entrypoint.apply_result = lambda result: events.append("applied")  # type: ignore[method-assign]
+    adb = _make_adb_sub_controller(app)
+    adb._enqueue_host_install_identity_job = lambda: events.append("host-enqueued")  # type: ignore[method-assign]
+
+    adb._startup_core_runtime()
+    app.handle_signals["job-1"].Completed.emit(object())
+
+    assert events == ["applied", "host-enqueued"]
+    assert app.submitted[0]["on_completed"] == app.model_entrypoint.apply_result
+    assert app.submitted[0]["on_failed"] == app.model_entrypoint.apply_failure
+
+
+@pytest.mark.parametrize("terminal_signal", ["Completed", "Failed"])
+def test_close_hook_runs_after_core_apply(
+    terminal_signal: str,
+    patch_repeat_timer: dict[str, Any],
+) -> None:
+    app = _AppStub()
+    events: list[str] = []
+    app.model_entrypoint.apply_result = lambda result: events.append("applied")  # type: ignore[method-assign]
+    app.model_entrypoint.apply_failure = lambda error: events.append("failed")  # type: ignore[method-assign]
+    adb = _make_adb_sub_controller(app)
+
+    adb._enqueue_close_core_runtime(after_apply=lambda: events.append("hook"))
+    payload = (
+        object()
+        if terminal_signal == "Completed"
+        else JobError(message="boom", traceback="", origin="close_core_runtime")
+    )
+    getattr(app.handle_signals["job-1"], terminal_signal).emit(payload)
+
+    expected_apply = "applied" if terminal_signal == "Completed" else "failed"
+    assert events == [expected_apply, "hook"]
+    assert adb._pending_after_close_apply is None
 
 
 def test_on_devices_updated_forwards_device_id_rebindings_to_view(
