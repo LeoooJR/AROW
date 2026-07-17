@@ -221,3 +221,9 @@ tasks/**/*.png
 
 # SQL files
 *.sql
+
+# TODO files
+TODO/
+
+# Cursor settings
+.cursor/settings.json
