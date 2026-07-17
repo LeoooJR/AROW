@@ -306,39 +306,6 @@ class ModelEntrypoint(Entrypoint):
             return CloseOutcome(adb_server=None)
         return CloseCoreRuntimeWork(self._adb_server).run()
 
-    def restart_adb_server(self) -> None:
-        """
-        Restart the ADB server and keep the instance in entrypoint state.
-        """
-        if self._adb_server is not None:
-            self.emit_core_signal(
-                CoreSignals.ADB_SERVER_STOPPED,
-                AdbServerStoppedPayload(
-                    adb_binary_path=str(self._adb_server.binary.path),
-                ),
-            )
-            self._adb_server.restart()
-            logger.info(
-                "ModelEntrypoint: ADB server restarted",
-                adb_path=str(self._adb_server.binary.path),
-            )
-            self.emit_core_signal(
-                CoreSignals.ADB_SERVER_STARTED,
-                AdbServerStartedPayload(
-                    adb_binary_path=str(self._adb_server.binary.path),
-                ),
-            )
-            self.emit_core_signal(
-                CoreSignals.DEVICES_UPDATED,
-                DevicesUpdatedPayload(
-                    devices=serialize_phone_collection(self.get_known_devices()),
-                ),
-            )
-        else:
-            logger.warning(
-                "ModelEntrypoint: ADB server restart skipped (not running)",
-            )
-
     def get_device(self, device_id: str) -> Phone | None:
         """
         Get a device from the ADB server.
