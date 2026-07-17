@@ -8,14 +8,11 @@ applied on the main thread and forwarded to the view.
 from __future__ import annotations
 
 from collections.abc import Callable
+from functools import partial
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Slot
 
-from controller.core_work_callbacks import (
-    MapAsyncJobCallbacks,
-    RenderMapSimulationCallback,
-)
 from controller.domains.app_sub_controller import AppSubController
 from controller.helper import validate_model_entrypoint, validate_view
 from controller.runner import JobHandler
@@ -40,16 +37,9 @@ class MapSubController(AppSubController):
 
     def __init__(self, app: AppController) -> None:
         super().__init__(app)
-        self._async_job_callbacks: MapAsyncJobCallbacks = (
-            MapAsyncJobCallbacks.for_subcontroller(self)
-        )
         self._render_jobs_by_simulation_id: dict[str, JobHandler] = (
             {}
         )  # Mapping of simulation to job handler
-        # Keep per-job callback objects alive until AsyncRunner emits completion.
-        self._render_callbacks_by_simulation_id: dict[
-            str, RenderMapSimulationCallback
-        ] = {}
 
     def _submit_model_entrypoint_async_call(self, *args, **kwargs):
         return self._app._submit_model_entrypoint_async_call(*args, **kwargs)
@@ -128,16 +118,6 @@ class MapSubController(AppSubController):
                 html_path,
             )
         else:
-            render_callbacks = self._async_job_callbacks.render_map_for_simulation(
-                simulation_id
-            )
-            self._render_callbacks_by_simulation_id[simulation_id] = render_callbacks
-            if render_callbacks is None:
-                logger.error(
-                    "MapSubController: render_map_for_simulation is not set",
-                    simulation_id=simulation_id,
-                )
-                return
             application_dir = self.model_entrypoint.application_dir
             handle = self._submit_model_entrypoint_async_call(
                 name="render_map",
@@ -147,13 +127,12 @@ class MapSubController(AppSubController):
                 job_type="process",
                 coalesce_key=f"render_map:{simulation_id}",
                 preflight=simulation_preflight,
-                on_completed=render_callbacks.on_completed,
-                on_failed=render_callbacks.on_failed,
-                on_cancelled=render_callbacks.on_cancelled,
+                on_completed=self.model_entrypoint.apply_result,
+                on_failed=self.model_entrypoint.apply_failure,
             )
             if handle is not None:
-                render_callbacks.bind_job(handle)
                 self._render_jobs_by_simulation_id[simulation_id] = handle
+                self._bind_render_job_lifecycle(simulation_id, handle)
 
     @validate_model_entrypoint
     @Slot(str, int, str, int, float, float)
@@ -218,9 +197,6 @@ class MapSubController(AppSubController):
         longitude: float,
     ) -> None:
         """Shared AsyncRunner submission for map and restored-marker validation."""
-        location_callbacks = (
-            self._async_job_callbacks.validate_simulation_marker_location
-        )
         self._submit_model_entrypoint_async_call(
             name="validate_simulation_marker_location",
             fn=self.model_entrypoint.validate_simulation_marker_location,
@@ -229,8 +205,8 @@ class MapSubController(AppSubController):
             job_type="thread",
             coalesce_key=f"validate_simulation_marker_location:{simulation_id}",
             preflight=self._simulation_exists_preflight(simulation_id),
-            on_completed=location_callbacks.on_completed,
-            on_failed=location_callbacks.on_failed,
+            on_completed=self.model_entrypoint.apply_result,
+            on_failed=self.model_entrypoint.apply_failure,
         )
 
     @validate_view
@@ -289,7 +265,43 @@ class MapSubController(AppSubController):
         if handle is None or job_id is None or handle.job_id != job_id:
             return
         self._render_jobs_by_simulation_id.pop(simulation_id, None)
-        self._render_callbacks_by_simulation_id.pop(simulation_id, None)
+
+    def _bind_render_job_lifecycle(
+        self, simulation_id: str, handle: JobHandler
+    ) -> None:
+        """Clear only this render handle when its runner job reaches a terminal state."""
+        handle_signals = self._app.runner.bind_handle_signals(handle)
+        handle_signals.Completed.connect(
+            partial(
+                self._on_render_job_finished,
+                simulation_id,
+                handle.job_id,
+            )
+        )
+        handle_signals.Failed.connect(
+            partial(
+                self._on_render_job_finished,
+                simulation_id,
+                handle.job_id,
+            )
+        )
+        handle_signals.Cancelled.connect(
+            partial(
+                self._on_render_job_cancelled,
+                simulation_id,
+                handle.job_id,
+            )
+        )
+
+    @Slot(str, str, object)
+    def _on_render_job_finished(
+        self, simulation_id: str, job_id: str, _result_or_error: object
+    ) -> None:
+        self._clear_render_job_if_current(simulation_id, job_id)
+
+    @Slot(str, str)
+    def _on_render_job_cancelled(self, simulation_id: str, job_id: str) -> None:
+        self._clear_render_job_if_current(simulation_id, job_id)
 
     @validate_view
     def _on_map_rendered(self, payload: MapRenderedPayload) -> None:
@@ -316,7 +328,6 @@ class MapSubController(AppSubController):
     def _on_simulation_deleted(self, payload: SimulationDeletedPayload) -> None:
         simulation_id = payload.simulation_id
         handle = self._render_jobs_by_simulation_id.pop(simulation_id, None)
-        self._render_callbacks_by_simulation_id.pop(simulation_id, None)
         if handle is not None:
             logger.debug(
                 "MapSubController: cancelling in-flight render map job",

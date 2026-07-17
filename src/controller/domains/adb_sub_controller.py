@@ -9,13 +9,6 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QTimer, Slot
 
-from controller.core_work_callbacks import (
-    AdbAsyncJobCallbacks,
-    AuthentificateDeviceCallback,
-    HostInstallIdentityCallback,
-    RefreshDeviceListCallback,
-    StartupCoreRuntimeCallback,
-)
 from controller.domains.app_sub_controller import AppSubController
 from controller.helper import repeat, validate_model_entrypoint, validate_view
 from core.signals import (
@@ -26,6 +19,7 @@ from core.signals import (
     DeviceAuthentificationSucceededPayload,
     DevicesUpdatedPayload,
 )
+from core.work.startup_work import StartupOutcome
 from gui.signals import signals
 from gui.window import MainWindow
 from logger import logger
@@ -41,14 +35,10 @@ class AdbSubController(AppSubController):
 
     def __init__(self, app: AppController) -> None:
         super().__init__(app)
-        self._async_job_callbacks: AdbAsyncJobCallbacks = (
-            AdbAsyncJobCallbacks.for_subcontroller(self)
-        )
         self._refresh_device_list_timer: QTimer = repeat(
             _REFRESH_DEVICE_LIST_INTERVAL_MS
         )(self._on_refresh_device_list_requested)
-        # One-shot hook after CloseCoreRuntime apply (e.g. quit nested QEventLoop); held on
-        # self so AsyncRunner slots keep a long-lived CloseCoreRuntimeCallback on AdbAsyncJobCallbacks.
+        # One-shot hook after CloseCoreRuntime apply (e.g. quit a nested QEventLoop).
         self._pending_after_close_apply: Callable[[], None] | None = None
 
     def _submit_model_entrypoint_async_call(self, *args, **kwargs):
@@ -94,18 +84,20 @@ class AdbSubController(AppSubController):
 
     @validate_model_entrypoint
     def _startup_core_runtime(self) -> None:
-        callback: StartupCoreRuntimeCallback = self._async_job_callbacks.startup
-        if callback is None:
-            raise ValueError("StartupCoreRuntimeCallback is not set")
-        self._submit_model_entrypoint_async_call(
+        handle = self._submit_model_entrypoint_async_call(
             name="startup_core_runtime",
             fn=self.model_entrypoint.startup,
             description="Startup the core runtime",
             job_type="thread",
             coalesce_key="startup",
-            on_completed=callback.on_completed,
-            on_failed=callback.on_failed,
+            on_completed=self.model_entrypoint.apply_result,
+            on_failed=self.model_entrypoint.apply_failure,
         )
+        if handle is not None:
+            handle_signals = self._app.runner.bind_handle_signals(handle)
+            # Connected after apply_result so host identity starts only after startup
+            # state and signals have been applied on the Qt main thread.
+            handle_signals.Completed.connect(self._on_startup_core_runtime_applied)
 
     @validate_model_entrypoint
     def _enqueue_host_install_identity_job(self) -> None:
@@ -113,19 +105,14 @@ class AdbSubController(AppSubController):
         After startup apply finishes, persist/load install UUID off the main thread and
         attach ``stable_key`` on completion (serialized after core runtime startup).
         """
-        callback: HostInstallIdentityCallback = (
-            self._async_job_callbacks.host_install_identity
-        )
-        if callback is None:
-            raise ValueError("HostInstallIdentityCallback is not set")
         self._submit_model_entrypoint_async_call(
             name="host_install_identity",
             fn=self.model_entrypoint.run_host_install_identity,
             description="Load or create persisted host install UUID",
             job_type="thread",
             coalesce_key="host_install_identity",
-            on_completed=callback.on_completed,
-            on_failed=callback.on_failed,
+            on_completed=self.model_entrypoint.apply_result,
+            on_failed=self.model_entrypoint.apply_failure,
         )
 
     ### Slots ###
@@ -142,11 +129,6 @@ class AdbSubController(AppSubController):
             port=port,
             association_code=association_code,
         )
-        callback: AuthentificateDeviceCallback = (
-            self._async_job_callbacks.authentificate_device
-        )
-        if callback is None:
-            raise ValueError("AuthentificateDeviceCallback is not set")
         _port = int(port)
         self._submit_model_entrypoint_async_call(
             name="authentification_workflow",
@@ -155,8 +137,8 @@ class AdbSubController(AppSubController):
             description="Authenticate a device over ADB",
             job_type="thread",
             coalesce_key="authentification",
-            on_completed=callback.on_completed,
-            on_failed=callback.on_failed,
+            on_completed=self.model_entrypoint.apply_result,
+            on_failed=self.model_entrypoint.apply_failure,
         )
 
     @validate_model_entrypoint
@@ -164,11 +146,6 @@ class AdbSubController(AppSubController):
     def _on_refresh_device_list_requested(self) -> None:
         """ADB list query on a worker."""
         logger.debug("AdbSubController: refresh device list requested")
-        callback: RefreshDeviceListCallback = (
-            self._async_job_callbacks.refresh_device_list
-        )
-        if callback is None:
-            raise ValueError("RefreshDeviceListCallback is not set")
         self._submit_model_entrypoint_async_call(
             name="refresh_device_list",
             fn=self.model_entrypoint.refresh_known_devices,
@@ -176,8 +153,8 @@ class AdbSubController(AppSubController):
             job_type="thread",
             coalesce_key="refresh_device_list",
             at_most_once=True,
-            on_completed=callback.on_completed,
-            on_failed=callback.on_failed,
+            on_completed=self.model_entrypoint.apply_result,
+            on_failed=self.model_entrypoint.apply_failure,
         )
 
     @Slot(str)
@@ -191,18 +168,42 @@ class AdbSubController(AppSubController):
         *,
         after_apply: Callable[[], None] | None = None,
     ) -> None:
-        """Stop ADB on a worker; apply outcome on main thread via callback."""
+        """Stop ADB on a worker and apply its outcome on the main thread."""
         self._pending_after_close_apply = after_apply
-        callback = self._async_job_callbacks.close
-        self._submit_model_entrypoint_async_call(
+        handle = self._submit_model_entrypoint_async_call(
             name="close_core_runtime",
             fn=self.model_entrypoint.close_core_runtime,
             description="Stop ADB server and detach core runtime",
             job_type="thread",
             coalesce_key="close",
-            on_completed=callback.on_completed,
-            on_failed=callback.on_failed,
+            on_completed=self.model_entrypoint.apply_result,
+            on_failed=self.model_entrypoint.apply_failure,
         )
+        if handle is not None:
+            handle_signals = self._app.runner.bind_handle_signals(handle)
+            # These are connected after the core appliers above, so the shutdown
+            # waiter is released only once main-thread application has finished.
+            handle_signals.Completed.connect(self._on_close_core_runtime_applied)
+            handle_signals.Failed.connect(self._on_close_core_runtime_applied)
+
+    @Slot(object)
+    def _on_startup_core_runtime_applied(self, result: object) -> None:
+        """Chain host identity only after a validated startup outcome was applied."""
+        if not isinstance(result, StartupOutcome):
+            logger.error(
+                "AdbSubController: unexpected startup result type; skipping host identity",
+                result_type=type(result).__name__,
+            )
+            return
+        self._enqueue_host_install_identity_job()
+
+    @Slot(object)
+    def _on_close_core_runtime_applied(self, _result_or_error: object) -> None:
+        """Consume the one-shot shutdown hook after close success or failure apply."""
+        hook = self._pending_after_close_apply
+        self._pending_after_close_apply = None
+        if hook is not None:
+            hook()
 
     @validate_view
     def _on_adb_server_started(self, payload: AdbServerStartedPayload) -> None:

@@ -16,7 +16,7 @@
 - `src/controller`: communication layer between GUI and model
   - `src/controller/orchestration/`: top-level coordinators (e.g. `AppController`)
   - `src/controller/domains/`: domain sub-controllers (`AdbSubController`, `SimulationSubController`, `MapSubController`)
-  - `src/controller/runner.py`, `helper.py`, `core_work_callbacks.py`, `controller.py`: shared async, validation, callbacks, and MVC base at package root
+  - `src/controller/runner.py`, `helper.py`, `controller.py`: shared async, validation, and MVC base at package root
 
 Follow the project MVC split:
 
@@ -92,7 +92,8 @@ Apply these rules whenever you touch `src/geo`.
 - Create and run model-side heavy work, map creation, and I/O through `src/controller/runner.py`.
 - Use `JobSpecification` and `AsyncRunner.submit(job)` for async execution.
 - Use the returned `JobHandler` and `runner.bind_handle_signals(handle)` when per-job signals are needed.
-- Implement core-runtime async job completion handlers (`on_completed` / `on_failed`) in `src/controller/core_work_callbacks.py`, wired to those handlers, instead of accumulating ad-hoc methods on large controllers.
+- Wire core-runtime async completion and failure directly to `ModelEntrypoint.apply_result` / `apply_failure`, which dispatch to the registered work appliers.
+- Keep post-apply chaining, shutdown hooks, cancellation, and job-tracking cleanup as focused lifecycle handlers in the owning domain subcontroller.
 - Do not introduce ad-hoc threads or processes for model work; route it through `AsyncRunner` so cancellation, coalescing, and signals remain consistent.
 
 ## Qt model/view usage
