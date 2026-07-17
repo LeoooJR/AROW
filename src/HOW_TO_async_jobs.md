@@ -4,6 +4,10 @@ This guide describes the current async job path in AROW: how controllers submit 
 
 It matches the implementation in `src/controller/runner.py`, the domain subcontrollers under `src/controller/domains/`, `src/core/entrypoint.py`, and `src/core/work/`.
 
+Each work module has a same-basename Markdown companion with a visual trace from
+controller submission through main-thread application. The built-in job table
+below links to those diagrams.
+
 ## Mental model
 
 | Layer | Role |
@@ -47,12 +51,13 @@ flowchart LR
 
 | Job origin | Entrypoint method | Work class | Outcome |
 |--------|------|------|------|
-| `startup_core_runtime` | `ModelEntrypoint.startup()` | `StartupCoreRuntimeWork` | `StartupOutcome` |
-| `authentification_workflow` | `ModelEntrypoint.authentificate_device(...)` | `AuthenticateDeviceWork` | `AuthentificateDeviceOutcome` |
-| `host_install_identity` | `ModelEntrypoint.run_host_install_identity()` | `HostInstallIdentityWork` | `HostInstallIdentityOutcome` |
-| `refresh_device_list` | `ModelEntrypoint.refresh_known_devices()` | `RefreshKnownDevicesWork` | `RefreshKnownDevicesOutcome` |
-| `close_core_runtime` | `ModelEntrypoint.close_core_runtime()` | `CloseCoreRuntimeWork` | `CloseOutcome` |
-| `render_map` | `ModelEntrypoint.render_map(simulation_id, application_dir)` | `RenderMapWork` | `RenderMapOutcome` |
+| `startup_core_runtime` | `ModelEntrypoint.startup()` | [`StartupCoreRuntimeWork`](core/work/startup_work.md) | `StartupOutcome` |
+| `authentification_workflow` | `ModelEntrypoint.authentificate_device(...)` | [`AuthenticateDeviceWork`](core/work/authentificate_device_work.md) | `AuthentificateDeviceOutcome` |
+| `host_install_identity` | `ModelEntrypoint.run_host_install_identity()` | [`HostInstallIdentityWork`](core/work/host_install_identity_work.md) | `HostInstallIdentityOutcome` |
+| `refresh_device_list` | `ModelEntrypoint.refresh_known_devices()` | [`RefreshKnownDevicesWork`](core/work/refresh_known_devices_work.md) | `RefreshKnownDevicesOutcome` |
+| `close_core_runtime` | `ModelEntrypoint.close_core_runtime()` | [`CloseCoreRuntimeWork`](core/work/close_work.md) | `CloseOutcome` |
+| `render_map` | `ModelEntrypoint.render_map(simulation_id, application_dir)` | [`RenderMapWork`](core/work/render_map_work.md) | `RenderMapOutcome` |
+| `validate_simulation_marker_location` | `ModelEntrypoint.validate_simulation_marker_location(...)` | [`ValidateSimulationMarkerLocationWork`](core/work/validate_simulation_marker_location_work.md) | `ValidateSimulationMarkerLocationOutcome` |
 
 When you add a new core runtime job, keep this catalog in sync so result/failure dispatch stays auditable.
 
