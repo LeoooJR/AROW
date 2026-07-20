@@ -201,6 +201,7 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+.cursor/settings.json
 
 # Marimo
 marimo/_static/
@@ -224,6 +225,3 @@ tasks/**/*.png
 
 # TODO files
 TODO/
-
-# Cursor settings
-.cursor/settings.json
