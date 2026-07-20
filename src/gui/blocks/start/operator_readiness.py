@@ -207,8 +207,6 @@ class OperatorReadinessBlock(VerticalLayoutWrapper, Block):
         )
 
     def _connect_signals(self) -> None:
-        signals.UI.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
-
         signals.ADB_SERVER.ADBServerStarted.connect(self._on_adb_server_started)
         signals.ADB_SERVER.ADBServerStopped.connect(self._on_adb_server_stopped)
 
@@ -226,10 +224,6 @@ class OperatorReadinessBlock(VerticalLayoutWrapper, Block):
         pass
 
     ### Slots ###
-
-    @Slot()
-    def _on_ui_constraints_disabled(self) -> None:
-        pass
 
     @Slot()
     def _on_adb_server_started(self) -> None:

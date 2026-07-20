@@ -10,7 +10,6 @@ from gui.blocks.start import (
     StartRecentBlock,
     WalkthroughBlock,
 )
-from gui.signals import signals
 from gui.tests.screenshot_helpers import capture_styled_widget_screenshot
 
 pytestmark = pytest.mark.usefixtures("qapp")
@@ -45,8 +44,7 @@ def test_operator_readiness_block_screenshot(qtbot, tmp_path) -> None:
 @pytest.mark.screenshot
 def test_start_recent_block_demo_screenshot(qtbot, tmp_path) -> None:
     block = StartRecentBlock()
-    signals.UI.UiConstraintsDisabled.emit()
-    qtbot.wait(0)
+    block._add_recent_placeholders()
     capture_styled_widget_screenshot(
         qtbot,
         block,

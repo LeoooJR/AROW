@@ -14,7 +14,6 @@ from gui.blocks.start.start_settings import start_settings
 from gui.colors import Theme
 from gui.components import File
 from gui.settings import Settings
-from gui.signals import signals
 from gui.wrapper import VerticalLayoutWrapper
 
 
@@ -154,8 +153,8 @@ class StartRecentBlock(VerticalLayoutWrapper, Block):
         )
 
     def _connect_signals(self) -> None:
-        """Connect delayed UI seed hooks."""
-        signals.UI.UiConstraintsDisabled.connect(self._add_recent_placeholders)
+        """Connect block signals."""
+        pass
 
     @property
     def recent_files_wrapper(self) -> VerticalLayoutWrapper:

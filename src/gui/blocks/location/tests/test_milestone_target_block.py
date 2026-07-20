@@ -63,27 +63,6 @@ def test_milestone_target_block_updates_status_and_repolishes_badge(qtbot) -> No
     assert block.ui.status_badge.property("status-badge") == "ready"
 
 
-def test_milestone_target_block_populates_placeholders_from_debug_signal(
-    qtbot,
-) -> None:
-    block = MilestoneTargetBlock()
-    qtbot.addWidget(block)
-
-    signals.UI.UiConstraintsDisabled.emit()
-    qtbot.wait(0)
-
-    assert block.ui.status_badge.text() == "Ready"
-    assert block.ui.status_badge.kind() == "ready"
-    assert block.ui.line_item.raw_value == block.texts.placeholder_line
-    assert block.ui.km_item.raw_value == block.texts.placeholder_km
-    assert block.ui.longitude_item.raw_value == (
-        f"{block.texts.placeholder_longitude:.6f}"
-    )
-    assert block.ui.latitude_item.raw_value == f"{block.texts.placeholder_latitude:.6f}"
-    assert block.ui.type_item.raw_value == block.texts.placeholder_type
-    assert block.ui.source_item.raw_value == block.texts.placeholder_source
-
-
 def test_milestone_target_block_set_placeholder_values_uses_text_fields(
     qtbot,
 ) -> None:

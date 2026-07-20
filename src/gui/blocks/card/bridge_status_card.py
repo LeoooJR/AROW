@@ -393,8 +393,7 @@ class BridgeStatusCardBlock(QFrame, Block):
         self.layout().setAlignment(self.ui.wrapper, Qt.AlignmentFlag.AlignTop)
 
     def _connect_signals(self) -> None:
-        """Connect card signals; placeholder/debug values are block-owned."""
-        signals.UI.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
+        """Connect card signals."""
         signals.ADB_SERVER.ADBServerStarted.connect(self._on_adb_server_started)
         signals.ADB_SERVER.ADBServerStopped.connect(self._on_adb_server_stopped)
 
@@ -409,11 +408,6 @@ class BridgeStatusCardBlock(QFrame, Block):
     def _on_adb_server_stopped(self) -> None:
         """Update bridge card when the ADB server stops."""
         self.set_adb_values(server_state="stopped", indicator_state="error")
-
-    @Slot()
-    def _on_ui_constraints_disabled(self) -> None:
-        """Re-apply placeholder values when UI constraints are disabled."""
-        self.set_placeholder_values()
 
     def set_placeholder_values(self) -> None:
         """Populate the card with generated placeholder ADB bridge values."""

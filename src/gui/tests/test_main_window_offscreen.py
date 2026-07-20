@@ -31,7 +31,7 @@ def test_main_window_can_be_grabbed_offscreen_without_primary_screen(
     app = QApplication.instance() or QApplication([])
     register_bundled_fonts()
 
-    window = MainWindow(ui_constraints_disabled=True)
+    window = MainWindow()
     window.show()
     app.processEvents()
 

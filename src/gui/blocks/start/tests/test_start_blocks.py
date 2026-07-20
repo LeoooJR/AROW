@@ -37,7 +37,7 @@ def test_start_recent_block_generates_recent_file_rows(qtbot) -> None:
     assert isinstance(block.ui.empty_placeholder, StartRecentPlaceholder)
     assert not block.ui.empty_placeholder.isHidden()
 
-    signals.UI.UiConstraintsDisabled.emit()
+    block._add_recent_placeholders()
     rows = _recent_file_widgets(block)
 
     assert len(rows) == len(block.texts.recent_files)
@@ -105,7 +105,7 @@ def test_start_recent_block_does_not_mix_real_rows_with_seed_placeholders(
         date_text="Last opened 2026-06-12",
     )
 
-    signals.UI.UiConstraintsDisabled.emit()
+    block._add_recent_placeholders()
 
     assert _recent_file_widgets(block) == [row]
 

@@ -27,7 +27,7 @@ When you run `PYTHONPATH=src python -m main`:
 
 1. `src/main.py` creates `QApplication`.
 2. It registers bundled fonts, then creates `MainWindow`.
-3. Unless `--interface-only` is set, it creates `ModelEntrypoint(use_mock_adb=mock_adb)`.
+3. It creates `ModelEntrypoint(use_mock_adb=mock_adb)`.
 4. It creates `AppController(model_entrypoint, view)`.
 5. `AppController` constructs subcontrollers in this order:
    - `SimulationSubController`
@@ -141,7 +141,6 @@ Use this checklist when introducing a new user action:
 
 ## Common pitfalls
 
-- `--interface-only` creates no controller or model. Any doc, demo, or test that depends on ADB, simulations, or async jobs must not assume that mode behaves like the full app.
 - Do not emit core-domain events through `gui.signals`; keep the controller as the boundary adapter.
 - Any custom slot connected with `.connect(...)` or `QTimer.singleShot(...)` should use `@Slot(...)` with an appropriate signature.
 - Do not add ad-hoc threads for model work. Use the shared `AsyncRunner` so cancellation, coalescing, and shutdown behavior stay consistent.

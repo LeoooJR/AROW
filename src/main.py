@@ -21,12 +21,6 @@ app = typer.Typer()
 
 @app.command()
 def main(
-    interface_only: Annotated[
-        bool,
-        typer.Option(
-            help="Only start the interface, no controller and model, useful for debugging."
-        ),
-    ] = False,
     mock_adb: Annotated[
         bool,
         typer.Option(help="Use faker-backed mock ADB (no real adb daemon or binary)."),
@@ -51,18 +45,16 @@ def main(
 
     from gui.window import MainWindow
 
-    main_window = MainWindow(ui_constraints_disabled=interface_only)
+    main_window = MainWindow()
 
-    if not interface_only:
+    from controller import AppController
+    from core.entrypoint import ModelEntrypoint
 
-        from controller import AppController
-        from core.entrypoint import ModelEntrypoint
+    model_entrypoint: ModelEntrypoint = ModelEntrypoint(use_mock_adb=mock_adb)
 
-        model_entrypoint: ModelEntrypoint = ModelEntrypoint(use_mock_adb=mock_adb)
-
-        app_controller: AppController = AppController(
-            model_entrypoint=model_entrypoint, view=main_window
-        )
+    _app_controller: AppController = AppController(
+        model_entrypoint=model_entrypoint, view=main_window
+    )
 
     main_window.show()
 
