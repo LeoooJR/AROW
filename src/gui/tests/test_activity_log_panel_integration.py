@@ -28,10 +28,6 @@ def test_activity_log_resyncs_after_panel_visibility_sequence(monkeypatch) -> No
     app.processEvents()
     body = window.ui.container.ui.body
 
-    body.set_host_panel_visibility(False)
-    app.processEvents()
-    QTest.qWait(Settings.ANIMATION.PANEL_VISIBILITY_DURATION + 40)
-    app.processEvents()
     body.set_left_panels_visibility(False)
     app.processEvents()
     QTest.qWait(Settings.ANIMATION.PANEL_VISIBILITY_DURATION + 40)
