@@ -2,270 +2,202 @@
 
 ## Project overview
 
-- This application spoofs the coordinates of a mobile phone from a computer using Android Debug Bridge (`ADB`).
-- The GUI is built with `PySide6`.
-- Communication between the computer and the phone is handled with ADB-related assets and logic in `src/assets` and `src/core/adb.py`.
+- AROW is a PySide6 desktop application that spoofs an Android phone's coordinates through Android Debug Bridge (`ADB`).
+- Bundled platform tools live in `src/assets`; ADB integration lives in `src/core/adb/`.
+- The project follows an MVC split:
+  - Model and domain logic: `src/core/`
+  - View: `src/gui/`
+  - Controllers and async orchestration: `src/controller/`
+- Geo datasets, validation, and Folium rendering live in `src/core/geo/`.
 
-## Repository structure
+## Working with this repository
 
-- `src/gui`: graphical user interface
-- `src/gui/components`: reusable GUI component package, grouped by component category
-- `src/gui/blocks`: reusable GUI block package for widgets composed from multiple components, grouped by block category
-- `src/core`: model and core logic
-- `src/geo`: Leaflet map integration and map-specific assets
-- `src/controller`: communication layer between GUI and model
-  - `src/controller/orchestration/`: top-level coordinators (e.g. `AppController`)
-  - `src/controller/domains/`: domain sub-controllers (`AdbSubController`, `SimulationSubController`, `MapSubController`)
-  - `src/controller/runner.py`, `helper.py`, `controller.py`: shared async, validation, and MVC base at package root
+- Inspect relevant files and call sites before editing; use `rg` and `rg --files` to discover the current structure.
+- Preserve existing conventions and make the smallest coherent change that fully addresses the task.
+- Treat changing package, component, block, settings, and test inventories as discoverable repository state. Do not rely on or add exhaustive inventories to this file.
+- For every Python coding task, use the `$python-patterns` and `$python-testing` skills. They are the source of truth for general Python design and testing practices; this file contains only AROW-specific constraints.
 
-Follow the project MVC split:
+## Definition of done
 
-- Model: `src/core`
-- View: `src/gui`
-- Controller: `src/controller`
+Before reporting a code change as complete:
+
+1. Add or update tests for changed behavior; every bug fix requires a regression test when the behavior is testable.
+2. Run the narrowest relevant tests first, following the test-selection matrix below.
+3. Run `uv run pre-commit run --files <changed files>` for supported changed files, listing the paths explicitly in the command.
+4. Run the full suite with `uv run pytest` when the change crosses architectural boundaries, affects shared APIs or configuration, or otherwise has broad regression risk.
+5. For visual GUI changes, run the relevant screenshot test and inspect the rendered output; use a full-window screenshot when shell layout, navigation, theme behavior, or multiple GUI areas change.
+6. Regenerate and validate derived files when their sources change.
+7. Report the exact validation commands and outcomes, including any skipped or unverified checks and why they were not run.
+
+Do not describe work as complete while a relevant check is failing.
+
+## Test selection
+
+Use the narrowest applicable row first. Expand validation when a change affects more than one area.
+
+| Changed area | Minimum validation |
+|---|---|
+| `src/core/adb/` or `src/core/devices/` | Corresponding ADB or device tests discovered under `src/` plus affected `src/core/work/` or controller tests; use mocks only |
+| `src/core/geo/` or map rendering | Relevant `src/core/geo/tests/` tests plus affected render-map work and map-controller tests |
+| `src/core/work/` or model entrypoint behavior | Targeted work tests plus affected `src/core/tests/` and domain-controller tests |
+| `src/controller/` or async lifecycle | Targeted controller tests; cover success, failure, cancellation, cleanup, and stale-result behavior when applicable |
+| GUI component or block behavior | The nearest behavioral tests under the owning component, block, or `src/gui/tests/` |
+| GUI appearance, layout, icons, or theme | Behavioral tests plus the nearest `@pytest.mark.screenshot` test and visual inspection, following `DESIGN.md` |
+| Signals or application lifecycle | Relevant controller tests plus main-window or integration tests |
+| Shared API, dependency, test configuration, or cross-layer change | Targeted tests followed by `uv run pytest` |
+| Documentation only | Validate referenced paths and commands; run code tests only when the documentation reflects executable behavior that changed |
+
+Tests must be deterministic and must not depend on a real Android device, live network service, or user-specific state unless the user explicitly authorizes an integration test.
+
+## ADB and device safety
+
+- Default to `MockAdb`, test fixtures, and `PYTHONPATH=src python -m main --mock-adb` for development and verification.
+- Never pair, connect to, disconnect, start or stop spoofing on, or otherwise alter a real device unless the user explicitly requests that operation.
+- Do not use a real connected device as an incidental test target. Mock subprocess and ADB boundaries in automated tests.
+- Never expose or log pairing codes, credentials, or other sensitive device data. Preserve the project's logging-redaction behavior.
+- Keep all ADB subprocess and protocol calls inside `src/core/adb/`; GUI and controller code must communicate through model APIs rather than invoking ADB directly.
+
+## Documentation routing
+
+Read the relevant source before changing these areas:
+
+| Area | Authoritative guide |
+|---|---|
+| Application architecture and launch modes | `README.md` |
+| GUI appearance, spacing, themes, and screenshot workflow | `DESIGN.md` |
+| Async jobs, work application, cancellation, and worker logging | `src/HOW_TO_async_jobs.md` |
+| Controller boundaries and GUI/core signal flows | `src/HOW_TO_controller_and_signals.md` |
+| Simulation persistence and stale-state cleanup | `src/HOW_TO_simulation_persistence.md` |
+| Development without a real ADB installation | `HOW_TO_mock_adb.md` |
+
+When implementation and documentation disagree, inspect tests and call sites to establish current behavior, then update stale documentation as part of the same change when it is in scope.
+
+## Dependency and generated-file ownership
+
+- `pyproject.toml` is the source of truth for runtime and development dependencies.
+- Manage dependencies with uv so `pyproject.toml` and `uv.lock` stay synchronized:
+  - Runtime dependency: `uv add <package>`
+  - Development dependency: `uv add --dev <package>`
+  - Remove a dependency: `uv remove <package>` or `uv remove --dev <package>`
+  - Refresh the lockfile: `uv lock`
+  - Synchronize the development environment: `uv sync --dev`
+- Do not edit `uv.lock` manually.
+- `requirements.txt` is a generated compatibility export, not a dependency source. After dependency changes, regenerate it with:
+
+```bash
+uv export --all-groups --format requirements-txt --no-hashes --output-file requirements.txt
+```
+
+- `src/gui/ressources_rc.py` is generated from `src/gui/ressources.qrc`; never edit it manually. Rebuild it after changing referenced GUI assets or the resource manifest:
+
+```bash
+uv run pyside6-rcc src/gui/ressources.qrc -o src/gui/ressources_rc.py
+```
 
 ## Git workflow
 
 This repository uses two long-lived branches:
 
 | Branch | Role |
-|--------|------|
-| **`dev`** | Integration branch — all day-to-day development lands here |
-| **`main`** | Stable branch — production-ready releases only |
+|---|---|
+| `dev` | Integration branch for day-to-day development |
+| `main` | Stable branch for intentional production releases |
 
-`main` is not the default target for agent automation or routine pull requests.
-
-### Rules for agents and contributors
-
-- **Branch from `dev`:** create feature or fix branches from an up-to-date `dev` checkout.
-- **Open pull requests against `dev`:** never open routine PRs targeting `main`.
-- **Do not commit directly to `main`:** routine work merges into `dev` via PR; `main` is updated only through intentional release promotion from `dev`.
-- **Compare against `dev`:** use `dev...HEAD` for reviews and PR summaries (not `main...HEAD`).
-- **Keep branches short-lived:** one logical change per branch; rebase or update from `dev` before opening or updating a PR.
-
-### Typical flow
-
-1. `git checkout dev && git pull`
-2. `git checkout -b agent/<tool>/<short-description>` (or an equivalent feature branch name)
-3. Commit on the feature branch
-4. Open a PR with **base branch `dev`**
-5. After merge, delete the feature branch when no longer needed
+- Branch feature and fix work from an up-to-date `dev` checkout when the user requests a branch workflow.
+- Open routine pull requests against `dev`, not `main`.
+- Do not commit routine work directly to `main`.
+- Use `dev...HEAD` for reviews and pull-request summaries.
+- Keep branches short-lived and limited to one logical change.
 
 ## Architecture boundaries
 
-- Keep ADB calls inside `src/core/adb.py`.
-- Keep network logic inside `src/core/network.py`.
-- Keep device methods, device metadata, and related dataclasses in `src/gui/device.py`.
-- Do not move model work into the GUI or controller just for convenience.
+- Keep network logic in `src/core/network.py`.
+- Keep device behavior, metadata, repositories, and related dataclasses in `src/core/devices/`.
+- Keep model work out of GUI and controller modules.
+- Keep controllers focused on translating view intent, submitting model work, and routing model results back to the view.
 
 ## Geo and dataset standards
 
-Apply these rules whenever you touch `src/geo`.
+Apply these rules whenever changing `src/core/geo/`.
 
 ### Tabular and spatial data operations
 
 - Treat `pandas.DataFrame`, `geopandas.GeoDataFrame`, and related structures as columnar data.
 - Prefer vectorized APIs, joins, concatenation, groupby aggregations, and spatial joins over row-wise Python loops.
-- Avoid `iterrows`, per-row `apply` with Python callables, and manual index loops in geo data paths unless there is no practical alternative.
-- If a scalar loop is truly required for a third-party API, isolate it, document why, and keep the hot path as small as possible.
+- Avoid `iterrows`, per-row `apply` with Python callables, and manual index loops unless no practical vectorized alternative exists.
+- If a scalar loop is required for a third-party API, isolate it, explain why, and keep the hot path small.
 
 ### Dataset validation
 
-- Express dataset shape, dtype, column, and value constraints for geo codepaths with `pandera`.
+- Express dataset shape, dtype, column, and value constraints with `pandera`.
 - Validate data at clear boundaries such as after load, before export, or before handing data to the map pipeline.
-- Reuse or extend schema definitions in `src/geo/datasets.py` or nearby schema modules instead of scattering ad-hoc checks through `src/geo`.
-- Handle schema failures with explicit project exceptions, following the `src/geo/exceptions.py` and `SchemaValidationError` pattern, rather than silent coercion.
+- Reuse or extend schemas in `src/core/geo/datasets.py`, `src/core/geo/dataset_schemas.py`, or a nearby schema module instead of scattering ad-hoc checks.
+- Translate schema failures into explicit project exceptions following `src/core/geo/exceptions.py` and the `SchemaValidationError` pattern.
 
 ### Map rendering
 
-- Build server-side map HTML with `folium`; do not replace the map stack with ad-hoc Leaflet-only string generation unless the project explicitly decides to migrate.
-- Keep first paint fast: simplify or decimate display geometry when appropriate, avoid redundant layers, and limit inline GeoJSON, plugins, and embedded JS/CSS that slow initial load.
-- Prefer doing data preparation in Python before handing results to Folium so the browser has less work to do.
-
-### Geo dependencies
-
-- Keep `pandera` and `folium` in project dependencies when extending schemas or map features.
-- Align geo-related imports and usage with the versions pinned in `requirements.txt`.
+- Build server-side map HTML with `folium`; do not replace the map stack with ad-hoc Leaflet string generation without an explicit migration decision.
+- Keep first paint fast by preparing data in Python, simplifying display geometry when appropriate, and limiting redundant layers and inline assets.
+- Keep `pandera` and `folium` declared in `pyproject.toml` when extending schema or map features.
 
 ## Async model work
 
-- Create and run model-side heavy work, map creation, and I/O through `src/controller/runner.py`.
-- Use `JobSpecification` and `AsyncRunner.submit(job)` for async execution.
+- Route model-side heavy work, map creation, and I/O through `src/controller/runner.py`.
+- Use `JobSpecification` and `AsyncRunner.submit(job)`.
 - Use the returned `JobHandler` and `runner.bind_handle_signals(handle)` when per-job signals are needed.
-- Wire core-runtime async completion and failure directly to `ModelEntrypoint.apply_result` / `apply_failure`, which dispatch to the registered work appliers.
+- Wire core-runtime completion and failure to `ModelEntrypoint.apply_result` and `ModelEntrypoint.apply_failure`, which dispatch to registered work appliers.
 - Keep post-apply chaining, shutdown hooks, cancellation, and job-tracking cleanup as focused lifecycle handlers in the owning domain subcontroller.
-- Do not introduce ad-hoc threads or processes for model work; route it through `AsyncRunner` so cancellation, coalescing, and signals remain consistent.
+- Do not introduce ad-hoc threads or processes for model work.
 
 ## Qt model/view usage
 
-- When the view needs lists, tables, or trees, prefer Qt model classes in `src/core/qt_models.py`.
-- Use the Qt model/view pattern when it is a better fit than passing plain Python data through the controller.
-
-## Python standards
-
-### Comments and typing
-
-- Comment non-obvious logic and algorithmic steps.
-- Algorithmic logic should be commented generously enough that the intent and flow are easy to follow.
-- Use type hints for function parameters and return values, and for variables when they improve clarity.
-- Prefer built-in collection types and standard `typing` annotations.
-
-### Paths
-
-- Use `pathlib.Path` for all filesystem paths.
-- Do not introduce raw string paths when a `Path` object is appropriate.
-
-### Logging and console output
-
-- Use `loguru` for logging.
-- Log with strong context: include paths, inputs, outputs, identifiers, and relevant state.
-- When styled terminal output is needed, use `rich`.
-
-### Error handling
-
-- Wrap failure-prone operations such as I/O, network access, and parsing in `try/except`.
-- Raise explicit, helpful exceptions that explain what failed.
-- Use `assert` only for strict internal preconditions.
-- Prefer explicit exceptions such as `ValueError` for recoverable or user-facing validation.
+- Prefer Qt model classes in `src/core/qt_models.py` when the view needs lists, tables, or trees.
+- Use Qt model/view instead of passing plain Python collections through the controller when it provides the cleaner ownership boundary.
 
 ## GUI standards
 
-Apply these rules whenever you touch `src/gui`.
+Apply these rules whenever changing `src/gui/`. Discover current categories and owner-local modules with `rg --files src/gui` instead of maintaining their inventory here.
 
-### Design guidelines
+### Design, settings, and colors
 
-- Follow `DESIGN.md` for the AROW visual direction, including light/dark palettes, typography, spacing, widget styling, and interaction states.
-- Treat `DESIGN.md` as the design source of truth before adding new GUI colors, dimensions, component treatments, or theme behavior.
+- Treat `DESIGN.md` as the source of truth for visual direction and screenshot verification.
+- Use `Settings` from `src/gui/settings.py` only for cross-cutting layout tokens shared by multiple owners.
+- Put owner-specific sizing and timing constants in a frozen `<owner>_settings.py` dataclass module next to the component, block, or panel.
+- Use colors from `src/gui/colors.py`; add reusable colors there instead of defining one-off values.
+- Keep styling in `src/gui/stylesheet.py`; do not embed inline style strings in other Python modules.
 
-### Settings and dimensions
+### Components, blocks, and panels
 
-GUI settings are split between **app-wide tokens** and **owner-local modules**, mirroring the signals layout.
+- Put reusable GUI components under the best-fitting category in `src/gui/components/`; create a category when no existing one fits.
+- Treat `src/gui/elements.py` as a backward-compatible re-export shim only. New code imports from `gui.components` or the owning category.
+- Export reusable components from the owning category and `src/gui/components/__init__.py` when they are intended for project-wide use.
+- Components participating in the shared lifecycle inherit from `Component`, implement the lifecycle hooks, and call `_finalize_ui_hooks()` after child widgets and state are initialized.
+- Put reusable multi-component widgets in `src/gui/blocks/`, preferably one block per file, and keep owner-specific helpers beside their block.
+- Export reusable blocks from the owning category and `src/gui/blocks/__init__.py` when intended for project-wide use.
+- Blocks participating in the shared lifecycle inherit from `Block`, implement the lifecycle hooks, and call `_finalize_ui_hooks()` after initialization.
+- Prefer owner-local `Text` and `UI` dataclasses for stable copy and meaningful child-widget references.
+- Blocks own block-specific rendering, filtering, selection, placeholders, theme propagation, and signal handlers.
+- Panels remain thin shells for chrome, visibility, orchestration, data routing, and explicit public facade methods. Do not reach through chained block internals from outside the owner.
+- Put block-internal tests in the owning block category's `tests/`; keep panel, window, component integration, and end-to-end GUI tests in `src/gui/tests/`.
+- Use layout helpers from `src/gui/wrapper.py` when they fit.
 
-#### App-wide settings (`src/gui/settings.py`)
+### Icons and resources
 
-- Import the shared container: `from gui.settings import Settings`.
-- Use `Settings` for cross-cutting layout tokens only:
-  - `Settings.FONT`, `Settings.SPACING`, `Settings.DIMENSION`
-  - `Settings.BORDER_RADIUS`, `Settings.ANIMATION`, `Settings.PANEL`
-- If a value is shared across multiple components, blocks, panels, or stylesheets, add or adjust it here instead of hardcoding elsewhere.
+- Use `src/gui/icons.py` for Qt resource icons.
+- Use `src/core/geo/icons.py` for Folium or Leaflet map icons.
+- Keep assets under `src/gui/statics/` synchronized with `src/gui/ressources.qrc`, then regenerate the compiled resource module as described above.
 
-#### Owner-local settings (`*_settings.py`)
+### Signals and slots
 
-- Component-, block-, and panel-specific dimensions live next to their owner as frozen dataclass modules with a module-level singleton (e.g. `button_settings`, `device_settings`, `welcome_settings`).
-- Import the owner singleton directly, for example:
-  - `from gui.components.buttons.button_settings import button_settings`
-  - `from gui.blocks.device.device_settings import device_settings`
-  - `from gui.welcome_settings import welcome_settings`
-- Current owner-local modules:
-  - Components: `button_settings`, `input_settings`, `list_settings`, `container_settings`, `feedback_settings`, `indicator_settings`, `svg_settings`
-  - Blocks: `activity_log_settings`, `card_settings`, `device_settings`, `location_settings`, `map_settings`, `start_settings`, `top_bar_settings`
-  - GUI-level panels/tabs: `welcome_settings`, `host_panel_settings`
-- When adding a new reusable component or block, create `<owner>_settings.py` beside the owner module if it needs dedicated sizing or timing constants.
-- Do not add owner-specific constants back into `src/gui/settings.py`; keep `settings.py` for shared shell tokens only.
-- `src/gui/stylesheet.py` may import both `Settings` and owner-local settings modules as needed.
-
-### Colors
-
-- Use colors from `src/gui/colors.py`.
-- If a needed color does not exist, add or update it there rather than defining a one-off value locally.
-
-### Components and layouts
-
-- Put reusable GUI building blocks in `src/gui/components/`, not `src/gui/elements.py`.
-- Treat `src/gui/elements.py` as a backward-compatible re-export shim for legacy imports only; new code should import from `gui.components` or a category subpackage such as `gui.components.buttons`.
-- Keep components grouped by purpose in the existing category packages:
-  - `base`: shared component protocol and Qt/ABC metaclass helpers
-  - `buttons`: action and tool button widgets
-  - `containers`: composite card, group, and placeholder widgets
-  - `dialogs`: file and message dialogs
-  - `feedback`: transient feedback such as toasts
-  - `file_display`: file summary/display widgets
-  - `indicators`: progress and state indicators
-  - `inputs`: form/input widgets
-  - `labels`: reusable text and icon-label widgets
-  - `lists`: list widgets
-  - `media`: image and SVG rendering widgets
-- If a new reusable component does not fit an existing category, create a new category package under `src/gui/components/` instead of forcing it into an unrelated module.
-- Export new reusable components from their category `__init__.py` and from `src/gui/components/__init__.py` when they are intended for project-wide use.
-- Components should inherit from `Component` when they participate in the shared component lifecycle, implement `_set_size_policy`, `_set_alignment`, `_connect_signals`, and `apply_theme_icons`, and call `_finalize_ui_hooks()` after their child widgets and state are initialized.
-- Prefer component-local `Text` and `UI` dataclasses for stable labels and child-widget references when a component has user-facing text or meaningful internal widgets.
-- Use layout helpers from `src/gui/wrapper.py` when they fit:
-  - `VerticalLayoutWrapper`
-  - `HorizontalLayoutWrapper`
-  - `GridLayoutWrapper`
-
-### Blocks and panels
-
-- Put reusable multi-component GUI widgets in `src/gui/blocks/`. A block is larger than a component and is composed from multiple components or helper widgets.
-- Keep blocks grouped by category. Current block categories include:
-  - `base`: shared `Block` lifecycle protocol
-  - `activity`: activity log stream, filtering, rows, file display, and activity storage
-  - `card`: reusable card/groupbox-style information blocks such as identity and bridge status cards
-  - `device`: device selection block, device list rows, badges, timestamps, placeholder rows, and selection helpers
-  - `map`: map canvas, placeholder, legend, coordinates, and simulation controls
-  - `start`: welcome start/recent-file and walkthrough blocks
-  - `top_bar`: application header, palette controls, title, and sidebar visibility controls
-- Prefer one block per file. Keep block-specific helper classes beside the block they serve, and avoid aggregate compatibility files that only re-export renamed blocks.
-- Export reusable blocks from their category `__init__.py` and from `src/gui/blocks/__init__.py` when they are intended for project-wide use.
-- Blocks should inherit from `Block` when they participate in the shared block lifecycle, implement `_set_size_policy`, `_set_alignment`, `_connect_signals`, and `apply_theme_icons`, and call `_finalize_ui_hooks()` after their child widgets and state are initialized.
-- Prefer block-local `Text` and `UI` dataclasses for stable copy and child-widget references. Placeholder, demo, default, and generated values owned by a block must live under the block `Text` dataclass.
-- Blocks own block-specific widgets, helper rows/classes, placeholder seeding, row rendering, filtering, list item sizing, selection/highlight behavior, theme-icon propagation, and block-specific signal handlers.
-- Panels should remain thin shells for panel chrome and orchestration: title/header widgets, expand/collapse behavior, visibility handling, routing real data into blocks, and public facade methods required by `window.py` or tests.
-- Panel `UI` dataclasses may store direct block instances, but should not duplicate or expose widgets owned by those blocks. Prefer explicit panel facade methods over reaching through chained block UI references from outside the block.
-- Keep `src/gui/location.py` out of the blocks refactor until the location panel receives its planned dedicated refactor.
-- Put block-internal tests under each block category's `tests/` directory inside `src/gui/blocks/`. Keep panel, window, component, and end-to-end GUI integration tests under `src/gui/tests/`.
-- When behavior moves from a panel into a block, move or add the matching tests under the block category and cover both successful behavior and error or state-regression paths.
-
-### Icons
-
-- Use `src/gui/icons.py` for GUI Qt resource icons.
-- Use `src/geo/icons.py` for folium or Leaflet map icons.
-
-### Signals
-
-- Use view-originating signals from `src/gui/signals.py` for cross-component communication.
-- Import the shared singleton: `from gui.signals import signals`.
-- Access signals through categorized attributes on `signals`, mirroring `Settings`:
-  - `signals.UI` — palette, panel visibility, sidebar display/hide, map-tab activation
-  - `signals.ADB_SERVER` — ADB server lifecycle
-  - `signals.DEVICE` — pairing, selection, refresh, removal
-  - `signals.HOST` — host identity and metadata
-  - `signals.ACTIVITY_LOG` — activity log file updates
-  - `signals.SIMULATION` — simulation start/stop and position/context changes
-- Example: `signals.UI.DisplayLeftPanelsRequested.connect(...)`, `signals.DEVICE.DeviceSelectionSucceeded.emit(...)`.
-- Sidebar visibility uses explicit `Display*` / `Hide*` signals; do not reintroduce boolean left/right toggle signals.
-- Add new GUI-originating signals to the appropriate category class in `src/gui/signals.py`; do not define new global GUI signals elsewhere unless there is a compelling architectural reason.
-- Do not use the legacy `view_signals` / flat `ViewSignals` API in new or updated code.
-
-### Slots
-
-- Any custom method connected via `.connect(...)` or `QTimer.singleShot(...)` must use the `@Slot(...)` decorator from `PySide6.QtCore`.
-- Prefer typed `@Slot` signatures aligned with the connected signal contract in `src/gui/signals.py` (e.g. `@Slot(bool)`, `@Slot(str, str, str)`).
+- Use view-originating signals from the categorized singleton in `src/gui/signals.py`: `from gui.signals import signals`.
+- Add new GUI-originating signals to the appropriate category on `signals`; do not use or extend the legacy flat `view_signals` or `ViewSignals` API.
+- Sidebar visibility uses explicit `Display*` and `Hide*` signals; do not reintroduce boolean left/right toggle signals.
+- Decorate every custom method connected with `.connect(...)` or `QTimer.singleShot(...)` using a typed `@Slot(...)` signature aligned with the signal contract.
 - Use named handler methods instead of lambda slot targets.
-- Do not decorate direct `.emit` bridges (`clicked.connect(signals.DEVICE.AddDeviceRequested.emit)`) or Qt built-in methods (`close`, `setChecked`).
-
-In **`src/controller`**, apply the same rule to handlers wired in subcontroller `connect_view_signals()` and `AppController._connect_view_signals()`. Do **not** decorate `model_entrypoint.subscribe(...)` handlers (core bus, not Qt). Controllers remain plain Python classes; they do not need to inherit `QObject`.
-
-### Stylesheets
-
-- Keep styling in `src/gui/stylesheet.py`.
-- Do not embed inline style strings in other Python files; extend the stylesheet module instead.
+- Do not decorate direct `.emit` bridges or Qt built-in methods.
+- Apply the same slot rule to controller handlers wired in `connect_view_signals()` and `AppController._connect_view_signals()`.
+- Do not decorate `model_entrypoint.subscribe(...)` handlers; they use the core bus, not Qt. Controllers remain plain Python classes.
 
 ### Animations
 
-- Implement common or generic animation helpers in `src/gui/animation.py`.
-- Reuse helpers from `src/gui/animation.py` instead of duplicating shared animation logic in panel or widget modules.
-
-### Qt resources
-
-When adding, removing, renaming, or updating GUI assets referenced by the Qt resource file:
-
-- Update assets under `src/gui/statics/` as needed.
-- Ensure `src/gui/ressources.qrc` matches the asset set.
-- Recompile the resource module when the task is complete:
-
-```bash
-pyside6-rcc src/gui/ressources.qrc -o src/gui/ressources_rc.py
-```
-
-The compiled module is `src/gui/ressources_rc.py`.
+- Implement common animation helpers in `src/gui/animation.py` and reuse them instead of duplicating animation logic in widgets or panels.
