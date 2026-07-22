@@ -27,7 +27,7 @@ When you run `PYTHONPATH=src python -m main run gui`:
 
 1. `src/commands/run/gui.py` creates `QApplication`.
 2. It registers bundled fonts, then creates `MainWindow`.
-3. It creates `ModelEntrypoint(use_mock_adb=mock_adb)`.
+3. It creates `ModelEntrypoint(use_mock_adb=run_options.mock_adb)`.
 4. It creates `AppController(model_entrypoint, view)`.
 5. `AppController` constructs subcontrollers in this order:
    - `SimulationSubController`

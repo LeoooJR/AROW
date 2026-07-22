@@ -49,7 +49,7 @@ def gui_dependencies(monkeypatch: pytest.MonkeyPatch) -> Iterator[dict[str, Mock
     ("arguments", "use_mock_adb"),
     [
         (["run", "gui"], False),
-        (["run", "gui", "--mock-adb"], True),
+        (["run", "--mock-adb", "gui"], True),
     ],
 )
 def test_gui_command_wires_application(

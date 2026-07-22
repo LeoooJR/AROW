@@ -14,10 +14,10 @@ Mock ADB applies only when the **full app** starts (controller + model).
 From the repository root, put `src` on the Python path and run the `main` module (same layout as pytest in this repo):
 
 ```bash
-PYTHONPATH=src python -m main run gui --mock-adb
+PYTHONPATH=src python -m main run --mock-adb gui
 ```
 
-If you normally start the UI from **`src/`** instead, **`python -m main run gui --mock-adb`** works there too.
+If you normally start the UI from **`src/`** instead, **`python -m main run --mock-adb gui`** works there too.
 
 To see Typer options and short help:
 
@@ -25,7 +25,7 @@ To see Typer options and short help:
 PYTHONPATH=src python -m main run gui --help
 ```
 
-Use the **`--mock-adb`** flag in your IDE or shell run configuration wherever you invoke the same entrypoint today.
+Use the **`--mock-adb`** flag before the selected run interface in your IDE or shell run configuration.
 
 ## Environment variables
 

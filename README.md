@@ -37,5 +37,5 @@ PYTHONPATH=src python -m main run gui
 ### Run without real ADB
 
 ```bash
-PYTHONPATH=src python -m main run gui --mock-adb
+PYTHONPATH=src python -m main run --mock-adb gui
 ```
