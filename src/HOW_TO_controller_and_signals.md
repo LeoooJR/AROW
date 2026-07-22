@@ -1,6 +1,6 @@
 # How controller and GUI signals work
 
-This guide explains how the PySide6 view, GUI signal bus, controllers, and core signal subscriptions fit together in AROW. It matches the current implementation in `src/main.py`, `src/gui/signals.py`, `src/controller/orchestration/app_controller.py`, and the domain subcontrollers under `src/controller/domains/`.
+This guide explains how the PySide6 view, GUI signal bus, controllers, and core signal subscriptions fit together in AROW. It matches the current implementation in `src/commands/run/gui.py`, `src/gui/signals.py`, `src/controller/orchestration/app_controller.py`, and the domain subcontrollers under `src/controller/domains/`.
 
 Read this with [`HOW_TO_async_jobs.md`](HOW_TO_async_jobs.md) when you need the lower-level worker-thread and worker-process contract.
 
@@ -23,9 +23,9 @@ The controller layer is the adapter between them. GUI code should not subscribe 
 
 ## Startup sequence
 
-When you run `PYTHONPATH=src python -m main`:
+When you run `PYTHONPATH=src python -m main run gui`:
 
-1. `src/main.py` creates `QApplication`.
+1. `src/commands/run/gui.py` creates `QApplication`.
 2. It registers bundled fonts, then creates `MainWindow`.
 3. It creates `ModelEntrypoint(use_mock_adb=mock_adb)`.
 4. It creates `AppController(model_entrypoint, view)`.
