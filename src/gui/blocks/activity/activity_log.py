@@ -689,7 +689,6 @@ class ActivityLogBlock(QFrame, Block):
 
     def _connect_signals(self) -> None:
         """Connect signals for the activity log block."""
-        signals.UI.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
         signals.ACTIVITY_LOG.ActivityLogFileUpdated.connect(
             self._on_activity_log_file_updated
         )
@@ -774,37 +773,6 @@ class ActivityLogBlock(QFrame, Block):
         action.setDefaultWidget(checkbox)
         menu.addAction(action)
         return action, checkbox
-
-    def _seed_placeholder_activities(self) -> None:
-        """Seed user-facing demo entries until real GUI activity arrives."""
-        now = dt.datetime.now().replace(microsecond=0)
-        self._activities = [
-            ActivityLogEntry(
-                id=uuid.uuid4().hex,
-                timestamp=now - dt.timedelta(minutes=9),
-                category="adb",
-                level="info",
-                message="ADB bridge ready",
-                metadata={"endpoint": "tcp:5037"},
-            ),
-            ActivityLogEntry(
-                id=uuid.uuid4().hex,
-                timestamp=now - dt.timedelta(minutes=6),
-                category="device",
-                level="success",
-                message="Device trusted",
-                detail="Pixel 8 Pro is available for the location spoofing workflow.",
-                metadata={"state": "trusted"},
-            ),
-            ActivityLogEntry(
-                id=uuid.uuid4().hex,
-                timestamp=now - dt.timedelta(minutes=3),
-                category="location",
-                level="info",
-                message="Waiting for target location",
-                metadata={"source": "map"},
-            ),
-        ]
 
     def _visible_activities(self) -> list[ActivityLogEntry]:
         """Return currently visible activities after category and level filtering."""
@@ -1005,12 +973,6 @@ class ActivityLogBlock(QFrame, Block):
             action.blockSignals(False)
 
     ### Slots ###
-
-    @Slot()
-    def _on_ui_constraints_disabled(self) -> None:
-        """Record an activity when the UI constraints are disabled."""
-        self._seed_placeholder_activities()
-        self._render_activities()
 
     @Slot()
     def _on_adb_server_started(self) -> None:

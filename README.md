@@ -10,7 +10,7 @@ AROW is a desktop app that spoofs a phone's location over ADB.
 - `src/core/`: model, ADB/runtime work, persistence, and map-generation entrypoints.
 - `src/core/geo/`: geo datasets, validation, and Folium-based map rendering.
 
-The main CLI entrypoint is `PYTHONPATH=src python -m main`. Starting without `--interface-only` creates:
+The main CLI entrypoint is `PYTHONPATH=src python -m main`. Startup creates:
 
 1. `MainWindow`
 2. `ModelEntrypoint`
@@ -39,11 +39,3 @@ PYTHONPATH=src python -m main
 ```bash
 PYTHONPATH=src python -m main --mock-adb
 ```
-
-### Run interface only
-
-```bash
-PYTHONPATH=src python -m main --interface-only
-```
-
-`--interface-only` starts the Qt UI without constructing `ModelEntrypoint` or `AppController`, so async core jobs, ADB, and mock ADB are all bypassed.

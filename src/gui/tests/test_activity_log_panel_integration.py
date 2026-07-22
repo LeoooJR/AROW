@@ -14,6 +14,7 @@ import gui.ressources_rc
 from gui.blocks.activity import ActivityLogItem
 from gui.fonts import register_bundled_fonts
 from gui.settings import Settings
+from gui.signals import signals
 from gui.window import MainWindow
 
 
@@ -23,10 +24,11 @@ def test_activity_log_resyncs_after_panel_visibility_sequence(monkeypatch) -> No
     app = QApplication.instance() or QApplication([])
     register_bundled_fonts()
 
-    window = MainWindow(ui_constraints_disabled=True)
+    window = MainWindow()
     window.show()
     app.processEvents()
     body = window.ui.container.ui.body
+    signals.ADB_SERVER.ADBServerStarted.emit()
 
     body.set_left_panels_visibility(False)
     app.processEvents()
@@ -64,7 +66,7 @@ def test_welcome_workspace_mode_tracks_outer_sidebars(monkeypatch) -> None:
     app = QApplication.instance() or QApplication([])
     register_bundled_fonts()
 
-    window = MainWindow(ui_constraints_disabled=True)
+    window = MainWindow()
     window.show()
     app.processEvents()
     body = window.ui.container.ui.body

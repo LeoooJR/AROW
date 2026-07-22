@@ -310,7 +310,6 @@ class MilestoneTargetBlock(VerticalLayoutWrapper, Block):
 
     def _connect_signals(self) -> None:
         self.ui.target_button.clicked.connect(signals.UI.TargetSelectionRequested.emit)
-        signals.UI.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
         signals.DEVICE.DeviceSelectionSucceeded.connect(
             self._on_device_selection_succeeded
         )
@@ -368,11 +367,6 @@ class MilestoneTargetBlock(VerticalLayoutWrapper, Block):
         )
 
     ### Slots ###
-
-    @Slot()
-    def _on_ui_constraints_disabled(self) -> None:
-        """Re-apply placeholder values when UI constraints are disabled."""
-        self.set_placeholder_values()
 
     @Slot(str, int, str, int, float, float, str)
     def _on_simulation_location_validated(

@@ -5,7 +5,6 @@ from __future__ import annotations
 import pytest
 
 from gui.blocks.card import BridgeStatusCardBlock, IdentityCardBlock
-from gui.icons import OperatingSystemIcons
 from gui.signals import signals
 
 pytestmark = pytest.mark.usefixtures("qapp")
@@ -39,26 +38,6 @@ def test_identity_card_setters_update_values_and_preserve_omitted_fields(qtbot) 
     assert card.content.host_summary_label.text() == original_summary
     assert card.content.ip_address_row.value_label.text() == "10.0.0.5"
     assert card.content.platform_row.value_label.text() == "linux"
-
-
-def test_identity_card_debug_signal_restores_placeholder_values(qtbot) -> None:
-    card = IdentityCardBlock()
-    qtbot.addWidget(card)
-    card.set_host_values(
-        host_name="Temporary",
-        summary="Temporary summary",
-        ip_address="127.0.0.1",
-        platform="test",
-        os_icon=OperatingSystemIcons.LINUX,
-        identity_state="error",
-    )
-
-    signals.UI.UiConstraintsDisabled.emit()
-    qtbot.wait(0)
-
-    assert card.content.host_name_label.text() == card.texts.placeholder_host_name
-    assert card.content.host_summary_label.text() == card.texts.placeholder_summary
-    assert card.indicator.property("indicator-state") == "valid"
 
 
 def test_identity_card_can_display_error_state(qtbot) -> None:
@@ -106,29 +85,6 @@ def test_bridge_status_card_setters_update_values_and_preserve_omitted_fields(
     assert card.content.version_row.value_label.text() == "1.0.41"
     assert card.content.daemon_row.value_label.text() == "tcp:5037"
     assert card.content.helper_note.text() == original_helper
-
-
-def test_bridge_status_card_debug_signal_restores_placeholder_values(qtbot) -> None:
-    card = BridgeStatusCardBlock()
-    qtbot.addWidget(card)
-    card.set_adb_values(
-        server_state="error",
-        adb_version="broken",
-        daemon="missing",
-        connected_devices="0",
-        helper_note="Temporary",
-        indicator_state="error",
-    )
-
-    signals.UI.UiConstraintsDisabled.emit()
-    qtbot.wait(0)
-
-    assert (
-        card.content.version_row.value_label.text()
-        == card.texts.placeholder_adb_version
-    )
-    assert card.content.helper_note.text() == card.texts.placeholder_helper_note
-    assert card.indicator.property("indicator-state") == "valid"
 
 
 def test_bridge_status_card_can_display_error_state(qtbot) -> None:

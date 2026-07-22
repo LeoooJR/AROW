@@ -344,8 +344,7 @@ class IdentityCardBlock(QFrame, Block):
         self.layout().setAlignment(self.ui.wrapper, Qt.AlignmentFlag.AlignTop)
 
     def _connect_signals(self) -> None:
-        """Connect card signals; placeholder/debug values are block-owned."""
-        signals.UI.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
+        """Connect card signals."""
         signals.HOST.HostDeviceInformationUpdated.connect(
             self._on_host_device_information_updated
         )
@@ -375,11 +374,6 @@ class IdentityCardBlock(QFrame, Block):
             os_icon=os_icon,
             identity_state="valid",
         )
-
-    @Slot()
-    def _on_ui_constraints_disabled(self) -> None:
-        """Re-apply placeholder values when UI constraints are disabled."""
-        self.set_placeholder_values()
 
     def set_placeholder_values(self) -> None:
         """Populate the card with generated placeholder host identity values."""

@@ -4,7 +4,7 @@ This file contains the main window of the application.
 
 import os
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from time import monotonic
 from typing import Deque, Final, Optional
@@ -23,7 +23,6 @@ from PySide6.QtWidgets import (
 )
 from shiboken6 import isValid
 
-import gui.faker as ui_faker
 import gui.ressources_rc  # noqa: F401
 from gui import __application__
 from gui.animation import animate_widget_visibility
@@ -728,17 +727,6 @@ class MainWindow(QMainWindow):
             "Make sure the device is powered on, in developer mode and connected to the same network as the computer.\n"
             "You must own full ownership of the device to use it with this software."
         )
-        demo_device_id: Final[str] = "1234567890"
-        demo_device_name: Final[str] = field(
-            default_factory=ui_faker.generate_android_device_model
-        )
-        demo_device_os: Final[str] = field(
-            default_factory=ui_faker.generate_android_release_label
-        )
-        demo_device_location: Final[str] = field(
-            default_factory=ui_faker.generate_city_state_location
-        )
-        demo_device_last_communication: Final[str] = "2026-01-01 12:00:00"
         authentification_success_toast: str = (
             "Successfully connected to device: {device}."
         )
@@ -767,16 +755,11 @@ class MainWindow(QMainWindow):
         container: MainContainer
         authentification_overlay: AuthentificationOverlay
 
-    def __init__(self, ui_constraints_disabled: bool = False):
-        """Create the main window, layout, and signal wiring.
-
-        Args:
-            ui_constraints_disabled: When True, skip UI sizing constraints used in tests or special modes.
-        """
+    def __init__(self):
+        """Create the main window, layout, and signal wiring."""
         # Initialize parent QMainWindow
         super().__init__()
 
-        self._ui_constraints_disabled = ui_constraints_disabled
         self._device_selection_dialog_open: bool = False
 
         self.ui: MainWindow.UI
@@ -839,10 +822,6 @@ class MainWindow(QMainWindow):
 
     def _connect_signals(self) -> None:
         """Connect signals for the main window."""
-
-        #### Debugging signals ####
-        if self._ui_constraints_disabled:
-            signals.UI.UiConstraintsDisabled.emit()
 
         #### Signals for handling the palette update ####
         signals.UI.UpdatePaletteSignal.connect(self._on_palette_update)
@@ -934,17 +913,7 @@ class MainWindow(QMainWindow):
             button = dialog.exec()
 
             if button == QMessageBox.StandardButton.Yes:
-                if self._ui_constraints_disabled:
-                    logger.warning(
-                        "MainWindow: device selection request skipped (UI constraints disabled)",
-                    )
-                    self.forward_device_selection_succeeded(
-                        f"demo-simulation-{device_id}",
-                        device_id,
-                        device_name,
-                    )
-                else:
-                    signals.DEVICE.DeviceSelectionConfirmed.emit(device_id, device_name)
+                signals.DEVICE.DeviceSelectionConfirmed.emit(device_id, device_name)
             else:
                 signals.DEVICE.DeviceSelectionCancelled.emit()
         finally:
@@ -968,16 +937,6 @@ class MainWindow(QMainWindow):
         """Handle the authentification confirmation."""
         logger.info("MainWindow: authentification confirmed")
         self.ui.authentification_overlay.hide()
-        if self._ui_constraints_disabled:
-            self.forward_device_authentification_succeeded(
-                {
-                    "id": self.texts.demo_device_id,
-                    "name": self.texts.demo_device_name,
-                    "os": self.texts.demo_device_os,
-                    "location": self.texts.demo_device_location,
-                    "last_communication": self.texts.demo_device_last_communication,
-                }
-            )
 
     def forward_device_authentification_succeeded(self, device: dict) -> None:
         """Handle the device authentification succeeded."""

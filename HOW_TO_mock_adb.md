@@ -9,8 +9,6 @@ Mock mode is optional and off by default.
 ## Important limitation
 
 Mock ADB applies only when the **full app** starts (controller + model).
-If you use **`--interface-only`**, no core runtime runs, so **`--mock-adb` has no effect**.
-
 ## CLI (recommended while developing)
 
 From the repository root, put `src` on the Python path and run the `main` module (same layout as pytest in this repo):
@@ -71,7 +69,7 @@ You can combine CLI and env: **`--mock-adb`** is enough on its own; **`AROW_USE_
 
 | Symptom | What to check |
 |--------|----------------|
-| Still looks for real ADB files | Confirm you did **not** pass **`--interface-only`**. Use **`--mock-adb`** or **`AROW_USE_MOCK_ADB=1`**. |
+| Still looks for real ADB files | Use **`--mock-adb`** or **`AROW_USE_MOCK_ADB=1`**. |
 | Data changes every launch | Expected unless you set **`AROW_MOCK_ADB_SEED`**. |
 
 ## Automated tests

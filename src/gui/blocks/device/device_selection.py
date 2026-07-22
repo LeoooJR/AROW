@@ -246,9 +246,6 @@ class DeviceSelectionBlock(QFrame, Block):
         signals.DEVICE.DeviceSelectionFailed.connect(self._on_device_selection_failed)
         signals.DEVICE.DevicesUpdated.connect(self._on_devices_updated)
 
-        #### Signals for handling the UI constraints disabled ####
-        signals.UI.UiConstraintsDisabled.connect(self._on_ui_constraints_disabled)
-
         signals.UI.DisplayLeftPanelsRequested.connect(
             self._on_left_panels_display_requested
         )
@@ -266,11 +263,6 @@ class DeviceSelectionBlock(QFrame, Block):
         signals.UI.MapTabActivated.connect(self._on_map_tab_activated)
 
     ### Slots ###
-
-    @Slot()
-    def _on_ui_constraints_disabled(self) -> None:
-        """Seed placeholder rows when UI constraints are disabled."""
-        self.add_list_items_placeholder()
 
     @Slot()
     def _on_refresh_timer_tick(self, *, now: dt.datetime | None = None) -> None:

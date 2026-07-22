@@ -251,18 +251,6 @@ def test_device_selection_block_map_tab_skips_highlight_when_device_selected(
     )
 
 
-def test_device_selection_block_seeds_placeholders_from_debug_signal(qtbot) -> None:
-    block = DeviceSelectionBlock()
-    qtbot.addWidget(block)
-
-    assert block.available_device_list.count() == 0
-
-    signals.UI.UiConstraintsDisabled.emit()
-    qtbot.wait(0)
-
-    assert block.available_device_list.count() == 3
-
-
 def test_device_selection_block_ignores_missing_remove_request(qtbot) -> None:
     block = DeviceSelectionBlock()
     qtbot.addWidget(block)
