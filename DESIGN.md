@@ -2,7 +2,12 @@
 
 AROW is a desktop control surface for Android location spoofing. Its interface should feel precise, calm, and technical: a clean operator console rather than a playful consumer app. The design direction combines Shadcn-style component polish with a Warp-inspired developer-tool typographic voice, while keeping AROW's orange identity at the center.
 
-This document is the visual target for future GUI work. It does not replace the architecture rules in `AGENTS.md`: colors belong in `src/gui/colors.py`, sizing and spacing in `src/gui/settings.py`, shared widget styles in `src/gui/stylesheet.py`, icons in `src/gui/icons.py`, and reusable view pieces in `src/gui/elements.py`.
+This document is the visual target for future GUI work. It complements the
+repository policy in [`AGENTS.md`](AGENTS.md) and the implementation rules in
+[`src/gui/CONTEXT.md`](src/gui/CONTEXT.md): colors belong in
+`src/gui/colors.py`, cross-cutting sizing and spacing in `src/gui/settings.py`,
+shared widget styles in `src/gui/stylesheet.py`, icons in `src/gui/icons.py`, and
+reusable view pieces in `src/gui/components/` and `src/gui/blocks/`.
 
 ## Design Principles
 
