@@ -14,18 +14,18 @@ Mock ADB applies only when the **full app** starts (controller + model).
 From the repository root, put `src` on the Python path and run the `main` module (same layout as pytest in this repo):
 
 ```bash
-PYTHONPATH=src python -m main --mock-adb
+PYTHONPATH=src python -m main run --mock-adb gui
 ```
 
-If you normally start the UI from **`src/`** instead, **`python -m main --mock-adb`** there also works once `main.py` is the module you invoke.
+If you normally start the UI from **`src/`** instead, **`python -m main run --mock-adb gui`** works there too.
 
 To see Typer options and short help:
 
 ```bash
-PYTHONPATH=src python -m main --help
+PYTHONPATH=src python -m main run gui --help
 ```
 
-Use the **`--mock-adb`** flag in your IDE or shell run configuration wherever you invoke the same entrypoint today.
+Use the **`--mock-adb`** flag before the selected run interface in your IDE or shell run configuration.
 
 ## Environment variables
 
@@ -45,7 +45,7 @@ If either **`--mock-adb`** **or** **`AROW_USE_MOCK_ADB`** is enabled, the app st
 
 ```bash
 export AROW_USE_MOCK_ADB=1
-PYTHONPATH=src python -m main
+PYTHONPATH=src python -m main run gui
 ```
 
 **Repeatable synthetic devices:**
@@ -53,14 +53,14 @@ PYTHONPATH=src python -m main
 ```bash
 export AROW_USE_MOCK_ADB=1
 export AROW_MOCK_ADB_SEED=42
-PYTHONPATH=src python -m main
+PYTHONPATH=src python -m main run gui
 ```
 
 **Windows (PowerShell):**
 
 ```powershell
 $env:AROW_USE_MOCK_ADB = "1"
-python -m main
+python -m main run gui
 ```
 
 You can combine CLI and env: **`--mock-adb`** is enough on its own; **`AROW_USE_MOCK_ADB`** is mainly for automation when you prefer not to change the command line.

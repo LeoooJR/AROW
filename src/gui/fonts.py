@@ -12,7 +12,7 @@ When registering a new bundled font:
 3. Update ``FontSettings`` in ``src/gui/settings.py`` (``FAMILY``, ``FAMILY_CSS``, weights) when
    the new face becomes the application default.
 4. Ensure startup calls ``register_bundled_fonts()`` after ``QApplication`` is created
-   (see ``src/main.py`` and GUI test helpers).
+   (see ``src/commands/run/gui.py`` and GUI test helpers).
 """
 
 from __future__ import annotations

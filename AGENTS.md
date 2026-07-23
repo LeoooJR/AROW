@@ -51,7 +51,7 @@ Tests must be deterministic and must not depend on a real Android device, live n
 
 ## ADB and device safety
 
-- Default to `MockAdb`, test fixtures, and `PYTHONPATH=src python -m main --mock-adb` for development and verification.
+- Default to `MockAdb`, test fixtures, and `PYTHONPATH=src python -m main run --mock-adb gui` for development and verification.
 - Never pair, connect to, disconnect, start or stop spoofing on, or otherwise alter a real device unless the user explicitly requests that operation.
 - Do not use a real connected device as an incidental test target. Mock subprocess and ADB boundaries in automated tests.
 - Never expose or log pairing codes, credentials, or other sensitive device data. Preserve the project's logging-redaction behavior.

@@ -10,7 +10,7 @@ AROW is a desktop app that spoofs a phone's location over ADB.
 - `src/core/`: model, ADB/runtime work, persistence, and map-generation entrypoints.
 - `src/core/geo/`: geo datasets, validation, and Folium-based map rendering.
 
-The main CLI entrypoint is `PYTHONPATH=src python -m main`. Startup creates:
+The main GUI entrypoint is `PYTHONPATH=src python -m main run gui`. The GUI command creates:
 
 1. `MainWindow`
 2. `ModelEntrypoint`
@@ -31,11 +31,11 @@ The main CLI entrypoint is `PYTHONPATH=src python -m main`. Startup creates:
 ### Run the full app
 
 ```bash
-PYTHONPATH=src python -m main
+PYTHONPATH=src python -m main run gui
 ```
 
 ### Run without real ADB
 
 ```bash
-PYTHONPATH=src python -m main --mock-adb
+PYTHONPATH=src python -m main run --mock-adb gui
 ```
