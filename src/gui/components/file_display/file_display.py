@@ -20,6 +20,7 @@ from gui.components.media.svg import SVG
 from gui.icons import GenericIcons, icon_qt_path, icon_qt_path_for_theme
 from gui.settings import Settings
 from gui.signals import signals
+from logger import logger
 
 
 class File(QWidget, Component):
@@ -168,7 +169,9 @@ class File(QWidget, Component):
         if dialog.exec():
             filename: list[str] = dialog.selectedFiles()
             if filename:
-                signals.ACTIVITY_LOG.ActivityLogFileUpdateRequested.emit(filename[0])
+                selected_path = filename[0]
+                logger.info("Activity log file selected", path=selected_path)
+                signals.ACTIVITY_LOG.ActivityLogFileUpdateRequested.emit(selected_path)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)

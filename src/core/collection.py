@@ -1,5 +1,4 @@
 from abc import ABC
-from pprint import pformat
 from typing import Generic, Iterator, Protocol, TypeVar
 
 from loguru import logger
@@ -31,10 +30,10 @@ class Repository(ABC, Generic[RepositoryObject]):
             raise ValueError(f"Item with id {item.id} already exists")
         self._repository[item.id] = item
         logger.debug(
-            "{}.add: repository snapshot ({} item(s))\n{}",
-            self.__class__.__name__,
-            len(self._repository),
-            pformat(self._repository),
+            "Repository item added",
+            repository_type=self.__class__.__name__,
+            item_id=item.id,
+            item_count=len(self._repository),
         )
 
     def add_all(self, items: list[RepositoryObject]) -> None:
@@ -42,10 +41,10 @@ class Repository(ABC, Generic[RepositoryObject]):
         for item in items:
             self.add(item)
         logger.debug(
-            "{}.add_all: repository snapshot ({} item(s))\n{}",
-            self.__class__.__name__,
-            len(self._repository),
-            pformat(self._repository),
+            "Repository items added",
+            repository_type=self.__class__.__name__,
+            added_count=len(items),
+            item_count=len(self._repository),
         )
 
     def remove(self, item: RepositoryObject) -> None:
@@ -54,19 +53,19 @@ class Repository(ABC, Generic[RepositoryObject]):
             raise ValueError(f"Item with id {item.id} does not exist")
         self._repository.pop(item.id)
         logger.debug(
-            "{}.remove: repository snapshot ({} item(s))\n{}",
-            self.__class__.__name__,
-            len(self._repository),
-            pformat(self._repository),
+            "Repository item removed",
+            repository_type=self.__class__.__name__,
+            item_id=item.id,
+            item_count=len(self._repository),
         )
 
     def clear(self) -> None:
         """Clear the repository."""
         self._repository.clear()
         logger.debug(
-            "{}.clear: repository snapshot (0 item(s))\n{}",
-            self.__class__.__name__,
-            pformat(self._repository),
+            "Repository cleared",
+            repository_type=self.__class__.__name__,
+            item_count=0,
         )
 
     def __len__(self) -> int:

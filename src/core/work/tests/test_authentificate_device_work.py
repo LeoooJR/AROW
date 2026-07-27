@@ -234,7 +234,9 @@ def test_mock_authenticate_non_protocol_failure_raises() -> None:
     assert error.association_code == "222222"
 
 
-def test_authenticate_apply_failure_emits_device_authentification_failed() -> None:
+def test_authenticate_apply_failure_emits_device_authentification_failed(
+    log_records,
+) -> None:
     model_entrypoint = ModelEntrypoint()
     emitted: list[tuple[CoreSignal[Any], object]] = []
     model_entrypoint.emit_core_signal = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
@@ -260,6 +262,10 @@ def test_authenticate_apply_failure_emits_device_authentification_failed() -> No
             ),
         )
     ]
+    record = log_records[-1]
+    assert record["level"].name == "WARNING"
+    assert record["message"] == "Device pairing failed"
+    assert record["extra"]["association_code"] == "333333"
 
 
 def test_authenticate_apply_failure_emits_error_raised_for_generic_exception() -> None:
@@ -281,7 +287,7 @@ def test_authenticate_apply_failure_emits_error_raised_for_generic_exception() -
     assert payload.error_message == "unexpected"
 
 
-def test_authenticate_apply_success_adds_phone_and_emits_signal() -> None:
+def test_authenticate_apply_success_adds_phone_and_emits_signal(log_records) -> None:
     state = MockAdbState(seed=444, initial_devices=0)
     server = MockAdbServer(state=state)
     model_entrypoint = ModelEntrypoint()
@@ -305,3 +311,9 @@ def test_authenticate_apply_success_adds_phone_and_emits_signal() -> None:
             ),
         )
     ]
+    paired_records = [
+        record for record in log_records if record["message"] == "Device paired"
+    ]
+    assert len(paired_records) == 1
+    assert paired_records[0]["level"].name == "INFO"
+    assert paired_records[0]["extra"]["device_id"] == "paired-phone"

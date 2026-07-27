@@ -150,8 +150,8 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
         ip, port, association_code = self.ip, self.port, self.association_code
         validation_failure = PairingInputValidator.validate(ip, port, association_code)
         if validation_failure is not None:
-            logger.warning(
-                "ModelEntrypoint: device pairing input validation failed",
+            logger.debug(
+                "Device pairing input validation failed",
                 ip=ip,
                 port=port,
                 reason=validation_failure,
@@ -168,8 +168,8 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
             return AuthentificateDeviceOutcome(success_phone=phone)
         except AdbClientException as error:
             error_message: str = str(error)
-            logger.warning(
-                "ModelEntrypoint: device pairing failed (first attempt)",
+            logger.debug(
+                "Device pairing attempt failed",
                 ip=ip,
                 port=port,
                 error=error_message,
@@ -178,7 +178,7 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
                 try:
                     adb_server.restart()
                     logger.info(
-                        "ModelEntrypoint: ADB server restarted after protocol fault",
+                        "ADB server restarted after a pairing protocol fault",
                         ip=ip,
                         port=port,
                     )
@@ -186,8 +186,8 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
                     enrich_phones_with_adb_shell_properties(adb_client, [phone])
                     return AuthentificateDeviceOutcome(success_phone=phone)
                 except (AdbClientException, AdbServerException) as retry_error:
-                    logger.warning(
-                        "ModelEntrypoint: authentification retry failed after ADB server restart",
+                    logger.debug(
+                        "Device pairing retry failed after ADB server restart",
                         ip=ip,
                         port=port,
                         error=str(retry_error),
@@ -212,6 +212,11 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
     ) -> None:
         """Emit successful authentification on the core bus (Qt main thread only)."""
         registration_entrypoint = cast(DeviceRegistrationEntrypoint, model_entrypoint)
+        logger.info(
+            "Device paired",
+            device_id=outcome.success_phone.id,
+            device_name=outcome.success_phone.name,
+        )
         registration_entrypoint.register_paired_device(outcome.success_phone)
         registration_entrypoint.emit_core_signal(
             CoreSignals.DEVICE_AUTHENTIFICATION_SUCCEEDED,
@@ -225,6 +230,13 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
         model_entrypoint: CoreSignalEmitter, error: BaseException
     ) -> None:
         if isinstance(error, DeviceAuthentificationError):
+            logger.warning(
+                "Device pairing failed",
+                ip=error.ip,
+                port=error.port,
+                association_code=error.association_code,
+                reason=error.reason,
+            )
             model_entrypoint.emit_core_signal(
                 CoreSignals.DEVICE_AUTHENTIFICATION_FAILED,
                 DeviceAuthentificationFailedPayload(

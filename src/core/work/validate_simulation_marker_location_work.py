@@ -19,6 +19,7 @@ from core.signals import (
     SimulationLocationValidatedPayload,
 )
 from core.work.core_runtime_work import CoreRuntimeWork, CoreRuntimeWorkOutcome
+from logger import logger
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,12 +130,27 @@ class ValidateSimulationMarkerLocationWork(
         outcome: ValidateSimulationMarkerLocationOutcome,
     ) -> None:
         if outcome.validated is not None:
+            logger.info(
+                "Simulation location validated",
+                simulation_id=outcome.validated.simulation_id,
+                km=outcome.validated.km,
+                line_code=outcome.validated.line_code,
+                line_troncon=outcome.validated.line_troncon,
+            )
             model_entrypoint.emit_core_signal(
                 CoreSignals.SIMULATION_LOCATION_VALIDATED,
                 outcome.validated,
             )
             return
         if outcome.rejected is not None:
+            logger.warning(
+                "Simulation location rejected",
+                simulation_id=outcome.rejected.simulation_id,
+                km=outcome.rejected.km,
+                line_code=outcome.rejected.line_code,
+                line_troncon=outcome.rejected.line_troncon,
+                reason=outcome.rejected.reason,
+            )
             model_entrypoint.emit_core_signal(
                 CoreSignals.SIMULATION_LOCATION_REJECTED,
                 outcome.rejected,

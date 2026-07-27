@@ -124,7 +124,7 @@ class AdbSubController(AppSubController):
     ) -> None:
         """Authentification workflow runs on a worker thread."""
         logger.debug(
-            "AdbSubController: authentification workflow confirmed",
+            "Device pairing workflow queued",
             ip=ip,
             port=port,
             association_code=association_code,
@@ -145,7 +145,7 @@ class AdbSubController(AppSubController):
     @Slot()
     def _on_refresh_device_list_requested(self) -> None:
         """ADB list query on a worker."""
-        logger.debug("AdbSubController: refresh device list requested")
+        logger.debug("Device list refresh queued")
         self._submit_model_entrypoint_async_call(
             name="refresh_device_list",
             fn=self.model_entrypoint.refresh_known_devices,
@@ -191,7 +191,7 @@ class AdbSubController(AppSubController):
         """Chain host identity only after a validated startup outcome was applied."""
         if not isinstance(result, StartupOutcome):
             logger.error(
-                "AdbSubController: unexpected startup result type; skipping host identity",
+                "Host identity setup skipped because startup returned an unexpected result",
                 result_type=type(result).__name__,
             )
             return
@@ -207,28 +207,14 @@ class AdbSubController(AppSubController):
 
     @validate_view
     def _on_adb_server_started(self, payload: AdbServerStartedPayload) -> None:
-        logger.info(
-            "AdbSubController: ADB server started",
-            adb_binary_path=payload.adb_binary_path,
-        )
         self.view.forward_adb_server_started()
 
     @validate_view
     def _on_adb_server_stopped(self, payload: AdbServerStoppedPayload) -> None:
-        logger.info(
-            "AdbSubController: ADB server stopped",
-            adb_binary_path=payload.adb_binary_path,
-        )
         self.view.forward_adb_server_stopped()
 
     @validate_view
     def _on_devices_updated(self, payload: DevicesUpdatedPayload) -> None:
-        logger.info(
-            "AdbSubController: devices updated",
-            device_count=len(payload.devices),
-            device_descriptors=payload.devices,
-            device_id_rebindings=dict(payload.device_id_rebindings),
-        )
         self.view.forward_devices_updated(
             payload.devices,
             dict(payload.device_id_rebindings),
@@ -239,26 +225,12 @@ class AdbSubController(AppSubController):
         self, payload: DeviceAuthentificationSucceededPayload
     ) -> None:
         descriptor = payload.device
-        device_id = str(descriptor.get("id", ""))
-        device_name = str(descriptor.get("name", ""))
-        logger.success(
-            "AdbSubController: device authentification succeeded",
-            device_id=device_id,
-            device_name=device_name,
-        )
         self.view.forward_device_authentification_succeeded(descriptor)
 
     @validate_view
     def _on_device_authentification_failed(
         self, payload: DeviceAuthentificationFailedPayload
     ) -> None:
-        logger.warning(
-            "AdbSubController: device authentification failed",
-            ip=payload.ip,
-            port=payload.port,
-            association_code=payload.association_code,
-            reason=payload.reason,
-        )
         self.view.forward_device_authentification_failed(
             ip=payload.ip,
             port=payload.port,

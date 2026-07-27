@@ -126,7 +126,7 @@ class AdbServer:
             self._paired_devices.working_device = device
         except ValueError as e:
             logger.error(
-                "AdbServer: failed to set working device",
+                "ADB working device could not be set",
                 error=str(e),
                 device_id=device.id,
             )
@@ -179,7 +179,7 @@ class AdbServer:
         argv = [str(binary.path), command.command, *command.args]
         profile = retry_profile_for(command, scope="server")
         logger.debug(
-            "AdbServer: reading ADB binary version",
+            "ADB binary version read started",
             adb_path=str(binary.path),
             argv=_log_safe_argv(command, argv),
             command_line=_log_safe_command_line(command, argv),
@@ -232,14 +232,14 @@ class AdbServer:
             result = self._execute(command)
         except AdbServerException as exc:
             logger.warning(
-                "AdbServer: failed to check mDNS availability",
+                "ADB mDNS availability could not be checked",
                 error=str(exc),
             )
             self._mdns_available = False
             return self._mdns_available
         if result.status != AdbCommandResultStatus.SUCCESS:
             logger.warning(
-                "AdbServer: mDNS availability check returned non-success",
+                "ADB mDNS availability check returned a non-success result",
                 status=result.status.name,
                 return_code=result.return_code,
                 stdout=_log_safe_output_preview(result.output, command),
@@ -248,9 +248,7 @@ class AdbServer:
             self._mdns_available = False
             return self._mdns_available
         self._mdns_available = ADBCommandParser.MDNS_CHECK.parse(result.output or "")
-        logger.debug(
-            "AdbServer: mDNS availability refreshed", available=self._mdns_available
-        )
+        logger.debug("ADB mDNS availability refreshed", available=self._mdns_available)
         return self._mdns_available
 
     def is_server_running(self) -> bool:
@@ -266,7 +264,7 @@ class AdbServer:
                 return result.status == AdbCommandResultStatus.ERROR
             if command == AdbCommands.START_SERVER.value:
                 return result.status == AdbCommandResultStatus.SUCCESS
-        logger.warning("AdbServer: server running state unknown (no lifecycle history)")
+        logger.warning("ADB server state is unknown because lifecycle history is empty")
         return False
 
     def get_known_devices(self) -> list[Phone]:
@@ -288,7 +286,7 @@ class AdbServer:
 
         def _attempt() -> AdbCommandResult:
             logger.debug(
-                "AdbServer: executing command",
+                "ADB server command started",
                 adb_path=str(self.binary.path),
                 command=command.command,
                 argv=_log_safe_argv(command, argv),
@@ -306,7 +304,7 @@ class AdbServer:
             except subprocess.TimeoutExpired as exc:
                 error = f"timed out after {profile.timeout_seconds}s"
                 logger.debug(
-                    "AdbServer: command timed out",
+                    "ADB server command timed out",
                     adb_path=str(self.binary.path),
                     command=command.command,
                     error=error,
@@ -328,7 +326,7 @@ class AdbServer:
                     f"Failed to run ADB binary {self.binary.path}"
                 ) from exc
             logger.debug(
-                "AdbServer: command completed",
+                "ADB server command completed",
                 adb_path=str(self.binary.path),
                 command=command.command,
                 return_code=completed.returncode,

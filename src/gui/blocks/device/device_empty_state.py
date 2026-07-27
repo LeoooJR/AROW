@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Final
 
-from PySide6.QtCore import QPointF, QRectF, QSize, Qt
+from PySide6.QtCore import QPointF, QRectF, QSize, Qt, Slot
 from PySide6.QtGui import QIcon, QPainter, QPen
 from PySide6.QtWidgets import (
     QFrame,
@@ -24,6 +24,7 @@ from gui.icons import GenericIcons, icon_qt_path_for_theme
 from gui.settings import Settings
 from gui.signals import signals
 from gui.wrapper import VerticalLayoutWrapper
+from logger import logger
 
 
 class DeviceDiscoveryGlyph(QFrame):
@@ -241,9 +242,13 @@ class DeviceEmptyState(QFrame, Block):
     def _connect_signals(self) -> None:
         """Emit the same view-level actions as the device-list toolbar."""
         self.ui.add_button.clicked.connect(signals.DEVICE.AddDeviceRequested.emit)
-        self.ui.refresh_button.clicked.connect(
-            signals.DEVICE.RefreshDeviceListRequested.emit
-        )
+        self.ui.refresh_button.clicked.connect(self._on_refresh_requested)
+
+    @Slot()
+    def _on_refresh_requested(self) -> None:
+        """Log and emit a refresh request from the empty-state action."""
+        logger.info("Device list refresh requested")
+        signals.DEVICE.RefreshDeviceListRequested.emit()
 
     def apply_theme_icons(self, theme: Theme) -> None:
         """Refresh all icon-bearing children for the active theme."""

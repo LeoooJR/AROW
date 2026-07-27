@@ -176,13 +176,13 @@ class InMemoryCoreSignalBus(CoreSignalBus):
         handlers = self._subscribers.setdefault(signal, [])
         if handler in handlers:
             logger.debug(
-                "CoreSignalBus: subscription ignored (duplicate handler)",
+                "Duplicate core signal subscription ignored",
                 signal=str(signal),
             )
             return CoreSignalSubscription(self, signal, handler)
         handlers.append(handler)
         logger.debug(
-            "CoreSignalBus: handler subscribed",
+            "Core signal handler subscribed",
             signal=str(signal),
             subscriber_count=len(handlers),
         )
@@ -208,7 +208,7 @@ class InMemoryCoreSignalBus(CoreSignalBus):
         if not handlers:
             self._subscribers.pop(signal, None)
         logger.debug(
-            "CoreSignalBus: handler unsubscribed",
+            "Core signal handler unsubscribed",
             signal=str(signal),
             subscriber_count=len(self._subscribers.get(signal, [])),
         )
@@ -239,7 +239,7 @@ class InMemoryCoreSignalBus(CoreSignalBus):
                 handler(payload)
             except Exception:
                 logger.exception(
-                    "CoreSignalBus: handler raised during emit",
+                    "Core signal handler raised while processing an event",
                     signal=str(signal),
                     payload_type=type(payload).__name__,
                 )

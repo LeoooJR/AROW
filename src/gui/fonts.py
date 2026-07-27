@@ -105,25 +105,32 @@ def register_bundled_fonts() -> None:
             if variable_font_id >= 0:
                 nb_variable_font_bundled += 1
                 logger.debug(
-                    "Registered bundled variable font file: {}", variable_font_path
+                    "Bundled variable font registered", path=str(variable_font_path)
                 )
             else:
                 nb_variable_font_refused += 1
-                logger.warning("Qt refused bundled font file {}", variable_font_path)
+                logger.debug(
+                    "Bundled variable font refused by Qt",
+                    path=str(variable_font_path),
+                )
 
     if nb_variable_font_bundled == 0:
-        logger.warning("No bundled variable fonts loaded under {}", _FONTS_BASE)
         logger.warning(
-            "Qt refused {} bundled variable font file(s)", nb_variable_font_refused
+            "Bundled variable fonts unavailable; falling back to static fonts",
+            path=str(_FONTS_BASE),
+            discovered_count=len(variable_font_paths),
+            refused_count=nb_variable_font_refused,
         )
-        logger.warning("Falling back to static fonts.")
     else:
         logger.debug(
-            "Registered {} bundled variable font file(s)", nb_variable_font_bundled
+            "Bundled variable fonts registered",
+            registered_count=nb_variable_font_bundled,
+            refused_count=nb_variable_font_refused,
         )
         if nb_variable_font_refused > 0:
             logger.warning(
-                "Qt refused {} bundled variable font file(s)", nb_variable_font_refused
+                "Some bundled variable fonts were refused by Qt",
+                refused_count=nb_variable_font_refused,
             )
         return
 
@@ -132,31 +139,42 @@ def register_bundled_fonts() -> None:
     static_font_paths: list[Path] = static_fonts.iter_ttf_paths()
 
     if not static_font_paths:
-        logger.warning("No bundled static fonts found under {}", _FONTS_BASE)
+        logger.warning(
+            "Bundled static font fallback is unavailable",
+            path=str(_FONTS_BASE),
+        )
         return
 
     for static_font_path in static_font_paths:
         static_font_id = QFontDatabase.addApplicationFont(str(static_font_path))
         if static_font_id >= 0:
             nb_static_font_bundled += 1
-            logger.debug("Registered bundled static font file: {}", static_font_path)
+            logger.debug(
+                "Bundled static font registered",
+                path=str(static_font_path),
+            )
         else:
             nb_static_font_refused += 1
-            logger.warning("Qt refused bundled font file {}", static_font_path)
+            logger.debug(
+                "Bundled static font refused by Qt",
+                path=str(static_font_path),
+            )
 
     if nb_static_font_bundled == 0:
         logger.warning(
-            "Bundled static fonts present but none loaded under {}", _FONTS_BASE
-        )
-        logger.warning(
-            "Qt refused {} bundled static font file(s)", nb_static_font_refused
+            "Bundled static fonts could not be registered",
+            path=str(_FONTS_BASE),
+            refused_count=nb_static_font_refused,
         )
     else:
         logger.debug(
-            "Registered {} bundled static font file(s)", nb_static_font_bundled
+            "Bundled static fonts registered",
+            registered_count=nb_static_font_bundled,
+            refused_count=nb_static_font_refused,
         )
         if nb_static_font_refused > 0:
             logger.warning(
-                "Qt refused {} bundled static font file(s)", nb_static_font_refused
+                "Some bundled static fonts were refused by Qt",
+                refused_count=nb_static_font_refused,
             )
     return

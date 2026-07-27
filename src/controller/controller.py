@@ -161,7 +161,7 @@ class Controller(ABC):
             handle_signals.Failed.connect(on_failed)
 
         logger.debug(
-            "Controller: async model entrypoint job submitted",
+            "Model entrypoint job submitted",
             controller_type=type(self).__name__,
             model_entrypoint_type=type(self.model_entrypoint).__name__,
             job_id=handle.job_id,

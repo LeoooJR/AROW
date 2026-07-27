@@ -55,7 +55,7 @@ class SimulationService:
             self._simulations.restore(simulation)
         except ValueError as error:
             logger.warning(
-                "SimulationService: failed to restore persisted simulation",
+                "Persisted simulation could not be restored",
                 simulation_id=simulation.id,
                 error=str(error),
             )
@@ -93,6 +93,12 @@ class SimulationService:
             if simulation is None:
                 simulation = Simulation(device=device)
                 self._simulations.add(simulation)
+                logger.info(
+                    "Simulation created",
+                    simulation_id=simulation.id,
+                    device_id=device.id,
+                    device_name=device.name,
+                )
                 self._entrypoint.emit_core_signal(
                     CoreSignals.SIMULATION_CREATED,
                     SimulationCreatedPayload(
@@ -122,7 +128,7 @@ class SimulationService:
         through the canonical async validation path on the main-thread bus.
         """
         logger.info(
-            "SimulationService: reusing existing simulation for device",
+            "Simulation restored",
             simulation_id=simulation.id,
             device_id=device.id,
         )
@@ -159,7 +165,7 @@ class SimulationService:
         """Publish a typed simulation creation failure for controller bridging."""
         device_name = device.name if device is not None else device_id
         logger.error(
-            "SimulationService: simulation creation failed",
+            "Simulation creation failed",
             device_id=device_id,
             device_name=device_name,
             reason=reason,
@@ -270,7 +276,7 @@ class SimulationService:
         simulation = self._simulations.get(simulation_id)
         if simulation is None:
             logger.warning(
-                "SimulationService: persist_simulation skipped (simulation not found)",
+                "Simulation persistence skipped because the simulation was not found",
                 simulation_id=simulation_id,
             )
             return
@@ -297,7 +303,7 @@ class SimulationService:
         simulation = self._get_simulation_for_device(device_id)
         if simulation is None:
             logger.debug(
-                "SimulationService: no simulation found for device, skipping deletion",
+                "Simulation deletion skipped because no device simulation was found",
                 device_id=device_id,
             )
             self._entrypoint.emit_core_signal(
@@ -310,6 +316,11 @@ class SimulationService:
             return
         simulation_id = simulation.id
         self.delete_simulation(simulation)
+        logger.info(
+            "Simulation deleted",
+            simulation_id=simulation_id,
+            device_id=device_id,
+        )
         self._entrypoint.emit_core_signal(
             CoreSignals.SIMULATION_DELETED,
             SimulationDeletedPayload(

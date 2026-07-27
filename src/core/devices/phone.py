@@ -407,7 +407,7 @@ class PhoneRepository(Repository[Phone]):
         try:
             super().add(item)
         except ValueError as error:
-            logger.error("PhoneRepository: failed to add phone", error=str(error))
+            logger.error("Phone could not be added to repository", error=str(error))
             return
         if self._working_device is None:
             self._working_device = item
@@ -416,7 +416,7 @@ class PhoneRepository(Repository[Phone]):
         try:
             super().remove(item)
         except ValueError as error:
-            logger.error("PhoneRepository: failed to remove phone", error=str(error))
+            logger.error("Phone could not be removed from repository", error=str(error))
             return
         if self._working_device == item:
             self._working_device = None

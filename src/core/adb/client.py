@@ -177,8 +177,8 @@ class AdbClient:
             result = self._execute(command, phone)
             raise_client_for_result(command, result)
         except AdbClientException as exc:
-            logger.warning(
-                "AdbClient: failed to read ro.serialno",
+            logger.debug(
+                "Device serial property could not be read",
                 device_id=phone.descriptor.id,
                 error=str(exc),
             )
@@ -190,7 +190,7 @@ class AdbClient:
         if not out:
             return ""
         logger.debug(
-            "AdbClient: ro.serialno read",
+            "Device serial property read",
             device_id=phone.descriptor.id,
             serial_len=len(out),
         )
@@ -205,8 +205,8 @@ class AdbClient:
             result = self._execute(command, phone)
             raise_client_for_result(command, result)
         except AdbClientException as exc:
-            logger.warning(
-                "AdbClient: failed to read device_name",
+            logger.debug(
+                "Device name property could not be read",
                 device_id=phone.descriptor.id,
                 error=str(exc),
             )
@@ -223,8 +223,8 @@ class AdbClient:
             result = self._execute(command, phone)
             raise_client_for_result(command, result)
         except AdbClientException as exc:
-            logger.warning(
-                "AdbClient: failed to read ro.build.version.release",
+            logger.debug(
+                "Android release property could not be read",
                 device_id=phone.descriptor.id,
                 error=str(exc),
             )
@@ -239,8 +239,8 @@ class AdbClient:
             result = self._execute(command, phone)
             raise_client_for_result(command, result)
         except AdbClientException as exc:
-            logger.warning(
-                "AdbClient: failed to read ro.product.manufacturer",
+            logger.debug(
+                "Device manufacturer property could not be read",
                 device_id=phone.descriptor.id,
                 error=str(exc),
             )
@@ -255,8 +255,8 @@ class AdbClient:
             result = self._execute(command, phone)
             raise_client_for_result(command, result)
         except AdbClientException as exc:
-            logger.warning(
-                "AdbClient: failed to read ro.product.model",
+            logger.debug(
+                "Device model property could not be read",
                 device_id=phone.descriptor.id,
                 error=str(exc),
             )
@@ -271,8 +271,8 @@ class AdbClient:
             result = self._execute(command, phone)
             raise_client_for_result(command, result)
         except AdbClientException as exc:
-            logger.warning(
-                "AdbClient: failed to read ro.build.version.sdk",
+            logger.debug(
+                "Android SDK property could not be read",
                 device_id=phone.descriptor.id,
                 error=str(exc),
             )
@@ -294,7 +294,7 @@ class AdbClient:
             raise_client_for_result(command, result)
         except AdbClientException as exc:
             logger.warning(
-                "AdbClient: failed to read shell enrichment properties",
+                "Device shell properties could not be enriched",
                 device_id=phone.descriptor.id,
                 error=str(exc),
             )
@@ -322,7 +322,7 @@ class AdbClient:
 
         def _attempt() -> AdbCommandResult:
             logger.debug(
-                "AdbClient: executing command",
+                "ADB client command started",
                 adb_path=str(self.binary.path),
                 command=command.command,
                 phone_id=_redacted_log_value(phone_id),
@@ -341,7 +341,7 @@ class AdbClient:
             except subprocess.TimeoutExpired as exc:
                 error = f"timed out after {profile.timeout_seconds}s"
                 logger.debug(
-                    "AdbClient: command timed out",
+                    "ADB client command timed out",
                     adb_path=str(self.binary.path),
                     command=command.command,
                     phone_id=_redacted_log_value(phone_id),
@@ -364,7 +364,7 @@ class AdbClient:
                     f"Failed to run ADB binary {self.binary.path}"
                 ) from exc
             logger.debug(
-                "AdbClient: command completed",
+                "ADB client command completed",
                 adb_path=str(self.binary.path),
                 command=command.command,
                 return_code=completed.returncode,

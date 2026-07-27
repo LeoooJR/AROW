@@ -61,19 +61,18 @@ class RenderMapWork(CoreRuntimeWork[RenderMapOutcome]):
             manager = MapRenderer()
             html_path = manager.to_html(path=output_dir, prefix=self._simulation_id)
         except Exception as error:
-            logger.error(
-                "RenderMapWork: failed to render map",
+            logger.exception(
+                "Map render failed",
                 simulation_id=self._simulation_id,
                 output_dir=str(output_dir),
                 error=str(error),
-                exc_info=True,
             )
             raise RenderMapError(
                 simulation_id=self._simulation_id,
                 reason=f"Failed to render map for simulation {self._simulation_id}",
             ) from error
         logger.info(
-            "RenderMapWork: map rendered",
+            "Map rendered",
             simulation_id=self._simulation_id,
             html_path=str(html_path),
         )
@@ -94,13 +93,13 @@ class RenderMapWork(CoreRuntimeWork[RenderMapOutcome]):
                 outcome.html_path.unlink(missing_ok=True)
             except OSError as error:
                 logger.warning(
-                    "RenderMapWork: failed to remove orphan map file",
+                    "Orphan map file could not be removed",
                     simulation_id=outcome.simulation_id,
                     html_path=str(outcome.html_path),
                     error=str(error),
                 )
             logger.warning(
-                "RenderMapWork: simulation missing on render success",
+                "Rendered map discarded because the simulation no longer exists",
                 simulation_id=outcome.simulation_id,
             )
             return
@@ -131,7 +130,7 @@ class RenderMapWork(CoreRuntimeWork[RenderMapOutcome]):
                 )
             else:
                 logger.warning(
-                    "RenderMapWork: simulation missing on render failure",
+                    "Map failure event skipped because the simulation no longer exists",
                     simulation_id=error.simulation_id,
                 )
             return

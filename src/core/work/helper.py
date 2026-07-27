@@ -91,7 +91,7 @@ def preflight(
                 server = _resolve_server(self)
                 if server is None:
                     logger.warning(
-                        "preflight: ADB server missing on work instance",
+                        "Work preflight failed because the ADB server is missing",
                         work_type=type(self).__name__,
                     )
                     _raise_preflight_error(self, error_to_raise)
@@ -99,7 +99,7 @@ def preflight(
             if check_server_started and server is not None:
                 if not _server_is_running(server):
                     logger.warning(
-                        "preflight: ADB server health probe failed",
+                        "Work preflight failed because the ADB server is unhealthy",
                         work_type=type(self).__name__,
                     )
                     _raise_preflight_error(self, error_to_raise)
@@ -108,7 +108,7 @@ def preflight(
                 client = _resolve_client(self)
                 if client is None or not _validate_client_usable(client):
                     logger.warning(
-                        "preflight: ADB client missing or not usable",
+                        "Work preflight failed because the ADB client is unavailable",
                         work_type=type(self).__name__,
                     )
                     _raise_preflight_error(self, error_to_raise)
@@ -116,7 +116,7 @@ def preflight(
             if check_mdns_available and server is not None:
                 if not _server_mdns_available(server):
                     logger.warning(
-                        "preflight: ADB mDNS unavailable",
+                        "Work preflight failed because ADB mDNS is unavailable",
                         work_type=type(self).__name__,
                     )
                     _raise_preflight_error(self, error_to_raise)

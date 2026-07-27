@@ -37,7 +37,9 @@ def test_placeholder_updates_text_icon_and_supports_missing_icon(qtbot) -> None:
     assert no_icon_placeholder.ui.svg.isHidden() is True
 
 
-def test_authentification_card_emits_confirm_for_valid_inputs(qtbot) -> None:
+def test_authentification_card_emits_confirm_for_valid_inputs(
+    qtbot, log_records
+) -> None:
     card = AuthentificationCard(
         None,
         title="Pair",
@@ -58,10 +60,16 @@ def test_authentification_card_emits_confirm_for_valid_inputs(qtbot) -> None:
         card.ui.confirm_button.click()
 
     assert signal.args == ["192.168.1.1", "55555", "123456"]
+    record = log_records[-1]
+    assert record["level"].name == "INFO"
+    assert record["message"] == "Device pairing submitted"
+    assert record["extra"]["ip"] == "192.168.1.1"
+    assert record["extra"]["port"] == "55555"
+    assert record["extra"]["association_code"] == "123456"
 
 
 def test_authentification_card_handles_missing_optional_copy_and_invalid_submit(
-    qtbot,
+    qtbot, log_records
 ) -> None:
     card = AuthentificationCard(None)
     qtbot.addWidget(card)
@@ -73,3 +81,19 @@ def test_authentification_card_handles_missing_optional_copy_and_invalid_submit(
     assert card.ui.description.isHidden() is True
     assert card.ui.icon.isHidden() is True
     assert card._invalid_targets
+    record = log_records[-1]
+    assert record["level"].name == "INFO"
+    assert record["message"] == "Device pairing submission rejected"
+    assert record["extra"]["invalid_fields"] == ("ip", "port", "association_code")
+
+
+def test_authentification_card_logs_user_cancellation(qtbot, log_records) -> None:
+    card = AuthentificationCard(None)
+    qtbot.addWidget(card)
+
+    with qtbot.waitSignal(signals.DEVICE.AuthentificationCancelled):
+        card.ui.close_button.click()
+
+    record = log_records[-1]
+    assert record["level"].name == "INFO"
+    assert record["message"] == "Device pairing cancelled"

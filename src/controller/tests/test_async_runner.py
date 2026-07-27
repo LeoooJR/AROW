@@ -494,6 +494,7 @@ class TestAsyncRunnerProcessAndCoalesce:
     def test_at_most_once_rejects_duplicate_while_first_job_is_active(
         self,
         runner_factory: Callable[..., AsyncRunner],
+        log_records,
     ) -> None:
         """Second submit with same coalesce_key returns None and leaves the first job running."""
         pending: dict[str, Callable[[], None]] = {}
@@ -552,6 +553,14 @@ class TestAsyncRunnerProcessAndCoalesce:
         assert "refresh_device_list" not in runner._coalesce_latest
 
         runner.shutdown()
+        duplicate_records = [
+            record
+            for record in log_records
+            if record["message"] == "Async job submission skipped"
+        ]
+        assert len(duplicate_records) == 1
+        assert duplicate_records[0]["level"].name == "DEBUG"
+        assert duplicate_records[0]["extra"]["reason"] == "at_most_once"
 
 
 class TestAsyncRunnerPreflight:

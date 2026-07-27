@@ -338,7 +338,7 @@ class MockAdbClient(AdbClient):
             argv.extend(["-s", phone.descriptor.id])
         argv.extend([command.command, *command.args, *positional_arguments])
         logger.debug(
-            "MockAdbClient: executing command (no subprocess)",
+            "Mock ADB client command started",
             adb_path=str(self.binary.path),
             command=command.command,
             phone_id=_redacted_log_value(phone.descriptor.id if phone else None),
@@ -365,7 +365,7 @@ class MockAdbClient(AdbClient):
             out = ""
 
         logger.debug(
-            "MockAdbClient: command completed (mock)",
+            "Mock ADB client command completed",
             command=command.command,
             stdout_preview=_log_safe_output_preview(out.strip(), command),
         )
@@ -405,7 +405,7 @@ class MockAdbServer(AdbServer):
     def _execute(self, command: AdbCommand) -> AdbCommandResult:
         argv: list[str] = [str(self.binary.path), command.command, *command.args]
         logger.debug(
-            "MockAdbServer: executing command (no subprocess)",
+            "Mock ADB server command started",
             adb_path=str(self.binary.path),
             command=command.command,
             argv=_log_safe_argv(command, argv),
