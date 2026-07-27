@@ -26,6 +26,21 @@ The main GUI entrypoint is `PYTHONPATH=src python -m main run gui`. The GUI comm
 - [`src/HOW_TO_simulation_persistence.md`](src/HOW_TO_simulation_persistence.md) explains where simulation metadata lives on disk, when it is persisted, how startup restores it, and when stale state is deleted.
 - [`HOW_TO_mock_adb.md`](HOW_TO_mock_adb.md) explains how to run the app without a real ADB installation.
 
+## Module context
+
+Every production Python package has a `CONTEXT.md` describing its purpose,
+architectural boundaries, local rules, primary dependencies, and validation.
+These files form a hierarchy rather than standalone copies of the same guidance:
+
+1. Read [`AGENTS.md`](AGENTS.md) for repository-wide policy.
+2. Read [`src/CONTEXT.md`](src/CONTEXT.md) for application-layer boundaries.
+3. Continue through each `CONTEXT.md` on the path to the package being changed.
+
+The nearest context supplies the most specific guidance but never overrides
+`AGENTS.md`. Tests and non-Python assets inherit the nearest production-package
+context. The detailed HOW-TO documents above remain authoritative and are linked
+from the contexts that use them.
+
 ## Common developer workflows
 
 ### Run the full app
