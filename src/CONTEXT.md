@@ -29,6 +29,10 @@ logic (`core`), and the PySide6 view (`gui`).
   or `exception` when a traceback is useful.
 - Use standard Loguru levels rather than `success`, and pass sensitive values only
   through structured fields covered by the logger redaction policy.
+- `--json-logs` selects the agent-oriented JSON Lines sink. Its native Loguru
+  record contains source, timing, process, thread, exception, and typed extras;
+  `record.extra.origin` identifies the application layer and
+  `record.extra.log_schema_version` identifies the schema.
 
 ## Primary dependencies
 

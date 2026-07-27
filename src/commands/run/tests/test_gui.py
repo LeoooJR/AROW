@@ -46,15 +46,17 @@ def gui_dependencies(monkeypatch: pytest.MonkeyPatch) -> Iterator[dict[str, Mock
 
 
 @pytest.mark.parametrize(
-    ("arguments", "use_mock_adb"),
+    ("arguments", "use_mock_adb", "serialize_logs"),
     [
-        (["run", "gui"], False),
-        (["run", "--mock-adb", "gui"], True),
+        (["run", "gui"], False, False),
+        (["run", "--mock-adb", "gui"], True, False),
+        (["run", "--json-logs", "gui"], False, True),
     ],
 )
 def test_gui_command_wires_application(
     arguments: list[str],
     use_mock_adb: bool,
+    serialize_logs: bool,
     gui_dependencies: dict[str, Mock],
 ) -> None:
     """The command configures Qt and wires the GUI to the model and controller."""
@@ -80,7 +82,7 @@ def test_gui_command_wires_application(
     qt_application.setApplicationName.assert_called_once_with(__application__)
     qt_application.setDesktopFileName.assert_called_once_with(__application__)
     qt_application.setApplicationVersion.assert_called_once_with(__version__)
-    setup_logger.assert_called_once_with()
+    setup_logger.assert_called_once_with(serialize=serialize_logs)
     gui_dependencies["register_bundled_fonts"].assert_called_once_with()
     assert lifecycle.mock_calls.index(call.fonts()) < lifecycle.mock_calls.index(
         call.window()

@@ -8,6 +8,7 @@ import os
 import re
 import tempfile
 import time
+from collections.abc import Mapping
 from datetime import timedelta
 from enum import Enum
 from pathlib import Path
@@ -24,11 +25,13 @@ AROW_LOG_FILE_ENV = (
     "AROW_LOG_FILE"  # Environment variable for the application log file path
 )
 AROW_LOG_FALLBACK_DIR_ENV = "AROW_LOG_FALLBACK_DIR"
+AROW_LOG_SERIALIZE_ENV = "AROW_LOG_SERIALIZE"
 
 _APPLICATION_LOG_ROTATION = "10 MB"
 _APPLICATION_LOG_RETENTION = timedelta(days=14)
 _APPLICATION_LOG_COMPRESSION = "gz"
 _APPLICATION_LOG_GLOB = "application_*.log*"
+_JSON_LOG_SCHEMA_VERSION = 1
 
 
 class LogOrigin(str, Enum):
@@ -117,6 +120,33 @@ def maybe_redact_extra_value(key: str, value: Any) -> str:
     if "pc:v1:install:" in raw.lower():
         return "<redacted:host_key>"
     return raw
+
+
+def _sanitize_json_extra_value(key: str, value: Any) -> Any:
+    """Return JSON-friendly structured context with nested sensitive values redacted."""
+    kl = key.lower()
+    if kl in _SENSITIVE_EXTRA_KEYS_EXACT:
+        return "<redacted>"
+    if any(kl.endswith(suffix) for suffix in _SENSITIVE_EXTRA_KEY_SUFFIXES):
+        return "<redacted>"
+    if isinstance(value, str):
+        if "pc:v1:install:" in value.lower():
+            return "<redacted:host_key>"
+        return redact_stable_identifier(value)
+    if isinstance(value, Mapping):
+        return {
+            str(nested_key): _sanitize_json_extra_value(str(nested_key), nested_value)
+            for nested_key, nested_value in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        return [_sanitize_json_extra_value(key, item) for item in value]
+    if isinstance(value, (set, frozenset)):
+        return [
+            _sanitize_json_extra_value(key, item) for item in sorted(value, key=repr)
+        ]
+    if value is None or isinstance(value, (bool, int, float)):
+        return value
+    return maybe_redact_extra_value(key, value)
 
 
 def logger_for(origin: LogOrigin) -> Any:
@@ -221,6 +251,29 @@ def _loguru_format(record: dict[str, Any]) -> str:
     )
 
 
+def _json_loguru_format(record: dict[str, Any]) -> str:
+    """
+    Prepare one Loguru record for agent-friendly JSON serialization.
+
+    Loguru's native ``serialize=True`` sink writes the complete record metadata.
+    This formatter enriches its structured extras with a stable schema marker and
+    inferred application layer while applying the same redaction boundary used by
+    the human-readable sink.
+    """
+    origin = _resolve_origin(record)
+    raw_extra = record.get("extra") or {}
+    sanitized_extra = {
+        str(key): _sanitize_json_extra_value(str(key), value)
+        for key, value in raw_extra.items()
+        if key != "origin"
+    }
+    sanitized_extra["log_schema_version"] = _JSON_LOG_SCHEMA_VERSION
+    sanitized_extra["origin"] = origin.value if origin is not None else None
+    record["extra"] = sanitized_extra
+    record["message"] = redact_stable_identifier(str(record["message"]))
+    return "{message}\n{exception}"
+
+
 def resolve_application_log_file_path() -> Path:
     """
     Return the shared low-level application log file for this process tree.
@@ -270,7 +323,15 @@ def _prune_expired_application_logs(log_dir: Path) -> None:
             continue
 
 
-def setup_logger() -> Path:
+def _resolve_log_serialization(serialize: bool | None) -> bool:
+    """Resolve and persist the sink mode so spawned workers inherit it."""
+    if serialize is None:
+        return os.environ.get(AROW_LOG_SERIALIZE_ENV, "0") == "1"
+    os.environ[AROW_LOG_SERIALIZE_ENV] = "1" if serialize else "0"
+    return serialize
+
+
+def setup_logger(*, serialize: bool | None = None) -> Path:
     """
     Configure Loguru sinks and the project format string.
 
@@ -282,6 +343,7 @@ def setup_logger() -> Path:
     Returns:
         Path: The concrete application log file used by this process tree.
     """
+    serialize_logs = _resolve_log_serialization(serialize)
     log_path = resolve_application_log_file_path()
     candidate_paths = (log_path, _fallback_application_log_file_path(log_path))
 
@@ -294,7 +356,8 @@ def setup_logger() -> Path:
             _prune_expired_application_logs(candidate_path.parent)
             logger.add(
                 str(candidate_path),
-                format=_loguru_format,
+                format=_json_loguru_format if serialize_logs else _loguru_format,
+                serialize=serialize_logs,
                 colorize=False,
                 encoding="utf-8",
                 rotation=_APPLICATION_LOG_ROTATION,

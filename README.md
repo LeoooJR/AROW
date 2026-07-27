@@ -54,3 +54,14 @@ PYTHONPATH=src python -m main run gui
 ```bash
 PYTHONPATH=src python -m main run --mock-adb gui
 ```
+
+### Run with machine-readable logs
+
+```bash
+PYTHONPATH=src python -m main run --json-logs --mock-adb gui
+```
+
+This writes one JSON object per line to the normal application log file. Each
+record includes Loguru's timestamp, level, source, process, thread, exception,
+and structured `extra` fields, plus AROW's normalized `origin` and
+`log_schema_version` fields for automated runtime tracing.

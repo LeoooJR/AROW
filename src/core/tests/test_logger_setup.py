@@ -9,7 +9,13 @@ from pathlib import Path
 import pytest
 
 from core.application_paths import default_application_log_file_path
-from logger import AROW_LOG_FILE_ENV, resolve_application_log_file_path, setup_logger
+from logger import (
+    AROW_LOG_FILE_ENV,
+    AROW_LOG_SERIALIZE_ENV,
+    _json_loguru_format,
+    resolve_application_log_file_path,
+    setup_logger,
+)
 
 
 def test_default_application_log_file_path_uses_run_timestamp(tmp_path: Path) -> None:
@@ -70,6 +76,31 @@ def test_setup_logger_configures_bounded_file_policy(
     assert sink_options["retention"] == timedelta(days=14)
     assert sink_options["compression"] == "gz"
     assert sink_options["watch"] is True
+
+
+def test_setup_logger_configures_json_serialization_for_process_tree(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    shared = tmp_path / "logs" / "application_20260101_120000.log"
+    sink_options: list[dict[str, object]] = []
+
+    def fake_add(_sink: str, **kwargs: object) -> int:
+        sink_options.append(kwargs)
+        return 1
+
+    monkeypatch.setenv(AROW_LOG_FILE_ENV, str(shared))
+    monkeypatch.delenv(AROW_LOG_SERIALIZE_ENV, raising=False)
+    monkeypatch.setattr("logger.logger.remove", lambda: None)
+    monkeypatch.setattr("logger.logger.add", fake_add)
+
+    setup_logger(serialize=True)
+    setup_logger()
+
+    assert os.environ[AROW_LOG_SERIALIZE_ENV] == "1"
+    assert sink_options[0]["serialize"] is True
+    assert sink_options[1]["serialize"] is True
+    assert sink_options[0]["format"] is _json_loguru_format
 
 
 def test_setup_logger_prunes_expired_logs_from_previous_runs(

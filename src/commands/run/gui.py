@@ -20,7 +20,7 @@ def gui(context: typer.Context) -> None:
         # Locale setting failed (not available on this machine); fallback to default locale.
         pass
 
-    setup_logger()
+    setup_logger(serialize=run_options.serialize_logs)
 
     qt_application = QtWidgets.QApplication.instance()
     if qt_application is None:
