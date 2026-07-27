@@ -7,6 +7,8 @@ from __future__ import annotations
 import os
 import re
 import tempfile
+import time
+from datetime import timedelta
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -22,6 +24,11 @@ AROW_LOG_FILE_ENV = (
     "AROW_LOG_FILE"  # Environment variable for the application log file path
 )
 AROW_LOG_FALLBACK_DIR_ENV = "AROW_LOG_FALLBACK_DIR"
+
+_APPLICATION_LOG_ROTATION = "10 MB"
+_APPLICATION_LOG_RETENTION = timedelta(days=14)
+_APPLICATION_LOG_COMPRESSION = "gz"
+_APPLICATION_LOG_GLOB = "application_*.log*"
 
 
 class LogOrigin(str, Enum):
@@ -246,6 +253,23 @@ def _fallback_application_log_file_path(original_path: Path) -> Path:
     return base_dir / original_path.name
 
 
+def _prune_expired_application_logs(log_dir: Path) -> None:
+    """Best-effort cleanup across timestamped application logs from previous runs."""
+    cutoff = time.time() - _APPLICATION_LOG_RETENTION.total_seconds()
+    try:
+        candidates = list(log_dir.glob(_APPLICATION_LOG_GLOB))
+    except OSError:
+        return
+
+    for candidate in candidates:
+        try:
+            if candidate.is_file() and candidate.stat().st_mtime <= cutoff:
+                candidate.unlink()
+        except OSError:
+            # Retention must not prevent the application from starting or logging.
+            continue
+
+
 def setup_logger() -> Path:
     """
     Configure Loguru sinks and the project format string.
@@ -267,11 +291,15 @@ def setup_logger() -> Path:
     for candidate_path in candidate_paths:
         try:
             candidate_path.parent.mkdir(parents=True, exist_ok=True)
+            _prune_expired_application_logs(candidate_path.parent)
             logger.add(
                 str(candidate_path),
                 format=_loguru_format,
                 colorize=False,
                 encoding="utf-8",
+                rotation=_APPLICATION_LOG_ROTATION,
+                retention=_APPLICATION_LOG_RETENTION,
+                compression=_APPLICATION_LOG_COMPRESSION,
                 watch=True,
             )
             os.environ[AROW_LOG_FILE_ENV] = str(candidate_path)

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -47,6 +47,65 @@ def test_setup_logger_reuses_env_log_path(
     log_path = setup_logger()
 
     assert log_path == shared
+
+
+def test_setup_logger_configures_bounded_file_policy(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    shared = tmp_path / "logs" / "application_20260101_120000.log"
+    sink_options: dict[str, object] = {}
+
+    def fake_add(_sink: str, **kwargs: object) -> int:
+        sink_options.update(kwargs)
+        return 1
+
+    monkeypatch.setenv(AROW_LOG_FILE_ENV, str(shared))
+    monkeypatch.setattr("logger.logger.remove", lambda: None)
+    monkeypatch.setattr("logger.logger.add", fake_add)
+
+    setup_logger()
+
+    assert sink_options["rotation"] == "10 MB"
+    assert sink_options["retention"] == timedelta(days=14)
+    assert sink_options["compression"] == "gz"
+    assert sink_options["watch"] is True
+
+
+def test_setup_logger_prunes_expired_logs_from_previous_runs(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    log_dir = tmp_path / "logs"
+    log_dir.mkdir()
+    shared = log_dir / "application_20260727_120000.log"
+    expired = log_dir / "application_20260701_120000.log"
+    expired_compressed = log_dir / "application_20260701_120000.log.gz"
+    recent = log_dir / "application_20260726_120000.log"
+    unrelated = log_dir / "activity_20260701.log"
+
+    for path in (expired, expired_compressed, recent, unrelated):
+        path.touch()
+
+    now = 1_800_000_000.0
+    expired_timestamp = now - timedelta(days=15).total_seconds()
+    recent_timestamp = now - timedelta(days=1).total_seconds()
+    os.utime(expired, (expired_timestamp, expired_timestamp))
+    os.utime(expired_compressed, (expired_timestamp, expired_timestamp))
+    os.utime(recent, (recent_timestamp, recent_timestamp))
+    os.utime(unrelated, (expired_timestamp, expired_timestamp))
+
+    monkeypatch.setattr("logger.time.time", lambda: now)
+    monkeypatch.setenv(AROW_LOG_FILE_ENV, str(shared))
+    monkeypatch.setattr("logger.logger.remove", lambda: None)
+    monkeypatch.setattr("logger.logger.add", lambda *_args, **_kwargs: 1)
+
+    setup_logger()
+
+    assert not expired.exists()
+    assert not expired_compressed.exists()
+    assert recent.exists()
+    assert unrelated.exists()
 
 
 def test_resolve_application_log_file_path_reuses_env_without_setup(
