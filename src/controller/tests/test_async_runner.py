@@ -5,6 +5,7 @@ import os
 import threading
 import time
 import traceback as _traceback
+from pathlib import Path
 from typing import Any, Callable
 
 import pytest
@@ -640,6 +641,7 @@ class TestProcessPoolLogging:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         captured: dict[str, object] = {}
+        events: list[tuple[str, object]] = []
 
         class FakeExecutor:
             def __init__(
@@ -648,6 +650,7 @@ class TestProcessPoolLogging:
                 max_workers: int | None = None,
                 initializer: object | None = None,
             ) -> None:
+                events.append(("executor", None))
                 captured["max_workers"] = max_workers
                 captured["initializer"] = initializer
 
@@ -658,8 +661,28 @@ class TestProcessPoolLogging:
                 return None
 
         monkeypatch.setattr(runner_mod, "ProcessPoolExecutor", FakeExecutor)
+        monkeypatch.setattr(
+            runner_mod,
+            "resolve_worker_application_log_file_path",
+            lambda *, process_id: Path(f"/logs/application.worker-{process_id}.log"),
+        )
+        monkeypatch.setattr(
+            runner_mod.logger,
+            "debug",
+            lambda message, **extra: events.append((message, extra)),
+        )
 
         runner_mod.ProcessPool(max_workers=2)
 
         assert captured["max_workers"] == 2
         assert captured["initializer"] is runner_mod.setup_worker_logger
+        assert events[:2] == [
+            (
+                "Opening process pool",
+                {
+                    "max_workers": 2,
+                    "path": "/logs/application.worker-{pid}.log",
+                },
+            ),
+            ("executor", None),
+        ]

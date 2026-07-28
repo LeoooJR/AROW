@@ -332,10 +332,15 @@ def _resolve_log_serialization(serialize: bool | None) -> bool:
     return serialize
 
 
-def _worker_application_log_file_path(shared_path: Path, process_id: int) -> Path:
-    """Return a sibling path owned by one process-pool worker."""
+def resolve_worker_application_log_file_path(
+    *,
+    process_id: int | str | None = None,
+) -> Path:
+    """Return the PID-specific worker path, or a template when given ``"{pid}"``."""
+    shared_path = resolve_application_log_file_path()
+    resolved_process_id = os.getpid() if process_id is None else process_id
     return shared_path.with_name(
-        f"{shared_path.stem}.worker-{process_id}{shared_path.suffix}"
+        f"{shared_path.stem}.worker-{resolved_process_id}{shared_path.suffix}"
     )
 
 
@@ -406,8 +411,7 @@ def setup_worker_logger() -> Path:
     but never open the main process file. This avoids unsupported concurrent
     rotation, compression, and writes across independently configured Loguru sinks.
     """
-    shared_path = resolve_application_log_file_path()
-    worker_path = _worker_application_log_file_path(shared_path, os.getpid())
+    worker_path = resolve_worker_application_log_file_path()
     return _configure_logger(
         worker_path,
         serialize_logs=_resolve_log_serialization(None),

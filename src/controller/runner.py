@@ -13,7 +13,7 @@ from typing import Any, Callable, Literal, Optional
 from loguru import logger
 from PySide6.QtCore import QObject, Qt, Signal
 
-from logger import setup_worker_logger
+from logger import resolve_worker_application_log_file_path, setup_worker_logger
 
 jobtype = Literal["auto", "thread", "process"]
 jobstatus = Literal["pending", "running", "completed", "cancelled", "failed"]
@@ -193,6 +193,14 @@ class ProcessPool:
     def __init__(self, max_workers: Optional[int] = None) -> None:
         try:
             self._max_workers: int | None = max_workers
+            worker_log_path = resolve_worker_application_log_file_path(
+                process_id="{pid}"
+            )
+            logger.debug(
+                "Opening process pool",
+                max_workers=max_workers,
+                path=str(worker_log_path),
+            )
             self._executor: ProcessPoolExecutor = ProcessPoolExecutor(
                 max_workers=max_workers,
                 initializer=setup_worker_logger,
