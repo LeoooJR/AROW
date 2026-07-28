@@ -376,7 +376,8 @@ class DeviceSelectionBlock(QFrame, Block):
             signals.DEVICE.DeviceSelectionRequested.emit(item.id, item.name)
         else:
             logger.warning(
-                "DeviceSelectionBlock: device item is not a DeviceItem", item=item
+                "Selected device list item has an unexpected type",
+                item_type=type(item).__name__,
             )
 
     @Slot(str, str, str)
@@ -387,7 +388,7 @@ class DeviceSelectionBlock(QFrame, Block):
         selected_item = self._find_available_device_item(device_id)
         if selected_item is None:
             logger.warning(
-                "DeviceSelectionBlock: selected device row not found",
+                "Selected device row could not be found",
                 device_id=device_id,
                 device_name=device_name,
             )
@@ -466,7 +467,7 @@ class DeviceSelectionBlock(QFrame, Block):
     @Slot()
     def _on_refresh_button_clicked(self) -> None:
         """Emit a device-list refresh request from the refresh action button."""
-        logger.info("Available device list refresh requested.")
+        logger.info("Device list refresh requested")
         signals.DEVICE.RefreshDeviceListRequested.emit()
 
     @Slot(str)
@@ -474,7 +475,7 @@ class DeviceSelectionBlock(QFrame, Block):
         """Remove the matching device row when a row-level delete action is requested.
         id: The id of the device to remove.
         """
-        logger.info("Remove device requested.", id=id)
+        logger.info("Device removal requested", device_id=id)
         current_item_before_removal = self.ui.available_device_list.currentItem()
         for item_index, item in enumerate(
             self.ui.available_device_list.iter_items(), start=0

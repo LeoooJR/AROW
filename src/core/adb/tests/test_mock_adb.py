@@ -4,6 +4,7 @@ Tests for faker-backed mock ADB (no real adb binary; not marked ``@pytest.mark.a
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -40,7 +41,17 @@ def test_mock_server_binary_version_output_matches_parser() -> None:
     assert str(parsed.path) == "/mock/adb"
 
 
-def test_model_entrypoint_startup_mock_returns_outcome_without_emitting() -> None:
+def test_model_entrypoint_startup_mock_returns_outcome_without_emitting(
+    monkeypatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(
+        "core.entrypoint.get_or_create_application_dir",
+        lambda: tmp_path,
+    )
+    monkeypatch.setattr(
+        "core.work.startup_work.get_or_create_application_dir",
+        lambda: tmp_path,
+    )
     model_entrypoint = ModelEntrypoint(use_mock_adb=True)
     emitted: list[tuple[CoreSignal[Any], object]] = []
     model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]

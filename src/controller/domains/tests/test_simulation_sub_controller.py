@@ -161,7 +161,7 @@ def test_connect_model_signals_subscribes_to_simulation_events(tmp_path: Path) -
 
 
 def test_device_selection_confirmed_creates_simulation_and_waits_for_signal(
-    monkeypatch, tmp_path: Path
+    monkeypatch, tmp_path: Path, log_records
 ) -> None:
     model_entrypoint = _make_model(
         tmp_path, device=Phone(id="device-1", state="device", model="Pixel")
@@ -185,6 +185,12 @@ def test_device_selection_confirmed_creates_simulation_and_waits_for_signal(
     view = _view_mock(subcontroller)
     view.forward_device_selection_succeeded.assert_not_called()
     view.forward_device_selection_failed.assert_not_called()
+    created_records = [
+        record for record in log_records if record["message"] == "Simulation created"
+    ]
+    assert len(created_records) == 1
+    assert created_records[0]["level"].name == "INFO"
+    assert created_records[0]["extra"]["device_id"] == "device-1"
 
 
 def test_device_selection_confirmed_forwards_failure_when_device_is_unknown(

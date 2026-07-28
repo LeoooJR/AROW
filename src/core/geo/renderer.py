@@ -109,11 +109,8 @@ class MapRenderer:
         n_km: int = len(kilometric_points_geodataset)
         n_low: int = len(kilometric_points_on_low_zoom_geodataset)
         n_med: int = len(kilometric_points_on_medium_zoom_geodataset)
-        logger.info(
-            "Milestone layers built: kilometric_points={} low_zoom={} medium_zoom={}",
-            n_km,
-            n_low,
-            n_med,
+        logger.debug(
+            "Map milestone layers built",
             kilometric_points_rows=n_km,
             low_zoom_rows=n_low,
             medium_zoom_rows=n_med,
@@ -457,13 +454,13 @@ class MapRenderer:
             size_bytes = html_path.stat().st_size
         except OSError as e:
             logger.warning(
-                "Saved map HTML but could not stat file",
+                "Map file was written but its size could not be read",
                 path=str(html_path),
                 error=str(e),
             )
         else:
-            logger.info(
-                "Map HTML written",
+            logger.debug(
+                "Map file written",
                 path=str(html_path),
                 size_bytes=size_bytes,
             )

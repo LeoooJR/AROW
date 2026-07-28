@@ -197,7 +197,12 @@ class Canvas(QWebEngineView):
     ) -> None:
         """Handle marker click event."""
         logger.info(
-            f"Marker clicked: {km}, {line_code}, {line_troncon}, {latitude}, {longitude}"
+            "Simulation location selected",
+            km=km,
+            line_code=line_code,
+            line_troncon=line_troncon,
+            latitude=latitude,
+            longitude=longitude,
         )
         signals.UI.MapMarkerClicked.emit(
             km, line_code, line_troncon, latitude, longitude
@@ -493,11 +498,6 @@ class Location(QWidget):
 
     def set_coordinates(self, latitude: float, longitude: float) -> None:
         """Update coordinate value labels while preserving axis title labels."""
-        logger.info(
-            "Setting coordinates",
-            latitude=latitude,
-            longitude=longitude,
-        )
         self.set_latitude(latitude)
         self.set_longitude(longitude)
 
@@ -745,11 +745,11 @@ class Coordinates(QFrame):
     def _on_play_button_clicked(self) -> None:
         """Handle the play button click."""
         if self.ui.play_button.property("toggle"):
-            logger.info("Simulation paused.")
+            logger.info("Simulation pause requested")
             self.ui.play_button.setProperty("toggle", False)
             self.set_simulation_state(False)
         else:
-            logger.info("Simulation started.")
+            logger.info("Simulation start requested")
             self.ui.play_button.setProperty("toggle", True)
             self.set_simulation_state(True)
 
@@ -948,7 +948,7 @@ class MapBlock(QWidget):
         """Load map HTML from a concrete on-disk path into the canvas."""
         if not html_path.is_file():
             logger.warning(
-                "MapBlock: rendered map HTML not found",
+                "Rendered map file is unavailable",
                 simulation_id=simulation_id,
                 path=str(html_path),
             )
@@ -958,8 +958,8 @@ class MapBlock(QWidget):
 
         def _load_after_layout() -> None:
             self.ui.canvas.load(load_url)
-            logger.info(
-                "MapBlock: map HTML loaded into canvas",
+            logger.debug(
+                "Rendered map loaded into canvas",
                 simulation_id=simulation_id,
                 path=str(html_path),
             )
@@ -997,7 +997,7 @@ class MapBlock(QWidget):
         """Load the map canvas after async rendering completes."""
         if self._is_stale_render_update(simulation_id):
             logger.debug(
-                "MapBlock: ignoring stale map render completion",
+                "Stale map render completion ignored",
                 simulation_id=simulation_id,
                 pending_simulation_id=self._pending_render_simulation_id,
             )
@@ -1011,15 +1011,15 @@ class MapBlock(QWidget):
         """Show the render-failure placeholder when map generation fails."""
         if self._is_stale_render_update(simulation_id):
             logger.debug(
-                "MapBlock: ignoring stale map render failure",
+                "Stale map render failure ignored",
                 simulation_id=simulation_id,
                 pending_simulation_id=self._pending_render_simulation_id,
                 reason=reason,
             )
             return
         self._pending_render_simulation_id = None
-        logger.warning(
-            "MapBlock: map render failed",
+        logger.debug(
+            "Map render failure applied to view",
             simulation_id=simulation_id,
             reason=reason,
         )
@@ -1060,7 +1060,7 @@ class MapBlock(QWidget):
         """Update the simulated location row after core validation succeeds."""
         if simulation_id != self._active_simulation_id:
             logger.debug(
-                "MapBlock: ignoring stale simulation location validation",
+                "Stale simulation location validation ignored",
                 simulation_id=simulation_id,
                 active_simulation_id=self._active_simulation_id,
                 km=km,

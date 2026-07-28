@@ -104,7 +104,7 @@ def _validate_frozen_adb_binary_version(
     # The packaged app expects one known ADB binary. A mismatch here may signal
     # replacement, corruption, packaging drift, or execution of an unexpected binary.
     logger.error(
-        "startup_work: bundled ADB metadata mismatch",
+        "Bundled ADB metadata does not match the expected release",
         expected_version=expected.version,
         expected_build_version=expected.build_version,
         expected_build_number=expected.build_number,
@@ -133,7 +133,7 @@ def _start_adb_server() -> AdbServer:
         )
         adb_server: AdbServer = AdbServer(binary=adb_binary)
         logger.info(
-            "startup_work: ADB server started",
+            "ADB server started",
             adb_path=str(adb_binary.path),
             adb_version=actual_binary.version,
             adb_build_version=actual_binary.build_version,
@@ -141,7 +141,7 @@ def _start_adb_server() -> AdbServer:
         return adb_server
     except Exception as error:
         logger.exception(
-            "startup_work: failed to start ADB server",
+            "ADB server startup failed",
             error=str(error),
         )
         raise
@@ -149,7 +149,7 @@ def _start_adb_server() -> AdbServer:
 
 def _create_adb_client() -> AdbClient:
     """Build an :class:`~core.adb.client.AdbClient` using the project's ADB binary path."""
-    logger.debug("startup_work: creating ADB client")
+    logger.debug("ADB client creation started")
     adb_binary: AdbBinary = AdbBinary(path=_resolve_adb_binary_path())
     return AdbClient(binary=adb_binary)
 
@@ -239,7 +239,7 @@ class StartupCoreRuntimeWork(CoreRuntimeWork[StartupOutcome]):
             adb_server = MockAdbServer(state=adb_state, binary=adb_binary)
             adb_client = MockAdbClient(state=adb_state, binary=adb_binary)
             logger.info(
-                "startup_work: mock ADB server/client initialized",
+                "Mock ADB runtime initialized",
                 adb_path=str(adb_binary.path),
                 mock_seed=seed,
             )
@@ -300,7 +300,7 @@ class StartupCoreRuntimeWork(CoreRuntimeWork[StartupOutcome]):
                     startup_entrypoint.create_simulation(result.last_active_device_id)
                 except (AttributeError, ValueError) as error:
                     logger.warning(
-                        "startup_work: failed to restore last active device",
+                        "Last active device could not be restored",
                         device_id=result.last_active_device_id,
                         error=str(error),
                     )

@@ -49,8 +49,8 @@ class MapSubController(AppSubController):
 
         def _preflight() -> bool:
             if self.model_entrypoint.get_simulation(simulation_id) is None:
-                logger.error(
-                    "MapSubController: simulation not found",
+                logger.debug(
+                    "Map operation skipped because the simulation was not found",
                     simulation_id=simulation_id,
                 )
                 return False
@@ -99,7 +99,7 @@ class MapSubController(AppSubController):
     def _on_render_map_requested(self, simulation_id: str) -> None:
         """Submit map rendering to a worker process."""
         logger.debug(
-            "MapSubController: render map requested",
+            "Map render requested",
             simulation_id=simulation_id,
         )
         simulation_preflight = self._simulation_exists_preflight(simulation_id)
@@ -109,7 +109,7 @@ class MapSubController(AppSubController):
             html_path = self.model_entrypoint.get_map_file_for_simulation(simulation_id)
             if html_path is None:
                 logger.error(
-                    "MapSubController: map file not found",
+                    "Cached map path is unavailable",
                     simulation_id=simulation_id,
                 )
                 return
@@ -147,7 +147,7 @@ class MapSubController(AppSubController):
     ) -> None:
         """Validate a map milestone selection for the given simulation."""
         logger.debug(
-            "MapSubController: simulation location requested",
+            "Simulation location validation queued",
             simulation_id=simulation_id,
             km=km,
             line_code=line_code,
@@ -170,7 +170,7 @@ class MapSubController(AppSubController):
     ) -> None:
         """Submit async validation when the model requests restored-marker revalidation."""
         logger.debug(
-            "MapSubController: simulation location validation requested",
+            "Persisted simulation location revalidation queued",
             simulation_id=payload.simulation_id,
             km=payload.km,
             line=f"{payload.line_code}-{payload.line_troncon}",
@@ -215,7 +215,7 @@ class MapSubController(AppSubController):
     ) -> None:
         """Forward validated simulation location to the map view."""
         logger.debug(
-            "MapSubController: simulation location validated",
+            "Simulation location validation forwarded",
             simulation_id=payload.simulation_id,
             km=payload.km,
             line=f"{payload.line_code}-{payload.line_troncon}",
@@ -237,16 +237,6 @@ class MapSubController(AppSubController):
     def _on_simulation_location_rejected(
         self, payload: SimulationLocationRejectedPayload
     ) -> None:
-        logger.warning(
-            "MapSubController: simulation location rejected",
-            simulation_id=payload.simulation_id,
-            km=payload.km,
-            line_code=payload.line_code,
-            line_troncon=payload.line_troncon,
-            lat=payload.lat,
-            lon=payload.lon,
-            reason=payload.reason,
-        )
         self.view.forward_simulation_location_rejected(
             simulation_id=payload.simulation_id,
             km=payload.km,
@@ -305,11 +295,6 @@ class MapSubController(AppSubController):
 
     @validate_view
     def _on_map_rendered(self, payload: MapRenderedPayload) -> None:
-        logger.info(
-            "MapSubController: map rendered",
-            simulation_id=payload.simulation_id,
-            html_path=str(payload.html_path),
-        )
         self.view.forward_map_rendered(
             payload.simulation_id,
             payload.html_path,
@@ -317,11 +302,6 @@ class MapSubController(AppSubController):
 
     @validate_view
     def _on_map_render_failed(self, payload: MapRenderFailedPayload) -> None:
-        logger.warning(
-            "MapSubController: map render failed",
-            simulation_id=payload.simulation_id,
-            reason=payload.reason,
-        )
         self.view.forward_map_render_failed(payload.simulation_id, payload.reason)
 
     @validate_view
@@ -330,7 +310,7 @@ class MapSubController(AppSubController):
         handle = self._render_jobs_by_simulation_id.pop(simulation_id, None)
         if handle is not None:
             logger.debug(
-                "MapSubController: cancelling in-flight render map job",
+                "In-flight map render cancelled after simulation deletion",
                 simulation_id=simulation_id,
                 job_id=handle.job_id,
             )

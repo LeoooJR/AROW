@@ -61,7 +61,7 @@ class CloseCoreRuntimeWork(CoreRuntimeWork[CloseOutcome]):
         adb_path = str(stopped_binary.path)
         self._adb_server.stop()
         logger.info(
-            "ModelEntrypoint: ADB server stopped",
+            "ADB server stopped",
             adb_path=adb_path,
         )
         return CloseOutcome(adb_server=self._adb_server)
@@ -74,8 +74,8 @@ class CloseCoreRuntimeWork(CoreRuntimeWork[CloseOutcome]):
         Apply the result of the close job to the entrypoint in the main thread.
         """
         if result.adb_server is None:
-            logger.warning(
-                "ModelEntrypoint: close apply skipped stop signal (no stopped server)",
+            logger.debug(
+                "ADB stop event skipped because no server was stopped",
             )
             return
         adb_entrypoint = cast(AdbRuntimeEntrypoint, model_entrypoint)

@@ -8,3 +8,4 @@ class RunOptions:
     """Options shared by the TUI and GUI launch paths."""
 
     mock_adb: bool = False
+    serialize_logs: bool = False

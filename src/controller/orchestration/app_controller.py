@@ -98,7 +98,7 @@ class AppController(Controller):
     def _on_activity_log_file_update_requested(self, path: str) -> None:
         """Update the app-wide activity log file path."""
         logger.debug(
-            "AppController: activity log file update requested",
+            "Activity log file update requested",
             path=path,
         )
         self.model_entrypoint.activity_log_file = Path(path)
@@ -109,7 +109,7 @@ class AppController(Controller):
     ) -> None:
         """Forward the activity log file updated signal to the view."""
         logger.debug(
-            "AppController: activity log file updated",
+            "Activity log file update forwarded",
             path=payload.path,
         )
         self.view.forward_activity_log_file_updated(str(payload.path))
@@ -179,7 +179,7 @@ class AppController(Controller):
 
         def _unblock_bootstrap_loop() -> None:
             logger.warning(
-                "AppController: bootstrap jobs exceeded shutdown wait",
+                "Bootstrap jobs exceeded the shutdown wait",
                 timeout_ms=_SHUTDOWN_CLOSE_JOB_TIMEOUT_MS,
             )
             if bootstrap_loop.isRunning():
@@ -217,7 +217,7 @@ class AppController(Controller):
 
         def _unblock_shutdown_loop() -> None:
             logger.warning(
-                "AppController: close_core_runtime exceeded shutdown wait",
+                "Core runtime close exceeded the shutdown wait",
                 timeout_ms=_SHUTDOWN_CLOSE_JOB_TIMEOUT_MS,
             )
             if shutdown_loop.isRunning():
@@ -243,5 +243,5 @@ class AppController(Controller):
         try:
             self._map.persist_simulation_repository()
         except Exception:
-            logger.exception("AppController: failed to persist simulation repository")
+            logger.exception("Simulation repository persistence failed during shutdown")
         self.runner.shutdown()

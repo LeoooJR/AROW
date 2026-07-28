@@ -65,7 +65,9 @@ def test_device_selection_block_hides_empty_state_when_devices_exist(qtbot) -> N
     assert block.ui.buttons_wrapper.isVisible() is True
 
 
-def test_device_selection_block_empty_state_buttons_emit_actions(qtbot) -> None:
+def test_device_selection_block_empty_state_buttons_emit_actions(
+    qtbot, log_records
+) -> None:
     block = DeviceSelectionBlock()
     qtbot.addWidget(block)
     block.show()
@@ -76,6 +78,10 @@ def test_device_selection_block_empty_state_buttons_emit_actions(qtbot) -> None:
 
     with qtbot.waitSignal(signals.DEVICE.RefreshDeviceListRequested):
         block.ui.available_device_empty_state.ui.refresh_button.click()
+
+    record = log_records[-1]
+    assert record["level"].name == "INFO"
+    assert record["message"] == "Device list refresh requested"
 
 
 def test_device_selection_block_extend_signal_expands_all_rows(qtbot) -> None:

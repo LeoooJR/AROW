@@ -17,9 +17,19 @@ def run(
         bool,
         typer.Option(help="Use faker-backed mock ADB (no real adb daemon or binary)."),
     ] = False,
+    json_logs: Annotated[
+        bool,
+        typer.Option(
+            "--json-logs",
+            help="Write machine-readable JSON Lines logs for runtime analysis.",
+        ),
+    ] = False,
 ) -> None:
     """Run AROW with the selected user interface."""
-    context.obj = RunOptions(mock_adb=mock_adb)
+    context.obj = RunOptions(
+        mock_adb=mock_adb,
+        serialize_logs=json_logs,
+    )
 
     if context.invoked_subcommand is None:
         raise typer.Exit(1)

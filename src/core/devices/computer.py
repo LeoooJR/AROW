@@ -173,7 +173,7 @@ class ComputerRepository(Repository[Computer]):
         try:
             super().add(item)
         except ValueError as error:
-            logger.error("ComputerRepository: failed to add computer", error=str(error))
+            logger.error("Computer could not be added to repository", error=str(error))
             return
         if self._working_device is None:
             self._working_device = item
@@ -183,7 +183,7 @@ class ComputerRepository(Repository[Computer]):
             super().remove(item)
         except ValueError as error:
             logger.error(
-                "ComputerRepository: failed to remove computer", error=str(error)
+                "Computer could not be removed from repository", error=str(error)
             )
             return
         if self._working_device == item:

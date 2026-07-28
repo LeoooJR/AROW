@@ -13,7 +13,7 @@ from typing import Any, Callable, Literal, Optional
 from loguru import logger
 from PySide6.QtCore import QObject, Qt, Signal
 
-from logger import setup_logger
+from logger import resolve_worker_application_log_file_path, setup_worker_logger
 
 jobtype = Literal["auto", "thread", "process"]
 jobstatus = Literal["pending", "running", "completed", "cancelled", "failed"]
@@ -193,20 +193,28 @@ class ProcessPool:
     def __init__(self, max_workers: Optional[int] = None) -> None:
         try:
             self._max_workers: int | None = max_workers
+            worker_log_path = resolve_worker_application_log_file_path(
+                process_id="{pid}"
+            )
+            logger.debug(
+                "Opening process pool",
+                max_workers=max_workers,
+                path=str(worker_log_path),
+            )
             self._executor: ProcessPoolExecutor = ProcessPoolExecutor(
                 max_workers=max_workers,
-                initializer=setup_logger,  # Initialize logger before the process is started
+                initializer=setup_worker_logger,
             )
         except (NotImplementedError, OSError, PermissionError) as e:
             logger.error(
-                "Process pool: failed to initialize",
+                "Process pool initialization failed",
                 error=e,
             )
             raise RuntimeError(
                 "Failed to initialize process pool on this system"
             ) from e
         logger.debug(
-            "Process pool: initialized",
+            "Process pool initialized",
             max_workers=max_workers,
         )
 
@@ -228,7 +236,7 @@ class ProcessPool:
             raise ValueError("JobSpecification.fn must be set (callable)")
         fn = job.fn
         logger.debug(
-            "Process pool: job queued",
+            "Process job queued",
             job_id=job_id,
             name=job.name,
             timeout_s=job.timeout,
@@ -239,7 +247,7 @@ class ProcessPool:
         def _on_done(f: Future[Any]) -> None:
             if cancel_token.is_cancelled():
                 logger.debug(
-                    "Process pool: done callback skipped (cancelled)",
+                    "Cancelled process job callback skipped",
                     job_id=job_id,
                     name=job.name,
                 )
@@ -252,7 +260,7 @@ class ProcessPool:
                     else f.result()
                 )
                 logger.debug(
-                    "Process pool: job finished OK",
+                    "Process job completed",
                     job_id=job_id,
                     name=job.name,
                     result_type=type(result).__name__,
@@ -260,7 +268,7 @@ class ProcessPool:
                 emit_completed(job_id, result)
             except FuturesTimeoutError:
                 logger.warning(
-                    "Process pool: job timed out waiting for result",
+                    "Process job timed out while collecting its result",
                     job_id=job_id,
                     name=job.name,
                     timeout_s=job.timeout,
@@ -287,13 +295,13 @@ class ProcessPool:
         """
         Shutdown the process pool
         """
-        logger.info("Process pool: shutdown requested (cancel_futures=True)")
+        logger.debug("Process pool shutdown requested", cancel_futures=True)
         if self._executor is not None:  # check if the executor is initialized
             self._executor.shutdown(wait=False, cancel_futures=True)
         else:
-            logger.warning("Process pool: shutdown requested but no executor found")
+            logger.debug("Process pool shutdown skipped because no executor exists")
         logger.debug(
-            "Process pool: shutdown completed",
+            "Process pool shutdown completed",
             max_workers=self._max_workers,
         )
 
@@ -313,12 +321,12 @@ class ThreadPool:
             )
         except (NotImplementedError, OSError, PermissionError) as e:
             logger.error(
-                "Thread pool: failed to initialize",
+                "Thread pool initialization failed",
                 error=e,
             )
             raise RuntimeError("Failed to initialize thread pool on this system") from e
         logger.debug(
-            "Thread pool: initialized",
+            "Thread pool initialized",
             max_workers=max_workers,
         )
 
@@ -339,7 +347,7 @@ class ThreadPool:
             raise ValueError("JobSpecification.fn must be set (callable)")
         fn = job.fn
         logger.debug(
-            "Thread pool: job queued",
+            "Thread job queued",
             job_id=job_id,
             name=job.name,
             timeout_s=job.timeout,
@@ -350,7 +358,7 @@ class ThreadPool:
         def _on_done(f: Future[Any]) -> None:
             if cancel_token.is_cancelled():
                 logger.debug(
-                    "Thread pool: done callback skipped (cancelled)",
+                    "Cancelled thread job callback skipped",
                     job_id=job_id,
                     name=job.name,
                 )
@@ -363,7 +371,7 @@ class ThreadPool:
                     else f.result()
                 )
                 logger.debug(
-                    "Thread pool: job finished OK",
+                    "Thread job completed",
                     job_id=job_id,
                     name=job.name,
                     result_type=type(result).__name__,
@@ -371,7 +379,7 @@ class ThreadPool:
                 emit_completed(job_id, result)
             except FuturesTimeoutError:
                 logger.warning(
-                    "Thread pool: job timed out waiting for result",
+                    "Thread job timed out while collecting its result",
                     job_id=job_id,
                     name=job.name,
                     timeout_s=job.timeout,
@@ -396,13 +404,13 @@ class ThreadPool:
 
     def shutdown(self) -> None:
         """Shutdown the thread pool."""
-        logger.info("Thread pool: shutdown requested (cancel_futures=True)")
+        logger.debug("Thread pool shutdown requested", cancel_futures=True)
         if self._executor is not None:  # check if the executor is initialized
             self._executor.shutdown(wait=False, cancel_futures=True)
         else:
-            logger.warning("Thread pool: shutdown requested but no executor found")
+            logger.debug("Thread pool shutdown skipped because no executor exists")
         logger.debug(
-            "Thread pool: shutdown completed",
+            "Thread pool shutdown completed",
             max_workers=self._max_workers,
         )
 
@@ -436,7 +444,7 @@ class AsyncRunner(QObject):
             self._thread_pool: ThreadPool = ThreadPool()
         except RuntimeError as e:
             logger.error(
-                "Async runner: failed to initialize thread pool",
+                "Async runner thread pool initialization failed",
                 error=e,
             )
             raise RuntimeError(
@@ -445,14 +453,14 @@ class AsyncRunner(QObject):
         try:
             self._process_pool: ProcessPool | ThreadPool = ProcessPool()
         except RuntimeError as e:
-            logger.error(
-                "Async runner: process pool unavailable, falling back to thread pool",
+            logger.warning(
+                "Process pool unavailable; process jobs will use the thread pool",
                 error=e,
             )
             # Process pool unavailable; thread pool was initialized above.
             self._process_pool = ThreadPool()
         logger.debug(
-            "Async runner: initialized",
+            "Async runner initialized",
             process_pool=type(self._process_pool).__name__,
             thread_pool=type(self._thread_pool).__name__,
         )
@@ -491,11 +499,12 @@ class AsyncRunner(QObject):
             raise ValueError("JobSpecification.fn must be set (callable)")
 
         if job.preflight is not None and not job.preflight():
-            logger.info(
-                "Async job preflight rejected submission",
+            logger.debug(
+                "Async job submission skipped",
                 name=job.name,
                 coalesce_key=job.coalesce_key,
                 job_type=job.type,
+                reason="preflight",
             )
             return None
 
@@ -511,13 +520,14 @@ class AsyncRunner(QObject):
             if latest_job and latest_job in self.history:
                 # "At most one" coalescing
                 if job.at_most_once:
-                    logger.info(
-                        "Async job coalesce: at most one job running with the same coalesce key",
+                    logger.debug(
+                        "Async job submission skipped",
                         coalesce_key=job.coalesce_key,
+                        reason="at_most_once",
                     )
                     return None
-                logger.info(
-                    "Async job coalesce: superseding previous job",
+                logger.debug(
+                    "Previous coalesced async job superseded",
                     coalesce_key=job.coalesce_key,
                     previous_job_id=latest_job,
                     new_job_id=job_id,
@@ -580,7 +590,7 @@ class AsyncRunner(QObject):
 
     def shutdown(self) -> None:
         """Shutdown process and thread pools."""
-        logger.info("AsyncRunner.shutdown: stopping process and thread pools")
+        logger.info("Async runner shutdown started")
         self._process_pool.shutdown()
         self._thread_pool.shutdown()
 
@@ -612,14 +622,14 @@ class AsyncRunner(QObject):
         tup = self.history.get(job_id)
         if tup:
             logger.debug(
-                "Async job cancel: token set",
+                "Async job cancellation requested",
                 job_id=job_id,
                 name=tup[0].name,
             )
             tup[0].cancel_token.cancel()
         else:
             logger.debug(
-                "Async job cancel: no active job (ignored)",
+                "Async job cancellation ignored because the job is no longer active",
                 job_id=job_id,
             )
 
@@ -642,7 +652,7 @@ class AsyncRunner(QObject):
         tup = self.history.get(job_id)
         job_name = tup[0].name if tup else ""
         logger.debug(
-            "Async job completed (signals)",
+            "Async job completion emitted",
             job_id=job_id,
             name=job_name,
             result_type=type(result).__name__,
@@ -657,7 +667,7 @@ class AsyncRunner(QObject):
         tup = self.history.get(job_id)
         job_name = tup[0].name if tup else ""
         logger.debug(
-            "Async job cancelled (signals)",
+            "Async job cancellation emitted",
             job_id=job_id,
             name=job_name,
         )
@@ -671,7 +681,7 @@ class AsyncRunner(QObject):
         tup = self.history.get(job_id)
         job_name = tup[0].name if tup else ""
         logger.error(
-            "Async job failed (signals)",
+            "Async job failed",
             job_id=job_id,
             name=job_name,
             message=error.message,
@@ -690,10 +700,10 @@ class AsyncRunner(QObject):
         for key, latest_id in list(self._coalesce_latest.items()):
             if latest_id == job_id:
                 logger.debug(
-                    "Async job cleanup: removed coalesce slot",
+                    "Async job coalescing state cleared",
                     job_id=job_id,
                     coalesce_key=key,
                 )
                 del self._coalesce_latest[key]
                 break
-        logger.debug("Async job cleanup: removed from history", job_id=job_id)
+        logger.debug("Async job history cleared", job_id=job_id)

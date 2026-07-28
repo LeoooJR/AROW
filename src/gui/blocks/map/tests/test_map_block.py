@@ -456,6 +456,24 @@ def test_bridge_normalizes_numeric_line_code() -> None:
     assert received == [(1, "001000", 1, 48.885333, 2.363530)]
 
 
+def test_canvas_logs_marker_selection_as_user_intent(qtbot, log_records) -> None:
+    canvas = Canvas()
+    qtbot.addWidget(canvas)
+
+    canvas._on_marker_clicked(1000, "001000", 2, 48.885333, 2.363530)
+
+    record = log_records[-1]
+    assert record["level"].name == "INFO"
+    assert record["message"] == "Simulation location selected"
+    assert record["extra"] == {
+        "km": 1000,
+        "line_code": "001000",
+        "line_troncon": 2,
+        "latitude": 48.885333,
+        "longitude": 2.363530,
+    }
+
+
 def test_bridge_preserves_non_numeric_line_code() -> None:
     bridge = Bridge()
     received: list[tuple[int, str, int, float, float]] = []

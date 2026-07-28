@@ -127,13 +127,13 @@ class HostInstallIdentityWork(CoreRuntimeWork[HostInstallIdentityOutcome]):
         token = (outcome.install_token or "").strip()
         if not token:
             logger.warning(
-                "HostInstallIdentityWork.apply_main_thread: empty token — host stable_key unchanged",
+                "Host stable key was not updated because the install token is empty",
             )
             return
         key = compute_computer_stable_key(token)
         host_entrypoint.set_host_identity(key)
         logger.debug(
-            "HostInstallIdentityWork: host install identity applied (stable_key redacted in extras by default)",
+            "Host install identity applied",
         )
 
     @staticmethod

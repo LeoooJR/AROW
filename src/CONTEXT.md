@@ -16,6 +16,27 @@ logic (`core`), and the PySide6 view (`gui`).
 - Preserve the MVC boundaries and prefer small, typed interfaces between layers.
 - Tests and non-Python assets inherit the nearest production-package context.
 
+## Logging policy
+
+- GUI `INFO` records describe explicit user workflow actions; presentation and
+  forwarded outcomes are silent or `DEBUG`.
+- The layer that produces a domain outcome owns its `INFO`, `WARNING`, or `ERROR`
+  record. Controllers log routing at `DEBUG` and orchestration anomalies at
+  `WARNING` or `ERROR`.
+- Use concise messages with structured context instead of class prefixes,
+  interpolated values, or multiline object dumps. Expected skips and coalescing
+  are `DEBUG`; recoverable degradation is `WARNING`; terminal failure is `ERROR`
+  or `exception` when a traceback is useful.
+- Use standard Loguru levels rather than `success`, and pass sensitive values only
+  through structured fields covered by the logger redaction policy.
+- `--json-logs` selects the agent-oriented JSON Lines sink. Its native Loguru
+  record contains source, timing, process, thread, exception, and typed extras;
+  `record.extra.origin` identifies the application layer and
+  `record.extra.log_schema_version` identifies the schema.
+- Every root run writes `<uuid4>.log`; process-pool workers write isolated
+  `<uuid4>.worker-<pid>.log` siblings. Never configure independently rotating
+  Loguru sinks against the main process file.
+
 ## Primary dependencies
 
 - **Typer** composes the command-line entrypoint.

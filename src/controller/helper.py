@@ -24,14 +24,14 @@ def validate_model_entrypoint(function: Callable[..., Any]) -> Callable[..., Any
         if hasattr(self, "model_entrypoint"):
             if not isinstance(self.model_entrypoint, ModelEntrypoint):
                 logger.warning(
-                    "Controller: model entrypoint type mismatch",
+                    "Controller model entrypoint type mismatch",
                     model_entrypoint_type=type(self.model_entrypoint).__name__,
                 )
                 return
         elif hasattr(self, "_subcontroller"):
             if not isinstance(self._subcontroller.model_entrypoint, ModelEntrypoint):
                 logger.warning(
-                    "Controller: model entrypoint type mismatch",
+                    "Controller model entrypoint type mismatch",
                     model_entrypoint_type=type(
                         self._subcontroller.model_entrypoint
                     ).__name__,
@@ -58,14 +58,14 @@ def validate_view(function: Callable[..., Any]) -> Callable[..., Any]:
         if hasattr(self, "view"):
             if not isinstance(self.view, MainWindow):
                 logger.warning(
-                    "Controller: view type mismatch",
+                    "Controller view type mismatch",
                     view_type=type(self.view).__name__,
                 )
                 return
         elif hasattr(self, "_subcontroller"):
             if not isinstance(self._subcontroller.view, MainWindow):
                 logger.warning(
-                    "Controller: view type mismatch",
+                    "Controller view type mismatch",
                     view_type=type(self._subcontroller.view).__name__,
                 )
                 return

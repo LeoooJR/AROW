@@ -321,6 +321,7 @@ class AuthentificationCard(QFrame, Component):
     @Slot()
     def _on_close_button_clicked(self) -> None:
         """Handle the close button clicked event."""
+        logger.info("Device pairing cancelled")
         signals.DEVICE.AuthentificationCancelled.emit()
 
     def _is_ip_otp_input_valid(self) -> bool:
@@ -334,42 +335,36 @@ class AuthentificationCard(QFrame, Component):
 
     @Slot()
     def _on_confirm_button_clicked(self) -> None:
-
-        raise_signal: bool = True
-
-        if self._is_ip_otp_input_valid():
-            logger.info(
-                "Authentification card: IP adress for authentification is valid."
+        """Validate and submit the pairing form."""
+        invalid_fields = tuple(
+            field
+            for field, valid in (
+                ("ip", self._is_ip_otp_input_valid()),
+                ("port", self._is_port_otp_input_valid()),
+                ("association_code", self._is_association_code_otp_input_valid()),
             )
-        else:
+            if not valid
+        )
+        if not invalid_fields:
+            ip = self.ui.ip_otp_input.text()
+            port = self.ui.port_otp_input.text()
+            association_code = self.ui.association_code_otp_input.text()
             logger.info(
-                "Authentification card: IP adress for authentification is invalid."
+                "Device pairing submitted",
+                ip=ip,
+                port=port,
+                association_code=association_code,
             )
-            raise_signal = False
-
-        if self._is_port_otp_input_valid():
-            logger.info("Authentification card: Port for authentification is valid.")
-        else:
-            logger.info("Authentification card: Port for authentification is invalid.")
-            raise_signal = False
-
-        if self._is_association_code_otp_input_valid():
-            logger.info(
-                "Authentification card: Association code for authentification is valid."
-            )
-        else:
-            logger.info(
-                "Authentification card: Association code for authentification is invalid."
-            )
-            raise_signal = False
-
-        if raise_signal:
             signals.DEVICE.AuthentificationConfirmed.emit(
-                self.ui.ip_otp_input.text(),
-                self.ui.port_otp_input.text(),
-                self.ui.association_code_otp_input.text(),
+                ip,
+                port,
+                association_code,
             )
         else:
+            logger.info(
+                "Device pairing submission rejected",
+                invalid_fields=invalid_fields,
+            )
             self.start_invalid_otp_highlight()
 
     def _otp_sections(self) -> list[tuple[HelperText, OTPInput]]:
@@ -436,5 +431,4 @@ class AuthentificationCard(QFrame, Component):
     def showEvent(self, event: QShowEvent) -> None:
         """Clear the OTP inputs when the card is shown."""
         self.clear()
-        logger.info("Authentification card cleared.")
         super().showEvent(event)

@@ -5,6 +5,7 @@ import os
 import threading
 import time
 import traceback as _traceback
+from pathlib import Path
 from typing import Any, Callable
 
 import pytest
@@ -494,6 +495,7 @@ class TestAsyncRunnerProcessAndCoalesce:
     def test_at_most_once_rejects_duplicate_while_first_job_is_active(
         self,
         runner_factory: Callable[..., AsyncRunner],
+        log_records,
     ) -> None:
         """Second submit with same coalesce_key returns None and leaves the first job running."""
         pending: dict[str, Callable[[], None]] = {}
@@ -552,6 +554,14 @@ class TestAsyncRunnerProcessAndCoalesce:
         assert "refresh_device_list" not in runner._coalesce_latest
 
         runner.shutdown()
+        duplicate_records = [
+            record
+            for record in log_records
+            if record["message"] == "Async job submission skipped"
+        ]
+        assert len(duplicate_records) == 1
+        assert duplicate_records[0]["level"].name == "DEBUG"
+        assert duplicate_records[0]["extra"]["reason"] == "at_most_once"
 
 
 class TestAsyncRunnerPreflight:
@@ -626,11 +636,13 @@ class TestAsyncRunnerPreflight:
 
 
 class TestProcessPoolLogging:
-    def test_process_pool_uses_setup_logger_initializer(
+    def test_process_pool_uses_isolated_worker_logger_initializer(
         self,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
+        run_identifier = "01fdb29d-2e6b-49d1-8956-9d1caa576d2c"
         captured: dict[str, object] = {}
+        events: list[tuple[str, object]] = []
 
         class FakeExecutor:
             def __init__(
@@ -639,6 +651,7 @@ class TestProcessPoolLogging:
                 max_workers: int | None = None,
                 initializer: object | None = None,
             ) -> None:
+                events.append(("executor", None))
                 captured["max_workers"] = max_workers
                 captured["initializer"] = initializer
 
@@ -649,8 +662,30 @@ class TestProcessPoolLogging:
                 return None
 
         monkeypatch.setattr(runner_mod, "ProcessPoolExecutor", FakeExecutor)
+        monkeypatch.setattr(
+            runner_mod,
+            "resolve_worker_application_log_file_path",
+            lambda *, process_id: Path(
+                f"/logs/{run_identifier}.worker-{process_id}.log"
+            ),
+        )
+        monkeypatch.setattr(
+            runner_mod.logger,
+            "debug",
+            lambda message, **extra: events.append((message, extra)),
+        )
 
         runner_mod.ProcessPool(max_workers=2)
 
         assert captured["max_workers"] == 2
-        assert captured["initializer"] is runner_mod.setup_logger
+        assert captured["initializer"] is runner_mod.setup_worker_logger
+        assert events[:2] == [
+            (
+                "Opening process pool",
+                {
+                    "max_workers": 2,
+                    "path": f"/logs/{run_identifier}.worker-{{pid}}.log",
+                },
+            ),
+            ("executor", None),
+        ]

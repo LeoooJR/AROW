@@ -157,8 +157,8 @@ class SimulationSubController(AppSubController):
             return
         if current_poi.line.troncon != payload.line_troncon:
             return
-        logger.info(
-            "SimulationSubController: clearing rejected stored spoofed marker",
+        logger.debug(
+            "Rejected persisted simulation location cleared",
             simulation_id=payload.simulation_id,
             km=payload.km,
             line_code=payload.line_code,
@@ -185,9 +185,9 @@ class SimulationSubController(AppSubController):
             # self.view.forward_simulation_started() # TODO: Implement this
         except ValueError as e:
             logger.error(
-                "SimulationSubController: failed to set simulation active",
+                "Simulation could not be activated",
                 error=str(e),
-                id=id,
+                simulation_id=id,
             )
             return
 
@@ -200,9 +200,9 @@ class SimulationSubController(AppSubController):
             # self.view.forward_simulation_stopped() # TODO: Implement this
         except ValueError as e:
             logger.error(
-                "SimulationSubController: failed to set simulation inactive",
+                "Simulation could not be deactivated",
                 error=str(e),
-                id=id,
+                simulation_id=id,
             )
             return
 
@@ -215,9 +215,9 @@ class SimulationSubController(AppSubController):
             # self.view.forward_simulation_paused() # TODO: Implement this
         except ValueError as e:
             logger.error(
-                "SimulationSubController: failed to set simulation inactive",
+                "Simulation could not be paused",
                 error=str(e),
-                id=id,
+                simulation_id=id,
             )
             return
 
@@ -230,9 +230,9 @@ class SimulationSubController(AppSubController):
             # self.view.forward_simulation_resumed() # TODO: Implement this
         except ValueError as e:
             logger.error(
-                "SimulationSubController: failed to set simulation active",
+                "Simulation could not be resumed",
                 error=str(e),
-                id=id,
+                simulation_id=id,
             )
             return
 
@@ -241,9 +241,9 @@ class SimulationSubController(AppSubController):
     def _on_device_selection_confirmed(self, device_id: str, device_name: str) -> None:
         """In-memory selection of the active device (UI thread)."""
         logger.debug(
-            "SimulationSubController: device selection confirmed",
-            input_device_id=device_id,
-            input_device_name=device_name,
+            "Simulation creation requested for selected device",
+            device_id=device_id,
+            device_name=device_name,
         )
         self.model_entrypoint.create_simulation(device_id=device_id)
 
@@ -251,7 +251,7 @@ class SimulationSubController(AppSubController):
     def _on_remove_device_requested(self, device_id: str) -> None:
         """Handle the remove device requested event."""
         logger.debug(
-            "SimulationSubController: remove device requested",
+            "Simulation deletion requested for device",
             device_id=device_id,
         )
         self.model_entrypoint.delete_simulation_for_device(device_id)
@@ -260,16 +260,10 @@ class SimulationSubController(AppSubController):
         """Handle the simulation created event."""
         if not payload.device_id:
             logger.error(
-                "SimulationSubController: simulation created without device",
+                "Simulation creation event has no device",
                 simulation_id=payload.simulation_id,
             )
             return
-        logger.success(
-            "SimulationSubController: simulation created",
-            simulation_id=payload.simulation_id,
-            device_id=payload.device_id,
-            device_name=payload.device_name,
-        )
         self.view.forward_device_selection_succeeded(
             payload.simulation_id,
             payload.device_id,
@@ -281,12 +275,6 @@ class SimulationSubController(AppSubController):
         self, payload: SimulationCreationFailedPayload
     ) -> None:
         """Forward simulation creation failure to the device selection UI."""
-        logger.error(
-            "SimulationSubController: simulation creation failed",
-            device_id=payload.device_id,
-            device_name=payload.device_name,
-            reason=payload.reason,
-        )
         self.view.forward_device_selection_failed(
             payload.device_id,
             payload.device_name,
@@ -297,15 +285,10 @@ class SimulationSubController(AppSubController):
         """Forward active-device removal success when the payload carries device context."""
         if payload.device_id is None:
             logger.warning(
-                "SimulationSubController: simulation deleted without device id",
+                "Simulation deletion event has no device",
                 simulation_id=payload.simulation_id,
             )
             return
-        logger.info(
-            "SimulationSubController: simulation deleted for device",
-            simulation_id=payload.simulation_id,
-            device_id=payload.device_id,
-        )
         self.view.forward_remove_active_device_succeeded(payload.device_id)
 
     @validate_view
@@ -314,7 +297,7 @@ class SimulationSubController(AppSubController):
     ) -> None:
         """Keep remove-device requests quiet when no active simulation exists."""
         logger.debug(
-            "SimulationSubController: simulation delete skipped",
+            "Simulation deletion event ignored",
             device_id=payload.device_id,
             reason=payload.reason,
         )
@@ -323,16 +306,10 @@ class SimulationSubController(AppSubController):
         """Handle the simulation restored event."""
         if not payload.device_id:
             logger.error(
-                "SimulationSubController: simulation restored without device",
+                "Simulation restoration event has no device",
                 simulation_id=payload.simulation_id,
             )
             return
-        logger.success(
-            "SimulationSubController: simulation restored",
-            simulation_id=payload.simulation_id,
-            device_id=payload.device_id,
-            device_name=payload.device_name,
-        )
         self.view.forward_device_selection_succeeded(
             payload.simulation_id,
             payload.device_id,

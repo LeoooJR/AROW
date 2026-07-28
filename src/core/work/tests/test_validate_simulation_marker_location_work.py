@@ -119,7 +119,7 @@ def test_validate_simulation_marker_location_work_run_returns_rejected_outcome(
     assert "Unknown milestone" in outcome.rejected.reason
 
 
-def test_apply_main_thread_emits_validated_signal(tmp_path: Path) -> None:
+def test_apply_main_thread_emits_validated_signal(tmp_path: Path, log_records) -> None:
     model_entrypoint, simulation_id = _make_model(tmp_path)
     captured: list[SimulationLocationValidatedPayload] = []
 
@@ -141,9 +141,12 @@ def test_apply_main_thread_emits_validated_signal(tmp_path: Path) -> None:
 
     assert len(captured) == 1
     assert captured[0].simulation_id == simulation_id
+    record = log_records[-1]
+    assert record["level"].name == "INFO"
+    assert record["message"] == "Simulation location validated"
 
 
-def test_apply_main_thread_emits_rejected_signal(tmp_path: Path) -> None:
+def test_apply_main_thread_emits_rejected_signal(tmp_path: Path, log_records) -> None:
     model_entrypoint, simulation_id = _make_model(tmp_path)
     captured: list[SimulationLocationRejectedPayload] = []
 
@@ -165,6 +168,9 @@ def test_apply_main_thread_emits_rejected_signal(tmp_path: Path) -> None:
 
     assert len(captured) == 1
     assert captured[0].km == 999
+    record = log_records[-1]
+    assert record["level"].name == "WARNING"
+    assert record["message"] == "Simulation location rejected"
 
 
 def test_apply_failure_main_thread_emits_generic_error(tmp_path: Path) -> None:

@@ -32,7 +32,9 @@ def _add_simulation(
     return restored
 
 
-def test_render_map_work_run_returns_outcome(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_render_map_work_run_returns_outcome(
+    monkeypatch: pytest.MonkeyPatch, log_records
+) -> None:
     html_path = Path("/tmp/sim-1.html")
 
     class FakeRenderer:
@@ -51,6 +53,11 @@ def test_render_map_work_run_returns_outcome(monkeypatch: pytest.MonkeyPatch) ->
     ).run()
 
     assert outcome == RenderMapOutcome(simulation_id="sim-1", html_path=html_path)
+    rendered_records = [
+        record for record in log_records if record["message"] == "Map rendered"
+    ]
+    assert len(rendered_records) == 1
+    assert rendered_records[0]["level"].name == "INFO"
 
 
 def test_render_map_work_run_raises_render_map_error(

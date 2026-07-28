@@ -300,8 +300,8 @@ class ModelEntrypoint(Entrypoint):
         :class:`~core.work.close_work.CloseCoreRuntimeWork` propagate to AsyncRunner.
         """
         if self._adb_server is None:
-            logger.warning(
-                "ModelEntrypoint: close_core_runtime skipped (no active ADB server)",
+            logger.debug(
+                "Core runtime close skipped because no ADB server is active",
             )
             return CloseOutcome(adb_server=None)
         return CloseCoreRuntimeWork(self._adb_server).run()
@@ -417,7 +417,7 @@ class ModelEntrypoint(Entrypoint):
 
         if changed:
             logger.info(
-                "ModelEntrypoint: reconciled paired devices",
+                "Paired devices reconciled",
                 discovered_count=len(discovered_phones),
                 paired_count=len(paired_devices),
             )
@@ -564,7 +564,7 @@ class ModelEntrypoint(Entrypoint):
         applier = _CORE_RUNTIME_RESULT_APPLIERS.get(type(result))
         if applier is None:
             logger.error(
-                "ModelEntrypoint.apply_result: unsupported result type",
+                "Async result could not be applied because its type is unsupported",
                 result_type=type(result).__name__,
             )
             return
@@ -589,7 +589,7 @@ class ModelEntrypoint(Entrypoint):
             exception_applier(self, exc)
             return
         logger.error(
-            "ModelEntrypoint.apply_failure: unregistered failure",
+            "Async failure could not be applied because its origin is unregistered",
             origin=origin or None,
             exception_type=type(exc).__name__,
             message=str(exc),
@@ -609,7 +609,7 @@ def _dedupe_discovered_phones(phones: list[Phone]) -> list[Phone]:
         device_id = (phone.id or "").strip()
         if not device_id:
             logger.warning(
-                "ModelEntrypoint: skipping discovered phone with empty id",
+                "Discovered phone skipped because its device id is empty",
                 phone_repr=repr(phone),
             )
             continue

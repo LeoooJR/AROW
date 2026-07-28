@@ -7,9 +7,13 @@ from __future__ import annotations
 import os
 import re
 import tempfile
+import time
+from collections.abc import Mapping
+from datetime import timedelta
 from enum import Enum
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 from loguru import logger
 
@@ -19,9 +23,16 @@ from core.application_paths import (
 )
 
 AROW_LOG_FILE_ENV = (
-    "AROW_LOG_FILE"  # Environment variable for the application log file path
+    "AROW_LOG_FILE"  # Main log path published internally for spawned workers
 )
 AROW_LOG_FALLBACK_DIR_ENV = "AROW_LOG_FALLBACK_DIR"
+AROW_LOG_SERIALIZE_ENV = "AROW_LOG_SERIALIZE"
+
+_APPLICATION_LOG_ROTATION = "10 MB"
+_APPLICATION_LOG_RETENTION = timedelta(days=14)
+_APPLICATION_LOG_COMPRESSION = "gz"
+_APPLICATION_LOG_GLOB = "*.log*"
+_JSON_LOG_SCHEMA_VERSION = 1
 
 
 class LogOrigin(str, Enum):
@@ -110,6 +121,33 @@ def maybe_redact_extra_value(key: str, value: Any) -> str:
     if "pc:v1:install:" in raw.lower():
         return "<redacted:host_key>"
     return raw
+
+
+def _sanitize_json_extra_value(key: str, value: Any) -> Any:
+    """Return JSON-friendly structured context with nested sensitive values redacted."""
+    kl = key.lower()
+    if kl in _SENSITIVE_EXTRA_KEYS_EXACT:
+        return "<redacted>"
+    if any(kl.endswith(suffix) for suffix in _SENSITIVE_EXTRA_KEY_SUFFIXES):
+        return "<redacted>"
+    if isinstance(value, str):
+        if "pc:v1:install:" in value.lower():
+            return "<redacted:host_key>"
+        return redact_stable_identifier(value)
+    if isinstance(value, Mapping):
+        return {
+            str(nested_key): _sanitize_json_extra_value(str(nested_key), nested_value)
+            for nested_key, nested_value in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        return [_sanitize_json_extra_value(key, item) for item in value]
+    if isinstance(value, (set, frozenset)):
+        return [
+            _sanitize_json_extra_value(key, item) for item in sorted(value, key=repr)
+        ]
+    if value is None or isinstance(value, (bool, int, float)):
+        return value
+    return maybe_redact_extra_value(key, value)
 
 
 def logger_for(origin: LogOrigin) -> Any:
@@ -214,12 +252,36 @@ def _loguru_format(record: dict[str, Any]) -> str:
     )
 
 
+def _json_loguru_format(record: dict[str, Any]) -> str:
+    """
+    Prepare one Loguru record for agent-friendly JSON serialization.
+
+    Loguru's native ``serialize=True`` sink writes the complete record metadata.
+    This formatter enriches its structured extras with a stable schema marker and
+    inferred application layer while applying the same redaction boundary used by
+    the human-readable sink.
+    """
+    origin = _resolve_origin(record)
+    raw_extra = record.get("extra") or {}
+    sanitized_extra = {
+        str(key): _sanitize_json_extra_value(str(key), value)
+        for key, value in raw_extra.items()
+        if key != "origin"
+    }
+    sanitized_extra["log_schema_version"] = _JSON_LOG_SCHEMA_VERSION
+    sanitized_extra["origin"] = origin.value if origin is not None else None
+    record["extra"] = sanitized_extra
+    record["message"] = redact_stable_identifier(str(record["message"]))
+    return "{message}\n{exception}"
+
+
 def resolve_application_log_file_path() -> Path:
     """
-    Return the shared low-level application log file for this process tree.
+    Return the published main low-level log path for this process tree.
 
-    The main process resolves a concrete path under ``<application_dir>/logs`` and stores
-    it in :data:`AROW_LOG_FILE_ENV`. Worker processes spawned later reuse that exact path.
+    ``setup_logger`` replaces inherited values for each root run. Spawned workers
+    reuse the published path as the base for isolated per-process log paths.
+    Callers operating without root setup lazily generate and publish a UUID4 path.
     """
     env_path = os.environ.get(AROW_LOG_FILE_ENV, "").strip()
     if env_path:
@@ -246,19 +308,57 @@ def _fallback_application_log_file_path(original_path: Path) -> Path:
     return base_dir / original_path.name
 
 
-def setup_logger() -> Path:
-    """
-    Configure Loguru sinks and the project format string.
+def _prune_expired_application_logs(log_dir: Path) -> None:
+    """Best-effort cleanup across UUID-prefixed application logs from previous runs."""
+    cutoff = time.time() - _APPLICATION_LOG_RETENTION.total_seconds()
+    try:
+        candidates = list(log_dir.glob(_APPLICATION_LOG_GLOB))
+    except OSError:
+        return
 
-    Call this before importing modules that emit logs at import time. For example,
-    ``core.entrypoint`` imports ``CORE_RUNTIME_WORKS``, which constructs
-    :class:`~collection.Repository` subclasses that log snapshot lines from ``add`` / ``add_all``.
-    If this runs too late, those lines go through Loguru's default handler instead of the file sink.
+    for candidate in candidates:
+        run_identifier = candidate.name.partition(".")[0]
+        try:
+            parsed_identifier = UUID(run_identifier)
+        except ValueError:
+            continue
+        if parsed_identifier.version != 4 or str(parsed_identifier) != run_identifier:
+            continue
+        try:
+            if candidate.is_file() and candidate.stat().st_mtime <= cutoff:
+                candidate.unlink()
+        except OSError:
+            # Retention must not prevent the application from starting or logging.
+            continue
 
-    Returns:
-        Path: The concrete application log file used by this process tree.
-    """
-    log_path = resolve_application_log_file_path()
+
+def _resolve_log_serialization(serialize: bool | None) -> bool:
+    """Resolve and persist the sink mode so spawned workers inherit it."""
+    if serialize is None:
+        return os.environ.get(AROW_LOG_SERIALIZE_ENV, "0") == "1"
+    os.environ[AROW_LOG_SERIALIZE_ENV] = "1" if serialize else "0"
+    return serialize
+
+
+def resolve_worker_application_log_file_path(
+    *,
+    process_id: int | str | None = None,
+) -> Path:
+    """Return the PID-specific worker path, or a template when given ``"{pid}"``."""
+    shared_path = resolve_application_log_file_path()
+    resolved_process_id = os.getpid() if process_id is None else process_id
+    return shared_path.with_name(
+        f"{shared_path.stem}.worker-{resolved_process_id}{shared_path.suffix}"
+    )
+
+
+def _configure_logger(
+    log_path: Path,
+    *,
+    serialize_logs: bool,
+    publish_log_path: bool,
+) -> Path:
+    """Configure one process-local sink and return its concrete path."""
     candidate_paths = (log_path, _fallback_application_log_file_path(log_path))
 
     logger.remove()
@@ -267,14 +367,20 @@ def setup_logger() -> Path:
     for candidate_path in candidate_paths:
         try:
             candidate_path.parent.mkdir(parents=True, exist_ok=True)
+            _prune_expired_application_logs(candidate_path.parent)
             logger.add(
                 str(candidate_path),
-                format=_loguru_format,
+                format=_json_loguru_format if serialize_logs else _loguru_format,
+                serialize=serialize_logs,
                 colorize=False,
                 encoding="utf-8",
+                rotation=_APPLICATION_LOG_ROTATION,
+                retention=_APPLICATION_LOG_RETENTION,
+                compression=_APPLICATION_LOG_COMPRESSION,
                 watch=True,
             )
-            os.environ[AROW_LOG_FILE_ENV] = str(candidate_path)
+            if publish_log_path:
+                os.environ[AROW_LOG_FILE_ENV] = str(candidate_path)
             return candidate_path
         except OSError as exc:
             last_error = exc
@@ -282,3 +388,43 @@ def setup_logger() -> Path:
     if last_error is not None:
         raise last_error
     return log_path
+
+
+def setup_logger(*, serialize: bool | None = None) -> Path:
+    """
+    Configure a fresh root-run Loguru sink and the project format string.
+
+    Call this before importing modules that emit logs at import time. For example,
+    ``core.entrypoint`` imports ``CORE_RUNTIME_WORKS``, which constructs
+    :class:`~collection.Repository` subclasses that log snapshot lines from ``add`` / ``add_all``.
+    If this runs too late, those lines go through Loguru's default handler instead of the file sink.
+    Any inherited :data:`AROW_LOG_FILE_ENV` value is ignored and replaced only
+    after the new primary or fallback sink is configured successfully.
+
+    Returns:
+        Path: The concrete application log file used by this process tree.
+    """
+    serialize_logs = _resolve_log_serialization(serialize)
+    application_dir = get_or_create_application_dir()
+    log_path = default_application_log_file_path(application_dir)
+    return _configure_logger(
+        log_path,
+        serialize_logs=serialize_logs,
+        publish_log_path=True,
+    )
+
+
+def setup_worker_logger() -> Path:
+    """
+    Configure a process-pool worker with an isolated rotating file sink.
+
+    Workers inherit the main path and serialization mode through the environment,
+    but never open the main process file. This avoids unsupported concurrent
+    rotation, compression, and writes across independently configured Loguru sinks.
+    """
+    worker_path = resolve_worker_application_log_file_path()
+    return _configure_logger(
+        worker_path,
+        serialize_logs=_resolve_log_serialization(None),
+        publish_log_path=False,
+    )

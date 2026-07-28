@@ -74,7 +74,7 @@ def test_file_display_without_save_button_and_empty_name_refreshes_safely(
 
 
 def test_file_display_save_as_emits_activity_log_file_update_requested(
-    monkeypatch, qtbot
+    monkeypatch, qtbot, log_records
 ) -> None:
     file_widget = File(None, "activity.log", "log", file_save=True)
     qtbot.addWidget(file_widget)
@@ -93,6 +93,10 @@ def test_file_display_save_as_emits_activity_log_file_update_requested(
     file_widget._on_save_as_button_clicked()
 
     assert emitted == ["/tmp/custom_activity.log"]
+    record = log_records[-1]
+    assert record["level"].name == "INFO"
+    assert record["message"] == "Activity log file selected"
+    assert record["extra"]["path"] == "/tmp/custom_activity.log"
 
 
 def test_file_display_name_survives_narrow_then_wide_resize(qtbot) -> None:

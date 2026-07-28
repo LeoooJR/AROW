@@ -136,7 +136,8 @@ class Simulation(Payload):
                 old = getattr(self, name)
                 if old != value:
                     logger.debug(
-                        f"Simulation {self.id}: field updated",
+                        "Simulation field updated",
+                        simulation_id=self.id,
                         field=name,
                         old=old,
                         new=value,
@@ -162,7 +163,7 @@ def _relative_to_simulation_dir(path: Path | None, simulation_dir: Path) -> str 
         return str(path.relative_to(simulation_dir))
     except ValueError:
         logger.warning(
-            "SimulationDiskStore: artifact path is outside simulation directory",
+            "Simulation artifact path is outside its simulation directory",
             path=str(path),
             simulation_dir=str(simulation_dir),
         )
@@ -235,14 +236,14 @@ class SimulationDiskStore:
             payload = json.loads(self.index_file.read_text(encoding="utf-8"))
         except json.JSONDecodeError as error:
             logger.warning(
-                "SimulationDiskStore: failed to parse index file",
+                "Simulation index file could not be parsed",
                 path=str(self.index_file),
                 error=str(error),
             )
             return None
         if not isinstance(payload, dict):
             logger.warning(
-                "SimulationDiskStore: index file is not a JSON object",
+                "Simulation index file is not a JSON object",
                 path=str(self.index_file),
             )
             return None
@@ -255,14 +256,14 @@ class SimulationDiskStore:
         schema_version = payload.get("schema_version")
         if schema_version != SIMULATION_REPOSITORY_SCHEMA_VERSION:
             logger.warning(
-                "SimulationDiskStore: unsupported index schema version",
+                "Simulation index uses an unsupported schema version",
                 schema_version=schema_version,
             )
             return None
         simulation_ids_raw = payload.get("simulations", [])
         if not isinstance(simulation_ids_raw, list):
             logger.warning(
-                "SimulationDiskStore: index simulations entry is not a list",
+                "Simulation index entry is not a list",
                 path=str(self.index_file),
             )
             return None
@@ -289,7 +290,7 @@ class SimulationDiskStore:
         metadata_path = self.simulation_metadata_file(simulation_id)
         if not metadata_path.is_file():
             logger.warning(
-                "SimulationDiskStore: simulation metadata file missing",
+                "Simulation metadata file is missing",
                 simulation_id=simulation_id,
                 path=str(metadata_path),
             )
@@ -298,7 +299,7 @@ class SimulationDiskStore:
             payload = json.loads(metadata_path.read_text(encoding="utf-8"))
         except json.JSONDecodeError as error:
             logger.warning(
-                "SimulationDiskStore: failed to parse simulation metadata",
+                "Simulation metadata could not be parsed",
                 simulation_id=simulation_id,
                 path=str(metadata_path),
                 error=str(error),
@@ -306,7 +307,7 @@ class SimulationDiskStore:
             return None
         if not isinstance(payload, dict):
             logger.warning(
-                "SimulationDiskStore: simulation metadata is not a JSON object",
+                "Simulation metadata is not a JSON object",
                 simulation_id=simulation_id,
                 path=str(metadata_path),
             )
@@ -320,7 +321,7 @@ class SimulationDiskStore:
         if simulation_dir.is_dir():
             shutil.rmtree(simulation_dir)
             logger.info(
-                "SimulationDiskStore: deleted stale persisted simulation directory",
+                "Stale persisted simulation directory deleted",
                 simulation_id=simulation_id,
                 path=str(simulation_dir),
             )
@@ -344,7 +345,7 @@ class SimulationDiskStore:
                 simulation = self._load_simulation_from_disk(simulation_id)
             except (TypeError, ValueError) as error:
                 logger.warning(
-                    "SimulationDiskStore: failed to deserialize simulation",
+                    "Persisted simulation could not be deserialized",
                     simulation_id=simulation_id,
                     error=str(error),
                 )
@@ -355,7 +356,7 @@ class SimulationDiskStore:
                 continue
             if simulation.device is None:
                 logger.warning(
-                    "SimulationDiskStore: persisted simulation has no device",
+                    "Persisted simulation has no device",
                     simulation_id=simulation_id,
                 )
                 self._delete_persisted_simulation_dir(simulation_id)
@@ -369,7 +370,7 @@ class SimulationDiskStore:
                     paired_device = paired_by_stable_key.get(stable_key)
             if paired_device is None:
                 logger.info(
-                    "SimulationDiskStore: deleting simulation for unavailable device",
+                    "Persisted simulation deleted because its device is unavailable",
                     simulation_id=simulation_id,
                     device_id=persisted_device_id,
                 )
@@ -388,7 +389,7 @@ class SimulationDiskStore:
             and devices.get(self._last_active_device_id) is None
         ):
             logger.info(
-                "SimulationDiskStore: clearing last active device (not paired)",
+                "Last active device cleared because it is not paired",
                 device_id=self._last_active_device_id,
             )
             self._last_active_device_id = None
@@ -480,8 +481,9 @@ class SimulationRepository(Repository[Simulation]):
             raise ValueError(f"Simulation with id {simulation.id} already exists")
         self._repository[simulation.id] = simulation
         logger.debug(
-            "SimulationRepository.restore: repository snapshot ({} item(s))",
-            len(self._repository),
+            "Simulation restored into repository",
+            simulation_id=simulation.id,
+            item_count=len(self._repository),
         )
 
     def load_all_for_devices(self, devices: PhoneRepository) -> list[Simulation]:
@@ -496,7 +498,7 @@ class SimulationRepository(Repository[Simulation]):
                 self.restore(simulation)
             except ValueError as error:
                 logger.warning(
-                    "SimulationRepository: failed to restore simulation",
+                    "Simulation could not be restored into repository",
                     simulation_id=simulation.id,
                     error=str(error),
                 )

@@ -9,6 +9,10 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+from faker import Faker
+
+_application_log_faker = Faker("en_US", use_weighting=False)
+
 
 def get_or_create_application_dir() -> Path:
     """
@@ -86,18 +90,13 @@ def default_activity_log_file_path(
 
 def default_application_log_file_path(
     application_dir: Path,
-    *,
-    now: datetime | None = None,
 ) -> Path:
     """
-    Return the low-level application log file path for one process run.
+    Return a UUID4-named low-level application log file path for one process run.
 
     Distinct from :func:`default_activity_log_file_path` (user-facing GUI activity).
     One file per application start under
-    ``<application_dir>/logs/application_YYYYMMDD_HHMMSS.log``.
+    ``<application_dir>/logs/<run_identifier>.log``.
     """
-    run_stamp = (now or datetime.now()).strftime("%Y%m%d_%H%M%S")
-    return (
-        get_or_create_activity_logs_dir(application_dir)
-        / f"application_{run_stamp}.log"
-    )
+    run_identifier = _application_log_faker.uuid4()
+    return get_or_create_activity_logs_dir(application_dir) / f"{run_identifier}.log"

@@ -86,7 +86,7 @@ def _offscreen_screen_size_from_env() -> QSize:
         height = int(height_text)
     except (TypeError, ValueError):
         logger.warning(
-            "MainWindow: invalid offscreen screen size, using fallback",
+            "Invalid offscreen screen size; using fallback",
             env_var=_OFFSCREEN_SCREEN_SIZE_ENV,
             raw=raw,
         )
@@ -96,7 +96,7 @@ def _offscreen_screen_size_from_env() -> QSize:
         or height < Settings.DIMENSION.WINDOW_MIN_HEIGHT
     ):
         logger.warning(
-            "MainWindow: offscreen screen size below minimum, using fallback",
+            "Offscreen screen size is below the minimum; using fallback",
             env_var=_OFFSCREEN_SCREEN_SIZE_ENV,
             raw=raw,
             min_width=Settings.DIMENSION.WINDOW_MIN_WIDTH,
@@ -409,7 +409,6 @@ class Body(QWidget):
     @Slot(str)
     def _on_remove_active_device_succeeded(self, device_id: str) -> None:
         """Handle the active device removed."""
-        logger.info("Body: active device removed", device_id=device_id)
         self.ui.progress_bar.setValue(0)
         self.ui.tabs.setCurrentIndex(0)
         # self.ui.tabs.setTabVisible(2, False) # TODO: uncomment this when the device tab is implemented
@@ -554,7 +553,6 @@ class MainContainer(QWidget):
     @Slot()
     def _on_add_device_requested(self) -> None:
         """Handle the add device request."""
-        logger.info("MainContainer: add device requested")
         dialog = QuestionDialog(
             self,
             icon=GenericIcons.DEVICE,
@@ -565,15 +563,16 @@ class MainContainer(QWidget):
         button = dialog.exec()
 
         if button == QMessageBox.StandardButton.Yes:
+            logger.info("Device pairing opened")
             signals.DEVICE.AuthentificationRequested.emit()
 
         else:
+            logger.info("Device pairing cancelled before opening")
             signals.DEVICE.AuthentificationCancelled.emit()
 
     @Slot()
     def _on_authentification_confirmed(self) -> None:
         """Handle the authentification confirmation."""
-        logger.info("MainContainer: authentification confirmation received")
         self.post_toast(self.texts.connecting_to_device_toast, level="info")
 
     def post_toast(self, text: str, level: str) -> None:
@@ -582,7 +581,7 @@ class MainContainer(QWidget):
             return
         if not self.isVisible():
             logger.debug(
-                "MainContainer: toast skipped (container not visible)",
+                "Toast skipped because the main container is hidden",
             )
             return
 
@@ -591,7 +590,7 @@ class MainContainer(QWidget):
         last_timestamp = getattr(self, "_last_toast_timestamp", 0.0)
         if last_payload == (text, level) and now - last_timestamp < 0.35:
             logger.debug(
-                "MainContainer: toast skipped (duplicate within debounce window)",
+                "Duplicate toast skipped within debounce window",
             )
             return
         self._last_toast_payload = (text, level)
@@ -620,7 +619,7 @@ class MainContainer(QWidget):
             self.ui.toast = toast
         except RuntimeError:
             logger.warning(
-                "MainContainer: toast display failed (widget deleted during creation)",
+                "Toast display failed because its widget was deleted during creation",
             )
             self.ui.toast = None
             QTimer.singleShot(0, self._show_next_toast)
@@ -858,7 +857,6 @@ class MainWindow(QMainWindow):
         )
         self.ui.container.setPalette(palette)
         self._refresh_theme_icons(theme)
-        logger.info("MainWindow: palette updated", theme=str(theme))
 
     def _refresh_theme_icons(self, theme: Theme) -> None:
         """Repaint pixmap/icon widgets when assets differ per theme."""
@@ -873,7 +871,6 @@ class MainWindow(QMainWindow):
     @Slot()
     def _on_idle(self) -> None:
         """Handle the idle state: run helper and highlight device lists to draw attention."""
-        logger.info("MainWindow: idle state detected")
         # self.ui.container.wake_up()
         signals.UI.RunHelperAnimationRequested.emit()
 
@@ -892,14 +889,10 @@ class MainWindow(QMainWindow):
             return
         if self._device_selection_dialog_open:
             logger.debug(
-                "MainWindow: device selection ignored (dialog already open)",
+                "Device selection ignored because the dialog is already open",
             )
             return
         self._device_selection_dialog_open = True
-        logger.info(
-            "MainWindow: device selection requested",
-            device_id=device_id,
-        )
         dialog = QuestionDialog(
             self,
             icon=GenericIcons.DEVICE,
@@ -913,8 +906,18 @@ class MainWindow(QMainWindow):
             button = dialog.exec()
 
             if button == QMessageBox.StandardButton.Yes:
+                logger.info(
+                    "Device selection confirmed",
+                    device_id=device_id,
+                    device_name=device_name,
+                )
                 signals.DEVICE.DeviceSelectionConfirmed.emit(device_id, device_name)
             else:
+                logger.info(
+                    "Device selection cancelled",
+                    device_id=device_id,
+                    device_name=device_name,
+                )
                 signals.DEVICE.DeviceSelectionCancelled.emit()
         finally:
             self._device_selection_dialog_open = False
@@ -929,20 +932,15 @@ class MainWindow(QMainWindow):
     @Slot()
     def _on_authentification_cancelled(self) -> None:
         """Handle the authentification cancelled."""
-        logger.info("MainWindow: authentification cancelled")
         self.ui.authentification_overlay.hide()
 
     @Slot()
     def _on_authentification_confirmed(self) -> None:
         """Handle the authentification confirmation."""
-        logger.info("MainWindow: authentification confirmed")
         self.ui.authentification_overlay.hide()
 
     def forward_device_authentification_succeeded(self, device: dict) -> None:
         """Handle the device authentification succeeded."""
-        logger.info(
-            "MainWindow: device authentification succeeded", device=device["name"]
-        )
         signals.DEVICE.AuthentificationSucceeded.emit(device)
         self.ui.container.post_toast(
             self.texts.authentification_success_toast.format(device=device["name"]),
@@ -953,7 +951,6 @@ class MainWindow(QMainWindow):
         self, simulation_id: str, device_id: str, device_name: str
     ) -> None:
         """Handle the device selection succeeded without adding a new list entry."""
-        logger.info("MainWindow: device selection succeeded", device=device_name)
         signals.DEVICE.DeviceSelectionSucceeded.emit(
             simulation_id, device_id, device_name
         )
@@ -964,11 +961,6 @@ class MainWindow(QMainWindow):
 
     def forward_map_rendered(self, simulation_id: str, html_path: Path) -> None:
         """Forward map render completion to the map block."""
-        logger.info(
-            "MainWindow: map rendered",
-            simulation_id=simulation_id,
-            html_path=str(html_path),
-        )
         signals.UI.MapRendered.emit(simulation_id, html_path)
 
     def forward_simulation_location_validated(
@@ -982,15 +974,6 @@ class MainWindow(QMainWindow):
         label: str,
     ) -> None:
         """Forward validated simulation location to map consumers."""
-        logger.info(
-            "MainWindow: simulation location validated",
-            simulation_id=simulation_id,
-            km=km,
-            line_code=line_code,
-            line_troncon=line_troncon,
-            lat=lat,
-            lon=lon,
-        )
         signals.SIMULATION.SimulationLocationValidated.emit(
             simulation_id,
             km,
@@ -1012,16 +995,6 @@ class MainWindow(QMainWindow):
         reason: str,
     ) -> None:
         """Notify the user when map milestone validation fails."""
-        logger.warning(
-            "MainWindow: simulation location rejected",
-            simulation_id=simulation_id,
-            km=km,
-            line_code=line_code,
-            line_troncon=line_troncon,
-            lat=lat,
-            lon=lon,
-            reason=reason,
-        )
         signals.SIMULATION.SimulationLocationRejected.emit(
             simulation_id,
             km,
@@ -1043,11 +1016,6 @@ class MainWindow(QMainWindow):
 
     def forward_map_render_failed(self, simulation_id: str, reason: str) -> None:
         """Forward map render failure to the map block and notify the user."""
-        logger.warning(
-            "MainWindow: map render failed",
-            simulation_id=simulation_id,
-            reason=reason,
-        )
         signals.UI.MapRenderFailed.emit(simulation_id, reason)
         self.ui.container.post_toast(
             self.texts.map_render_failed_toast.format(
@@ -1059,7 +1027,6 @@ class MainWindow(QMainWindow):
 
     def forward_device_selection_failed(self, device_id: str, device_name: str) -> None:
         """Handle the device selection failed."""
-        logger.warning("MainWindow: device selection failed", device=device_name)
         signals.DEVICE.DeviceSelectionFailed.emit(device_id, device_name)
         self.ui.container.post_toast(
             self.texts.device_selection_failed_toast.format(device=device_name),
@@ -1070,13 +1037,6 @@ class MainWindow(QMainWindow):
         self, ip: str, port: int, association_code: str, reason: str
     ) -> None:
         """Handle the device authentification failed."""
-        logger.warning(
-            "MainWindow: device authentification failed",
-            ip=ip,
-            port=port,
-            association_code=association_code,
-            reason=reason,
-        )
         signals.DEVICE.AuthentificationFailed.emit(ip, port, association_code)
         self.ui.container.post_toast(
             self.texts.authentification_failed_toast.format(
@@ -1090,25 +1050,14 @@ class MainWindow(QMainWindow):
     ) -> None:
         """Handle the devices updated."""
         rebindings = device_id_rebindings or {}
-        logger.info(
-            "MainWindow: devices updated",
-            device_count=len(devices),
-            device_descriptors=devices,
-            device_id_rebindings=rebindings,
-        )
         signals.DEVICE.DevicesUpdated.emit(devices, rebindings)
 
     def forward_simulation_deleted(self, simulation_id: str) -> None:
         """Forward simulation deletion to map and simulation UI consumers."""
-        logger.info(
-            "MainWindow: simulation deleted",
-            simulation_id=simulation_id,
-        )
         signals.SIMULATION.SimulationDeleted.emit(simulation_id)
 
     def forward_remove_active_device_succeeded(self, device_id: str) -> None:
         """Handle the active device removed."""
-        logger.info("MainWindow: active device removed")
         signals.DEVICE.RemoveActiveDeviceSucceeded.emit(device_id)
         self.ui.container.post_toast(
             self.texts.active_device_removed_success_toast.format(device=device_id),
@@ -1119,20 +1068,10 @@ class MainWindow(QMainWindow):
         self, name: str, os: str, ip: str
     ) -> None:
         """Handle the host device information updated."""
-        logger.info(
-            "MainWindow: host device information updated",
-            name=name,
-            host_os=os,
-            ip=ip,
-        )
         signals.HOST.HostDeviceInformationUpdated.emit(name, os, ip)
 
     def forward_activity_log_file_updated(self, log_file_path: str) -> None:
         """Forward the app-wide activity log path to the log panel (via app signals)."""
-        logger.info(
-            "MainWindow: activity log file path updated",
-            log_file_path=log_file_path,
-        )
         signals.ACTIVITY_LOG.ActivityLogFileUpdated.emit(log_file_path)
 
     def resizeEvent(self, event) -> None:

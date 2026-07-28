@@ -344,7 +344,7 @@ def make_adb_retry_before(
     def _before(retry_state: Any) -> None:
         elapsed = retry_state.seconds_since_start
         logger.debug(
-            "ADB retry: attempt starting",
+            "ADB retry attempt started",
             scope=scope,
             command=command_name,
             phone_id=_redacted_log_value(phone_id),
@@ -371,7 +371,7 @@ def make_adb_retry_after(
         result_status = getattr(getattr(result, "status", None), "name", None)
         elapsed = retry_state.seconds_since_start
         logger.debug(
-            "ADB retry: attempt finished",
+            "ADB retry attempt completed",
             scope=scope,
             command=command_name,
             phone_id=_redacted_log_value(phone_id),

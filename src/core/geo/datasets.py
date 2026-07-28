@@ -417,7 +417,7 @@ class DatasetManager:
                 )
         except sqlite3.OperationalError as error:
             logger.error(
-                "Error querying SQLite database",
+                "SQLite dataset query failed",
                 dataset_id=definition.id,
                 path=str(definition.full_path),
                 sql=sql,
@@ -427,7 +427,7 @@ class DatasetManager:
             raise
         except DatabaseError as error:
             logger.error(
-                "Error querying SQLite database",
+                "SQLite dataset query failed",
                 dataset_id=definition.id,
                 path=str(definition.full_path),
                 sql=sql,
@@ -469,7 +469,7 @@ class DatasetManager:
             return validated_data
         except pa.errors.SchemaErrors as e:
             logger.error(
-                f"Validation errors for dataset",
+                "Dataset validation failed",
                 definition=definition,
                 errors=e,
             )
