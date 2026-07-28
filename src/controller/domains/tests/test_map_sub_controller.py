@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from PySide6.QtWidgets import QApplication
 
+from application_paths import ApplicationPaths
 from controller.domains.map_sub_controller import MapSubController
 from controller.orchestration.app_controller import AppController
 from controller.runner import JobError, JobHandler, JobHandlerSignals
@@ -41,11 +42,14 @@ class _AppStub:
 
     def __init__(self, tmp_path: Path | None = None) -> None:
         self._tmp_path = tmp_path if tmp_path is not None else Path(tempfile.mkdtemp())
-        with patch(
-            "core.entrypoint.get_or_create_application_dir",
-            return_value=self._tmp_path,
-        ):
-            self.model_entrypoint = ModelEntrypoint()
+        self.model_entrypoint = ModelEntrypoint(
+            paths=ApplicationPaths(
+                self._tmp_path,
+                self._tmp_path / "config",
+                self._tmp_path / "src",
+                "linux",
+            )
+        )
         self.view = MagicMock()
         self.submitted: list[dict[str, Any]] = []
         self.cancelled_job_ids: list[str] = []
@@ -129,7 +133,10 @@ def test_on_render_map_requested_submits_process_job(tmp_path: Path) -> None:
     assert submit_kwargs["job_type"] == "process"
     assert submit_kwargs["coalesce_key"] == "render_map:sim-1"
     assert submit_kwargs["fn"] == app.model_entrypoint.render_map
-    assert submit_kwargs["args"] == ("sim-1", app.model_entrypoint.application_dir)
+    assert submit_kwargs["args"] == (
+        "sim-1",
+        app.model_entrypoint.paths.simulation_map_dir("sim-1"),
+    )
     assert callable(submit_kwargs["preflight"])
     assert submit_kwargs["preflight"]() is True
     assert map_controller._render_jobs_by_simulation_id["sim-1"].job_id == "job-1"

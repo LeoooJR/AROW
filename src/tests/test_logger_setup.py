@@ -1,4 +1,4 @@
-"""Tests for shared low-level application log file setup."""
+"""Tests for source-root low-level application log file setup."""
 
 from __future__ import annotations
 
@@ -28,13 +28,8 @@ def test_setup_logger_publishes_fresh_application_log_path(
     generated_path = tmp_path / "logs" / f"{RUN_IDENTIFIER}.log"
     inherited_path = tmp_path / "logs" / "inherited.log"
     monkeypatch.setenv(AROW_LOG_FILE_ENV, str(inherited_path))
-    monkeypatch.setattr("logger.get_or_create_application_dir", lambda: tmp_path)
-    monkeypatch.setattr(
-        "logger.default_application_log_file_path",
-        lambda _application_dir: generated_path,
-    )
 
-    log_path = setup_logger()
+    log_path = setup_logger(generated_path)
 
     assert log_path == generated_path
     assert os.environ[AROW_LOG_FILE_ENV] == str(log_path)
@@ -44,20 +39,11 @@ def test_successive_root_logger_setups_publish_distinct_run_paths(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    generated_paths = iter(
-        (
-            tmp_path / "logs" / f"{RUN_IDENTIFIER}.log",
-            tmp_path / "logs" / f"{SECOND_RUN_IDENTIFIER}.log",
-        )
-    )
-    monkeypatch.setattr("logger.get_or_create_application_dir", lambda: tmp_path)
-    monkeypatch.setattr(
-        "logger.default_application_log_file_path",
-        lambda _application_dir: next(generated_paths),
-    )
+    first_generated = tmp_path / "logs" / f"{RUN_IDENTIFIER}.log"
+    second_generated = tmp_path / "logs" / f"{SECOND_RUN_IDENTIFIER}.log"
 
-    first_path = setup_logger()
-    second_path = setup_logger()
+    first_path = setup_logger(first_generated)
+    second_path = setup_logger(second_generated)
 
     assert first_path != second_path
     assert os.environ[AROW_LOG_FILE_ENV] == str(second_path)
@@ -67,22 +53,16 @@ def test_setup_logger_configures_bounded_file_policy(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    shared = tmp_path / "logs" / f"{RUN_IDENTIFIER}.log"
     sink_options: dict[str, object] = {}
 
     def fake_add(_sink: str, **kwargs: object) -> int:
         sink_options.update(kwargs)
         return 1
 
-    monkeypatch.setattr("logger.get_or_create_application_dir", lambda: tmp_path)
-    monkeypatch.setattr(
-        "logger.default_application_log_file_path",
-        lambda _application_dir: shared,
-    )
     monkeypatch.setattr("logger.logger.remove", lambda: None)
     monkeypatch.setattr("logger.logger.add", fake_add)
 
-    setup_logger()
+    setup_logger(tmp_path / "logs" / f"{RUN_IDENTIFIER}.log")
 
     assert sink_options["rotation"] == "10 MB"
     assert sink_options["retention"] == timedelta(days=14)
@@ -94,24 +74,21 @@ def test_setup_logger_configures_json_serialization_for_process_tree(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    shared = tmp_path / "logs" / f"{RUN_IDENTIFIER}.log"
     sink_options: list[dict[str, object]] = []
 
     def fake_add(_sink: str, **kwargs: object) -> int:
         sink_options.append(kwargs)
         return 1
 
-    monkeypatch.setattr("logger.get_or_create_application_dir", lambda: tmp_path)
-    monkeypatch.setattr(
-        "logger.default_application_log_file_path",
-        lambda _application_dir: shared,
-    )
     monkeypatch.delenv(AROW_LOG_SERIALIZE_ENV, raising=False)
     monkeypatch.setattr("logger.os.getpid", lambda: 4242)
     monkeypatch.setattr("logger.logger.remove", lambda: None)
     monkeypatch.setattr("logger.logger.add", fake_add)
 
-    setup_logger(serialize=True)
+    setup_logger(
+        tmp_path / "logs" / f"{RUN_IDENTIFIER}.log",
+        serialize=True,
+    )
     setup_worker_logger()
 
     assert os.environ[AROW_LOG_SERIALIZE_ENV] == "1"
@@ -152,7 +129,6 @@ def test_setup_logger_prunes_expired_logs_from_previous_runs(
 ) -> None:
     log_dir = tmp_path / "logs"
     log_dir.mkdir()
-    shared = log_dir / f"{RUN_IDENTIFIER}.log"
     expired = log_dir / f"{SECOND_RUN_IDENTIFIER}.log"
     expired_worker = log_dir / f"{SECOND_RUN_IDENTIFIER}.worker-4242.log"
     expired_rotated_compressed = (
@@ -189,15 +165,10 @@ def test_setup_logger_prunes_expired_logs_from_previous_runs(
     os.utime(unrelated, (expired_timestamp, expired_timestamp))
 
     monkeypatch.setattr("logger.time.time", lambda: now)
-    monkeypatch.setattr("logger.get_or_create_application_dir", lambda: tmp_path)
-    monkeypatch.setattr(
-        "logger.default_application_log_file_path",
-        lambda _application_dir: shared,
-    )
     monkeypatch.setattr("logger.logger.remove", lambda: None)
     monkeypatch.setattr("logger.logger.add", lambda *_args, **_kwargs: 1)
 
-    setup_logger()
+    setup_logger(log_dir / f"{RUN_IDENTIFIER}.log")
 
     assert not expired.exists()
     assert not expired_worker.exists()
@@ -218,11 +189,20 @@ def test_resolve_application_log_file_path_reuses_env_without_setup(
     assert resolve_application_log_file_path() == shared
 
 
+def test_resolve_application_log_file_path_requires_root_setup(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv(AROW_LOG_FILE_ENV, raising=False)
+
+    with pytest.raises(RuntimeError, match="configure root logging"):
+        resolve_application_log_file_path()
+
+
 def test_setup_logger_falls_back_when_primary_log_path_is_unwritable(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    primary = tmp_path / "primary" / f"{RUN_IDENTIFIER}.log"
+    primary = tmp_path / "primary" / "logs" / f"{RUN_IDENTIFIER}.log"
     fallback_dir = tmp_path / "fallback"
     calls: list[Path] = []
 
@@ -233,16 +213,11 @@ def test_setup_logger_falls_back_when_primary_log_path_is_unwritable(
             raise PermissionError("primary path is not writable")
         return 1
 
-    monkeypatch.setattr("logger.get_or_create_application_dir", lambda: tmp_path)
-    monkeypatch.setattr(
-        "logger.default_application_log_file_path",
-        lambda _application_dir: primary,
-    )
     monkeypatch.setenv("AROW_LOG_FALLBACK_DIR", str(fallback_dir))
     monkeypatch.setattr("logger.logger.remove", lambda: None)
     monkeypatch.setattr("logger.logger.add", fake_add)
 
-    log_path = setup_logger()
+    log_path = setup_logger(primary)
 
     expected_fallback = fallback_dir / primary.name
     assert calls == [primary, expected_fallback]
@@ -254,7 +229,7 @@ def test_setup_logger_uses_default_temp_fallback_dir_when_override_is_unset(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    primary = tmp_path / "primary" / f"{RUN_IDENTIFIER}.log"
+    primary = tmp_path / "primary" / "logs" / f"{RUN_IDENTIFIER}.log"
     temp_root = tmp_path / "tmp-root"
     calls: list[Path] = []
 
@@ -265,17 +240,12 @@ def test_setup_logger_uses_default_temp_fallback_dir_when_override_is_unset(
             raise PermissionError("primary path is not writable")
         return 1
 
-    monkeypatch.setattr("logger.get_or_create_application_dir", lambda: tmp_path)
-    monkeypatch.setattr(
-        "logger.default_application_log_file_path",
-        lambda _application_dir: primary,
-    )
     monkeypatch.delenv("AROW_LOG_FALLBACK_DIR", raising=False)
     monkeypatch.setattr("logger.tempfile.gettempdir", lambda: str(temp_root))
     monkeypatch.setattr("logger.logger.remove", lambda: None)
     monkeypatch.setattr("logger.logger.add", fake_add)
 
-    log_path = setup_logger()
+    log_path = setup_logger(primary)
 
     expected_fallback = temp_root / "arow-logs" / primary.name
     assert calls == [primary, expected_fallback]
@@ -287,7 +257,7 @@ def test_setup_logger_raises_last_error_when_primary_and_fallback_both_fail(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    primary = tmp_path / "primary" / f"{RUN_IDENTIFIER}.log"
+    primary = tmp_path / "primary" / "logs" / f"{RUN_IDENTIFIER}.log"
     fallback_dir = tmp_path / "fallback"
     calls: list[Path] = []
 
@@ -298,16 +268,11 @@ def test_setup_logger_raises_last_error_when_primary_and_fallback_both_fail(
             raise PermissionError("primary path is not writable")
         raise PermissionError("fallback path is not writable")
 
-    monkeypatch.setattr("logger.get_or_create_application_dir", lambda: tmp_path)
-    monkeypatch.setattr(
-        "logger.default_application_log_file_path",
-        lambda _application_dir: primary,
-    )
     monkeypatch.setenv("AROW_LOG_FALLBACK_DIR", str(fallback_dir))
     monkeypatch.setattr("logger.logger.remove", lambda: None)
     monkeypatch.setattr("logger.logger.add", fake_add)
 
     with pytest.raises(PermissionError, match="fallback path is not writable"):
-        setup_logger()
+        setup_logger(primary)
 
     assert calls == [primary, fallback_dir / primary.name]

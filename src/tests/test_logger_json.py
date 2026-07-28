@@ -1,4 +1,4 @@
-"""Tests for machine-readable application logging."""
+"""Tests for source-root machine-readable application logging."""
 
 from __future__ import annotations
 

@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 from loguru import logger
 
+from application_paths import APPLICATION_PATHS
 from logger import setup_logger
 
 pytest_plugins = ["core.tests.geo_fixtures"]
@@ -21,7 +22,7 @@ def pytest_configure() -> None:
     except locale.Error:
         # Locale setting failed (not available on this machine); fallback to default locale.
         pass
-    setup_logger()
+    setup_logger(APPLICATION_PATHS.application_log_file())
 
 
 @pytest.fixture

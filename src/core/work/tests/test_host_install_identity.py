@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-import core.work.host_install_identity_work as host_install_identity_work
+from application_paths import ApplicationPaths
 from core.devices.computer import compute_computer_stable_key
 from core.entrypoint import ModelEntrypoint
 from core.signals import CoreSignals, HostComputerIdentityPayload
@@ -19,14 +19,21 @@ from core.work.host_install_identity_work import (
 pytestmark = [pytest.mark.devices]
 
 
-def test_host_install_identity_work_idempotent(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.setattr(
-        host_install_identity_work, "get_or_create_application_dir", lambda: tmp_path
+def test_host_install_identity_work_idempotent(tmp_path: Path) -> None:
+    paths = ApplicationPaths(
+        application_dir=tmp_path,
+        config_dir=tmp_path / "config",
+        source_dir=tmp_path / "src",
+        platform="linux",
     )
-    outcome = HostInstallIdentityWork().run()
-    assert Path(tmp_path / "install_identity").is_file()
+    outcome = HostInstallIdentityWork(
+        install_identity_file=paths.install_identity_file
+    ).run()
+    assert paths.install_identity_file.is_file()
     uuid.UUID(outcome.install_token)
-    second = HostInstallIdentityWork().run()
+    second = HostInstallIdentityWork(
+        install_identity_file=paths.install_identity_file
+    ).run()
     assert outcome.install_token == second.install_token
 
 

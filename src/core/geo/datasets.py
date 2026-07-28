@@ -13,6 +13,7 @@ import pandera.pandas as pa
 from loguru import logger
 from pandas.errors import DatabaseError
 
+from application_paths import APPLICATION_PATHS
 from core.geo.dataset_schemas import (
     GaresDeVoyageursSchema,
     LignesParTypeSchema,
@@ -136,17 +137,12 @@ class DatasetDefinition:
 
     @property
     def full_path(self) -> Path:
-
-        return (
-            Path(__file__)
-            .resolve()
-            .parent.joinpath("statics", ".".join([self.name, self.format]))
-        )
+        return APPLICATION_PATHS.geo_dataset_file(".".join([self.name, self.format]))
 
 
 class DatasetRepository:
 
-    BASE_URL = Path(__file__).resolve().parent.joinpath("statics")
+    BASE_URL = APPLICATION_PATHS.geo_datasets_dir
 
     DATASET_DEFINITIONS: Final[Dict[str, DatasetDefinition]] = {
         "gares-de-voyageurs": DatasetDefinition(

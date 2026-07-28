@@ -9,6 +9,7 @@ from typing import Any
 
 import pytest
 
+from application_paths import APPLICATION_PATHS, ApplicationPaths
 from core import ADB_BINARY_BUILD_NUMBER, ADB_BINARY_BUILD_VERSION, ADB_BINARY_VERSION
 from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
 from core.adb.command import ADBCommandParser, AdbCommands
@@ -44,15 +45,13 @@ def test_mock_server_binary_version_output_matches_parser() -> None:
 def test_model_entrypoint_startup_mock_returns_outcome_without_emitting(
     monkeypatch, tmp_path: Path
 ) -> None:
-    monkeypatch.setattr(
-        "core.entrypoint.get_or_create_application_dir",
-        lambda: tmp_path,
+    paths = ApplicationPaths(
+        application_dir=tmp_path,
+        config_dir=tmp_path / "config",
+        source_dir=APPLICATION_PATHS.source_dir,
+        platform=APPLICATION_PATHS.platform,
     )
-    monkeypatch.setattr(
-        "core.work.startup_work.get_or_create_application_dir",
-        lambda: tmp_path,
-    )
-    model_entrypoint = ModelEntrypoint(use_mock_adb=True)
+    model_entrypoint = ModelEntrypoint(use_mock_adb=True, paths=paths)
     emitted: list[tuple[CoreSignal[Any], object]] = []
     model_entrypoint._signal_bus.emit = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
         (signal, payload)

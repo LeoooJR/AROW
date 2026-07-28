@@ -1,4 +1,4 @@
-"""Tests for loguru extras redaction (UUID and sensitive keys)."""
+"""Tests for source-root loguru extras redaction."""
 
 from __future__ import annotations
 

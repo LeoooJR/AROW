@@ -6,6 +6,7 @@ from typing import Any
 
 import pytest
 
+from application_paths import ApplicationPaths
 from core import ADB_BINARY_BUILD_NUMBER, ADB_BINARY_BUILD_VERSION, ADB_BINARY_VERSION
 from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
 from core.adb.binary import AdbBinary
@@ -36,17 +37,26 @@ class KnownDevicesCountingMockAdbServer(MockAdbServer):
         return super().get_known_devices()
 
 
-@pytest.fixture(autouse=True)
-def _patch_application_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Keep startup and entrypoint simulation persistence inside pytest tmp_path."""
-    monkeypatch.setattr(
-        startup_work,
-        "get_or_create_application_dir",
-        lambda: tmp_path,
+@pytest.fixture
+def application_paths(tmp_path: Path) -> ApplicationPaths:
+    """Keep startup and entrypoint persistence inside pytest's temporary path."""
+    return ApplicationPaths(
+        application_dir=tmp_path,
+        config_dir=tmp_path / "config",
+        source_dir=tmp_path,
+        platform="linux",
     )
-    monkeypatch.setattr(
-        "core.entrypoint.get_or_create_application_dir",
-        lambda: tmp_path,
+
+
+def _startup_work(
+    paths: ApplicationPaths,
+    *,
+    use_mock_adb: bool,
+) -> StartupCoreRuntimeWork:
+    return StartupCoreRuntimeWork(
+        use_mock_adb=use_mock_adb,
+        adb_binary_path=paths.adb_binary,
+        simulations_dir=paths.simulations_dir,
     )
 
 
@@ -75,9 +85,11 @@ def test_ensure_adb_binary_executable_raises_for_non_executable_file(
 
 
 def test_start_adb_server_checks_binary_before_constructing_server(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    application_paths: ApplicationPaths,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    adb_path = tmp_path / "adb"
+    adb_path = application_paths.adb_binary
+    adb_path.parent.mkdir(parents=True)
     adb_path.write_text("#!/bin/sh\n", encoding="utf-8")
     calls: list[str] = []
 
@@ -101,20 +113,21 @@ def test_start_adb_server_checks_binary_before_constructing_server(
         assert path == adb_path
         calls.append("ensure")
 
-    monkeypatch.setattr(startup_work, "_resolve_adb_binary_path", lambda: adb_path)
     monkeypatch.setattr(startup_work, "_ensure_adb_binary_executable", fake_ensure)
     monkeypatch.setattr(startup_work, "AdbServer", FakeAdbServer)
 
-    server = startup_work._start_adb_server()
+    server = startup_work._start_adb_server(adb_path)
 
     assert isinstance(server, FakeAdbServer)
     assert calls == ["ensure", "version", "construct"]
 
 
 def test_start_adb_server_rejects_binary_version_mismatch(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    application_paths: ApplicationPaths,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    adb_path = tmp_path / "adb"
+    adb_path = application_paths.adb_binary
+    adb_path.parent.mkdir(parents=True)
     adb_path.write_text("#!/bin/sh\n", encoding="utf-8")
     constructed: list[AdbBinary] = []
 
@@ -131,20 +144,21 @@ def test_start_adb_server_rejects_binary_version_mismatch(
                 build_number=ADB_BINARY_BUILD_NUMBER,
             )
 
-    monkeypatch.setattr(startup_work, "_resolve_adb_binary_path", lambda: adb_path)
     monkeypatch.setattr(
         startup_work, "_ensure_adb_binary_executable", lambda _path: None
     )
     monkeypatch.setattr(startup_work, "AdbServer", FakeAdbServer)
 
     with pytest.raises(RuntimeError, match="frozen metadata"):
-        startup_work._start_adb_server()
+        startup_work._start_adb_server(adb_path)
 
     assert constructed == []
 
 
-def test_startup_mock_enriches_devices() -> None:
-    outcome = StartupCoreRuntimeWork(use_mock_adb=True).run()
+def test_startup_mock_enriches_devices(
+    application_paths: ApplicationPaths,
+) -> None:
+    outcome = _startup_work(application_paths, use_mock_adb=True).run()
     assert outcome.adb_server is not None
     assert outcome.adb_client is not None
     assert len(outcome.devices) >= 1
@@ -155,6 +169,7 @@ def test_startup_mock_enriches_devices() -> None:
 
 
 def test_startup_reuses_server_paired_devices_after_start(
+    application_paths: ApplicationPaths,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     state = MockAdbState(seed=909, initial_devices=2)
@@ -162,10 +177,10 @@ def test_startup_reuses_server_paired_devices_after_start(
     client = MockAdbClient(state=state)
     assert server.get_known_devices_calls == 1
 
-    monkeypatch.setattr(startup_work, "_start_adb_server", lambda: server)
-    monkeypatch.setattr(startup_work, "_create_adb_client", lambda: client)
+    monkeypatch.setattr(startup_work, "_start_adb_server", lambda _path: server)
+    monkeypatch.setattr(startup_work, "_create_adb_client", lambda _path: client)
 
-    outcome = StartupCoreRuntimeWork(use_mock_adb=False).run()
+    outcome = _startup_work(application_paths, use_mock_adb=False).run()
 
     assert server.get_known_devices_calls == 1
     assert outcome.devices == list(server.paired_devices)
@@ -174,19 +189,18 @@ def test_startup_reuses_server_paired_devices_after_start(
 
 
 def test_startup_run_loads_persisted_simulations_for_paired_devices(
+    application_paths: ApplicationPaths,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(startup_work, "mock_adb_seed_from_env", lambda: 111)
-    first_outcome = StartupCoreRuntimeWork(use_mock_adb=True).run()
+    first_outcome = _startup_work(application_paths, use_mock_adb=True).run()
     phone = first_outcome.devices[0]
-    repository = SimulationRepository(
-        startup_work.get_or_create_application_dir() / "simulations"
-    )
+    repository = SimulationRepository(application_paths.simulations_dir)
     simulation = Simulation(id="sim-1", device=phone, active=True)
     repository.add(simulation)
     repository.write_all()
 
-    second_outcome = StartupCoreRuntimeWork(use_mock_adb=True).run()
+    second_outcome = _startup_work(application_paths, use_mock_adb=True).run()
 
     assert len(second_outcome.simulations) == 1
     assert second_outcome.simulations[0].id == "sim-1"
@@ -202,40 +216,38 @@ def test_startup_run_loads_persisted_simulations_for_paired_devices(
 
 
 def test_startup_run_includes_last_active_device_id_in_outcome(
+    application_paths: ApplicationPaths,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(startup_work, "mock_adb_seed_from_env", lambda: 111)
-    first_outcome = StartupCoreRuntimeWork(use_mock_adb=True).run()
+    first_outcome = _startup_work(application_paths, use_mock_adb=True).run()
     phone = first_outcome.devices[0]
-    repository = SimulationRepository(
-        startup_work.get_or_create_application_dir() / "simulations"
-    )
+    repository = SimulationRepository(application_paths.simulations_dir)
     simulation = Simulation(id="sim-1", device=phone, active=True)
     repository.add(simulation)
     repository.last_active_device_id = phone.id
     repository.write_all()
 
-    second_outcome = StartupCoreRuntimeWork(use_mock_adb=True).run()
+    second_outcome = _startup_work(application_paths, use_mock_adb=True).run()
 
     assert second_outcome.last_active_device_id == phone.id
 
 
 def test_startup_apply_restores_last_active_device_when_online(
+    application_paths: ApplicationPaths,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(startup_work, "mock_adb_seed_from_env", lambda: 111)
-    first_outcome = StartupCoreRuntimeWork(use_mock_adb=True).run()
+    first_outcome = _startup_work(application_paths, use_mock_adb=True).run()
     phone = first_outcome.devices[0]
-    repository = SimulationRepository(
-        startup_work.get_or_create_application_dir() / "simulations"
-    )
+    repository = SimulationRepository(application_paths.simulations_dir)
     simulation = Simulation(id="sim-1", device=phone, active=True)
     repository.add(simulation)
     repository.last_active_device_id = phone.id
     repository.write_all()
 
-    second_outcome = StartupCoreRuntimeWork(use_mock_adb=True).run()
-    model_entrypoint = ModelEntrypoint()
+    second_outcome = _startup_work(application_paths, use_mock_adb=True).run()
+    model_entrypoint = ModelEntrypoint(paths=application_paths)
     simulation_created: list[str] = []
 
     def capture(payload: SimulationCreatedPayload) -> None:
@@ -259,6 +271,7 @@ def test_startup_apply_restores_last_active_device_when_online(
 
 
 def test_startup_apply_restores_last_active_device_after_adb_id_rebind(
+    application_paths: ApplicationPaths,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     phone = Phone(
@@ -268,9 +281,7 @@ def test_startup_apply_restores_last_active_device_after_adb_id_rebind(
         state="device",
         hardware_serial="SER-123",
     )
-    repository = SimulationRepository(
-        startup_work.get_or_create_application_dir() / "simulations"
-    )
+    repository = SimulationRepository(application_paths.simulations_dir)
     simulation = Simulation(id="sim-1", device=phone, active=True)
     repository.add(simulation)
     repository.last_active_device_id = phone.id
@@ -287,16 +298,18 @@ def test_startup_apply_restores_last_active_device_after_adb_id_rebind(
     rebound_server = MockAdbServer(state=rebound_state)
     rebound_server.paired_devices.add(rebound_phone)
     rebound_client = MockAdbClient(state=rebound_state)
-    monkeypatch.setattr(startup_work, "_start_adb_server", lambda: rebound_server)
-    monkeypatch.setattr(startup_work, "_create_adb_client", lambda: rebound_client)
+    monkeypatch.setattr(startup_work, "_start_adb_server", lambda _path: rebound_server)
+    monkeypatch.setattr(
+        startup_work, "_create_adb_client", lambda _path: rebound_client
+    )
     monkeypatch.setattr(
         startup_work,
         "enrich_phones_with_adb_shell_properties",
         lambda _client, _phones: None,
     )
 
-    second_outcome = StartupCoreRuntimeWork(use_mock_adb=False).run()
-    model_entrypoint = ModelEntrypoint()
+    second_outcome = _startup_work(application_paths, use_mock_adb=False).run()
+    model_entrypoint = ModelEntrypoint(paths=application_paths)
     simulation_restored: list[str] = []
 
     def capture(payload: SimulationRestoredPayload) -> None:
@@ -311,9 +324,7 @@ def test_startup_apply_restores_last_active_device_after_adb_id_rebind(
     assert second_outcome.last_active_device_id == rebound_phone.id
     assert len(second_outcome.simulations) == 1
     assert second_outcome.simulations[0].device is rebound_phone
-    repository = SimulationRepository(
-        startup_work.get_or_create_application_dir() / "simulations"
-    )
+    repository = SimulationRepository(application_paths.simulations_dir)
     assert repository.last_active_device_id == rebound_phone.id
     assert simulation_restored == ["sim-1"]
     working_device = rebound_server.get_working_device()
@@ -321,27 +332,26 @@ def test_startup_apply_restores_last_active_device_after_adb_id_rebind(
 
 
 def test_startup_apply_skips_last_active_device_when_offline(
+    application_paths: ApplicationPaths,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(startup_work, "mock_adb_seed_from_env", lambda: 111)
-    first_outcome = StartupCoreRuntimeWork(use_mock_adb=True).run()
+    first_outcome = _startup_work(application_paths, use_mock_adb=True).run()
     phone = first_outcome.devices[0]
     phone.state = "offline"
-    repository = SimulationRepository(
-        startup_work.get_or_create_application_dir() / "simulations"
-    )
+    repository = SimulationRepository(application_paths.simulations_dir)
     simulation = Simulation(id="sim-1", device=phone, active=True)
     repository.add(simulation)
     repository.last_active_device_id = phone.id
     repository.write_all()
 
-    second_outcome = StartupCoreRuntimeWork(use_mock_adb=True).run()
+    second_outcome = _startup_work(application_paths, use_mock_adb=True).run()
     assert second_outcome.adb_server is not None
     paired_phone = second_outcome.adb_server.paired_devices.get(phone.id)
     assert paired_phone is not None
     paired_phone.state = "offline"
 
-    model_entrypoint = ModelEntrypoint()
+    model_entrypoint = ModelEntrypoint(paths=application_paths)
     simulation_created: list[str] = []
 
     def capture(payload: SimulationCreatedPayload) -> None:
@@ -355,16 +365,18 @@ def test_startup_apply_skips_last_active_device_when_offline(
     StartupCoreRuntimeWork.apply_main_thread(model_entrypoint, second_outcome)
 
     assert simulation_created == []
-    third_outcome = StartupCoreRuntimeWork(use_mock_adb=True).run()
+    third_outcome = _startup_work(application_paths, use_mock_adb=True).run()
     assert third_outcome.last_active_device_id == phone.id
 
 
-def test_startup_apply_binds_mock_runtime_and_emits_startup_signals() -> None:
+def test_startup_apply_binds_mock_runtime_and_emits_startup_signals(
+    application_paths: ApplicationPaths,
+) -> None:
     state = MockAdbState(seed=111, initial_devices=1)
     server = MockAdbServer(state=state)
     client = MockAdbClient(state=state)
     devices = server.get_known_devices()
-    model_entrypoint = ModelEntrypoint()
+    model_entrypoint = ModelEntrypoint(paths=application_paths)
     emitted: list[tuple[CoreSignal[Any], object]] = []
     model_entrypoint.emit_core_signal = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
         (signal, payload)
@@ -391,14 +403,16 @@ def test_startup_apply_binds_mock_runtime_and_emits_startup_signals() -> None:
     ]
 
 
-def test_startup_apply_restores_persisted_simulations() -> None:
+def test_startup_apply_restores_persisted_simulations(
+    application_paths: ApplicationPaths,
+) -> None:
     phone = Phone(id="device-1", state="device", model="Pixel")
     simulation = Simulation(id="sim-1", device=phone, active=True)
     state = MockAdbState(seed=111, initial_devices=1)
     server = MockAdbServer(state=state)
     client = MockAdbClient(state=state)
     devices = server.get_known_devices()
-    model_entrypoint = ModelEntrypoint()
+    model_entrypoint = ModelEntrypoint(paths=application_paths)
 
     StartupCoreRuntimeWork.apply_main_thread(
         model_entrypoint,

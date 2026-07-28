@@ -5,12 +5,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
+from application_paths import APPLICATION_PATHS
 from core import ADB_BINARY_BUILD_NUMBER, ADB_BINARY_BUILD_VERSION, ADB_BINARY_VERSION
-
-# Default path to the bundled Linux ADB binary under src/assets (overridden at startup).
-_DEFAULT_ADB_BINARY_PATH: Path = (
-    Path(__file__).resolve().parents[2] / "assets" / "linux" / "platform-tools" / "adb"
-)
 
 
 @dataclass(frozen=True, match_args=True)
@@ -19,7 +15,7 @@ class AdbBinary:
 
     path: Path = field(
         metadata={"description": "The path to the adb binary"},
-        default=_DEFAULT_ADB_BINARY_PATH,
+        default=APPLICATION_PATHS.adb_binary,
         compare=False,
     )
     version: str = field(

@@ -6,6 +6,7 @@ import typer
 from PySide6 import QtWidgets
 
 from __init__ import __application__, __version__
+from application_paths import APPLICATION_PATHS
 from commands.run.options import RunOptions
 from logger import setup_logger
 
@@ -20,7 +21,11 @@ def gui(context: typer.Context) -> None:
         # Locale setting failed (not available on this machine); fallback to default locale.
         pass
 
-    setup_logger(serialize=run_options.serialize_logs)
+    paths = APPLICATION_PATHS
+    setup_logger(
+        paths.application_log_file(),
+        serialize=run_options.serialize_logs,
+    )
 
     qt_application = QtWidgets.QApplication.instance()
     if qt_application is None:
@@ -45,7 +50,8 @@ def gui(context: typer.Context) -> None:
     from core.entrypoint import ModelEntrypoint
 
     model_entrypoint: ModelEntrypoint = ModelEntrypoint(
-        use_mock_adb=run_options.mock_adb
+        use_mock_adb=run_options.mock_adb,
+        paths=paths,
     )
 
     _app_controller: AppController = AppController(

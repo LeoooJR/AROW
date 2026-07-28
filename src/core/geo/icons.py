@@ -4,6 +4,8 @@ from pathlib import Path
 
 import folium
 
+from application_paths import APPLICATION_PATHS
+
 # Correct MIME type for SVG to render it in the browser.
 SVG_MIME = "image/svg+xml"
 
@@ -32,7 +34,7 @@ class Icons(Enum):
     Icons that are used to represent map elements.
     """
 
-    BASE_URL = Path(__file__).resolve().parent / "assets"
+    BASE_URL = APPLICATION_PATHS.geo_icons_dir
 
     STATION = create_custom_icon(BASE_URL / "station.svg")
     MILESTONE = create_custom_icon(BASE_URL / "milestone.svg")

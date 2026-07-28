@@ -42,9 +42,14 @@ class RenderMapWork(CoreRuntimeWork[RenderMapOutcome]):
     Blocking Folium / dataset rendering on a worker process; apply emits ``MAP_RENDERED``.
     """
 
-    def __init__(self, *, simulation_id: str, application_dir: Path) -> None:
+    def __init__(
+        self,
+        *,
+        simulation_id: str,
+        output_dir: Path,
+    ) -> None:
         self._simulation_id = simulation_id
-        self._application_dir = application_dir
+        self._output_dir = output_dir
 
     def run(self) -> RenderMapOutcome:
         """
@@ -56,15 +61,17 @@ class RenderMapWork(CoreRuntimeWork[RenderMapOutcome]):
         Raises:
             RenderMapError: When map rendering or HTML export fails.
         """
-        output_dir = self._application_dir / "simulations" / self._simulation_id / "map"
         try:
             manager = MapRenderer()
-            html_path = manager.to_html(path=output_dir, prefix=self._simulation_id)
+            html_path = manager.to_html(
+                path=self._output_dir,
+                prefix=self._simulation_id,
+            )
         except Exception as error:
             logger.exception(
                 "Map render failed",
                 simulation_id=self._simulation_id,
-                output_dir=str(output_dir),
+                output_dir=str(self._output_dir),
                 error=str(error),
             )
             raise RenderMapError(

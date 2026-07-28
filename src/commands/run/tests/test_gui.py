@@ -69,10 +69,13 @@ def test_gui_command_wires_application(
     lifecycle = Mock()
     lifecycle.attach_mock(gui_dependencies["register_bundled_fonts"], "fonts")
     lifecycle.attach_mock(gui_dependencies["MainWindow"], "window")
+    paths = Mock(name="application_paths")
+    log_path = paths.application_log_file.return_value
 
     with (
         patch("commands.run.gui.QtWidgets.QApplication", qapplication_type),
         patch("commands.run.gui.locale.setlocale"),
+        patch("commands.run.gui.APPLICATION_PATHS", paths),
         patch("commands.run.gui.setup_logger") as setup_logger,
     ):
         result = runner.invoke(app, arguments)
@@ -82,7 +85,7 @@ def test_gui_command_wires_application(
     qt_application.setApplicationName.assert_called_once_with(__application__)
     qt_application.setDesktopFileName.assert_called_once_with(__application__)
     qt_application.setApplicationVersion.assert_called_once_with(__version__)
-    setup_logger.assert_called_once_with(serialize=serialize_logs)
+    setup_logger.assert_called_once_with(log_path, serialize=serialize_logs)
     gui_dependencies["register_bundled_fonts"].assert_called_once_with()
     assert lifecycle.mock_calls.index(call.fonts()) < lifecycle.mock_calls.index(
         call.window()
@@ -91,7 +94,8 @@ def test_gui_command_wires_application(
     main_window = gui_dependencies["MainWindow"].return_value
     model_entrypoint = gui_dependencies["ModelEntrypoint"].return_value
     gui_dependencies["ModelEntrypoint"].assert_called_once_with(
-        use_mock_adb=use_mock_adb
+        use_mock_adb=use_mock_adb,
+        paths=paths,
     )
     gui_dependencies["AppController"].assert_called_once_with(
         model_entrypoint=model_entrypoint,

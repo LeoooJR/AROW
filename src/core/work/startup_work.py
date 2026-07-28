@@ -8,7 +8,6 @@ so startup matches the project-wide paired worker / apply convention.
 from __future__ import annotations
 
 import os
-import platform
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import cast
@@ -23,7 +22,6 @@ from core.adb.adb_mock import (
 from core.adb.binary import AdbBinary
 from core.adb.client import AdbClient
 from core.adb.server import AdbServer
-from core.application_paths import get_or_create_application_dir
 from core.devices.phone import Phone, serialize_phone_collection
 from core.entrypoint_protocol import CoreSignalEmitter, StartupRuntimeEntrypoint
 from core.exceptions import CoreException
@@ -48,34 +46,6 @@ def _use_mock_adb_effective(cli_or_model_flag: bool) -> bool:
         "true",
         "yes",
     )
-
-
-def _resolve_adb_binary_path() -> Path:
-    """
-    Resolve the OS-specific ADB binary path shipped with the project.
-    """
-    src_root: Path = Path(__file__).resolve().parents[2]
-    system: str = platform.system().lower()
-    platform_folder: str
-    binary_name: str
-    if system == "darwin":
-        platform_folder = "macos"
-        binary_name = "adb"
-    elif system == "linux":
-        platform_folder = "linux"
-        binary_name = "adb"
-    elif system == "windows":
-        platform_folder = "win"
-        binary_name = "adb.exe"
-    else:
-        raise RuntimeError(f"Unsupported operating system for ADB startup: {system}")
-
-    adb_path: Path = (
-        src_root / "assets" / platform_folder / "platform-tools" / binary_name
-    )
-    if not adb_path.exists():
-        raise FileNotFoundError(f"ADB binary not found at expected path: {adb_path}")
-    return adb_path
 
 
 def _ensure_adb_binary_executable(adb_path: Path) -> None:
@@ -116,7 +86,7 @@ def _validate_frozen_adb_binary_version(
     raise RuntimeError("Bundled ADB binary version does not match frozen metadata")
 
 
-def _start_adb_server() -> AdbServer:
+def _start_adb_server(adb_binary_path: Path) -> AdbServer:
     """
     Instantiate an ADB server bound to the shipped binary (blocking I/O on process start).
 
@@ -124,12 +94,15 @@ def _start_adb_server() -> AdbServer:
     ``apply_main_thread`` path assigns ``_adb_server`` on the Qt main thread.
     """
     try:
-        adb_path = _resolve_adb_binary_path()
-        _ensure_adb_binary_executable(adb_path)
-        adb_binary: AdbBinary = AdbBinary(path=adb_path)
+        if not adb_binary_path.exists():
+            raise FileNotFoundError(
+                f"ADB binary not found at expected path: {adb_binary_path}"
+            )
+        _ensure_adb_binary_executable(adb_binary_path)
+        adb_binary: AdbBinary = AdbBinary(path=adb_binary_path)
         actual_binary: AdbBinary = AdbServer.get_binary_version(adb_binary)
         _validate_frozen_adb_binary_version(
-            expected=AdbBinary(path=adb_path), actual=actual_binary
+            expected=AdbBinary(path=adb_binary_path), actual=actual_binary
         )
         adb_server: AdbServer = AdbServer(binary=adb_binary)
         logger.info(
@@ -147,10 +120,10 @@ def _start_adb_server() -> AdbServer:
         raise
 
 
-def _create_adb_client() -> AdbClient:
+def _create_adb_client(adb_binary_path: Path) -> AdbClient:
     """Build an :class:`~core.adb.client.AdbClient` using the project's ADB binary path."""
     logger.debug("ADB client creation started")
-    adb_binary: AdbBinary = AdbBinary(path=_resolve_adb_binary_path())
+    adb_binary: AdbBinary = AdbBinary(path=adb_binary_path)
     return AdbClient(binary=adb_binary)
 
 
@@ -192,8 +165,16 @@ class StartupCoreRuntimeWork(CoreRuntimeWork[StartupOutcome]):
     Apply path owns model server/client fields and emits on the core bus.
     """
 
-    def __init__(self, use_mock_adb: bool = False) -> None:
+    def __init__(
+        self,
+        use_mock_adb: bool = False,
+        *,
+        adb_binary_path: Path,
+        simulations_dir: Path,
+    ) -> None:
         self._use_mock_adb: bool = use_mock_adb
+        self._adb_binary_path = adb_binary_path
+        self._simulations_dir = simulations_dir
 
     @preflight()
     def run(self) -> StartupOutcome:
@@ -244,13 +225,12 @@ class StartupCoreRuntimeWork(CoreRuntimeWork[StartupOutcome]):
                 mock_seed=seed,
             )
         else:
-            adb_server = _start_adb_server()
-            adb_client = _create_adb_client()
+            adb_server = _start_adb_server(self._adb_binary_path)
+            adb_client = _create_adb_client(self._adb_binary_path)
         devices = list(adb_server.paired_devices)
         enrich_phones_with_adb_shell_properties(adb_client, devices)
-        simulations_save_dir = get_or_create_application_dir() / "simulations"
         persisted_state: PersistedSimulationState = SimulationDiskStore(
-            simulations_save_dir
+            self._simulations_dir
         ).load_for_devices(adb_server.paired_devices)
         return StartupOutcome(
             adb_server=adb_server,

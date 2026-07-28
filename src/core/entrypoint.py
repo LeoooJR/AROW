@@ -1,16 +1,11 @@
 from abc import ABC
 from dataclasses import dataclass, field
-from functools import cached_property
 from pathlib import Path
 from typing import Callable, Literal, Mapping, Tuple, TypeVar
 
+from application_paths import APPLICATION_PATHS, ApplicationPaths
 from core.adb.client import AdbClient
 from core.adb.server import AdbServer
-from core.application_paths import (
-    default_activity_log_file_path,
-    get_or_create_application_dir,
-    get_or_create_config_dir,
-)
 from core.devices.computer import Computer
 from core.devices.phone import (
     Phone,
@@ -101,9 +96,10 @@ class DeviceReconcileResult:
 
 class Entrypoint(ABC):
 
-    def __init__(self):
+    def __init__(self, *, paths: ApplicationPaths | None = None) -> None:
 
         self._signal_bus: InMemoryCoreSignalBus = InMemoryCoreSignalBus()
+        self._paths = paths or APPLICATION_PATHS
 
     @property
     def signal_bus(self) -> InMemoryCoreSignalBus:
@@ -118,13 +114,18 @@ class Entrypoint(ABC):
         """Publish one typed payload on the core signal bus."""
         self.signal_bus.emit(signal, payload)
 
-    @cached_property
-    def config_dir(self) -> Path:
-        return get_or_create_config_dir()
+    @property
+    def paths(self) -> ApplicationPaths:
+        """Return the centralized paths for this application runtime."""
+        return self._paths
 
-    @cached_property
+    @property
+    def config_dir(self) -> Path:
+        return self.paths.config_dir
+
+    @property
     def application_dir(self) -> Path:
-        return get_or_create_application_dir()
+        return self.paths.application_dir
 
 
 class ModelEntrypoint(Entrypoint):
@@ -135,8 +136,13 @@ class ModelEntrypoint(Entrypoint):
     can interact with a stable entrypoint API rather than low-level core classes.
     """
 
-    def __init__(self, *, use_mock_adb: bool = False) -> None:
-        super().__init__()
+    def __init__(
+        self,
+        *,
+        use_mock_adb: bool = False,
+        paths: ApplicationPaths | None = None,
+    ) -> None:
+        super().__init__(paths=paths)
         self._host: Computer = Computer(id="host-1")
         self._adb_server: AdbServer | None = None
         self._adb_client: AdbClient | None = None
@@ -145,7 +151,7 @@ class ModelEntrypoint(Entrypoint):
         self._resolve_activity_log_file()
         self._simulation_service = SimulationService(
             self,
-            save_dir=self.application_dir / "simulations",
+            save_dir=self.paths.simulations_dir,
         )
 
     @property
@@ -212,9 +218,7 @@ class ModelEntrypoint(Entrypoint):
     def _resolve_activity_log_file(self) -> Path:
         """Resolve the current app-wide activity log path, creating a default when unset."""
         if self._activity_log_file is None:
-            self._activity_log_file = default_activity_log_file_path(
-                self.application_dir
-            )
+            self._activity_log_file = self.paths.activity_log_file()
             self.emit_core_signal(
                 CoreSignals.ACTIVITY_LOG_FILE_UPDATED,
                 ActivityLogFileUpdatedPayload(path=self._activity_log_file),
@@ -225,7 +229,11 @@ class ModelEntrypoint(Entrypoint):
         """
         Initialize runtime core services at application startup (worker thread).
         """
-        return StartupCoreRuntimeWork(use_mock_adb=self._use_mock_adb).run()
+        return StartupCoreRuntimeWork(
+            use_mock_adb=self._use_mock_adb,
+            adb_binary_path=self.paths.adb_binary,
+            simulations_dir=self.paths.simulations_dir,
+        ).run()
 
     def authentificate_device(
         self, ip: str, port: int, association_code: str
@@ -289,7 +297,9 @@ class ModelEntrypoint(Entrypoint):
         raises:
             RuntimeError: If the install token is not created.
         """
-        return HostInstallIdentityWork().run()
+        return HostInstallIdentityWork(
+            install_identity_file=self.paths.install_identity_file
+        ).run()
 
     def close_core_runtime(self) -> CloseOutcome:
         """
@@ -511,7 +521,10 @@ class ModelEntrypoint(Entrypoint):
         self._simulation_service.delete_simulation_for_device(device_id)
 
     @staticmethod
-    def render_map(simulation_id: str, application_dir: Path) -> RenderMapOutcome:
+    def render_map(
+        simulation_id: str,
+        output_dir: Path,
+    ) -> RenderMapOutcome:
         """
         Render the map for a simulation and write HTML under the application dir.
 
@@ -524,7 +537,7 @@ class ModelEntrypoint(Entrypoint):
 
         Args:
             simulation_id: The id of the simulation whose map should be rendered.
-            application_dir: Root application data directory.
+            output_dir: Directory where the simulation map will be written.
 
         Returns:
             RenderMapOutcome: Written HTML path and simulation id.
@@ -534,8 +547,12 @@ class ModelEntrypoint(Entrypoint):
         """
         return RenderMapWork(
             simulation_id=simulation_id,
-            application_dir=application_dir,
+            output_dir=output_dir,
         ).run()
+
+    def simulation_map_output_dir(self, simulation_id: str) -> Path:
+        """Return the worker output directory for one simulation map."""
+        return self.paths.simulation_map_dir(simulation_id)
 
     def get_map_file_for_simulation(self, simulation_id: str) -> Path | None:
         """

@@ -12,20 +12,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
-from core.application_paths import get_or_create_application_dir
 from core.devices.computer import compute_computer_stable_key
 from core.entrypoint_protocol import CoreSignalEmitter, HostIdentityEntrypoint
 from core.exceptions import CoreException
 from core.work.core_runtime_work import CoreRuntimeWork, CoreRuntimeWorkOutcome
 from core.work.helper import preflight
 from logger import logger
-
-_INSTALL_IDENTITY_FILENAME = "install_identity"
-
-
-def install_identity_file_path() -> Path:
-    """Resolved path for atomic read/write (tests may monkeypatch underlying app data root)."""
-    return get_or_create_application_dir() / _INSTALL_IDENTITY_FILENAME
 
 
 def _read_existing_normalized(path: Path) -> str:
@@ -38,7 +30,7 @@ def _read_existing_normalized(path: Path) -> str:
     return text.casefold()
 
 
-def _load_or_create_install_token() -> str:
+def _load_or_create_install_token(path: Path) -> str:
     """
     Read or exclusive-create persisted install UUID (worker-thread only).
 
@@ -49,7 +41,6 @@ def _load_or_create_install_token() -> str:
         OSError: Propagated from filesystem operations.
         RuntimeError: If the file stays empty / unreadable after a create race.
     """
-    path = install_identity_file_path()
     path.parent.mkdir(parents=True, exist_ok=True)
 
     token = _read_existing_normalized(path)
@@ -95,6 +86,9 @@ class HostInstallIdentityWork(CoreRuntimeWork[HostInstallIdentityOutcome]):
     Persist / load install token on a worker; apply stable_key and emit on the main thread.
     """
 
+    def __init__(self, *, install_identity_file: Path) -> None:
+        self._install_identity_file = install_identity_file
+
     @preflight()
     def run(self) -> HostInstallIdentityOutcome:
         """
@@ -117,7 +111,9 @@ class HostInstallIdentityWork(CoreRuntimeWork[HostInstallIdentityOutcome]):
             RuntimeError: Exclusive create raced with another process and the
             resulting file is empty or unreadable.
         """
-        return HostInstallIdentityOutcome(install_token=_load_or_create_install_token())
+        return HostInstallIdentityOutcome(
+            install_token=_load_or_create_install_token(self._install_identity_file)
+        )
 
     @staticmethod
     def apply_main_thread(

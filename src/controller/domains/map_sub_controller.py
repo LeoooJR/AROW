@@ -118,11 +118,11 @@ class MapSubController(AppSubController):
                 html_path,
             )
         else:
-            application_dir = self.model_entrypoint.application_dir
+            output_dir = self.model_entrypoint.simulation_map_output_dir(simulation_id)
             handle = self._submit_model_entrypoint_async_call(
                 name="render_map",
                 fn=self.model_entrypoint.render_map,
-                args=(simulation_id, application_dir),
+                args=(simulation_id, output_dir),
                 description="Render Folium map HTML for simulation",
                 job_type="process",
                 coalesce_key=f"render_map:{simulation_id}",
