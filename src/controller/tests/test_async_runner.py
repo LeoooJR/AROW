@@ -635,7 +635,7 @@ class TestAsyncRunnerPreflight:
 
 
 class TestProcessPoolLogging:
-    def test_process_pool_uses_setup_logger_initializer(
+    def test_process_pool_uses_isolated_worker_logger_initializer(
         self,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
@@ -662,4 +662,4 @@ class TestProcessPoolLogging:
         runner_mod.ProcessPool(max_workers=2)
 
         assert captured["max_workers"] == 2
-        assert captured["initializer"] is runner_mod.setup_logger
+        assert captured["initializer"] is runner_mod.setup_worker_logger

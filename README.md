@@ -21,7 +21,7 @@ The main GUI entrypoint is `PYTHONPATH=src python -m main run gui`. The GUI comm
 
 ## Developer docs
 
-- [`src/HOW_TO_async_jobs.md`](src/HOW_TO_async_jobs.md) explains the async `CoreRuntimeWork` flow, result/failure dispatch, process-backed map rendering, and shared worker logging.
+- [`src/HOW_TO_async_jobs.md`](src/HOW_TO_async_jobs.md) explains the async `CoreRuntimeWork` flow, result/failure dispatch, process-backed map rendering, and process-safe worker logging.
 - [`src/HOW_TO_controller_and_signals.md`](src/HOW_TO_controller_and_signals.md) explains the GUI signal categories, controller/subcontroller responsibilities, startup/shutdown orchestration, and the main user-driven flows.
 - [`src/HOW_TO_simulation_persistence.md`](src/HOW_TO_simulation_persistence.md) explains where simulation metadata lives on disk, when it is persisted, how startup restores it, and when stale state is deleted.
 - [`HOW_TO_mock_adb.md`](HOW_TO_mock_adb.md) explains how to run the app without a real ADB installation.
@@ -61,7 +61,8 @@ PYTHONPATH=src python -m main run --mock-adb gui
 PYTHONPATH=src python -m main run --json-logs --mock-adb gui
 ```
 
-This writes one JSON object per line to the normal application log file. Each
-record includes Loguru's timestamp, level, source, process, thread, exception,
-and structured `extra` fields, plus AROW's normalized `origin` and
-`log_schema_version` fields for automated runtime tracing.
+This writes one JSON object per line to the main application log and
+PID-specific `application_*.worker-<pid>.log` siblings. Analyze every file with
+the same run prefix for a complete trace. Each record includes Loguru's
+timestamp, level, source, process, thread, exception, and structured `extra`
+fields, plus AROW's normalized `origin` and `log_schema_version` fields.

@@ -1,6 +1,6 @@
 # How async core jobs work
 
-This guide describes the current async job path in AROW: how controllers submit blocking core work, what a `CoreRuntimeWork` must return, how results and failures are applied on the Qt main thread, how process-backed map rendering fits into the same pipeline, and how worker threads/processes share one application log file.
+This guide describes the current async job path in AROW: how controllers submit blocking core work, what a `CoreRuntimeWork` must return, how results and failures are applied on the Qt main thread, how process-backed map rendering fits into the same pipeline, and how runtime logging remains traceable across workers.
 
 It matches the implementation in `src/controller/runner.py`, the domain subcontrollers under `src/controller/domains/`, `src/core/entrypoint.py`, and `src/core/work/`.
 
@@ -202,19 +202,20 @@ Tests covering this path live in:
 - `src/controller/domains/tests/test_map_sub_controller.py`
 - `src/core/work/tests/test_render_map_work.py`
 
-## Shared application logging across workers
+## Process-safe application logging across workers
 
-AsyncRunner's process pool uses `setup_logger` as its executor `initializer`. That detail matters operationally:
+AsyncRunner's process pool uses `setup_worker_logger` as its executor `initializer`. That detail matters operationally:
 
 - The main process resolves one concrete low-level log file under `<application_dir>/logs/application_YYYYMMDD_HHMMSS.log`.
 - `setup_logger()` stores that path in `AROW_LOG_FILE`.
-- Worker processes spawned later reuse the exact same path from that environment variable instead of creating their own per-process log files.
+- Each spawned process derives an isolated sibling file named `application_YYYYMMDD_HHMMSS.worker-<pid>.log`.
+- Workers inherit the same text or JSON Lines mode and the same rotation, retention, compression, redaction, and structured record schema.
 
-Result: controller, GUI, core, worker-thread, and worker-process log lines from one app run land in the same application log file, which makes debugging async map rendering and other background work much easier.
+This avoids unsupported concurrent Loguru rotation and compression on one file. To trace a run, analyze the main file and every sibling sharing its `application_YYYYMMDD_HHMMSS` prefix; Loguru's process metadata identifies each producer.
 
 Do not confuse this with the user-facing activity log:
 
-- `application_*.log`: low-level diagnostic loguru sink shared by the process tree.
+- `application_*.log`: low-level diagnostic Loguru sinks for the main process and isolated process workers.
 - `activity_YYYYMMDD.log`: app activity log surfaced in the GUI and managed through `activity_log_file`.
 
 ## Lower-level API: `JobSpecification` + `submit` + `bind_handle_signals`

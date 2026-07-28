@@ -13,7 +13,7 @@ from typing import Any, Callable, Literal, Optional
 from loguru import logger
 from PySide6.QtCore import QObject, Qt, Signal
 
-from logger import setup_logger
+from logger import setup_worker_logger
 
 jobtype = Literal["auto", "thread", "process"]
 jobstatus = Literal["pending", "running", "completed", "cancelled", "failed"]
@@ -195,7 +195,7 @@ class ProcessPool:
             self._max_workers: int | None = max_workers
             self._executor: ProcessPoolExecutor = ProcessPoolExecutor(
                 max_workers=max_workers,
-                initializer=setup_logger,  # Initialize logger before the process is started
+                initializer=setup_worker_logger,
             )
         except (NotImplementedError, OSError, PermissionError) as e:
             logger.error(

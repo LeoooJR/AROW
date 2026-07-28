@@ -15,6 +15,7 @@ from logger import (
     _json_loguru_format,
     resolve_application_log_file_path,
     setup_logger,
+    setup_worker_logger,
 )
 
 
@@ -91,16 +92,43 @@ def test_setup_logger_configures_json_serialization_for_process_tree(
 
     monkeypatch.setenv(AROW_LOG_FILE_ENV, str(shared))
     monkeypatch.delenv(AROW_LOG_SERIALIZE_ENV, raising=False)
+    monkeypatch.setattr("logger.os.getpid", lambda: 4242)
     monkeypatch.setattr("logger.logger.remove", lambda: None)
     monkeypatch.setattr("logger.logger.add", fake_add)
 
     setup_logger(serialize=True)
-    setup_logger()
+    setup_worker_logger()
 
     assert os.environ[AROW_LOG_SERIALIZE_ENV] == "1"
     assert sink_options[0]["serialize"] is True
     assert sink_options[1]["serialize"] is True
     assert sink_options[0]["format"] is _json_loguru_format
+    assert sink_options[1]["format"] is _json_loguru_format
+
+
+def test_setup_worker_logger_uses_process_isolated_sink(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    shared = tmp_path / "logs" / "application_20260101_120000.log"
+    sink_paths: list[Path] = []
+
+    def fake_add(sink: str, **_kwargs: object) -> int:
+        sink_paths.append(Path(sink))
+        return 1
+
+    monkeypatch.setenv(AROW_LOG_FILE_ENV, str(shared))
+    monkeypatch.setenv(AROW_LOG_SERIALIZE_ENV, "1")
+    monkeypatch.setattr("logger.os.getpid", lambda: 4242)
+    monkeypatch.setattr("logger.logger.remove", lambda: None)
+    monkeypatch.setattr("logger.logger.add", fake_add)
+
+    worker_path = setup_worker_logger()
+
+    expected = shared.with_name("application_20260101_120000.worker-4242.log")
+    assert worker_path == expected
+    assert sink_paths == [expected]
+    assert os.environ[AROW_LOG_FILE_ENV] == str(shared)
 
 
 def test_setup_logger_prunes_expired_logs_from_previous_runs(

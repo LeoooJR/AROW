@@ -276,10 +276,11 @@ def _json_loguru_format(record: dict[str, Any]) -> str:
 
 def resolve_application_log_file_path() -> Path:
     """
-    Return the shared low-level application log file for this process tree.
+    Return the main low-level application log file for this process tree.
 
     The main process resolves a concrete path under ``<application_dir>/logs`` and stores
-    it in :data:`AROW_LOG_FILE_ENV`. Worker processes spawned later reuse that exact path.
+    it in :data:`AROW_LOG_FILE_ENV`. Spawned workers use it as the base for isolated
+    per-process log paths.
     """
     env_path = os.environ.get(AROW_LOG_FILE_ENV, "").strip()
     if env_path:
@@ -331,20 +332,20 @@ def _resolve_log_serialization(serialize: bool | None) -> bool:
     return serialize
 
 
-def setup_logger(*, serialize: bool | None = None) -> Path:
-    """
-    Configure Loguru sinks and the project format string.
+def _worker_application_log_file_path(shared_path: Path, process_id: int) -> Path:
+    """Return a sibling path owned by one process-pool worker."""
+    return shared_path.with_name(
+        f"{shared_path.stem}.worker-{process_id}{shared_path.suffix}"
+    )
 
-    Call this before importing modules that emit logs at import time. For example,
-    ``core.entrypoint`` imports ``CORE_RUNTIME_WORKS``, which constructs
-    :class:`~collection.Repository` subclasses that log snapshot lines from ``add`` / ``add_all``.
-    If this runs too late, those lines go through Loguru's default handler instead of the file sink.
 
-    Returns:
-        Path: The concrete application log file used by this process tree.
-    """
-    serialize_logs = _resolve_log_serialization(serialize)
-    log_path = resolve_application_log_file_path()
+def _configure_logger(
+    log_path: Path,
+    *,
+    serialize_logs: bool,
+    publish_log_path: bool,
+) -> Path:
+    """Configure one process-local sink and return its concrete path."""
     candidate_paths = (log_path, _fallback_application_log_file_path(log_path))
 
     logger.remove()
@@ -365,7 +366,8 @@ def setup_logger(*, serialize: bool | None = None) -> Path:
                 compression=_APPLICATION_LOG_COMPRESSION,
                 watch=True,
             )
-            os.environ[AROW_LOG_FILE_ENV] = str(candidate_path)
+            if publish_log_path:
+                os.environ[AROW_LOG_FILE_ENV] = str(candidate_path)
             return candidate_path
         except OSError as exc:
             last_error = exc
@@ -373,3 +375,41 @@ def setup_logger(*, serialize: bool | None = None) -> Path:
     if last_error is not None:
         raise last_error
     return log_path
+
+
+def setup_logger(*, serialize: bool | None = None) -> Path:
+    """
+    Configure Loguru sinks and the project format string.
+
+    Call this before importing modules that emit logs at import time. For example,
+    ``core.entrypoint`` imports ``CORE_RUNTIME_WORKS``, which constructs
+    :class:`~collection.Repository` subclasses that log snapshot lines from ``add`` / ``add_all``.
+    If this runs too late, those lines go through Loguru's default handler instead of the file sink.
+
+    Returns:
+        Path: The concrete application log file used by this process tree.
+    """
+    serialize_logs = _resolve_log_serialization(serialize)
+    log_path = resolve_application_log_file_path()
+    return _configure_logger(
+        log_path,
+        serialize_logs=serialize_logs,
+        publish_log_path=True,
+    )
+
+
+def setup_worker_logger() -> Path:
+    """
+    Configure a process-pool worker with an isolated rotating file sink.
+
+    Workers inherit the main path and serialization mode through the environment,
+    but never open the main process file. This avoids unsupported concurrent
+    rotation, compression, and writes across independently configured Loguru sinks.
+    """
+    shared_path = resolve_application_log_file_path()
+    worker_path = _worker_application_log_file_path(shared_path, os.getpid())
+    return _configure_logger(
+        worker_path,
+        serialize_logs=_resolve_log_serialization(None),
+        publish_log_path=False,
+    )
