@@ -5,6 +5,9 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
+import pytest
+
+import core.application_paths as application_paths
 from core.application_paths import (
     default_activity_log_file_path,
     default_application_log_file_path,
@@ -20,13 +23,20 @@ def test_default_activity_log_file_path_uses_timestamped_name(tmp_path: Path) ->
     assert path.parent.is_dir()
 
 
-def test_default_application_log_file_path_uses_run_timestamp(
+def test_default_application_log_file_path_uses_faker_uuid4_run_identifier(
+    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    fixed_now = datetime(2026, 6, 21, 12, 30, 45)
-    path = default_application_log_file_path(tmp_path, now=fixed_now)
+    run_identifier = "01fdb29d-2e6b-49d1-8956-9d1caa576d2c"
+    monkeypatch.setattr(
+        application_paths._application_log_faker,
+        "uuid4",
+        lambda: run_identifier,
+    )
 
-    assert path == tmp_path / "logs" / "application_20260621_123045.log"
+    path = default_application_log_file_path(tmp_path)
+
+    assert path == tmp_path / "logs" / f"{run_identifier}.log"
     assert path.parent.is_dir()
 
 

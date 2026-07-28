@@ -13,6 +13,7 @@ from datetime import timedelta
 from enum import Enum
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 from loguru import logger
 
@@ -22,7 +23,7 @@ from core.application_paths import (
 )
 
 AROW_LOG_FILE_ENV = (
-    "AROW_LOG_FILE"  # Environment variable for the application log file path
+    "AROW_LOG_FILE"  # Main log path published internally for spawned workers
 )
 AROW_LOG_FALLBACK_DIR_ENV = "AROW_LOG_FALLBACK_DIR"
 AROW_LOG_SERIALIZE_ENV = "AROW_LOG_SERIALIZE"
@@ -30,7 +31,7 @@ AROW_LOG_SERIALIZE_ENV = "AROW_LOG_SERIALIZE"
 _APPLICATION_LOG_ROTATION = "10 MB"
 _APPLICATION_LOG_RETENTION = timedelta(days=14)
 _APPLICATION_LOG_COMPRESSION = "gz"
-_APPLICATION_LOG_GLOB = "application_*.log*"
+_APPLICATION_LOG_GLOB = "*.log*"
 _JSON_LOG_SCHEMA_VERSION = 1
 
 
@@ -276,11 +277,11 @@ def _json_loguru_format(record: dict[str, Any]) -> str:
 
 def resolve_application_log_file_path() -> Path:
     """
-    Return the main low-level application log file for this process tree.
+    Return the published main low-level log path for this process tree.
 
-    The main process resolves a concrete path under ``<application_dir>/logs`` and stores
-    it in :data:`AROW_LOG_FILE_ENV`. Spawned workers use it as the base for isolated
-    per-process log paths.
+    ``setup_logger`` replaces inherited values for each root run. Spawned workers
+    reuse the published path as the base for isolated per-process log paths.
+    Callers operating without root setup lazily generate and publish a UUID4 path.
     """
     env_path = os.environ.get(AROW_LOG_FILE_ENV, "").strip()
     if env_path:
@@ -308,7 +309,7 @@ def _fallback_application_log_file_path(original_path: Path) -> Path:
 
 
 def _prune_expired_application_logs(log_dir: Path) -> None:
-    """Best-effort cleanup across timestamped application logs from previous runs."""
+    """Best-effort cleanup across UUID-prefixed application logs from previous runs."""
     cutoff = time.time() - _APPLICATION_LOG_RETENTION.total_seconds()
     try:
         candidates = list(log_dir.glob(_APPLICATION_LOG_GLOB))
@@ -316,6 +317,13 @@ def _prune_expired_application_logs(log_dir: Path) -> None:
         return
 
     for candidate in candidates:
+        run_identifier = candidate.name.partition(".")[0]
+        try:
+            parsed_identifier = UUID(run_identifier)
+        except ValueError:
+            continue
+        if parsed_identifier.version != 4 or str(parsed_identifier) != run_identifier:
+            continue
         try:
             if candidate.is_file() and candidate.stat().st_mtime <= cutoff:
                 candidate.unlink()
@@ -384,18 +392,21 @@ def _configure_logger(
 
 def setup_logger(*, serialize: bool | None = None) -> Path:
     """
-    Configure Loguru sinks and the project format string.
+    Configure a fresh root-run Loguru sink and the project format string.
 
     Call this before importing modules that emit logs at import time. For example,
     ``core.entrypoint`` imports ``CORE_RUNTIME_WORKS``, which constructs
     :class:`~collection.Repository` subclasses that log snapshot lines from ``add`` / ``add_all``.
     If this runs too late, those lines go through Loguru's default handler instead of the file sink.
+    Any inherited :data:`AROW_LOG_FILE_ENV` value is ignored and replaced only
+    after the new primary or fallback sink is configured successfully.
 
     Returns:
         Path: The concrete application log file used by this process tree.
     """
     serialize_logs = _resolve_log_serialization(serialize)
-    log_path = resolve_application_log_file_path()
+    application_dir = get_or_create_application_dir()
+    log_path = default_application_log_file_path(application_dir)
     return _configure_logger(
         log_path,
         serialize_logs=serialize_logs,

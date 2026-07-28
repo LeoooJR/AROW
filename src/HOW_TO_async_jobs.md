@@ -206,16 +206,16 @@ Tests covering this path live in:
 
 AsyncRunner's process pool uses `setup_worker_logger` as its executor `initializer`. That detail matters operationally:
 
-- The main process resolves one concrete low-level log file under `<application_dir>/logs/application_YYYYMMDD_HHMMSS.log`.
-- `setup_logger()` stores that path in `AROW_LOG_FILE`.
-- Each spawned process derives an isolated sibling file named `application_YYYYMMDD_HHMMSS.worker-<pid>.log`.
+- Every `setup_logger()` call generates a fresh UUID4 run identifier and opens `<application_dir>/logs/<run_identifier>.log`.
+- Root setup replaces any inherited `AROW_LOG_FILE`, then publishes the successfully configured primary or fallback path through that variable.
+- Each spawned process derives an isolated sibling file named `<run_identifier>.worker-<pid>.log`.
 - Workers inherit the same text or JSON Lines mode and the same rotation, retention, compression, redaction, and structured record schema.
 
-This avoids unsupported concurrent Loguru rotation and compression on one file. To trace a run, analyze the main file and every sibling sharing its `application_YYYYMMDD_HHMMSS` prefix; Loguru's process metadata identifies each producer.
+This avoids unsupported concurrent Loguru rotation and compression on one file. To trace a run, analyze the main file and every sibling sharing its UUID4 prefix; Loguru's process metadata identifies each producer.
 
 Do not confuse this with the user-facing activity log:
 
-- `application_*.log`: low-level diagnostic Loguru sinks for the main process and isolated process workers.
+- `<run_identifier>.log` and `<run_identifier>.worker-<pid>.log`: low-level diagnostic Loguru sinks for the main process and isolated process workers.
 - `activity_YYYYMMDD.log`: app activity log surfaced in the GUI and managed through `activity_log_file`.
 
 ## Lower-level API: `JobSpecification` + `submit` + `bind_handle_signals`
@@ -353,5 +353,5 @@ Tests with a fake runner live under **`src/core/tests/test_async_runner.py`** fo
 | A work fails before its body runs | Check `@preflight(...)` conditions and the work’s `error_to_raise=` mapping. |
 | `apply_result(...)` logs “unsupported result type” | The returned outcome type is not registered in the built-in work catalog and has no custom applier. |
 | A reconnect creates a second device row instead of updating the existing one | The handset probably lacks a Tier-1 `hw:v1:` stable key, so reconciliation intentionally avoids merging on Tier-2 fingerprint keys. |
-| Map opens the failure placeholder after a background render | Check the shared `application_*.log` for `RenderMapWork` errors and confirm the process job returned `RenderMapOutcome` rather than `RenderMapError`. |
+| Map opens the failure placeholder after a background render | Check every runtime log sharing the run's UUID4 prefix for `RenderMapWork` errors and confirm the process job returned `RenderMapOutcome` rather than `RenderMapError`. |
 | Map reopens instantly without starting a new job | Confirm the cached HTML file already exists under `<application_dir>/simulations/<simulation_id>/map/`; this is expected lazy-load behavior. |

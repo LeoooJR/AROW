@@ -33,9 +33,9 @@ logic (`core`), and the PySide6 view (`gui`).
   record contains source, timing, process, thread, exception, and typed extras;
   `record.extra.origin` identifies the application layer and
   `record.extra.log_schema_version` identifies the schema.
-- Process-pool workers write isolated `application_*.worker-<pid>.log` siblings;
-  never configure independently rotating Loguru sinks against the main process
-  file.
+- Every root run writes `<uuid4>.log`; process-pool workers write isolated
+  `<uuid4>.worker-<pid>.log` siblings. Never configure independently rotating
+  Loguru sinks against the main process file.
 
 ## Primary dependencies
 

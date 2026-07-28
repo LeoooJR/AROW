@@ -640,6 +640,7 @@ class TestProcessPoolLogging:
         self,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
+        run_identifier = "01fdb29d-2e6b-49d1-8956-9d1caa576d2c"
         captured: dict[str, object] = {}
         events: list[tuple[str, object]] = []
 
@@ -664,7 +665,9 @@ class TestProcessPoolLogging:
         monkeypatch.setattr(
             runner_mod,
             "resolve_worker_application_log_file_path",
-            lambda *, process_id: Path(f"/logs/application.worker-{process_id}.log"),
+            lambda *, process_id: Path(
+                f"/logs/{run_identifier}.worker-{process_id}.log"
+            ),
         )
         monkeypatch.setattr(
             runner_mod.logger,
@@ -681,7 +684,7 @@ class TestProcessPoolLogging:
                 "Opening process pool",
                 {
                     "max_workers": 2,
-                    "path": "/logs/application.worker-{pid}.log",
+                    "path": f"/logs/{run_identifier}.worker-{{pid}}.log",
                 },
             ),
             ("executor", None),

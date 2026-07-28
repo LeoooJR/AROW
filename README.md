@@ -61,8 +61,8 @@ PYTHONPATH=src python -m main run --mock-adb gui
 PYTHONPATH=src python -m main run --json-logs --mock-adb gui
 ```
 
-This writes one JSON object per line to the main application log and
-PID-specific `application_*.worker-<pid>.log` siblings. Analyze every file with
-the same run prefix for a complete trace. Each record includes Loguru's
-timestamp, level, source, process, thread, exception, and structured `extra`
-fields, plus AROW's normalized `origin` and `log_schema_version` fields.
+This writes one JSON object per line to the UUID4-named main application log and
+PID-specific `<run_identifier>.worker-<pid>.log` siblings. Analyze every file
+with the same run identifier prefix for a complete trace. Each record includes
+Loguru's timestamp, level, source, process, thread, exception, and structured
+`extra` fields, plus AROW's normalized `origin` and `log_schema_version` fields.
