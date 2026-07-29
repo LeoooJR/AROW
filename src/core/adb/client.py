@@ -7,36 +7,31 @@ import subprocess  # nosec B404
 from collections import OrderedDict
 from dataclasses import replace
 
-from tenacity import (
-    Retrying,
-    retry_if_exception,
-    retry_if_result,
-)
-
 from core.adb.binary import AdbBinary
 from core.adb.command import (
     ADB_HISTORY_MAX_ENTRIES,
     AdbCommand,
-    ADBCommandParser,
     AdbCommandResult,
     AdbCommandResultStatus,
     AdbCommands,
-    ShellEnrichmentProperties,
-    _is_retryable_adb_exception,
-    _is_retryable_adb_result,
     _log_safe_argv,
     _log_safe_command_line,
     _log_safe_output_preview,
     _redacted_log_value,
-    adb_status_from_process,
-    adb_status_from_timeout,
-    make_adb_retry_after,
-    make_adb_retry_before,
-    raise_client_for_result,
-    retry_profile_for,
-    return_last_adb_retry_outcome,
 )
 from core.adb.exceptions import AdbClientException
+from core.adb.parser import (
+    ADBCommandParser,
+    ShellEnrichmentProperties,
+    parse_device_state_from_listing,
+)
+from core.adb.retry import (
+    adb_status_from_process,
+    adb_status_from_timeout,
+    execute_with_adb_retry,
+    raise_client_for_result,
+    timeout_seconds_for,
+)
 from core.devices.phone import Phone
 from core.geo.location import Location
 from logger import logger
@@ -316,32 +311,22 @@ class AdbClient:
         """
         positional_arguments = positional_arguments or []
         phone_id = phone.descriptor.id if phone else None
-        profile = retry_profile_for(command, scope="client")
 
-        def _attempt() -> AdbCommandResult:
+        def _attempt(timeout_seconds: float) -> AdbCommandResult:
             return self._run_once(
                 command,
                 phone=phone,
                 positional_arguments=positional_arguments,
-                timeout_seconds=profile.timeout_seconds,
+                timeout_seconds=timeout_seconds,
             )
 
-        retryer = Retrying(
-            stop=profile.stop,
-            wait=profile.wait,
-            retry=retry_if_exception(_is_retryable_adb_exception)
-            | retry_if_result(_is_retryable_adb_result),
-            reraise=True,
-            before=make_adb_retry_before(
-                scope="client", command_name=command.command, phone_id=phone_id
-            ),
-            after=make_adb_retry_after(
-                scope="client", command_name=command.command, phone_id=phone_id
-            ),
-            retry_error_callback=return_last_adb_retry_outcome,
-        )
         try:
-            result = retryer(_attempt)
+            result = execute_with_adb_retry(
+                command,
+                scope="client",
+                phone_id=phone_id,
+                attempt=_attempt,
+            )
         except AdbClientException as exc:
             if phone is None:
                 raise
@@ -438,13 +423,15 @@ class AdbClient:
     ) -> str:
         """Check once whether a failed command's target remains listed by ADB."""
         devices_command = AdbCommands.GET_DEVICES.value
-        profile = retry_profile_for(devices_command, scope="client")
         try:
             result = self._run_once(
                 devices_command,
                 phone=None,
                 positional_arguments=[],
-                timeout_seconds=profile.timeout_seconds,
+                timeout_seconds=timeout_seconds_for(
+                    devices_command,
+                    scope="client",
+                ),
             )
         except AdbClientException:
             logger.warning(
@@ -473,8 +460,9 @@ class AdbClient:
                 f"(ADB device-list check returned {result.status.name})"
             )
 
-        state = self._device_state_from_listing(
-            result.output or "", phone.descriptor.id
+        state = parse_device_state_from_listing(
+            result.output or "",
+            phone.descriptor.id,
         )
         if state is None:
             logger.warning(
@@ -493,12 +481,3 @@ class AdbClient:
             device_state=state,
         )
         return f"target device remains listed by ADB with state {state!r}"
-
-    @staticmethod
-    def _device_state_from_listing(output: str, device_id: str) -> str | None:
-        """Return the state from an exact ``adb devices -l`` row match."""
-        for raw_line in output.splitlines():
-            tokens = raw_line.strip().split()
-            if len(tokens) >= 2 and tokens[0] == device_id:
-                return tokens[1]
-        return None

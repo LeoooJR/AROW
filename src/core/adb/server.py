@@ -6,34 +6,26 @@ import datetime
 import subprocess  # nosec B404
 from collections import OrderedDict
 
-from tenacity import (
-    Retrying,
-    retry_if_exception,
-    retry_if_result,
-)
-
 from core.adb.binary import AdbBinary
 from core.adb.command import (
     ADB_HISTORY_MAX_ENTRIES,
     AdbCommand,
-    ADBCommandParser,
     AdbCommandResult,
     AdbCommandResultStatus,
     AdbCommands,
-    _is_retryable_adb_exception,
-    _is_retryable_adb_result,
     _log_safe_argv,
     _log_safe_command_line,
     _log_safe_output_preview,
-    adb_status_from_process,
-    adb_status_from_timeout,
-    make_adb_retry_after,
-    make_adb_retry_before,
-    raise_server_for_result,
-    retry_profile_for,
-    return_last_adb_retry_outcome,
 )
 from core.adb.exceptions import AdbClientException, AdbServerException
+from core.adb.parser import ADBCommandParser
+from core.adb.retry import (
+    adb_status_from_process,
+    adb_status_from_timeout,
+    execute_with_adb_retry,
+    raise_server_for_result,
+    timeout_seconds_for,
+)
 from core.devices.phone import Phone, PhoneRepository
 from logger import logger
 
@@ -177,13 +169,13 @@ class AdbServer:
         """
         command = AdbCommands.GET_BINARY_VERSION.value
         argv = [str(binary.path), command.command, *command.args]
-        profile = retry_profile_for(command, scope="server")
+        timeout_seconds = timeout_seconds_for(command, scope="server")
         logger.debug(
             "ADB binary version read started",
             adb_path=str(binary.path),
             argv=_log_safe_argv(command, argv),
             command_line=_log_safe_command_line(command, argv),
-            timeout_s=profile.timeout_seconds,
+            timeout_s=timeout_seconds,
         )
         try:
             # Version preflight uses list argv, no shell, and a bounded timeout.
@@ -191,11 +183,11 @@ class AdbServer:
                 argv,
                 capture_output=True,
                 text=True,
-                timeout=profile.timeout_seconds,
+                timeout=timeout_seconds,
             )
         except subprocess.TimeoutExpired as exc:
             raise AdbServerException(
-                f"Failed to read ADB binary version: timed out after {profile.timeout_seconds}s"
+                f"Failed to read ADB binary version: timed out after {timeout_seconds}s"
             ) from exc
         except OSError as exc:
             raise AdbServerException(f"Failed to run ADB binary {binary.path}") from exc
@@ -281,17 +273,16 @@ class AdbServer:
         """
         Execute a command with Tenacity-backed retries on transient subprocess failures.
         """
-        argv: list[str] = [str(self.binary.path), command.command, *command.args]
-        profile = retry_profile_for(command, scope="server")
 
-        def _attempt() -> AdbCommandResult:
+        def _attempt(timeout_seconds: float) -> AdbCommandResult:
+            argv: list[str] = [str(self.binary.path), command.command, *command.args]
             logger.debug(
                 "ADB server command started",
                 adb_path=str(self.binary.path),
                 command=command.command,
                 argv=_log_safe_argv(command, argv),
                 command_line=_log_safe_command_line(command, argv),
-                timeout_s=profile.timeout_seconds,
+                timeout_s=timeout_seconds,
             )
             try:
                 # ADB execution uses list argv, no shell, and bounded timeouts.
@@ -299,10 +290,10 @@ class AdbServer:
                     argv,
                     capture_output=True,
                     text=True,
-                    timeout=profile.timeout_seconds,
+                    timeout=timeout_seconds,
                 )
             except subprocess.TimeoutExpired as exc:
-                error = f"timed out after {profile.timeout_seconds}s"
+                error = f"timed out after {timeout_seconds}s"
                 logger.debug(
                     "ADB server command timed out",
                     adb_path=str(self.binary.path),
@@ -346,20 +337,11 @@ class AdbServer:
                 return_code=completed.returncode,
             )
 
-        retryer = Retrying(
-            stop=profile.stop,
-            wait=profile.wait,
-            retry=retry_if_exception(_is_retryable_adb_exception)
-            | retry_if_result(_is_retryable_adb_result),
-            reraise=True,
-            before=make_adb_retry_before(
-                scope="server", command_name=command.command, phone_id=None
-            ),
-            after=make_adb_retry_after(
-                scope="server", command_name=command.command, phone_id=None
-            ),
-            retry_error_callback=return_last_adb_retry_outcome,
+        result = execute_with_adb_retry(
+            command,
+            scope="server",
+            phone_id=None,
+            attempt=_attempt,
         )
-        result = retryer(_attempt)
         self.add_to_history(command, result)
         return result

@@ -18,11 +18,13 @@ from core.adb.command import (
     AdbCommandResult,
     AdbCommandResultStatus,
     AdbCommands,
+)
+from core.adb.exceptions import AdbClientException, AdbServerException
+from core.adb.retry import (
     _AdbRetryProfile,
     _is_retryable_adb_exception,
     retry_profile_for,
 )
-from core.adb.exceptions import AdbClientException, AdbServerException
 from core.adb.server import AdbServer
 from core.devices.phone import Phone, PhoneRepository
 
@@ -49,7 +51,7 @@ def _fast_profile(command: AdbCommand, *, scope: str) -> _AdbRetryProfile:
 def adb_client(monkeypatch: pytest.MonkeyPatch) -> AdbClient:
     """AdbClient with a dummy binary path and fast retry profile."""
     monkeypatch.setattr(
-        "core.adb.client.retry_profile_for",
+        "core.adb.retry.retry_profile_for",
         _fast_profile,
     )
     client = AdbClient(AdbBinary(path=Path("/mock/adb")))
@@ -60,7 +62,7 @@ def adb_client(monkeypatch: pytest.MonkeyPatch) -> AdbClient:
 def adb_server(monkeypatch: pytest.MonkeyPatch) -> AdbServer:
     """AdbServer built without __init__ side effects and fast retry profile."""
     monkeypatch.setattr(
-        "core.adb.server.retry_profile_for",
+        "core.adb.retry.retry_profile_for",
         _fast_profile,
     )
     server = object.__new__(AdbServer)
