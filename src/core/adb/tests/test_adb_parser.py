@@ -7,7 +7,12 @@ from __future__ import annotations
 import pytest
 
 from core import ADB_BINARY_BUILD_NUMBER, ADB_BINARY_BUILD_VERSION, ADB_BINARY_VERSION
-from core.adb.command import ADB_COMMAND_PARSERS, ADBCommandParser, AdbCommands
+from core.adb.command import AdbCommands
+from core.adb.parser import (
+    ADB_COMMAND_PARSERS,
+    ADBCommandParser,
+    parse_device_state_from_listing,
+)
 from core.devices.phone import DEFAULT_PHONE_DISPLAY_NAME, Phone
 
 pytestmark = [pytest.mark.adb_parser]
@@ -115,6 +120,30 @@ emulator-5554 offline product:sdk model:sdk_gphone device:emulator transport_id:
     p = phones[0]
     assert isinstance(p, Phone)
     assert p.descriptor.id == "emulator-5554"
+
+
+@pytest.mark.parametrize("state", ["offline", "unauthorized"])
+def test_parse_device_state_from_abbreviated_listing(state: str) -> None:
+    listing = f"List of devices attached\nabc123 {state}\n"
+
+    assert parse_device_state_from_listing(listing, "abc123") == state
+
+
+def test_parse_device_state_matches_exact_device_id() -> None:
+    listing = """List of devices attached
+abc123-extra device product:x model:y device:z transport_id:1
+abc123 offline
+"""
+
+    assert parse_device_state_from_listing(listing, "abc123") == "offline"
+
+
+def test_parse_device_state_returns_none_when_target_is_absent() -> None:
+    listing = """List of devices attached
+another-device device product:x model:y device:z transport_id:1
+"""
+
+    assert parse_device_state_from_listing(listing, "abc123") is None
 
 
 def test_battery_parser_keys_and_concatenated_log() -> None:
