@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
+from application_paths import ApplicationPaths
 from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
 from core.devices.phone import Phone
 from core.entrypoint import ModelEntrypoint
@@ -36,11 +36,9 @@ def _make_model(tmp_path: Path) -> tuple[ModelEntrypoint, str]:
     client = MockAdbClient(state=state)
     device = Phone(id="device-1", state="device", model="Pixel")
     server.paired_devices.add(device)
-    with patch(
-        "core.entrypoint.get_or_create_application_dir",
-        return_value=tmp_path,
-    ):
-        model_entrypoint = ModelEntrypoint()
+    model_entrypoint = ModelEntrypoint(
+        paths=ApplicationPaths(tmp_path, tmp_path / "config", tmp_path / "src", "linux")
+    )
     model_entrypoint.adb_server = server
     model_entrypoint.adb_client = client
     seed_adb_startup_for_entrypoint(model_entrypoint)

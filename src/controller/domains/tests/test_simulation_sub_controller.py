@@ -7,10 +7,11 @@ import json
 from collections.abc import Iterator
 from pathlib import Path
 from typing import cast
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
+from application_paths import ApplicationPaths
 from controller.domains.simulation_sub_controller import SimulationSubController
 from controller.orchestration.app_controller import AppController
 from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
@@ -58,11 +59,9 @@ def _make_model(tmp_path: Path, *, device: Phone | None = None) -> ModelEntrypoi
     state = MockAdbState(seed=404, initial_devices=0)
     server = MockAdbServer(state=state)
     client = MockAdbClient(state=state)
-    with patch(
-        "core.entrypoint.get_or_create_application_dir",
-        return_value=tmp_path,
-    ):
-        model_entrypoint = ModelEntrypoint()
+    model_entrypoint = ModelEntrypoint(
+        paths=ApplicationPaths(tmp_path, tmp_path / "config", tmp_path / "src", "linux")
+    )
     model_entrypoint._adb_server = server
     model_entrypoint._adb_client = client
     seed_adb_startup_for_entrypoint(model_entrypoint)

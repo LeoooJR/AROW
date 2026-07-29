@@ -90,7 +90,7 @@ JSON writes are atomic: files are written through a `*.tmp` sibling and then rep
 `StartupCoreRuntimeWork.run()` loads persisted simulations from:
 
 ```python
-SimulationDiskStore(get_or_create_application_dir() / "simulations")
+SimulationDiskStore(application_paths.simulations_dir)
 ```
 
 The worker returns:

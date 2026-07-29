@@ -17,11 +17,6 @@ from uuid import UUID
 
 from loguru import logger
 
-from core.application_paths import (
-    default_application_log_file_path,
-    get_or_create_application_dir,
-)
-
 AROW_LOG_FILE_ENV = (
     "AROW_LOG_FILE"  # Main log path published internally for spawned workers
 )
@@ -281,15 +276,14 @@ def resolve_application_log_file_path() -> Path:
 
     ``setup_logger`` replaces inherited values for each root run. Spawned workers
     reuse the published path as the base for isolated per-process log paths.
-    Callers operating without root setup lazily generate and publish a UUID4 path.
+    Root setup must publish the path before a process worker configures logging.
     """
     env_path = os.environ.get(AROW_LOG_FILE_ENV, "").strip()
     if env_path:
         return Path(env_path)
-    application_dir = get_or_create_application_dir()
-    log_path = default_application_log_file_path(application_dir)
-    os.environ[AROW_LOG_FILE_ENV] = str(log_path)
-    return log_path
+    raise RuntimeError(
+        f"{AROW_LOG_FILE_ENV} is not set; configure root logging before workers"
+    )
 
 
 def _fallback_application_log_file_path(original_path: Path) -> Path:
@@ -390,7 +384,11 @@ def _configure_logger(
     return log_path
 
 
-def setup_logger(*, serialize: bool | None = None) -> Path:
+def setup_logger(
+    log_path: Path,
+    *,
+    serialize: bool | None = None,
+) -> Path:
     """
     Configure a fresh root-run Loguru sink and the project format string.
 
@@ -405,8 +403,6 @@ def setup_logger(*, serialize: bool | None = None) -> Path:
         Path: The concrete application log file used by this process tree.
     """
     serialize_logs = _resolve_log_serialization(serialize)
-    application_dir = get_or_create_application_dir()
-    log_path = default_application_log_file_path(application_dir)
     return _configure_logger(
         log_path,
         serialize_logs=serialize_logs,

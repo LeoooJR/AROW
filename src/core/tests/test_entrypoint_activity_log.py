@@ -7,6 +7,7 @@ from typing import Any
 
 import pytest
 
+from application_paths import ApplicationPaths
 from core.entrypoint import ModelEntrypoint
 from core.signal_bus import InMemoryCoreSignalBus
 from core.signals import (
@@ -17,30 +18,32 @@ from core.signals import (
 
 
 @pytest.fixture
-def application_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Point ModelEntrypoint application data at an isolated temporary directory."""
-    monkeypatch.setattr(
-        "core.entrypoint.get_or_create_application_dir",
-        lambda: tmp_path,
+def application_paths(tmp_path: Path) -> ApplicationPaths:
+    """Provide isolated application paths."""
+    return ApplicationPaths(
+        application_dir=tmp_path,
+        config_dir=tmp_path / "config",
+        source_dir=tmp_path / "src",
+        platform="linux",
     )
-    return tmp_path
 
 
 def test_model_entrypoint_resolves_timestamped_default_activity_log_file(
-    application_dir: Path,
+    application_paths: ApplicationPaths,
 ) -> None:
-    model_entrypoint = ModelEntrypoint()
+    model_entrypoint = ModelEntrypoint(paths=application_paths)
 
     resolved = model_entrypoint.activity_log_file
 
+    assert model_entrypoint.paths is application_paths
     assert resolved is not None
-    assert resolved.parent == application_dir / "logs"
+    assert resolved.parent == application_paths.logs_dir
     assert resolved.name.startswith("activity_")
     assert resolved.suffix == ".log"
 
 
 def test_model_entrypoint_init_emits_activity_log_file_updated(
-    application_dir: Path,
+    application_paths: ApplicationPaths,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     emitted: list[tuple[CoreSignal[Any], object]] = []
@@ -56,7 +59,7 @@ def test_model_entrypoint_init_emits_activity_log_file_updated(
 
     monkeypatch.setattr(InMemoryCoreSignalBus, "emit", capture_emit)
 
-    model_entrypoint = ModelEntrypoint()
+    model_entrypoint = ModelEntrypoint(paths=application_paths)
 
     assert len(emitted) == 1
     signal, payload = emitted[0]
@@ -66,9 +69,9 @@ def test_model_entrypoint_init_emits_activity_log_file_updated(
 
 
 def test_model_entrypoint_activity_log_file_setter_stores_path_and_emits(
-    application_dir: Path,
+    application_paths: ApplicationPaths,
 ) -> None:
-    model_entrypoint = ModelEntrypoint()
+    model_entrypoint = ModelEntrypoint(paths=application_paths)
     received: list[ActivityLogFileUpdatedPayload] = []
 
     def capture(payload: ActivityLogFileUpdatedPayload) -> None:

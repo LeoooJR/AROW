@@ -168,7 +168,7 @@ This origin-first rule matters because a generic `RuntimeError` raised inside on
 Map rendering follows the same AsyncRunner contract as the ADB-facing jobs, but there are two design constraints worth calling out:
 
 1. `MapSubController` submits `ModelEntrypoint.render_map(...)` with `job_type="process"` because Folium + geo dataset preparation is CPU-heavy enough to justify leaving the GUI thread and the thread pool alone.
-2. `ModelEntrypoint.render_map(...)` is a `@staticmethod` that accepts only picklable inputs (`simulation_id`, `application_dir`) so `ProcessPoolExecutor` can execute it without serializing the whole `ModelEntrypoint` object graph.
+2. `ModelEntrypoint.render_map(...)` is a `@staticmethod` that accepts only picklable inputs (`simulation_id`, a concrete output `Path`) so `ProcessPoolExecutor` can execute it without serializing the whole `ModelEntrypoint` object graph.
 
 ### Request path
 
@@ -184,7 +184,7 @@ This means "render map" is lazy and cache-aware from the controller side: once t
 
 `RenderMapWork.run()`:
 
-1. Computes `output_dir = <application_dir>/simulations/<simulation_id>/map`.
+1. Receives the concrete `output_dir` resolved by `ModelEntrypoint`.
 2. Instantiates `MapRenderer()`.
 3. Calls `MapRenderer.to_html(path=output_dir, prefix=simulation_id)`.
 4. Returns `RenderMapOutcome(simulation_id=..., html_path=...)`.
@@ -206,7 +206,7 @@ Tests covering this path live in:
 
 AsyncRunner's process pool uses `setup_worker_logger` as its executor `initializer`. That detail matters operationally:
 
-- Every `setup_logger()` call generates a fresh UUID4 run identifier and opens `<application_dir>/logs/<run_identifier>.log`.
+- The composition root generates a fresh UUID4 path and passes it to `setup_logger(...)`, which opens `<application_dir>/logs/<run_identifier>.log`.
 - Root setup replaces any inherited `AROW_LOG_FILE`, then publishes the successfully configured primary or fallback path through that variable.
 - Each spawned process derives an isolated sibling file named `<run_identifier>.worker-<pid>.log`.
 - Workers inherit the same text or JSON Lines mode and the same rotation, retention, compression, redaction, and structured record schema.

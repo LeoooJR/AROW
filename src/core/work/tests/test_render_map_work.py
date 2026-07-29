@@ -49,7 +49,7 @@ def test_render_map_work_run_returns_outcome(
 
     outcome = RenderMapWork(
         simulation_id="sim-1",
-        application_dir=Path("/app"),
+        output_dir=Path("/app/simulations/sim-1/map"),
     ).run()
 
     assert outcome == RenderMapOutcome(simulation_id="sim-1", html_path=html_path)
@@ -75,7 +75,7 @@ def test_render_map_work_run_raises_render_map_error(
     with pytest.raises(RenderMapError) as exc_info:
         RenderMapWork(
             simulation_id="sim-1",
-            application_dir=Path("/app"),
+            output_dir=Path("/app/simulations/sim-1/map"),
         ).run()
 
     assert exc_info.value.simulation_id == "sim-1"
@@ -90,18 +90,19 @@ def test_model_entrypoint_render_map_delegates_to_work(
     calls: list[tuple[str, Path]] = []
 
     class FakeWork:
-        def __init__(self, *, simulation_id: str, application_dir: Path) -> None:
-            calls.append((simulation_id, application_dir))
+        def __init__(self, *, simulation_id: str, output_dir: Path) -> None:
+            calls.append((simulation_id, output_dir))
 
         def run(self) -> RenderMapOutcome:
             return expected
 
     monkeypatch.setattr("core.entrypoint.RenderMapWork", FakeWork)
 
-    result = ModelEntrypoint.render_map("sim-1", Path("/app"))
+    output_dir = Path("/app/simulations/sim-1/map")
+    result = ModelEntrypoint.render_map("sim-1", output_dir)
 
     assert result == expected
-    assert calls == [("sim-1", Path("/app"))]
+    assert calls == [("sim-1", output_dir)]
 
 
 def test_apply_main_thread_emits_map_rendered() -> None:

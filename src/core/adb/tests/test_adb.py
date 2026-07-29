@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 
+import core.adb.binary as adb_binary_module
 from core import ADB_BINARY_BUILD_NUMBER, ADB_BINARY_BUILD_VERSION, ADB_BINARY_VERSION
 from core.adb.binary import AdbBinary
 from core.adb.client import AdbClient
@@ -255,6 +256,33 @@ class TestAdbClientDeviceStatus:
 
 class TestAdbBinaryDefaults:
     """Bundled ADB binary metadata defaults."""
+
+    def test_adb_binary_path_default_is_resolved_lazily(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        expected_path = Path("/resolved/adb")
+        resolutions: list[Path] = []
+
+        class FakeApplicationPaths:
+            @property
+            def adb_binary(self) -> Path:
+                resolutions.append(expected_path)
+                return expected_path
+
+        monkeypatch.setattr(
+            adb_binary_module,
+            "APPLICATION_PATHS",
+            FakeApplicationPaths(),
+        )
+
+        explicit = AdbBinary(path=Path("/mock/adb"))
+        assert explicit.path == Path("/mock/adb")
+        assert resolutions == []
+
+        defaulted = AdbBinary()
+        assert defaulted.path == expected_path
+        assert resolutions == [expected_path]
 
     def test_adb_binary_defaults_use_frozen_project_metadata(self) -> None:
         binary = AdbBinary()
