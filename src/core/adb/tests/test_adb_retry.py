@@ -210,10 +210,12 @@ class TestAdbClientExecuteRetry:
         assert (
             "target device remains listed by ADB with state 'offline'" in result.error
         )
-        assert [entry[0] for entry in adb_client.history.values()] == [
-            AdbCommands.GET_PRODUCT_MODEL.value,
+        history_entries = list(adb_client.history.values())
+        assert [entry[0] for entry in history_entries] == [
             AdbCommands.GET_DEVICES.value,
+            AdbCommands.GET_PRODUCT_MODEL.value,
         ]
+        assert history_entries[-1][1] == result
 
     def test_targeted_terminal_failure_probes_once_and_reports_state(
         self, adb_client: AdbClient, monkeypatch: pytest.MonkeyPatch

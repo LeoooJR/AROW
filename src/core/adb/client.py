@@ -333,13 +333,17 @@ class AdbClient:
             diagnostic = self._diagnose_phone_reference(phone, command)
             raise AdbClientException(f"{exc}; {diagnostic}") from exc
 
-        self.add_to_history(command, result)
         if phone is None or result.status == AdbCommandResultStatus.SUCCESS:
+            self.add_to_history(command, result)
             return result
 
         diagnostic = self._diagnose_phone_reference(phone, command)
         original_detail = (result.error or result.output or result.status.name).strip()
-        return replace(result, error=f"{original_detail}; {diagnostic}")
+        result_with_diagnostic = replace(
+            result, error=f"{original_detail}; {diagnostic}"
+        )
+        self.add_to_history(command, result_with_diagnostic)
+        return result_with_diagnostic
 
     def _run_once(
         self,
