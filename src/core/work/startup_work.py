@@ -13,7 +13,6 @@ from pathlib import Path
 from typing import cast
 
 from core.adb.adb_mock import (
-    DEFAULT_MOCK_ADB_BINARY_PATH,
     MockAdbClient,
     MockAdbServer,
     MockAdbState,
@@ -35,17 +34,6 @@ from core.work.core_runtime_work import CoreRuntimeWork, CoreRuntimeWorkOutcome
 from core.work.helper import preflight
 from core.work.refresh_known_devices_work import enrich_phones_with_adb_shell_properties
 from logger import logger
-
-
-def _use_mock_adb_effective(cli_or_model_flag: bool) -> bool:
-    """Enable mock ADB from constructor/CLI flag or ``AROW_USE_MOCK_ADB`` env."""
-    if cli_or_model_flag:
-        return True
-    return os.environ.get("AROW_USE_MOCK_ADB", "").strip().lower() in (
-        "1",
-        "true",
-        "yes",
-    )
 
 
 def _ensure_adb_binary_executable(adb_path: Path) -> None:
@@ -182,7 +170,7 @@ class StartupCoreRuntimeWork(CoreRuntimeWork[StartupOutcome]):
         Start ADB server and client, snapshot paired devices, and enrich phones
         from ADB shell properties (AsyncRunner worker thread).
 
-        Chooses mock vs real ADB from the constructor flag or ``AROW_USE_MOCK_ADB``.
+        Chooses mock vs real ADB from the mode resolved by ``ModelEntrypoint``.
         Real path resolves the packaged binary, starts :class:`~core.adb.server.AdbServer`,
         and builds :class:`~core.adb.client.AdbClient`. Mock path uses
         :class:`~core.adb.adb_mock.MockAdbServer` / :class:`~core.adb.adb_mock.MockAdbClient`.
@@ -210,13 +198,12 @@ class StartupCoreRuntimeWork(CoreRuntimeWork[StartupOutcome]):
             Exception: Any unexpected failure from mock state construction,
             enrichment helpers, or outcome construction propagates to AsyncRunner.
         """
-        use_mock = _use_mock_adb_effective(self._use_mock_adb)
         adb_server: AdbServer
         adb_client: AdbClient
-        if use_mock:
+        if self._use_mock_adb:
             seed = mock_adb_seed_from_env()
             adb_state = MockAdbState(seed=seed)
-            adb_binary = AdbBinary(path=DEFAULT_MOCK_ADB_BINARY_PATH)
+            adb_binary = AdbBinary(path=self._adb_binary_path)
             adb_server = MockAdbServer(state=adb_state, binary=adb_binary)
             adb_client = MockAdbClient(state=adb_state, binary=adb_binary)
             logger.info(

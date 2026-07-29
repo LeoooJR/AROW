@@ -18,7 +18,8 @@ sequenceDiagram
     App->>Controller: run_startup()
     Controller->>Runner: submit startup_core_runtime<br/>thread, coalesce startup
     Runner->>Entrypoint: startup() in worker thread
-    Entrypoint->>Work: construct(use_mock_adb) and run()
+    Entrypoint->>Entrypoint: resolve effective ADB mode and binary path
+    Entrypoint->>Work: construct(use_mock_adb, adb_binary_path, simulations_dir) and run()
     Work->>Work: start real or mock ADB server/client
     Work->>Work: enrich paired devices and load simulations
     alt worker succeeds

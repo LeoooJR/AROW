@@ -171,6 +171,11 @@ class ApplicationPaths:
         return self.assets_dir / platform_folder / "platform-tools" / binary_name
 
     @property
+    def mock_adb_binary(self) -> Path:
+        """Synthetic binary path used by the mock ADB runtime."""
+        return Path("/mock/adb")
+
+    @property
     def geo_datasets_dir(self) -> Path:
         """Directory containing bundled geospatial datasets."""
         return self.source_dir / "core" / "geo" / "statics"

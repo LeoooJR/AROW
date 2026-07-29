@@ -4,12 +4,12 @@ import datetime
 import os
 import random
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Final
 
 from faker import Faker
 from faker.providers import DynamicProvider
 
+from application_paths import APPLICATION_PATHS
 from core.adb.binary import AdbBinary
 from core.adb.client import AdbClient
 from core.adb.command import (
@@ -26,8 +26,6 @@ from core.adb.exceptions import AdbClientException, AdbServerException
 from core.adb.server import AdbServer
 from core.devices.phone import Phone
 from logger import logger
-
-DEFAULT_MOCK_ADB_BINARY_PATH: Final[Path] = Path("/mock/adb")
 
 AROW_MOCK_ADB_SEED_ENV_VAR: Final[str] = "AROW_MOCK_ADB_SEED"
 
@@ -275,7 +273,7 @@ class MockAdbClient(AdbClient):
         state: MockAdbState,
         binary: AdbBinary | None = None,
     ) -> None:
-        super().__init__(binary or AdbBinary(path=DEFAULT_MOCK_ADB_BINARY_PATH))
+        super().__init__(binary or AdbBinary(path=APPLICATION_PATHS.mock_adb_binary))
         self._state = state
 
     def _fake_shell_stdout(
@@ -391,7 +389,7 @@ class MockAdbServer(AdbServer):
         binary: AdbBinary | None = None,
     ) -> None:
         self._mock_state = state
-        super().__init__(binary or AdbBinary(path=DEFAULT_MOCK_ADB_BINARY_PATH))
+        super().__init__(binary or AdbBinary(path=APPLICATION_PATHS.mock_adb_binary))
 
     def start(self) -> None:
         command = AdbCommands.START_SERVER.value
@@ -420,7 +418,7 @@ class MockAdbServer(AdbServer):
             out = (
                 "Android Debug Bridge version 1.0.41\n"
                 "Version 36.0.0-13206524\n"
-                "Installed as /mock/adb\n"
+                f"Installed as {self.binary.path}\n"
                 "Running on MockOS 0.0.0 (mock)\n"
             )
         cmd_result = AdbCommandResult(

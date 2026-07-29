@@ -53,9 +53,10 @@ def _startup_work(
     *,
     use_mock_adb: bool,
 ) -> StartupCoreRuntimeWork:
+    adb_binary_path = paths.mock_adb_binary if use_mock_adb else paths.adb_binary
     return StartupCoreRuntimeWork(
         use_mock_adb=use_mock_adb,
-        adb_binary_path=paths.adb_binary,
+        adb_binary_path=adb_binary_path,
         simulations_dir=paths.simulations_dir,
     )
 
@@ -161,6 +162,8 @@ def test_startup_mock_enriches_devices(
     outcome = _startup_work(application_paths, use_mock_adb=True).run()
     assert outcome.adb_server is not None
     assert outcome.adb_client is not None
+    assert outcome.adb_server.binary.path == application_paths.mock_adb_binary
+    assert outcome.adb_client.binary.path == application_paths.mock_adb_binary
     assert len(outcome.devices) >= 1
     phone = outcome.devices[0]
     assert phone.descriptor.manufacturer.strip()

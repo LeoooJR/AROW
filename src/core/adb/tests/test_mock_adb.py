@@ -24,6 +24,13 @@ def test_mock_server_reports_mdns_available() -> None:
     assert server.mdns_available is True
 
 
+def test_mock_runtime_defaults_use_centralized_binary_path() -> None:
+    state = MockAdbState(seed=807, initial_devices=1)
+
+    assert MockAdbServer(state=state).binary.path == APPLICATION_PATHS.mock_adb_binary
+    assert MockAdbClient(state=state).binary.path == APPLICATION_PATHS.mock_adb_binary
+
+
 def test_mock_server_mdns_check_output_matches_parser() -> None:
     server = MockAdbServer(state=MockAdbState(seed=809, initial_devices=1))
     result = server._execute(AdbCommands.MDNS_CHECK.value)
@@ -65,6 +72,39 @@ def test_model_entrypoint_startup_mock_returns_outcome_without_emitting(
     assert emitted == []
     assert outcome.devices
     assert outcome.devices[0].descriptor.manufacturer.strip()
+
+
+@pytest.mark.parametrize(
+    ("use_mock_adb", "environment_value"),
+    [(True, None), (False, "true")],
+    ids=["cli-option", "environment-override"],
+)
+def test_model_entrypoint_mock_startup_ignores_unsupported_real_adb_platform(
+    use_mock_adb: bool,
+    environment_value: str | None,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    if environment_value is None:
+        monkeypatch.delenv("AROW_USE_MOCK_ADB", raising=False)
+    else:
+        monkeypatch.setenv("AROW_USE_MOCK_ADB", environment_value)
+    paths = ApplicationPaths(
+        application_dir=tmp_path,
+        config_dir=tmp_path / "config",
+        source_dir=tmp_path / "src",
+        platform="freebsd",
+    )
+
+    outcome = ModelEntrypoint(
+        use_mock_adb=use_mock_adb,
+        paths=paths,
+    ).startup()
+
+    assert isinstance(outcome.adb_server, MockAdbServer)
+    assert isinstance(outcome.adb_client, MockAdbClient)
+    assert outcome.adb_server.binary.path == paths.mock_adb_binary
+    assert outcome.adb_client.binary.path == paths.mock_adb_binary
 
 
 def test_mock_server_restart_repopulates_devices() -> None:

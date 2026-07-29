@@ -1,3 +1,4 @@
+import os
 from abc import ABC
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -76,6 +77,17 @@ _CORE_RUNTIME_EXCEPTION_FAILURE_APPLIERS: dict[
 ] = {
     DeviceAuthentificationError: AuthenticateDeviceWork.apply_failure_main_thread,
 }
+
+
+def _use_mock_adb_effective(requested: bool) -> bool:
+    """Resolve mock ADB mode from the requested flag or process environment."""
+    if requested:
+        return True
+    return os.environ.get("AROW_USE_MOCK_ADB", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
 
 
 def register_core_runtime_result_applier(
@@ -229,9 +241,13 @@ class ModelEntrypoint(Entrypoint):
         """
         Initialize runtime core services at application startup (worker thread).
         """
+        use_mock_adb = _use_mock_adb_effective(self._use_mock_adb)
+        adb_binary_path = (
+            self.paths.mock_adb_binary if use_mock_adb else self.paths.adb_binary
+        )
         return StartupCoreRuntimeWork(
-            use_mock_adb=self._use_mock_adb,
-            adb_binary_path=self.paths.adb_binary,
+            use_mock_adb=use_mock_adb,
+            adb_binary_path=adb_binary_path,
             simulations_dir=self.paths.simulations_dir,
         ).run()
 

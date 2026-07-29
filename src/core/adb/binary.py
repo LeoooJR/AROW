@@ -15,7 +15,7 @@ class AdbBinary:
 
     path: Path = field(
         metadata={"description": "The path to the adb binary"},
-        default=APPLICATION_PATHS.adb_binary,
+        default_factory=lambda: APPLICATION_PATHS.adb_binary,
         compare=False,
     )
     version: str = field(

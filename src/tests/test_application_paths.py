@@ -141,6 +141,17 @@ def test_adb_binary_rejects_unsupported_platform(tmp_path: Path) -> None:
         _ = paths.adb_binary
 
 
+@pytest.mark.parametrize("platform", ["darwin", "linux", "win32", "freebsd"])
+def test_mock_adb_binary_is_platform_independent(
+    tmp_path: Path,
+    platform: str,
+) -> None:
+    paths = _paths(tmp_path, platform=platform)
+
+    assert paths.mock_adb_binary == Path("/mock/adb")
+    assert not paths.application_dir.exists()
+
+
 def test_geo_resource_paths_use_source_root(tmp_path: Path) -> None:
     paths = _paths(tmp_path)
 
