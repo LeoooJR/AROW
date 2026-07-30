@@ -27,6 +27,7 @@ from core.adb.retry import (
     timeout_seconds_for,
 )
 from core.devices.phone import Phone, PhoneRepository
+from core.network import resolve_network_identity
 from logger import logger
 
 
@@ -40,8 +41,10 @@ class AdbServer:
         ] = OrderedDict()
         self._paired_devices: PhoneRepository = PhoneRepository()
         self._mdns_available: bool = False
+        self._network_available: bool = False
         self.start()
         self.refresh_mdns_availability()
+        self.refresh_network_availability()
 
     @property
     def history(
@@ -136,6 +139,11 @@ class AdbServer:
     def mdns_available(self) -> bool:
         """Get whether ADB reports mDNS discovery as available."""
         return self._mdns_available
+
+    @property
+    def network_available(self) -> bool:
+        """Get whether the host has a usable non-loopback IPv4 route."""
+        return self._network_available
 
     def start(self) -> None:
         """Start the adb server."""
@@ -242,6 +250,15 @@ class AdbServer:
         self._mdns_available = ADBCommandParser.MDNS_CHECK.parse(result.output or "")
         logger.debug("ADB mDNS availability refreshed", available=self._mdns_available)
         return self._mdns_available
+
+    def refresh_network_availability(self) -> bool:
+        """Refresh and return whether the host has a usable IPv4 network route."""
+        _ip, self._network_available = resolve_network_identity()
+        logger.debug(
+            "Host network availability refreshed",
+            available=self._network_available,
+        )
+        return self._network_available
 
     def is_server_running(self) -> bool:
         """

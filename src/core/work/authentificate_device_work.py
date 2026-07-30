@@ -21,7 +21,7 @@ from core.signals import (
     DeviceAuthentificationSucceededPayload,
 )
 from core.work.core_runtime_work import CoreRuntimeWork, CoreRuntimeWorkOutcome
-from core.work.helper import preflight
+from core.work.helper import device_endpoint_is_paired, preflight
 from core.work.refresh_known_devices_work import enrich_phones_with_adb_shell_properties
 from logger import logger
 
@@ -90,14 +90,14 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
 
     def __init__(
         self,
-        adb_server: AdbServer,
-        adb_client: AdbClient,
+        adb_server: AdbServer | None,
+        adb_client: AdbClient | None,
         ip: str,
         port: int,
         association_code: str,
     ) -> None:
-        self.adb_server: AdbServer = adb_server
-        self.adb_client: AdbClient = adb_client
+        self.adb_server: AdbServer | None = adb_server
+        self.adb_client: AdbClient | None = adb_client
         self.ip: str = ip
         self.port: int = port
         self.association_code: str = association_code
@@ -111,16 +111,23 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
                 association_code="",
                 reason="ADB runtime preflight failed",
             )
+        reason = (
+            "Device with this IP address and port is already paired"
+            if device_endpoint_is_paired(work)
+            else "ADB runtime preflight failed"
+        )
         return DeviceAuthentificationError(
             ip=work.ip,
             port=work.port,
             association_code=work.association_code,
-            reason="ADB runtime preflight failed",
+            reason=reason,
         )
 
     @preflight(
         check_server_started=True,
         check_client_created=True,
+        check_device_not_paired=True,
+        check_network_available=True,
         check_mdns_available=True,
         error_to_raise=_preflight_error,
     )
@@ -145,8 +152,8 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
             Exception: Any unexpected failure outside the documented pairing path
             propagates to AsyncRunner.
         """
-        adb_server = self.adb_server
-        adb_client = self.adb_client
+        adb_server = cast(AdbServer, self.adb_server)
+        adb_client = cast(AdbClient, self.adb_client)
         ip, port, association_code = self.ip, self.port, self.association_code
         validation_failure = PairingInputValidator.validate(ip, port, association_code)
         if validation_failure is not None:

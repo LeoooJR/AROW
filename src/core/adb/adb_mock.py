@@ -400,6 +400,11 @@ class MockAdbServer(AdbServer):
         for device in self.get_known_devices():
             self._paired_devices.add(device)
 
+    def refresh_network_availability(self) -> bool:
+        """Keep mock workflows independent from host-specific network state."""
+        self._network_available = True
+        return self._network_available
+
     def _execute(self, command: AdbCommand) -> AdbCommandResult:
         argv: list[str] = [str(self.binary.path), command.command, *command.args]
         logger.debug(

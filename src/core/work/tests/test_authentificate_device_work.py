@@ -58,6 +58,7 @@ class FakeAdbClient:
 class FakeAdbServer:
     def __init__(self) -> None:
         self.restart_calls = 0
+        self.paired_devices: list[Phone] = []
 
     def restart(self) -> None:
         self.restart_calls += 1
@@ -66,6 +67,9 @@ class FakeAdbServer:
         return True
 
     def refresh_mdns_availability(self) -> bool:
+        return True
+
+    def refresh_network_availability(self) -> bool:
         return True
 
 
@@ -171,6 +175,54 @@ def test_authenticate_work_valid_input_pairs_and_returns_success() -> None:
     assert outcome.success_phone.descriptor.id == "mock-phone"
     assert client.pair_calls == [PairCall("192.168.1.10", 37777, "123456")]
     assert server.restart_calls == 0
+
+
+def test_authenticate_work_exact_paired_endpoint_fails_before_pair() -> None:
+    server = FakeAdbServer()
+    server.paired_devices.append(Phone(id="existing", ip="192.168.1.10", port=37777))
+    client = FakeAdbClient()
+
+    with pytest.raises(DeviceAuthentificationError) as exc_info:
+        AuthenticateDeviceWork(
+            adb_server=server,  # type: ignore[arg-type]
+            adb_client=client,  # type: ignore[arg-type]
+            ip="192.168.1.10",
+            port=37777,
+            association_code="123456",
+        ).run()
+
+    assert exc_info.value.reason == (
+        "Device with this IP address and port is already paired"
+    )
+    assert exc_info.value.ip == "192.168.1.10"
+    assert exc_info.value.port == 37777
+    assert client.pair_calls == []
+
+
+@pytest.mark.parametrize(
+    ("ip", "port"),
+    [
+        ("192.168.1.10", 37778),
+        ("192.168.1.11", 37777),
+    ],
+)
+def test_authenticate_work_allows_nonmatching_paired_endpoint(
+    ip: str, port: int
+) -> None:
+    server = FakeAdbServer()
+    server.paired_devices.append(Phone(id="existing", ip="192.168.1.10", port=37777))
+    client = FakeAdbClient()
+
+    outcome = AuthenticateDeviceWork(
+        adb_server=server,  # type: ignore[arg-type]
+        adb_client=client,  # type: ignore[arg-type]
+        ip=ip,
+        port=port,
+        association_code="123456",
+    ).run()
+
+    assert outcome.success_phone.id == "mock-phone"
+    assert client.pair_calls == [PairCall(ip, port, "123456")]
 
 
 def test_mock_pair_then_enrich() -> None:

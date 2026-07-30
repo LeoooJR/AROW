@@ -137,9 +137,15 @@ Available checks:
 
 - `check_server_started=True`: resolve `_adb_server` / `adb_server` and require `is_server_running()`.
 - `check_client_created=True`: resolve `_adb_client` / `adb_client` and require usable binary metadata.
+- `check_device_not_paired=True`: require a valid target IP/port and reject an exact endpoint already present in `paired_devices`.
+- `check_network_available=True`: require `refresh_network_availability()` to find a usable non-loopback host IPv4 route.
 - `check_mdns_available=True`: require `refresh_mdns_availability()` to succeed.
 
 Use `error_to_raise=` when a work needs a domain-specific exception such as `RefreshKnownDevicesError` or `DeviceAuthentificationError`. The decorator runs before the body of `run()`, so failed preflight should not partially mutate core state.
+
+Wireless device authentication enables the duplicate-endpoint, network, and mDNS
+checks. Startup, device refresh, and close do not require them because they must
+remain usable with USB-connected devices.
 
 ## Result and failure dispatch
 

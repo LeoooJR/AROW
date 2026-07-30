@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import datetime
+import ipaddress
 from dataclasses import dataclass, field
-from typing import Iterable
+from typing import Iterable, Literal, cast
 
 from loguru import logger
 
@@ -15,6 +16,38 @@ from core.payload import Payload
 
 DEFAULT_PHONE_DISPLAY_NAME = "Android device"
 _PHONE_DISPLAY_ID_TAIL_LEN = 8
+ConnectivityType = Literal["usb", "wifi"]
+
+
+def _connection_id_is_wifi(connection_id: str) -> bool:
+    normalized = connection_id.strip()
+    if normalized.casefold().endswith("._adb-tls-connect._tcp"):
+        return True
+    if ":" not in normalized:
+        return False
+    host, port_value = normalized.rsplit(":", 1)
+    try:
+        ipaddress.IPv4Address(host)
+        port = int(port_value)
+    except (ipaddress.AddressValueError, ValueError):
+        return False
+    return 1 <= port <= 65535
+
+
+def _resolve_connectivity_type(
+    *,
+    connection_id: str,
+    ip: str | None,
+    port: int | None,
+    connectivity_type: ConnectivityType | None,
+) -> ConnectivityType:
+    if connectivity_type is not None:
+        if connectivity_type not in ("usb", "wifi"):
+            raise ValueError("connectivity_type must be 'usb' or 'wifi'")
+        return connectivity_type
+    if (ip or "").strip() and port is not None:
+        return "wifi"
+    return "wifi" if _connection_id_is_wifi(connection_id) else "usb"
 
 
 def _adb_connection_id_is_human_readable(connection_id: str) -> bool:
@@ -47,6 +80,12 @@ class PhoneDescriptor(DeviceDescriptor):
     )
     transport_id: str = field(
         metadata={"description": "The transport id of the phone"}, default=""
+    )
+    connectivity_type: ConnectivityType = field(
+        metadata={"description": "Whether ADB reaches the phone over USB or Wi-Fi"},
+        default="usb",
+        compare=False,
+        hash=False,
     )
     state: str = field(
         metadata={"description": "The state of the phone"},
@@ -145,10 +184,10 @@ class PhoneDescriptor(DeviceDescriptor):
         object.__setattr__(self, "name", name)
 
     def __str__(self) -> str:
-        return f"{self.id} - {self.name} - {self.os} - {self.ip}:{self.port} - {self.product} - {self.model} - {self.transport_id} - {self.state} - {self.hardware_serial} - {self.stable_key} - {self.manufacturer} - {self.android_api_level} - {self.last_communication}"
+        return f"{self.id} - {self.name} - {self.os} - {self.ip}:{self.port} - {self.product} - {self.model} - {self.transport_id} - {self.connectivity_type} - {self.state} - {self.hardware_serial} - {self.stable_key} - {self.manufacturer} - {self.android_api_level} - {self.last_communication}"
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(id={self.id}, name={self.name}, os={self.os}, ip={self.ip}, port={self.port}, product={self.product}, model={self.model}, transport_id={self.transport_id}, state={self.state}, hardware_serial={self.hardware_serial!r}, stable_key={self.stable_key!r}, manufacturer={self.manufacturer!r}, android_api_level={self.android_api_level!r}, shell_device_name={self.shell_device_name!r}, last_communication={self.last_communication})"
+        return f"{self.__class__.__name__}(id={self.id}, name={self.name}, os={self.os}, ip={self.ip}, port={self.port}, product={self.product}, model={self.model}, transport_id={self.transport_id}, connectivity_type={self.connectivity_type!r}, state={self.state}, hardware_serial={self.hardware_serial!r}, stable_key={self.stable_key!r}, manufacturer={self.manufacturer!r}, android_api_level={self.android_api_level!r}, shell_device_name={self.shell_device_name!r}, last_communication={self.last_communication})"
 
 
 class Phone(Device[PhoneDescriptor], Payload):
@@ -169,6 +208,7 @@ class Phone(Device[PhoneDescriptor], Payload):
         manufacturer: str | None = None,
         transport_id: str | None = None,
         android_api_level: int | None = None,
+        connectivity_type: ConnectivityType | None = None,
     ) -> None:
         prod, mod, man = product or "", model or "", manufacturer or ""
         serial = (hardware_serial.strip() if hardware_serial else "") or ""
@@ -191,6 +231,12 @@ class Phone(Device[PhoneDescriptor], Payload):
             model=mod,
             device=device_column,
             transport_id=(transport_id.strip() if transport_id else "") or "",
+            connectivity_type=_resolve_connectivity_type(
+                connection_id=id,
+                ip=ip,
+                port=port,
+                connectivity_type=connectivity_type,
+            ),
             state=state or "",
             last_communication=datetime.datetime.now(),
             hardware_serial=serial,
@@ -260,6 +306,10 @@ class Phone(Device[PhoneDescriptor], Payload):
         return self._descriptor.transport_id
 
     @property
+    def connectivity_type(self) -> ConnectivityType:
+        return self._descriptor.connectivity_type
+
+    @property
     def stable_key(self) -> str:
         return self._descriptor.stable_key
 
@@ -311,6 +361,7 @@ class Phone(Device[PhoneDescriptor], Payload):
             "ip": self.ip,
             "port": self.port,
             "state": self.state,
+            "connectivity_type": self.connectivity_type,
             "stable_key": self.stable_key,
             "last_communication": (
                 self.last_communication.isoformat()
@@ -344,6 +395,11 @@ class Phone(Device[PhoneDescriptor], Payload):
             ip=str(payload["ip"]) if payload.get("ip") is not None else None,
             port=port,
             state=str(payload["state"]) if payload.get("state") is not None else None,
+            connectivity_type=(
+                cast(ConnectivityType, payload["connectivity_type"])
+                if payload.get("connectivity_type") is not None
+                else None
+            ),
         )
         if payload.get("stable_key") is not None:
             phone.descriptor.stable_key = str(payload["stable_key"])
@@ -365,6 +421,7 @@ _DISCOVERED_PHONE_DESCRIPTOR_FIELDS = (
     "model",
     "device",
     "transport_id",
+    "connectivity_type",
     "state",
     "hardware_serial",
     "stable_key",

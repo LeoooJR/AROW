@@ -261,27 +261,6 @@ class ModelEntrypoint(Entrypoint):
         :class:`~core.work.authentificate_device_work.DeviceAuthentificationError`
         so AsyncRunner invokes the job ``on_failed`` callback.
         """
-        if self._adb_server is None or self._adb_client is None:
-            raise AttributeError(
-                "ADB server and client must be initialized before authentification"
-            )
-        self._host.refresh_network_identity()
-        if not self._host.network_available:
-            raise DeviceAuthentificationError(
-                ip=ip,
-                port=port,
-                association_code=association_code,
-                reason="Host network is unavailable",
-            )
-        # Check if a device with this IP address on the current ADB server is already paired
-        for device in self._adb_server.paired_devices:
-            if device.ip == ip:
-                raise DeviceAuthentificationError(
-                    ip=ip,
-                    port=port,
-                    association_code=association_code,
-                    reason="Device with this IP address is already paired",
-                )
         return AuthenticateDeviceWork(
             adb_server=self._adb_server,
             adb_client=self._adb_client,
@@ -295,10 +274,6 @@ class ModelEntrypoint(Entrypoint):
         List devices from the bound server and enrich ``ro.serialno`` via ADB.
         Blocking; intended for AsyncRunner / worker-thread use only.
         """
-        if self._adb_server is None or self._adb_client is None:
-            raise AttributeError(
-                "ADB server and client must be initialized before refreshing devices"
-            )
         return RefreshKnownDevicesWork(self._adb_server, self._adb_client).run()
 
     def run_host_install_identity(self) -> HostInstallIdentityOutcome:
@@ -398,6 +373,7 @@ class ModelEntrypoint(Entrypoint):
                 if (
                     paired.id == discovered.id
                     and paired.state == discovered.state
+                    and paired.connectivity_type == discovered.connectivity_type
                     and paired == discovered
                 ):
                     # If no property changed, skip.

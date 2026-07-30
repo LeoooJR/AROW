@@ -10,6 +10,7 @@ When adding a parser:
 
 from __future__ import annotations
 
+import ipaddress
 import re
 from enum import Enum, member
 from pathlib import Path
@@ -128,11 +129,25 @@ def _parse_devices(output: str) -> list[Phone]:
         if len(tokens) < 6:
             continue
         try:
-            values = [token.split(":", 1)[-1] for token in tokens]
-            device_id, state, product, model, device, transport_id = values
+            connection_id, state = tokens[:2]
+            metadata = dict(token.split(":", 1) for token in tokens[2:] if ":" in token)
+            product = metadata["product"]
+            model = metadata["model"]
+            device = metadata["device"]
+            transport_id = metadata["transport_id"]
+            ip = ""
+            port: int | None = None
+            if ":" in connection_id:
+                host, port_value = connection_id.rsplit(":", 1)
+                ipaddress.IPv4Address(host)
+                parsed_port = int(port_value)
+                if 1 <= parsed_port <= 65535:
+                    ip, port = host, parsed_port
             phones.append(
                 Phone(
-                    id=device_id,
+                    id=connection_id,
+                    ip=ip,
+                    port=port,
                     product=product,
                     model=model,
                     state=state,
@@ -140,7 +155,7 @@ def _parse_devices(output: str) -> list[Phone]:
                     device=device,
                 )
             )
-        except (ValueError, TypeError):
+        except (KeyError, ValueError, TypeError):
             continue
     return phones
 

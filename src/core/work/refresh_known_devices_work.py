@@ -136,7 +136,11 @@ class RefreshKnownDevicesWork(CoreRuntimeWork[RefreshKnownDevicesOutcome]):
     Blocking ADB listing + shell property enrichment on a worker; apply emits ``DEVICES_UPDATED``.
     """
 
-    def __init__(self, adb_server: AdbServer, adb_client: AdbClient) -> None:
+    def __init__(
+        self,
+        adb_server: AdbServer | None,
+        adb_client: AdbClient | None,
+    ) -> None:
         self._adb_server = adb_server
         self._adb_client = adb_client
 
@@ -171,8 +175,10 @@ class RefreshKnownDevicesWork(CoreRuntimeWork[RefreshKnownDevicesOutcome]):
             Exception: Any unexpected failure outside the documented ADB listing
             path propagates to AsyncRunner.
         """
-        phones = self._adb_server.get_known_devices()
-        enrich_phones_with_adb_shell_properties(self._adb_client, phones)
+        adb_server = cast(AdbServer, self._adb_server)
+        adb_client = cast(AdbClient, self._adb_client)
+        phones = adb_server.get_known_devices()
+        enrich_phones_with_adb_shell_properties(adb_client, phones)
         return RefreshKnownDevicesOutcome(devices=phones)
 
     @staticmethod

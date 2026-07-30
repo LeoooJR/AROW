@@ -41,6 +41,44 @@ class TestPhone:
         assert "Phone" in repr(phone)
         assert "x" in repr(phone)
 
+    @pytest.mark.parametrize(
+        ("kwargs", "expected"),
+        [
+            ({"id": "serial-123"}, "usb"),
+            ({"id": "emulator-5554"}, "usb"),
+            ({"id": "192.168.1.20:5555"}, "wifi"),
+            ({"id": "adb-serial._adb-tls-connect._tcp"}, "wifi"),
+            ({"id": "adb-guid", "ip": "192.168.1.20", "port": 37777}, "wifi"),
+        ],
+    )
+    def test_phone_infers_connectivity_type(
+        self, kwargs: dict[str, object], expected: str
+    ) -> None:
+        phone = Phone(**kwargs)  # type: ignore[arg-type]
+
+        assert phone.connectivity_type == expected
+
+    def test_phone_connectivity_type_is_transient_identity_metadata(self) -> None:
+        usb = Phone(id="device-1", model="Pixel", connectivity_type="usb")
+        wifi = Phone(id="device-1", model="Pixel", connectivity_type="wifi")
+
+        assert usb == wifi
+        assert hash(usb) == hash(wifi)
+
+    def test_phone_connectivity_type_round_trips_and_old_payload_infers(self) -> None:
+        phone = Phone(
+            id="adb-guid",
+            ip="192.168.1.20",
+            port=37777,
+            connectivity_type="wifi",
+        )
+        payload = phone.serialize()
+
+        assert payload["connectivity_type"] == "wifi"
+        assert Phone.deserialize(payload).connectivity_type == "wifi"
+        payload.pop("connectivity_type")
+        assert Phone.deserialize(payload).connectivity_type == "wifi"
+
     def test_phone_update_state(self) -> None:
         """Phone.update_state updates only given fields."""
         phone = Phone(id="a", name="b", os="c", ip="d", port=1, state="e")
