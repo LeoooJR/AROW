@@ -112,4 +112,5 @@ This repository uses two long-lived branches:
 - Controller boundaries and signal flows:
   `src/HOW_TO_controller_and_signals.md`
 - Simulation persistence: `src/HOW_TO_simulation_persistence.md`
+- Desktop and mobile communication contract: `HOW_TO_mobile_communication.md`
 - Development without real ADB: `HOW_TO_mock_adb.md`
