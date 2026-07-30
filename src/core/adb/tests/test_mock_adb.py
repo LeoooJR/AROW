@@ -12,7 +12,8 @@ import pytest
 from application_paths import APPLICATION_PATHS, ApplicationPaths
 from core import ADB_BINARY_BUILD_NUMBER, ADB_BINARY_BUILD_VERSION, ADB_BINARY_VERSION
 from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
-from core.adb.command import ADBCommandParser, AdbCommands
+from core.adb.command import AdbCommands
+from core.adb.parser import ADBCommandParser
 from core.entrypoint import ModelEntrypoint
 from core.signals import CoreSignal, CoreSignals
 

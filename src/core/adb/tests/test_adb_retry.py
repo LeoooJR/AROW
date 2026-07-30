@@ -18,11 +18,13 @@ from core.adb.command import (
     AdbCommandResult,
     AdbCommandResultStatus,
     AdbCommands,
+)
+from core.adb.exceptions import AdbClientException, AdbServerException
+from core.adb.retry import (
     _AdbRetryProfile,
     _is_retryable_adb_exception,
     retry_profile_for,
 )
-from core.adb.exceptions import AdbClientException, AdbServerException
 from core.adb.server import AdbServer
 from core.devices.phone import Phone, PhoneRepository
 
@@ -49,7 +51,7 @@ def _fast_profile(command: AdbCommand, *, scope: str) -> _AdbRetryProfile:
 def adb_client(monkeypatch: pytest.MonkeyPatch) -> AdbClient:
     """AdbClient with a dummy binary path and fast retry profile."""
     monkeypatch.setattr(
-        "core.adb.client.retry_profile_for",
+        "core.adb.retry.retry_profile_for",
         _fast_profile,
     )
     client = AdbClient(AdbBinary(path=Path("/mock/adb")))
@@ -60,7 +62,7 @@ def adb_client(monkeypatch: pytest.MonkeyPatch) -> AdbClient:
 def adb_server(monkeypatch: pytest.MonkeyPatch) -> AdbServer:
     """AdbServer built without __init__ side effects and fast retry profile."""
     monkeypatch.setattr(
-        "core.adb.server.retry_profile_for",
+        "core.adb.retry.retry_profile_for",
         _fast_profile,
     )
     server = object.__new__(AdbServer)
@@ -118,6 +120,31 @@ class TestIsRetryableAdbException:
 class TestAdbClientExecuteRetry:
     """Retry integration for AdbClient._execute via monkeypatched subprocess.run."""
 
+    def test_targeted_success_does_not_probe_devices(
+        self, adb_client: AdbClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        calls: list[list[str]] = []
+
+        def fake_run(
+            argv: list[str],
+            capture_output: bool,
+            text: bool,
+            timeout: float,
+        ) -> subprocess.CompletedProcess[str]:
+            calls.append(argv)
+            return _completed_process(argv, returncode=0, stdout="Pixel\n")
+
+        monkeypatch.setattr(subprocess, "run", fake_run)
+
+        result = adb_client._execute(
+            AdbCommands.GET_PRODUCT_MODEL.value,
+            Phone(id="abc123", state="device"),
+        )
+
+        assert result.status == AdbCommandResultStatus.SUCCESS
+        assert len(calls) == 1
+        assert calls[0][1:3] == ["-s", "abc123"]
+
     def test_transient_failure_retries_then_succeeds(
         self, adb_client: AdbClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
@@ -144,6 +171,194 @@ class TestAdbClientExecuteRetry:
         assert result.status == AdbCommandResultStatus.SUCCESS
         assert result.return_code == 0
         assert result.output == "ok\n"
+
+    def test_targeted_transient_exhaustion_probes_once_and_reports_state(
+        self, adb_client: AdbClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        calls: list[list[str]] = []
+
+        def fake_run(
+            argv: list[str],
+            capture_output: bool,
+            text: bool,
+            timeout: float,
+        ) -> subprocess.CompletedProcess[str]:
+            calls.append(argv)
+            if argv[1] == "devices":
+                return _completed_process(
+                    argv,
+                    returncode=0,
+                    stdout="List of devices attached\nabc123 offline\n",
+                )
+            return _completed_process(
+                argv,
+                returncode=1,
+                stderr="device offline",
+            )
+
+        monkeypatch.setattr(subprocess, "run", fake_run)
+
+        result = adb_client._execute(
+            AdbCommands.GET_PRODUCT_MODEL.value,
+            Phone(id="abc123", state="device"),
+        )
+
+        assert result.status == AdbCommandResultStatus.TRANSIENT_ERROR
+        assert len(calls) == 4
+        assert sum(argv[1] == "devices" for argv in calls) == 1
+        assert "device offline" in result.error
+        assert (
+            "target device remains listed by ADB with state 'offline'" in result.error
+        )
+        history_entries = list(adb_client.history.values())
+        assert [entry[0] for entry in history_entries] == [
+            AdbCommands.GET_DEVICES.value,
+            AdbCommands.GET_PRODUCT_MODEL.value,
+        ]
+        assert history_entries[-1][1] == result
+
+    def test_targeted_terminal_failure_probes_once_and_reports_state(
+        self, adb_client: AdbClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        calls: list[list[str]] = []
+
+        def fake_run(
+            argv: list[str],
+            capture_output: bool,
+            text: bool,
+            timeout: float,
+        ) -> subprocess.CompletedProcess[str]:
+            calls.append(argv)
+            if argv[1] == "devices":
+                return _completed_process(
+                    argv,
+                    returncode=0,
+                    stdout="List of devices attached\nabc123 unauthorized\n",
+                )
+            return _completed_process(
+                argv,
+                returncode=1,
+                stderr="permission denied",
+            )
+
+        monkeypatch.setattr(subprocess, "run", fake_run)
+
+        result = adb_client._execute(
+            AdbCommands.SEND_NOTIFICATION.value,
+            Phone(id="abc123", state="device"),
+            ["-t", "Title", "-m", "Message"],
+        )
+
+        assert result.status == AdbCommandResultStatus.ERROR
+        assert len(calls) == 2
+        assert "permission denied" in result.error
+        assert (
+            "target device remains listed by ADB with state 'unauthorized'"
+            in result.error
+        )
+
+    def test_public_client_exception_includes_device_diagnostic(
+        self, adb_client: AdbClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def fake_run(
+            argv: list[str],
+            capture_output: bool,
+            text: bool,
+            timeout: float,
+        ) -> subprocess.CompletedProcess[str]:
+            if argv[1] == "devices":
+                return _completed_process(
+                    argv,
+                    returncode=0,
+                    stdout="List of devices attached\nabc123 unauthorized\n",
+                )
+            return _completed_process(
+                argv,
+                returncode=1,
+                stderr="permission denied",
+            )
+
+        monkeypatch.setattr(subprocess, "run", fake_run)
+
+        with pytest.raises(
+            AdbClientException,
+            match="target device remains listed by ADB with state 'unauthorized'",
+        ):
+            adb_client.status(Phone(id="abc123", state="device"))
+
+    def test_targeted_failure_reports_device_is_no_longer_listed(
+        self, adb_client: AdbClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def fake_run(
+            argv: list[str],
+            capture_output: bool,
+            text: bool,
+            timeout: float,
+        ) -> subprocess.CompletedProcess[str]:
+            if argv[1] == "devices":
+                return _completed_process(
+                    argv,
+                    returncode=0,
+                    stdout=(
+                        "List of devices attached\n"
+                        "another-device device product:x model:y device:z "
+                        "transport_id:1\n"
+                    ),
+                )
+            return _completed_process(
+                argv,
+                returncode=1,
+                stderr="permission denied",
+            )
+
+        monkeypatch.setattr(subprocess, "run", fake_run)
+
+        result = adb_client._execute(
+            AdbCommands.GET_PRODUCT_MODEL.value,
+            Phone(id="abc123", state="device"),
+        )
+
+        assert "target device is no longer listed by ADB" in result.error
+        assert "another-device" not in result.error
+
+    def test_failed_device_probe_does_not_mask_original_failure(
+        self, adb_client: AdbClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        calls: list[list[str]] = []
+
+        def fake_run(
+            argv: list[str],
+            capture_output: bool,
+            text: bool,
+            timeout: float,
+        ) -> subprocess.CompletedProcess[str]:
+            calls.append(argv)
+            if argv[1] == "devices":
+                return _completed_process(
+                    argv,
+                    returncode=1,
+                    stderr="unauthorized",
+                )
+            return _completed_process(
+                argv,
+                returncode=1,
+                stderr="permission denied",
+            )
+
+        monkeypatch.setattr(subprocess, "run", fake_run)
+
+        result = adb_client._execute(
+            AdbCommands.GET_PRODUCT_MODEL.value,
+            Phone(id="abc123", state="device"),
+        )
+
+        assert len(calls) == 2
+        assert result.status == AdbCommandResultStatus.ERROR
+        assert result.error.startswith("permission denied")
+        assert (
+            "target device reference could not be determined "
+            "(ADB device-list check returned ERROR)" in result.error
+        )
 
     def test_permanent_failure_is_not_retried(
         self, adb_client: AdbClient, monkeypatch: pytest.MonkeyPatch
@@ -187,6 +402,35 @@ class TestAdbClientExecuteRetry:
         with pytest.raises(AdbClientException, match="Failed to run ADB binary"):
             adb_client._execute(AdbCommands.GET_DEVICES.value)
         assert calls["count"] == 1
+
+    def test_targeted_oserror_preserves_exception_chain_after_failed_probe(
+        self, adb_client: AdbClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        calls = {"count": 0}
+
+        def fake_run(
+            argv: list[str],
+            capture_output: bool,
+            text: bool,
+            timeout: float,
+        ) -> subprocess.CompletedProcess[str]:
+            calls["count"] += 1
+            raise OSError("No such file or directory")
+
+        monkeypatch.setattr(subprocess, "run", fake_run)
+
+        with pytest.raises(AdbClientException) as exc_info:
+            adb_client._execute(
+                AdbCommands.GET_PRODUCT_MODEL.value,
+                Phone(id="abc123", state="device"),
+            )
+
+        assert calls["count"] == 2
+        assert "Failed to run ADB binary" in str(exc_info.value)
+        assert "target device reference could not be determined" in str(exc_info.value)
+        original_error = exc_info.value.__cause__
+        assert isinstance(original_error, AdbClientException)
+        assert isinstance(original_error.__cause__, OSError)
 
     def test_timeout_is_retried_then_reraises(
         self, adb_client: AdbClient, monkeypatch: pytest.MonkeyPatch

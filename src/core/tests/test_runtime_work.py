@@ -11,6 +11,7 @@ from core.work.authentificate_device_work import (
     AuthentificateDeviceOutcome,
     DeviceAuthentificationError,
 )
+from core.work.refresh_known_devices_work import RefreshKnownDevicesError
 
 pytestmark = [pytest.mark.async_jobs]
 
@@ -40,6 +41,15 @@ class TestModelEntrypoint:
         assert exc_info.value.reason == "ADB runtime preflight failed"
         assert exc_info.value.ip == "192.168.1.10"
         assert exc_info.value.port == 37777
+
+    def test_refresh_known_devices_missing_runtime_uses_work_preflight(self) -> None:
+        model_entrypoint = ModelEntrypoint()
+
+        with pytest.raises(
+            RefreshKnownDevicesError,
+            match="must be initialized and healthy before refreshing devices",
+        ):
+            model_entrypoint.refresh_known_devices()
 
     @patch("core.entrypoint.AuthenticateDeviceWork")
     def test_authentificate_device_delegates_duplicate_endpoint_to_work(
