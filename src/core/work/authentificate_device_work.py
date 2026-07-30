@@ -21,7 +21,7 @@ from core.signals import (
     DeviceAuthentificationSucceededPayload,
 )
 from core.work.core_runtime_work import CoreRuntimeWork, CoreRuntimeWorkOutcome
-from core.work.helper import preflight
+from core.work.helper import device_endpoint_is_paired, preflight
 from core.work.refresh_known_devices_work import enrich_phones_with_adb_shell_properties
 from logger import logger
 
@@ -111,16 +111,22 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
                 association_code="",
                 reason="ADB runtime preflight failed",
             )
+        reason = (
+            "Device with this IP address and port is already paired"
+            if device_endpoint_is_paired(work)
+            else "ADB runtime preflight failed"
+        )
         return DeviceAuthentificationError(
             ip=work.ip,
             port=work.port,
             association_code=work.association_code,
-            reason="ADB runtime preflight failed",
+            reason=reason,
         )
 
     @preflight(
         check_server_started=True,
         check_client_created=True,
+        check_device_not_paired=True,
         check_network_available=True,
         check_mdns_available=True,
         error_to_raise=_preflight_error,

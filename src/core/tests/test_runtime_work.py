@@ -9,7 +9,6 @@ from core.devices.phone import Phone
 from core.entrypoint import ModelEntrypoint
 from core.work.authentificate_device_work import (
     AuthentificateDeviceOutcome,
-    DeviceAuthentificationError,
 )
 
 pytestmark = [pytest.mark.async_jobs]
@@ -25,13 +24,10 @@ class TestModelEntrypoint:
             model_entrypoint.authentificate_device("127.0.0.1", 5555, "123456")
 
     @patch("core.entrypoint.AuthenticateDeviceWork")
-    def test_authentificate_device_skips_work_when_ip_already_paired(
+    def test_authentificate_device_delegates_duplicate_endpoint_to_work(
         self, mock_work_cls: MagicMock
     ) -> None:
-        """
-        :meth:`ModelEntrypoint.authentificate_device` must not start a new pair attempt
-        when ``paired_devices`` already contains a handset with the same IP.
-        """
+        """Duplicate endpoint rejection belongs to AuthenticateDeviceWork preflight."""
         state = MockAdbState(seed=11, initial_devices=0)
         server = MockAdbServer(state=state)
         client = MockAdbClient(state=state)
@@ -44,15 +40,19 @@ class TestModelEntrypoint:
         model_entrypoint = ModelEntrypoint()
         model_entrypoint._adb_server = server
         model_entrypoint._adb_client = client
-        with pytest.raises(DeviceAuthentificationError) as exc_info:
-            model_entrypoint.authentificate_device(duplicate_ip, port, code)
+        expected_outcome = AuthentificateDeviceOutcome(success_phone=Phone(id="unused"))
+        mock_work_cls.return_value.run.return_value = expected_outcome
 
-        mock_work_cls.assert_not_called()
-        error = exc_info.value
-        assert error.ip == duplicate_ip
-        assert error.port == port
-        assert error.association_code == code
-        assert error.reason == "Device with this IP address is already paired"
+        outcome = model_entrypoint.authentificate_device(duplicate_ip, port, code)
+
+        mock_work_cls.assert_called_once_with(
+            adb_server=server,
+            adb_client=client,
+            ip=duplicate_ip,
+            port=port,
+            association_code=code,
+        )
+        assert outcome is expected_outcome
 
     @patch("core.entrypoint.AuthenticateDeviceWork")
     def test_authentificate_device_delegates_to_work_when_ip_not_paired(
