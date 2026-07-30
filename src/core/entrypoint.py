@@ -265,14 +265,6 @@ class ModelEntrypoint(Entrypoint):
             raise AttributeError(
                 "ADB server and client must be initialized before authentification"
             )
-        self._host.refresh_network_identity()
-        if not self._host.network_available:
-            raise DeviceAuthentificationError(
-                ip=ip,
-                port=port,
-                association_code=association_code,
-                reason="Host network is unavailable",
-            )
         # Check if a device with this IP address on the current ADB server is already paired
         for device in self._adb_server.paired_devices:
             if device.ip == ip:
@@ -398,6 +390,7 @@ class ModelEntrypoint(Entrypoint):
                 if (
                     paired.id == discovered.id
                     and paired.state == discovered.state
+                    and paired.connectivity_type == discovered.connectivity_type
                     and paired == discovered
                 ):
                     # If no property changed, skip.

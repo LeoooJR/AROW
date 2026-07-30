@@ -57,6 +57,7 @@ def server(adb_binary: AdbBinary) -> AdbServer:
     server._history = OrderedDict()
     server.paired_devices = PhoneRepository()
     server._mdns_available = False
+    server._network_available = False
     return server
 
 
@@ -86,16 +87,31 @@ class TestAdbServerStartSuccess:
             self._mdns_available = True
             return self._mdns_available
 
+        def fake_refresh_network_availability(self: AdbServer) -> bool:
+            calls.append("refresh_network_availability")
+            self._network_available = True
+            return self._network_available
+
         monkeypatch.setattr(AdbServer, "start", fake_start)
         monkeypatch.setattr(
             AdbServer,
             "refresh_mdns_availability",
             fake_refresh_mdns_availability,
         )
+        monkeypatch.setattr(
+            AdbServer,
+            "refresh_network_availability",
+            fake_refresh_network_availability,
+        )
         server = AdbServer(adb_binary)
         assert server.binary == adb_binary
-        assert calls == ["start", "refresh_mdns_availability"]
+        assert calls == [
+            "start",
+            "refresh_mdns_availability",
+            "refresh_network_availability",
+        ]
         assert server.mdns_available is True
+        assert server.network_available is True
 
     def test_server_start_adds_known_devices(
         self, server: AdbServer, monkeypatch: pytest.MonkeyPatch
@@ -170,6 +186,29 @@ class TestAdbServerStartSuccess:
 
         assert server.refresh_mdns_availability() is False
         assert server.mdns_available is False
+
+    def test_refresh_network_availability_updates_cached_property(
+        self, server: AdbServer, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            "core.adb.server.resolve_network_identity",
+            lambda: ("192.168.1.10", True),
+        )
+
+        assert server.refresh_network_availability() is True
+        assert server.network_available is True
+
+    def test_refresh_network_availability_clears_previous_state(
+        self, server: AdbServer, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        server._network_available = True
+        monkeypatch.setattr(
+            "core.adb.server.resolve_network_identity",
+            lambda: ("127.0.0.1", False),
+        )
+
+        assert server.refresh_network_availability() is False
+        assert server.network_available is False
 
 
 class TestAdbServerHealthProbe:

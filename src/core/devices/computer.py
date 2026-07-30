@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import datetime
 import platform
-import socket
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -12,7 +11,7 @@ from loguru import logger
 
 from core.collection import Repository
 from core.devices.base import Device, DeviceDescriptor
-from core.network import is_non_loopback_ipv4
+from core.network import is_non_loopback_ipv4, resolve_network_identity
 
 _STABLE_PC_INSTALL_PREFIX = "pc:v1:install:"
 
@@ -137,21 +136,7 @@ class Computer(Device[ComputerDescriptor]):
         )
 
     def _resolve_network_identity(self) -> tuple[str, bool]:
-        try:
-            ip = socket.gethostbyname(socket.gethostname())
-            if is_non_loopback_ipv4(ip):
-                return ip, True
-        except OSError:
-            pass
-        try:
-            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-                sock.connect(("8.8.8.8", 80))
-                ip = sock.getsockname()[0]
-            if is_non_loopback_ipv4(ip):
-                return ip, True
-        except OSError:
-            pass
-        return "127.0.0.1", False
+        return resolve_network_identity()
 
 
 class ComputerRepository(Repository[Computer]):

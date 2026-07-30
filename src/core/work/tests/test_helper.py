@@ -53,6 +53,7 @@ class _FakeWork:
     @preflight(
         check_server_started=True,
         check_client_created=True,
+        check_network_available=True,
         check_mdns_available=True,
         error_to_raise=lambda self: RuntimeError("mdns preflight failed"),
     )
@@ -61,10 +62,11 @@ class _FakeWork:
         return _FakeOutcome()
 
 
-def _healthy_server(*, mdns: bool = True) -> MagicMock:
+def _healthy_server(*, mdns: bool = True, network: bool = True) -> MagicMock:
     server = MagicMock()
     server.is_server_running.return_value = True
     server.refresh_mdns_availability.return_value = mdns
+    server.refresh_network_availability.return_value = network
     return server
 
 
@@ -101,6 +103,15 @@ def test_preflight_missing_client_blocks_body() -> None:
     assert work.body_calls == 0
 
 
+def test_preflight_network_check_requires_server() -> None:
+    work = _FakeWork(server=None, client=_healthy_client())
+
+    with pytest.raises(RuntimeError, match="mdns preflight failed"):
+        work.run_full_preflight()
+
+    assert work.body_calls == 0
+
+
 def test_preflight_mdns_failure_blocks_body() -> None:
     work = _FakeWork(
         server=_healthy_server(mdns=False),
@@ -111,6 +122,18 @@ def test_preflight_mdns_failure_blocks_body() -> None:
         work.run_full_preflight()
 
     assert work.body_calls == 0
+
+
+def test_preflight_network_failure_blocks_body_before_mdns() -> None:
+    server = _healthy_server(network=False)
+    work = _FakeWork(server=server, client=_healthy_client())
+
+    with pytest.raises(RuntimeError, match="mdns preflight failed"):
+        work.run_full_preflight()
+
+    assert work.body_calls == 0
+    server.refresh_network_availability.assert_called_once()
+    server.refresh_mdns_availability.assert_not_called()
 
 
 def test_preflight_passes_before_body_when_all_checks_succeed() -> None:
@@ -125,4 +148,5 @@ def test_preflight_passes_before_body_when_all_checks_succeed() -> None:
     assert outcome.value == "ok"
     assert work.body_calls == 1
     server.is_server_running.assert_called_once()
+    server.refresh_network_availability.assert_called_once()
     server.refresh_mdns_availability.assert_called_once()

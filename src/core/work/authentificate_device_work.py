@@ -121,6 +121,7 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
     @preflight(
         check_server_started=True,
         check_client_created=True,
+        check_network_available=True,
         check_mdns_available=True,
         error_to_raise=_preflight_error,
     )

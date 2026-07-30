@@ -62,6 +62,34 @@ def test_authenticate_work_preflight_blocks_before_validation(
     assert exc_info.value.reason == "ADB runtime preflight failed"
 
 
+def test_authenticate_work_network_preflight_blocks_before_validation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    state = MockAdbState(seed=405, initial_devices=0)
+    server = MockAdbServer(state=state)
+    client = MockAdbClient(state=state)
+    monkeypatch.setattr(server, "refresh_network_availability", lambda: False)
+    pair_calls: list[None] = []
+
+    def pair(*_args: object) -> object:
+        pair_calls.append(None)
+        raise AssertionError("pair should not run")
+
+    monkeypatch.setattr(client, "pair", pair)
+
+    with pytest.raises(DeviceAuthentificationError) as exc_info:
+        AuthenticateDeviceWork(
+            adb_server=server,
+            adb_client=client,
+            ip="999.168.1.1",
+            port=37777,
+            association_code="123456",
+        ).run()
+
+    assert exc_info.value.reason == "ADB runtime preflight failed"
+    assert pair_calls == []
+
+
 def test_close_work_preflight_blocks_before_stop(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

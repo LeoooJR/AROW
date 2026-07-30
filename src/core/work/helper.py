@@ -55,6 +55,13 @@ def _server_mdns_available(server: object) -> bool:
     return bool(refresh())
 
 
+def _server_network_available(server: object) -> bool:
+    refresh = getattr(server, "refresh_network_availability", None)
+    if not callable(refresh):
+        return False
+    return bool(refresh())
+
+
 def _raise_preflight_error(
     work: object,
     error_to_raise: BaseException | PreflightErrorFactory | None,
@@ -70,6 +77,7 @@ def preflight(
     *,
     check_server_started: bool = False,
     check_client_created: bool = False,
+    check_network_available: bool = False,
     check_mdns_available: bool = False,
     error_to_raise: BaseException | PreflightErrorFactory | None = None,
 ) -> Callable[[Callable[..., TOutcome]], Callable[..., TOutcome]]:
@@ -87,7 +95,7 @@ def preflight(
         def wrapper(self: object, *args: Any, **kwargs: Any) -> TOutcome:
             server: object | None = None
 
-            if check_server_started or check_mdns_available:
+            if check_server_started or check_network_available or check_mdns_available:
                 server = _resolve_server(self)
                 if server is None:
                     logger.warning(
@@ -109,6 +117,14 @@ def preflight(
                 if client is None or not _validate_client_usable(client):
                     logger.warning(
                         "Work preflight failed because the ADB client is unavailable",
+                        work_type=type(self).__name__,
+                    )
+                    _raise_preflight_error(self, error_to_raise)
+
+            if check_network_available and server is not None:
+                if not _server_network_available(server):
+                    logger.warning(
+                        "Work preflight failed because the host network is unavailable",
                         work_type=type(self).__name__,
                     )
                     _raise_preflight_error(self, error_to_raise)

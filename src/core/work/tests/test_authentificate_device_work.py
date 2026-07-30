@@ -68,6 +68,9 @@ class FakeAdbServer:
     def refresh_mdns_availability(self) -> bool:
         return True
 
+    def refresh_network_availability(self) -> bool:
+        return True
+
 
 class RestartCountingMockAdbServer(MockAdbServer):
     """Mock server variant that records lifecycle retries."""

@@ -54,10 +54,9 @@ class TestComputer:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setattr(
-            computer_devices.socket, "gethostname", lambda: "workstation"
-        )
-        monkeypatch.setattr(
-            computer_devices.socket, "gethostbyname", lambda _hostname: "192.168.1.10"
+            computer_devices,
+            "resolve_network_identity",
+            lambda: ("192.168.1.10", True),
         )
 
         computer = Computer(id="host-1")
@@ -68,29 +67,10 @@ class TestComputer:
     def test_computer_udp_route_probe_used_after_loopback_hostname(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        class FakeSocket:
-            def __enter__(self) -> "FakeSocket":
-                return self
-
-            def __exit__(self, *args: object) -> None:
-                return None
-
-            def connect(self, _address: tuple[str, int]) -> None:
-                return None
-
-            def getsockname(self) -> tuple[str, int]:
-                return ("10.0.0.42", 54321)
-
         monkeypatch.setattr(
-            computer_devices.socket, "gethostname", lambda: "workstation"
-        )
-        monkeypatch.setattr(
-            computer_devices.socket, "gethostbyname", lambda _hostname: "127.0.0.1"
-        )
-        monkeypatch.setattr(
-            computer_devices.socket,
-            "socket",
-            lambda _family, _type: FakeSocket(),
+            computer_devices,
+            "resolve_network_identity",
+            lambda: ("10.0.0.42", True),
         )
 
         computer = Computer(id="host-1")
@@ -101,28 +81,10 @@ class TestComputer:
     def test_computer_network_resolution_fallback_marks_unavailable(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        class FailingSocket:
-            def __enter__(self) -> "FailingSocket":
-                return self
-
-            def __exit__(self, *args: object) -> None:
-                return None
-
-            def connect(self, _address: tuple[str, int]) -> None:
-                raise OSError("no route")
-
         monkeypatch.setattr(
-            computer_devices.socket, "gethostname", lambda: "workstation"
-        )
-        monkeypatch.setattr(
-            computer_devices.socket,
-            "gethostbyname",
-            lambda _hostname: (_ for _ in ()).throw(OSError("lookup failed")),
-        )
-        monkeypatch.setattr(
-            computer_devices.socket,
-            "socket",
-            lambda _family, _type: FailingSocket(),
+            computer_devices,
+            "resolve_network_identity",
+            lambda: ("127.0.0.1", False),
         )
 
         computer = Computer(id="host-1")

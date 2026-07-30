@@ -166,6 +166,31 @@ def test_reconcile_noop_when_discovery_matches_paired(tmp_path: Path) -> None:
     assert server.paired_devices.get("device-1") is paired
 
 
+def test_reconcile_updates_connectivity_without_changing_stable_identity(
+    tmp_path: Path,
+) -> None:
+    model_entrypoint, server = _model_with_server(tmp_path)
+    paired = Phone(
+        id="device-1",
+        state="device",
+        model="Pixel",
+        connectivity_type="usb",
+    )
+    server.paired_devices.add(paired)
+    discovered = Phone(
+        id="device-1",
+        state="device",
+        model="Pixel",
+        connectivity_type="wifi",
+    )
+
+    result = model_entrypoint.reconcile_paired_devices([discovered])
+
+    assert result.changed is True
+    assert paired.connectivity_type == "wifi"
+    assert server.paired_devices.get("device-1") is paired
+
+
 def test_reconcile_preserves_simulation_reference_on_in_place_update(
     tmp_path: Path,
 ) -> None:

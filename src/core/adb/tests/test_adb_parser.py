@@ -65,6 +65,7 @@ def test_get_devices_parser_returns_phone() -> None:
     assert "ALT_NX1" in p.descriptor.model
     assert p.descriptor.name == "ALT_NX1"
     assert p.descriptor.device == "HNALT-Q1"
+    assert p.connectivity_type == "wifi"
 
 
 def test_parse_devices_line_success() -> None:
@@ -84,6 +85,21 @@ abc123 device product:model model:pixel device:Pixel transport_id:1
     assert p.descriptor.state == "device"
     assert p.descriptor.transport_id == "1"
     assert p.stable_key == ""
+    assert p.connectivity_type == "usb"
+
+
+def test_parse_devices_preserves_direct_tcp_endpoint() -> None:
+    blob = """List of devices attached
+192.168.1.20:5555 device product:model model:pixel device:Pixel transport_id:1
+"""
+    phones = ADBCommandParser.GET_DEVICES.parse(blob)
+
+    assert len(phones) == 1
+    phone = phones[0]
+    assert phone.id == "192.168.1.20:5555"
+    assert phone.ip == "192.168.1.20"
+    assert phone.port == 5555
+    assert phone.connectivity_type == "wifi"
 
 
 def test_parse_devices_emulator_line() -> None:
@@ -236,6 +252,7 @@ def test_parse_pair_success_builds_phone() -> None:
     assert phone.descriptor.ip == "10.0.0.42"
     assert phone.descriptor.port == 37125
     assert phone.descriptor.state == "device"
+    assert phone.connectivity_type == "wifi"
 
 
 @pytest.mark.parametrize(
