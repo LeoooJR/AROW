@@ -20,8 +20,7 @@ sequenceDiagram
     View->>Controller: AuthentificationConfirmed(ip, port, code)
     Controller->>Runner: submit authentification_workflow<br/>thread, latest wins
     Runner->>Entrypoint: authentificate_device(...) in worker thread
-    Entrypoint->>Entrypoint: require ADB runtime
-    Entrypoint->>Work: construct(runtime and inputs) and run()
+    Entrypoint->>Work: construct(current runtime references and inputs) and run()
     Work->>Work: preflight unpaired IP/port, server, client, host network, and mDNS
     Work->>Work: validate input, pair, and enrich phone
     opt ADB protocol fault

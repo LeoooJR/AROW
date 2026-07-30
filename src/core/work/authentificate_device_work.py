@@ -90,14 +90,14 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
 
     def __init__(
         self,
-        adb_server: AdbServer,
-        adb_client: AdbClient,
+        adb_server: AdbServer | None,
+        adb_client: AdbClient | None,
         ip: str,
         port: int,
         association_code: str,
     ) -> None:
-        self.adb_server: AdbServer = adb_server
-        self.adb_client: AdbClient = adb_client
+        self.adb_server: AdbServer | None = adb_server
+        self.adb_client: AdbClient | None = adb_client
         self.ip: str = ip
         self.port: int = port
         self.association_code: str = association_code
@@ -152,8 +152,8 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
             Exception: Any unexpected failure outside the documented pairing path
             propagates to AsyncRunner.
         """
-        adb_server = self.adb_server
-        adb_client = self.adb_client
+        adb_server = cast(AdbServer, self.adb_server)
+        adb_client = cast(AdbClient, self.adb_client)
         ip, port, association_code = self.ip, self.port, self.association_code
         validation_failure = PairingInputValidator.validate(ip, port, association_code)
         if validation_failure is not None:

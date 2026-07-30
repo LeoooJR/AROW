@@ -261,10 +261,6 @@ class ModelEntrypoint(Entrypoint):
         :class:`~core.work.authentificate_device_work.DeviceAuthentificationError`
         so AsyncRunner invokes the job ``on_failed`` callback.
         """
-        if self._adb_server is None or self._adb_client is None:
-            raise AttributeError(
-                "ADB server and client must be initialized before authentification"
-            )
         return AuthenticateDeviceWork(
             adb_server=self._adb_server,
             adb_client=self._adb_client,
@@ -278,10 +274,6 @@ class ModelEntrypoint(Entrypoint):
         List devices from the bound server and enrich ``ro.serialno`` via ADB.
         Blocking; intended for AsyncRunner / worker-thread use only.
         """
-        if self._adb_server is None or self._adb_client is None:
-            raise AttributeError(
-                "ADB server and client must be initialized before refreshing devices"
-            )
         return RefreshKnownDevicesWork(self._adb_server, self._adb_client).run()
 
     def run_host_install_identity(self) -> HostInstallIdentityOutcome:

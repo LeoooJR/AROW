@@ -9,6 +9,7 @@ from core.devices.phone import Phone
 from core.entrypoint import ModelEntrypoint
 from core.work.authentificate_device_work import (
     AuthentificateDeviceOutcome,
+    DeviceAuthentificationError,
 )
 
 pytestmark = [pytest.mark.async_jobs]
@@ -16,12 +17,29 @@ pytestmark = [pytest.mark.async_jobs]
 
 class TestModelEntrypoint:
     def test_authentificate_device_requires_initialized_adb(self) -> None:
-        """Pairing is rejected until startup has bound server and client on the entrypoint."""
+        """Missing runtime references are rejected by AuthenticateDeviceWork preflight."""
         model_entrypoint = ModelEntrypoint()
-        with pytest.raises(
-            AttributeError, match="must be initialized before authentification"
-        ):
+
+        with pytest.raises(DeviceAuthentificationError) as exc_info:
             model_entrypoint.authentificate_device("127.0.0.1", 5555, "123456")
+
+        assert exc_info.value.reason == "ADB runtime preflight failed"
+        assert exc_info.value.ip == "127.0.0.1"
+        assert exc_info.value.port == 5555
+        assert exc_info.value.association_code == "123456"
+
+    def test_authentificate_device_missing_client_uses_work_preflight(self) -> None:
+        state = MockAdbState(seed=10, initial_devices=0)
+        model_entrypoint = ModelEntrypoint()
+        model_entrypoint._adb_server = MockAdbServer(state=state)
+        model_entrypoint._adb_client = None
+
+        with pytest.raises(DeviceAuthentificationError) as exc_info:
+            model_entrypoint.authentificate_device("192.168.1.10", 37777, "123456")
+
+        assert exc_info.value.reason == "ADB runtime preflight failed"
+        assert exc_info.value.ip == "192.168.1.10"
+        assert exc_info.value.port == 37777
 
     @patch("core.entrypoint.AuthenticateDeviceWork")
     def test_authentificate_device_delegates_duplicate_endpoint_to_work(
