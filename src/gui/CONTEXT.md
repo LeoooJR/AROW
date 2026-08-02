@@ -43,4 +43,4 @@ Versions remain in `pyproject.toml`.
 - Parent context: [`../CONTEXT.md`](../CONTEXT.md).
 - Design system: [`../../DESIGN.md`](../../DESIGN.md).
 - Signal flows:
-  [`../HOW_TO_controller_and_signals.md`](../HOW_TO_controller_and_signals.md).
+  [`../../docs/HOW_TO_controller_and_signals.md`](../../docs/HOW_TO_controller_and_signals.md).

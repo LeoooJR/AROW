@@ -1,7 +1,7 @@
 # Close core runtime async flow
 
 Companion to [`close_work.py`](close_work.py). For shared runner and dispatch
-conventions, see [`HOW_TO_async_jobs.md`](../../HOW_TO_async_jobs.md).
+conventions, see [`HOW_TO_async_jobs.md`](../../../docs/HOW_TO_async_jobs.md).
 
 **Job:** `close_core_runtime` | **Pool:** thread | **Coalesce key:** `close`
 

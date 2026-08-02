@@ -33,6 +33,6 @@ Versions remain in `pyproject.toml`.
 - Run targeted tests under `src/controller/tests` plus the affected domain or
   orchestration tests. Cross-layer changes require `uv run pytest`.
 - Parent context: [`../CONTEXT.md`](../CONTEXT.md).
-- Async work contract: [`../HOW_TO_async_jobs.md`](../HOW_TO_async_jobs.md).
+- Async work contract: [`../../docs/HOW_TO_async_jobs.md`](../../docs/HOW_TO_async_jobs.md).
 - Signal and controller flows:
-  [`../HOW_TO_controller_and_signals.md`](../HOW_TO_controller_and_signals.md).
+  [`../../docs/HOW_TO_controller_and_signals.md`](../../docs/HOW_TO_controller_and_signals.md).

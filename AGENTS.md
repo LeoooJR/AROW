@@ -67,7 +67,7 @@ integration test.
 - Never pair, connect to, disconnect, start or stop spoofing on, or otherwise
   alter a real device unless the user explicitly requests that operation.
 - Default development and automated verification to `MockAdb` and the mock launch
-  documented in `HOW_TO_mock_adb.md`.
+  documented in `docs/HOW_TO_mock_adb.md`.
 - Never expose pairing codes, credentials, or other sensitive device data.
 - Package-specific ADB and device constraints live in
   `src/core/adb/CONTEXT.md` and `src/core/devices/CONTEXT.md`.
@@ -108,8 +108,9 @@ This repository uses two long-lived branches:
 
 - Application architecture and launch modes: `README.md`
 - GUI design and screenshot workflow: `DESIGN.md`
-- Async jobs and result application: `src/HOW_TO_async_jobs.md`
+- Async jobs and result application: `docs/HOW_TO_async_jobs.md`
 - Controller boundaries and signal flows:
-  `src/HOW_TO_controller_and_signals.md`
-- Simulation persistence: `src/HOW_TO_simulation_persistence.md`
-- Development without real ADB: `HOW_TO_mock_adb.md`
+  `docs/HOW_TO_controller_and_signals.md`
+- Simulation persistence: `docs/HOW_TO_simulation_persistence.md`
+- Desktop and mobile communication contract: `docs/HOW_TO_mobile_communication.md`
+- Development without real ADB: `docs/HOW_TO_mock_adb.md`

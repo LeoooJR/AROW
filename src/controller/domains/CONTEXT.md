@@ -31,6 +31,6 @@ Versions remain in `pyproject.toml`.
 - Run `uv run pytest src/controller/domains/tests` plus affected core-work tests.
 - Parent context: [`../CONTEXT.md`](../CONTEXT.md).
 - Controller and signal flows:
-  [`../../HOW_TO_controller_and_signals.md`](../../HOW_TO_controller_and_signals.md).
+  [`../../../docs/HOW_TO_controller_and_signals.md`](../../../docs/HOW_TO_controller_and_signals.md).
 - Simulation persistence:
-  [`../../HOW_TO_simulation_persistence.md`](../../HOW_TO_simulation_persistence.md).
+  [`../../../docs/HOW_TO_simulation_persistence.md`](../../../docs/HOW_TO_simulation_persistence.md).

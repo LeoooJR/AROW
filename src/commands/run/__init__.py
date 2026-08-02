@@ -15,13 +15,17 @@ def run(
     context: typer.Context,
     mock_adb: Annotated[
         bool,
-        typer.Option(help="Use faker-backed mock ADB (no real adb daemon or binary)."),
+        typer.Option(
+            help="Use faker-backed mock ADB (no real adb daemon or binary).",
+            rich_help_panel="ADB Options",
+        ),
     ] = False,
     json_logs: Annotated[
         bool,
         typer.Option(
             "--json-logs",
             help="Write machine-readable JSON Lines logs for runtime analysis.",
+            rich_help_panel="Logging Options",
         ),
     ] = False,
 ) -> None:

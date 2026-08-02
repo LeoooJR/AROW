@@ -29,4 +29,4 @@ Versions remain in `pyproject.toml`.
 - Run `uv run pytest src/controller/orchestration/tests src/controller/tests`.
 - Parent context: [`../CONTEXT.md`](../CONTEXT.md).
 - Controller and startup flows:
-  [`../../HOW_TO_controller_and_signals.md`](../../HOW_TO_controller_and_signals.md).
+  [`../../../docs/HOW_TO_controller_and_signals.md`](../../../docs/HOW_TO_controller_and_signals.md).

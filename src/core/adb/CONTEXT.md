@@ -34,4 +34,4 @@ Versions remain in `pyproject.toml`.
   controller tests.
 - Parent context: [`../CONTEXT.md`](../CONTEXT.md).
 - Mock development workflow:
-  [`../../../HOW_TO_mock_adb.md`](../../../HOW_TO_mock_adb.md).
+  [`../../../docs/HOW_TO_mock_adb.md`](../../../docs/HOW_TO_mock_adb.md).

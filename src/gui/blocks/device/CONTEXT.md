@@ -30,4 +30,4 @@ Versions remain in `pyproject.toml`.
   under `src/gui/tests`.
 - Parent rules: [`../CONTEXT.md`](../CONTEXT.md).
 - Signal flows:
-  [`../../../HOW_TO_controller_and_signals.md`](../../../HOW_TO_controller_and_signals.md).
+  [`../../../../docs/HOW_TO_controller_and_signals.md`](../../../../docs/HOW_TO_controller_and_signals.md).

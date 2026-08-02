@@ -34,4 +34,4 @@ Versions remain in `pyproject.toml`.
 - Parent context: [`../CONTEXT.md`](../CONTEXT.md).
 - Architecture: [`../../README.md`](../../README.md).
 - Simulation persistence:
-  [`../HOW_TO_simulation_persistence.md`](../HOW_TO_simulation_persistence.md).
+  [`../../docs/HOW_TO_simulation_persistence.md`](../../docs/HOW_TO_simulation_persistence.md).

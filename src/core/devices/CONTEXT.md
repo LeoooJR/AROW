@@ -31,4 +31,4 @@ Versions remain in `pyproject.toml`.
 - Run device tests discovered under `src/core` plus affected ADB, work, and
   controller tests.
 - Parent context: [`../CONTEXT.md`](../CONTEXT.md).
-- Mock ADB workflow: [`../../../HOW_TO_mock_adb.md`](../../../HOW_TO_mock_adb.md).
+- Mock ADB workflow: [`../../../docs/HOW_TO_mock_adb.md`](../../../docs/HOW_TO_mock_adb.md).
