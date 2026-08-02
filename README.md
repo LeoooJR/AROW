@@ -21,10 +21,12 @@ The main GUI entrypoint is `PYTHONPATH=src python -m main run gui`. The GUI comm
 
 ## Developer docs
 
-- [`src/HOW_TO_async_jobs.md`](src/HOW_TO_async_jobs.md) explains the async `CoreRuntimeWork` flow, result/failure dispatch, process-backed map rendering, and process-safe worker logging.
-- [`src/HOW_TO_controller_and_signals.md`](src/HOW_TO_controller_and_signals.md) explains the GUI signal categories, controller/subcontroller responsibilities, startup/shutdown orchestration, and the main user-driven flows.
-- [`src/HOW_TO_simulation_persistence.md`](src/HOW_TO_simulation_persistence.md) explains where simulation metadata lives on disk, when it is persisted, how startup restores it, and when stale state is deleted.
-- [`HOW_TO_mock_adb.md`](HOW_TO_mock_adb.md) explains how to run the app without a real ADB installation.
+- [`docs/HOW_TO_agent_design_workflow.md`](docs/HOW_TO_agent_design_workflow.md) explains the agent-oriented design workflow.
+- [`docs/HOW_TO_async_jobs.md`](docs/HOW_TO_async_jobs.md) explains the async `CoreRuntimeWork` flow, result/failure dispatch, process-backed map rendering, and process-safe worker logging.
+- [`docs/HOW_TO_controller_and_signals.md`](docs/HOW_TO_controller_and_signals.md) explains the GUI signal categories, controller/subcontroller responsibilities, startup/shutdown orchestration, and the main user-driven flows.
+- [`docs/HOW_TO_simulation_persistence.md`](docs/HOW_TO_simulation_persistence.md) explains where simulation metadata lives on disk, when it is persisted, how startup restores it, and when stale state is deleted.
+- [`docs/HOW_TO_mobile_communication.md`](docs/HOW_TO_mobile_communication.md) describes the desktop-to-mobile communication contract.
+- [`docs/HOW_TO_mock_adb.md`](docs/HOW_TO_mock_adb.md) explains how to run the app without a real ADB installation.
 
 ## Module context
 

@@ -33,6 +33,6 @@ Versions remain in `pyproject.toml`.
   controller tests.
 - Parent context: [`../CONTEXT.md`](../CONTEXT.md).
 - Complete async contract:
-  [`../../HOW_TO_async_jobs.md`](../../HOW_TO_async_jobs.md).
+  [`../../../docs/HOW_TO_async_jobs.md`](../../../docs/HOW_TO_async_jobs.md).
 - Persistence behavior:
-  [`../../HOW_TO_simulation_persistence.md`](../../HOW_TO_simulation_persistence.md).
+  [`../../../docs/HOW_TO_simulation_persistence.md`](../../../docs/HOW_TO_simulation_persistence.md).

@@ -1,7 +1,7 @@
 # Startup core runtime async flow
 
 Companion to [`startup_work.py`](startup_work.py). For shared runner and dispatch
-conventions, see [`HOW_TO_async_jobs.md`](../../HOW_TO_async_jobs.md).
+conventions, see [`HOW_TO_async_jobs.md`](../../../docs/HOW_TO_async_jobs.md).
 
 **Job:** `startup_core_runtime` | **Pool:** thread | **Coalesce key:** `startup`
 

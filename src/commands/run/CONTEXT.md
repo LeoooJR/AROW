@@ -27,4 +27,4 @@ Versions remain in `pyproject.toml`.
 
 - Run `uv run pytest src/commands/run/tests src/commands/tests`.
 - Parent context: [`../CONTEXT.md`](../CONTEXT.md).
-- Safe mock launch: [`../../../HOW_TO_mock_adb.md`](../../../HOW_TO_mock_adb.md).
+- Safe mock launch: [`../../../docs/HOW_TO_mock_adb.md`](../../../docs/HOW_TO_mock_adb.md).

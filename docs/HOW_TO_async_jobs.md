@@ -51,13 +51,13 @@ flowchart LR
 
 | Job origin | Entrypoint method | Work class | Outcome |
 |--------|------|------|------|
-| `startup_core_runtime` | `ModelEntrypoint.startup()` | [`StartupCoreRuntimeWork`](core/work/startup_work.md) | `StartupOutcome` |
-| `authentification_workflow` | `ModelEntrypoint.authentificate_device(...)` | [`AuthenticateDeviceWork`](core/work/authentificate_device_work.md) | `AuthentificateDeviceOutcome` |
-| `host_install_identity` | `ModelEntrypoint.run_host_install_identity()` | [`HostInstallIdentityWork`](core/work/host_install_identity_work.md) | `HostInstallIdentityOutcome` |
-| `refresh_device_list` | `ModelEntrypoint.refresh_known_devices()` | [`RefreshKnownDevicesWork`](core/work/refresh_known_devices_work.md) | `RefreshKnownDevicesOutcome` |
-| `close_core_runtime` | `ModelEntrypoint.close_core_runtime()` | [`CloseCoreRuntimeWork`](core/work/close_work.md) | `CloseOutcome` |
-| `render_map` | `ModelEntrypoint.render_map(simulation_id, application_dir)` | [`RenderMapWork`](core/work/render_map_work.md) | `RenderMapOutcome` |
-| `validate_simulation_marker_location` | `ModelEntrypoint.validate_simulation_marker_location(...)` | [`ValidateSimulationMarkerLocationWork`](core/work/validate_simulation_marker_location_work.md) | `ValidateSimulationMarkerLocationOutcome` |
+| `startup_core_runtime` | `ModelEntrypoint.startup()` | [`StartupCoreRuntimeWork`](../src/core/work/startup_work.md) | `StartupOutcome` |
+| `authentification_workflow` | `ModelEntrypoint.authentificate_device(...)` | [`AuthenticateDeviceWork`](../src/core/work/authentificate_device_work.md) | `AuthentificateDeviceOutcome` |
+| `host_install_identity` | `ModelEntrypoint.run_host_install_identity()` | [`HostInstallIdentityWork`](../src/core/work/host_install_identity_work.md) | `HostInstallIdentityOutcome` |
+| `refresh_device_list` | `ModelEntrypoint.refresh_known_devices()` | [`RefreshKnownDevicesWork`](../src/core/work/refresh_known_devices_work.md) | `RefreshKnownDevicesOutcome` |
+| `close_core_runtime` | `ModelEntrypoint.close_core_runtime()` | [`CloseCoreRuntimeWork`](../src/core/work/close_work.md) | `CloseOutcome` |
+| `render_map` | `ModelEntrypoint.render_map(simulation_id, application_dir)` | [`RenderMapWork`](../src/core/work/render_map_work.md) | `RenderMapOutcome` |
+| `validate_simulation_marker_location` | `ModelEntrypoint.validate_simulation_marker_location(...)` | [`ValidateSimulationMarkerLocationWork`](../src/core/work/validate_simulation_marker_location_work.md) | `ValidateSimulationMarkerLocationOutcome` |
 
 When you add a new core runtime job, keep this catalog in sync so result/failure dispatch stays auditable.
 
