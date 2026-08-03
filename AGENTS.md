@@ -2,8 +2,15 @@
 
 ## Project overview
 
-- AROW is a PySide6 desktop application that spoofs an Android phone's
-  coordinates through Android Debug Bridge (`ADB`).
+- AROW (Advanced Railway geOlocation Workflow) is a PySide6 desktop application
+  for railway-sector research and development. In one sentence, it is "Google
+  Maps for the railway world, with controlled GPS location simulation built
+  in."
+- The application lets users explore railway-specific geographic data, including
+  railways, stations, and milestones, and alter an Android phone's reported
+  location by sending controlled fake GPS coordinates through Android Debug
+  Bridge (`ADB`).
+- AROW desktop has a companion mobile application with which it exchanges data.
 - The application follows an MVC split:
   - Model and domain logic: `src/core/`
   - View: `src/gui/`
