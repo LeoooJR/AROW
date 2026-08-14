@@ -22,10 +22,25 @@ def gui(context: typer.Context) -> None:
         pass
 
     paths = APPLICATION_PATHS
-    setup_logger(
-        paths.application_log_file(),
-        serialize=run_options.serialize_logs,
+    default_log_path = paths.application_log_file()
+    log_path = (
+        default_log_path
+        if run_options.log_dir is None
+        else run_options.log_dir / default_log_path.name
     )
+    try:
+        setup_logger(
+            log_path,
+            serialize=run_options.serialize_logs,
+            allow_fallback=run_options.log_dir is None,
+        )
+    except OSError as exc:
+        if run_options.log_dir is None:
+            raise
+        raise typer.BadParameter(
+            f"cannot write application logs to {run_options.log_dir}: {exc}",
+            param_hint="--log-dir",
+        ) from exc
 
     qt_application = QtWidgets.QApplication.instance()
     if qt_application is None:

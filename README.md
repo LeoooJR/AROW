@@ -68,3 +68,14 @@ PID-specific `<run_identifier>.worker-<pid>.log` siblings. Analyze every file
 with the same run identifier prefix for a complete trace. Each record includes
 Loguru's timestamp, level, source, process, thread, exception, and structured
 `extra` fields, plus AROW's normalized `origin` and `log_schema_version` fields.
+
+### Write logs to an agent-readable directory
+
+```bash
+PYTHONPATH=src python -m main run --log-dir ./arow-logs --json-logs --mock-adb gui
+```
+
+`--log-dir` accepts an absolute, relative, or `~`-based directory and creates it
+when needed. The main log keeps its UUID4 filename and worker logs remain beside
+it. An explicitly requested directory must be writable; startup fails clearly
+instead of silently redirecting those logs to the temporary fallback directory.

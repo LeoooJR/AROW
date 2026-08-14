@@ -1,5 +1,6 @@
 """Run commands for the application."""
 
+from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -28,11 +29,22 @@ def run(
             rich_help_panel="Logging Options",
         ),
     ] = False,
+    log_dir: Annotated[
+        Path | None,
+        typer.Option(
+            "--log-dir",
+            help="Write application and worker logs to this directory.",
+            file_okay=False,
+            dir_okay=True,
+            rich_help_panel="Logging Options",
+        ),
+    ] = None,
 ) -> None:
     """Run AROW with the selected user interface."""
     context.obj = RunOptions(
         mock_adb=mock_adb,
         serialize_logs=json_logs,
+        log_dir=log_dir.expanduser().resolve(strict=False) if log_dir else None,
     )
 
     if context.invoked_subcommand is None:

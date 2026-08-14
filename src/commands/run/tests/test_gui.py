@@ -2,6 +2,7 @@
 
 import sys
 from collections.abc import Iterator
+from pathlib import Path
 from types import ModuleType
 from unittest.mock import Mock, call, patch
 
@@ -46,17 +47,31 @@ def gui_dependencies(monkeypatch: pytest.MonkeyPatch) -> Iterator[dict[str, Mock
 
 
 @pytest.mark.parametrize(
-    ("arguments", "use_mock_adb", "serialize_logs"),
+    ("arguments", "use_mock_adb", "serialize_logs", "log_dir"),
     [
-        (["run", "gui"], False, False),
-        (["run", "--mock-adb", "gui"], True, False),
-        (["run", "--json-logs", "gui"], False, True),
+        (["run", "gui"], False, False, None),
+        (["run", "--mock-adb", "gui"], True, False, None),
+        (["run", "--json-logs", "gui"], False, True, None),
+        (
+            [
+                "run",
+                "--log-dir",
+                "/sandbox/logs",
+                "--json-logs",
+                "--mock-adb",
+                "gui",
+            ],
+            True,
+            True,
+            Path("/sandbox/logs"),
+        ),
     ],
 )
 def test_gui_command_wires_application(
     arguments: list[str],
     use_mock_adb: bool,
     serialize_logs: bool,
+    log_dir: Path | None,
     gui_dependencies: dict[str, Mock],
 ) -> None:
     """The command configures Qt and wires the GUI to the model and controller."""
@@ -70,7 +85,8 @@ def test_gui_command_wires_application(
     lifecycle.attach_mock(gui_dependencies["register_bundled_fonts"], "fonts")
     lifecycle.attach_mock(gui_dependencies["MainWindow"], "window")
     paths = Mock(name="application_paths")
-    log_path = paths.application_log_file.return_value
+    log_path = Path("/default/logs/run-id.log")
+    paths.application_log_file.return_value = log_path
 
     with (
         patch("commands.run.gui.QtWidgets.QApplication", qapplication_type),
@@ -85,7 +101,12 @@ def test_gui_command_wires_application(
     qt_application.setApplicationName.assert_called_once_with(__application__)
     qt_application.setDesktopFileName.assert_called_once_with(__application__)
     qt_application.setApplicationVersion.assert_called_once_with(__version__)
-    setup_logger.assert_called_once_with(log_path, serialize=serialize_logs)
+    expected_log_path = log_path if log_dir is None else log_dir / log_path.name
+    setup_logger.assert_called_once_with(
+        expected_log_path,
+        serialize=serialize_logs,
+        allow_fallback=log_dir is None,
+    )
     gui_dependencies["register_bundled_fonts"].assert_called_once_with()
     assert lifecycle.mock_calls.index(call.fonts()) < lifecycle.mock_calls.index(
         call.window()
@@ -103,6 +124,72 @@ def test_gui_command_wires_application(
     )
     main_window.show.assert_called_once_with()
     qt_application.exec.assert_called_once_with()
+
+
+@pytest.mark.parametrize(
+    ("log_dir_argument", "relative_to_home"),
+    [("agent-logs", False), ("~/agent-logs", True)],
+)
+def test_gui_command_resolves_log_directory(
+    log_dir_argument: str,
+    relative_to_home: bool,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    gui_dependencies: dict[str, Mock],
+) -> None:
+    """Relative and home-based log directories are resolved before setup."""
+    qt_application = Mock(name="qt_application")
+    qt_application.exec.return_value = 0
+    qapplication_type = Mock(name="QApplication")
+    qapplication_type.instance.return_value = qt_application
+    paths = Mock(name="application_paths")
+    paths.application_log_file.return_value = Path("/default/logs/run-id.log")
+    home_dir = tmp_path / "home"
+    monkeypatch.setenv("HOME", str(home_dir))
+    monkeypatch.chdir(tmp_path)
+
+    with (
+        patch("commands.run.gui.QtWidgets.QApplication", qapplication_type),
+        patch("commands.run.gui.locale.setlocale"),
+        patch("commands.run.gui.APPLICATION_PATHS", paths),
+        patch("commands.run.gui.setup_logger") as setup_logger,
+    ):
+        result = runner.invoke(app, ["run", "--log-dir", log_dir_argument, "gui"])
+
+    assert result.exit_code == 0
+    expected_root = home_dir if relative_to_home else tmp_path
+    setup_logger.assert_called_once_with(
+        expected_root / "agent-logs" / "run-id.log",
+        serialize=False,
+        allow_fallback=False,
+    )
+
+
+def test_gui_command_reports_explicit_log_directory_failure(
+    tmp_path: Path,
+    gui_dependencies: dict[str, Mock],
+) -> None:
+    """An explicit log directory failure stops startup without a temp fallback."""
+    qapplication_type = Mock(name="QApplication")
+    paths = Mock(name="application_paths")
+    paths.application_log_file.return_value = Path("/default/logs/run-id.log")
+    log_dir = tmp_path / "agent-logs"
+
+    with (
+        patch("commands.run.gui.QtWidgets.QApplication", qapplication_type),
+        patch("commands.run.gui.locale.setlocale"),
+        patch("commands.run.gui.APPLICATION_PATHS", paths),
+        patch(
+            "commands.run.gui.setup_logger",
+            side_effect=PermissionError("directory is read-only"),
+        ),
+    ):
+        result = runner.invoke(app, ["run", "--log-dir", str(log_dir), "gui"])
+
+    assert result.exit_code == 2
+    assert "--log-dir" in result.stderr
+    assert "read-only" in result.stderr
+    qapplication_type.instance.assert_not_called()
 
 
 def test_gui_command_reuses_existing_qapplication(

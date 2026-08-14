@@ -351,9 +351,14 @@ def _configure_logger(
     *,
     serialize_logs: bool,
     publish_log_path: bool,
+    allow_fallback: bool,
 ) -> Path:
     """Configure one process-local sink and return its concrete path."""
-    candidate_paths = (log_path, _fallback_application_log_file_path(log_path))
+    candidate_paths = (
+        (log_path, _fallback_application_log_file_path(log_path))
+        if allow_fallback
+        else (log_path,)
+    )
 
     logger.remove()
 
@@ -388,6 +393,7 @@ def setup_logger(
     log_path: Path,
     *,
     serialize: bool | None = None,
+    allow_fallback: bool = True,
 ) -> Path:
     """
     Configure a fresh root-run Loguru sink and the project format string.
@@ -401,12 +407,19 @@ def setup_logger(
 
     Returns:
         Path: The concrete application log file used by this process tree.
+
+    Args:
+        log_path: Preferred path for the root process log.
+        serialize: Whether to write Loguru's JSON-serialized records.
+        allow_fallback: Whether an unwritable preferred path may fall back to the
+            configured or system temporary logging directory.
     """
     serialize_logs = _resolve_log_serialization(serialize)
     return _configure_logger(
         log_path,
         serialize_logs=serialize_logs,
         publish_log_path=True,
+        allow_fallback=allow_fallback,
     )
 
 
@@ -423,4 +436,5 @@ def setup_worker_logger() -> Path:
         worker_path,
         serialize_logs=_resolve_log_serialization(None),
         publish_log_path=False,
+        allow_fallback=True,
     )
