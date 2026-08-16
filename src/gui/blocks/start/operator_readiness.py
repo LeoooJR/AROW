@@ -11,9 +11,9 @@ from PySide6.QtWidgets import QLabel, QSizePolicy, QWidget
 
 from gui.blocks.base import Block
 from gui.blocks.start.start_settings import start_settings
-from gui.colors import Theme
 from gui.components import StatusBadge
-from gui.settings import Settings
+from gui.constants.colors import Theme
+from gui.constants.settings import Settings
 from gui.signals import signals
 from gui.wrapper import HorizontalLayoutWrapper, VerticalLayoutWrapper
 

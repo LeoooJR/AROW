@@ -20,11 +20,11 @@ from gui.blocks.activity import (
     ActivityLogEntry,
     ActivityLogItem,
 )
-from gui.colors import Theme
 from gui.components import File, LeadingIconLabel, List
-from gui.icons import GenericIcons
-from gui.panel import CollapsiblePanel, CollapsiblePanelConfig
-from gui.settings import Settings
+from gui.constants.colors import Theme
+from gui.constants.icons import GenericIcons
+from gui.constants.settings import Settings
+from gui.panels.base import CollapsiblePanel, CollapsiblePanelConfig
 from gui.wrapper import VerticalLayoutWrapper
 
 

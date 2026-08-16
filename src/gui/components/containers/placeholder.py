@@ -7,18 +7,18 @@ from dataclasses import dataclass
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout, QWidget
 
-from gui.colors import Theme
 from gui.components.base.component import Component
 from gui.components.containers.container_settings import container_settings
 from gui.components.media.svg import SVG
-from gui.icons import (
+from gui.constants.colors import Theme
+from gui.constants.icons import (
     ApplicationIcons,
     GenericIcons,
     OperatingSystemIcons,
     icon_qt_path,
     icon_qt_path_for_theme,
 )
-from gui.settings import Settings
+from gui.constants.settings import Settings
 
 
 class PlaceHolder(QFrame, Component):

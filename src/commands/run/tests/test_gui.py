@@ -23,17 +23,17 @@ def gui_dependencies(monkeypatch: pytest.MonkeyPatch) -> Iterator[dict[str, Mock
     app_controller_type = Mock(name="AppController")
     model_entrypoint_type = Mock(name="ModelEntrypoint")
 
-    fonts_module = ModuleType("gui.fonts")
+    fonts_module = ModuleType("gui.constants.fonts")
     fonts_module.register_bundled_fonts = register_bundled_fonts  # type: ignore[attr-defined]
-    window_module = ModuleType("gui.window")
+    window_module = ModuleType("gui.windows")
     window_module.MainWindow = main_window_type  # type: ignore[attr-defined]
     controller_module = ModuleType("controller")
     controller_module.AppController = app_controller_type  # type: ignore[attr-defined]
     entrypoint_module = ModuleType("core.entrypoint")
     entrypoint_module.ModelEntrypoint = model_entrypoint_type  # type: ignore[attr-defined]
 
-    monkeypatch.setitem(sys.modules, "gui.fonts", fonts_module)
-    monkeypatch.setitem(sys.modules, "gui.window", window_module)
+    monkeypatch.setitem(sys.modules, "gui.constants.fonts", fonts_module)
+    monkeypatch.setitem(sys.modules, "gui.windows", window_module)
     monkeypatch.setitem(sys.modules, "controller", controller_module)
     monkeypatch.setitem(sys.modules, "core.entrypoint", entrypoint_module)
 

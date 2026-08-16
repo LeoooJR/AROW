@@ -14,7 +14,7 @@ from gui.components.dialogs import (
     WarningDialog,
 )
 from gui.components.dialogs.dialog_settings import dialog_settings
-from gui.icons import GenericIcons
+from gui.constants.icons import GenericIcons
 
 pytestmark = pytest.mark.usefixtures("qapp")
 

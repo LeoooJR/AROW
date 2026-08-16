@@ -15,7 +15,7 @@ When registering a new icon:
 from dataclasses import dataclass
 from enum import Enum
 
-from gui.colors import Theme, get_current_theme
+from gui.constants.colors import Theme, get_current_theme
 
 
 @dataclass(frozen=True)

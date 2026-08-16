@@ -10,10 +10,10 @@ from PySide6.QtGui import QFont, QPixmap
 from PySide6.QtWidgets import QVBoxLayout, QWidget
 
 import gui.ressources_rc  # noqa: F401 — register Qt resources for icon pixmaps
-from gui.colors import Theme, set_current_theme
-from gui.fonts import register_bundled_fonts
-from gui.settings import Settings
-from gui.stylesheet import stylesheet_dark, stylesheet_light
+from gui.constants.colors import Theme, set_current_theme
+from gui.constants.fonts import register_bundled_fonts
+from gui.constants.settings import Settings
+from gui.constants.stylesheet import stylesheet_dark, stylesheet_light
 
 _SCREENSHOT_ENV = "AROW_GUI_SCREENSHOT_DIR"
 _FONTS_REGISTERED = False

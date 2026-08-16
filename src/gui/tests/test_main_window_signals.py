@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import cast
 
 from gui.signals import signals
-from gui.window import MainWindow
+from gui.windows import MainWindow
 
 
 def test_forward_devices_updated_emits_rebindings_without_info_log(

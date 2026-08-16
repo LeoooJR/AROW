@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from PySide6.QtGui import QColor
 
-from gui.colors import Colors, get_palette, qcolor_from_css
+from gui.constants.colors import Colors, get_palette, qcolor_from_css
 
 pytestmark = pytest.mark.usefixtures("qapp")
 

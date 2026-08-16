@@ -53,11 +53,11 @@ def gui(context: typer.Context) -> None:
     qt_application.setApplicationVersion(__version__)
 
     # Bundled fonts need Qt GUI app + registration before stylesheet (imported with MainWindow).
-    from gui.fonts import register_bundled_fonts
+    from gui.constants.fonts import register_bundled_fonts
 
     register_bundled_fonts()
 
-    from gui.window import MainWindow
+    from gui.windows import MainWindow
 
     main_window = MainWindow()
 

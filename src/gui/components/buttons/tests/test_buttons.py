@@ -6,7 +6,7 @@ import pytest
 
 from gui.components.buttons import Button, ToolButton, WalkthroughButton
 from gui.components.buttons.button_settings import button_settings
-from gui.icons import GenericIcons, OperatingSystemIcons
+from gui.constants.icons import GenericIcons, OperatingSystemIcons
 
 pytestmark = pytest.mark.usefixtures("qapp")
 

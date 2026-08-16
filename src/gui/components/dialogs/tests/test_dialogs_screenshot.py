@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from gui.components.dialogs import QuestionDialog, WarningDialog
-from gui.icons import GenericIcons
+from gui.constants.icons import GenericIcons
 from gui.tests.screenshot_helpers import capture_styled_top_level_screenshot
 
 pytestmark = pytest.mark.usefixtures("qapp")

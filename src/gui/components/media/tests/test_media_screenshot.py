@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from gui.components.media import SVG, Image
-from gui.icons import GenericIcons, icon_qt_path
+from gui.constants.icons import GenericIcons, icon_qt_path
 from gui.tests.screenshot_helpers import capture_styled_widget_screenshot
 
 pytestmark = pytest.mark.usefixtures("qapp")

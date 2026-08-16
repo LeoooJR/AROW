@@ -8,9 +8,9 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QLabel, QWidget
 
-from gui.colors import Theme
 from gui.components.base.component import Component
-from gui.settings import Settings
+from gui.constants.colors import Theme
+from gui.constants.settings import Settings
 
 
 class DemiBoldText(QLabel, Component):

@@ -20,7 +20,7 @@ from controller.helper import validate_model_entrypoint, validate_view, watchdog
 from core.entrypoint import ModelEntrypoint
 from core.signals import ActivityLogFileUpdatedPayload, CoreSignals
 from gui.signals import signals
-from gui.window import MainWindow
+from gui.windows import MainWindow
 from logger import logger
 
 # Hard cap blocking quit until close job applies; avoids orphaned ADB during exit.

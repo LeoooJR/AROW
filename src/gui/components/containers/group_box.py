@@ -7,8 +7,8 @@ from dataclasses import dataclass
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QGroupBox, QHBoxLayout, QVBoxLayout, QWidget
 
-from gui.colors import Theme
 from gui.components.base.component import Component
+from gui.constants.colors import Theme
 
 
 class GroupBox(QGroupBox, Component):

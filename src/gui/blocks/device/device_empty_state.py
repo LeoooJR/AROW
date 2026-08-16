@@ -18,10 +18,15 @@ from PySide6.QtWidgets import (
 
 from gui.blocks.base import Block
 from gui.blocks.device.device_settings import device_settings
-from gui.colors import Theme, get_current_palette, get_current_theme, qcolor_from_css
 from gui.components import Button, DotStatusBadge
-from gui.icons import GenericIcons, icon_qt_path_for_theme
-from gui.settings import Settings
+from gui.constants.colors import (
+    Theme,
+    get_current_palette,
+    get_current_theme,
+    qcolor_from_css,
+)
+from gui.constants.icons import GenericIcons, icon_qt_path_for_theme
+from gui.constants.settings import Settings
 from gui.signals import signals
 from gui.wrapper import VerticalLayoutWrapper
 from logger import logger

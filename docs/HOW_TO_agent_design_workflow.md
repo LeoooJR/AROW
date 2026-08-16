@@ -16,7 +16,7 @@ This document describes a **repeatable, iteration-first** pattern for steering a
 
 | Item | Purpose |
 |------|--------|
-| **responsive-frontend-builder** | Turn screenshots and design notes into UI that matches layout, spacing, and conventions of this repo (`src/gui/settings.py`, `elements.py`, etc.). |
+| **responsive-frontend-builder** | Turn screenshots and design notes into UI that matches layout, spacing, and conventions of this repo (`src/gui/constants/settings.py`, `components/`, etc.). |
 | **Image generation** (when applicable) | Have the agent produce a **target mock** so intent is explicit before code changes. Replace the placeholder below with your project’s image skill name if different. |
 
 ---

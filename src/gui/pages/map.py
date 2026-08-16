@@ -7,11 +7,11 @@ from dataclasses import dataclass
 from PySide6.QtWidgets import QFrame, QSizePolicy, QVBoxLayout
 
 from gui.blocks.map import MapBlock
-from gui.colors import Theme
-from gui.settings import Settings
+from gui.constants.colors import Theme
+from gui.constants.settings import Settings
 
 
-class MapPanel(QFrame):
+class MapPage(QFrame):
     """
     Panel that displays the map view.
     """
@@ -36,8 +36,8 @@ class MapPanel(QFrame):
         """
         super().__init__(parent)
 
-        self.ui: MapPanel.UI
-        self.texts = MapPanel.Text()
+        self.ui: MapPage.UI
+        self.texts = MapPage.Text()
 
         self.setObjectName("map-panel")
         self.setProperty("main-panel", True)
@@ -59,7 +59,7 @@ class MapPanel(QFrame):
 
         self.setLayout(layout)
 
-        self.ui: MapPanel.UI = MapPanel.UI(map_block=map_block)
+        self.ui: MapPage.UI = MapPage.UI(map_block=map_block)
 
         self._finalize_ui_hooks()
 

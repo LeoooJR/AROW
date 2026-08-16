@@ -24,10 +24,10 @@ from gui.blocks.base import Block
 from gui.blocks.device.device_empty_state import DeviceEmptyState
 from gui.blocks.device.device_item import DeviceItem
 from gui.blocks.device.device_settings import device_settings
-from gui.colors import Theme
 from gui.components import GroupBox, HelperText, List, ToolButton
-from gui.icons import GenericIcons
-from gui.settings import Settings
+from gui.constants.colors import Theme
+from gui.constants.icons import GenericIcons
+from gui.constants.settings import Settings
 from gui.signals import signals
 from gui.wrapper import GridLayoutWrapper, HorizontalLayoutWrapper
 from logger import logger

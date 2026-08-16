@@ -7,8 +7,8 @@ from dataclasses import dataclass
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QLabel, QWidget
 
-from gui.colors import Theme
 from gui.components.base.component import Component
+from gui.constants.colors import Theme
 
 
 class Image(QLabel, Component):

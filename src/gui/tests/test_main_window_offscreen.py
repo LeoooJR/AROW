@@ -10,8 +10,8 @@ from __future__ import annotations
 from PySide6.QtWidgets import QApplication
 
 import gui.ressources_rc
-from gui.fonts import register_bundled_fonts
-from gui.window import (
+from gui.constants.fonts import register_bundled_fonts
+from gui.windows.main_window import (
     _DEFAULT_OFFSCREEN_SCREEN_SIZE,
     MainWindow,
     _main_window_screen_size,

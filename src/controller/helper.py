@@ -6,7 +6,7 @@ from typing import Any
 from PySide6.QtCore import QTimer
 
 from core.entrypoint import ModelEntrypoint
-from gui.window import MainWindow
+from gui.windows import MainWindow
 from logger import logger
 
 

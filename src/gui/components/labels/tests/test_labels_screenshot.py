@@ -5,8 +5,8 @@ from __future__ import annotations
 import pytest
 
 from gui.components.labels import DemiBoldText, HelperText, LeadingIconLabel
-from gui.icons import GenericIcons
-from gui.settings import Settings
+from gui.constants.icons import GenericIcons
+from gui.constants.settings import Settings
 from gui.tests.screenshot_helpers import capture_styled_widget_screenshot
 
 pytestmark = pytest.mark.usefixtures("qapp")

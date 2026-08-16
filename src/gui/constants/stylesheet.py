@@ -6,13 +6,13 @@ Light and dark stylesheets are built once from the color palette for each theme.
 from gui.blocks.activity.activity_log_settings import activity_log_settings
 from gui.blocks.device.device_settings import device_settings
 from gui.blocks.map.map_settings import map_settings
-from gui.colors import get_current_theme, get_palette
 from gui.components.buttons.button_settings import button_settings
 from gui.components.containers.container_settings import container_settings
 from gui.components.indicators.indicator_settings import indicator_settings
 from gui.components.inputs.input_settings import input_settings
 from gui.components.lists.list_settings import list_settings
-from gui.settings import Settings
+from gui.constants.colors import get_current_theme, get_palette
+from gui.constants.settings import Settings
 
 
 def _build_stylesheet(palette) -> str:
