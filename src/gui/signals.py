@@ -2,7 +2,7 @@
 Central hub for GUI-originating signals (cross-component wiring).
 
 Signals are grouped into logical categories for easy access and maintenance,
-mirroring the organization of ``gui.settings``.
+mirroring the organization of ``gui.constants.settings``.
 
 When adding a new GUI signal:
 1. Add the ``Signal(...)`` on the appropriate category class (``UISignals``, ``DeviceSignals``,

@@ -6,7 +6,7 @@ import pytest
 from PySide6.QtWidgets import QLabel, QVBoxLayout
 
 from gui.components.containers import AuthentificationCard, GroupBox, PlaceHolder
-from gui.icons import GenericIcons, icon_qt_path
+from gui.constants.icons import GenericIcons, icon_qt_path
 from gui.tests.screenshot_helpers import capture_styled_widget_screenshot
 
 pytestmark = pytest.mark.usefixtures("qapp")

@@ -11,7 +11,7 @@ from controller.runner import (
     jobtype,
 )
 from core.entrypoint import ModelEntrypoint
-from gui.window import MainWindow
+from gui.windows import MainWindow
 from logger import logger
 
 

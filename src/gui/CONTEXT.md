@@ -14,12 +14,14 @@ and blocks, theme and resource infrastructure, and view-originating signals.
 - Use categorized signals from `gui.signals.signals`; do not extend legacy flat
   signal APIs. Custom connected methods and timer callbacks use matching typed
   `@Slot(...)` signatures and named handlers.
-- Put cross-cutting colors in `colors.py`, styling in `stylesheet.py`, reusable
-  animation in `animation.py`, and shared layout tokens in `Settings`.
+- Put cross-cutting colors in `constants/colors.py`, styling in
+  `constants/stylesheet.py`, reusable animation in `animation.py`, and shared
+  layout tokens in `constants/settings.py`.
 - Put owner-specific sizing and timing constants in a frozen local settings
   dataclass. Do not embed one-off styles in widget modules.
-- Use `icons.py` for Qt resource icons. Keep `statics`, `ressources.qrc`, and
-  generated `ressources_rc.py` synchronized; never edit the generated file.
+- Use `constants/icons.py` for Qt resource icons. Keep `statics`,
+  `ressources.qrc`, and generated `ressources_rc.py` synchronized; never edit
+  the generated file.
 - Communicate with the model through controllers and view signals, never through
   ADB subprocesses or direct model work.
 

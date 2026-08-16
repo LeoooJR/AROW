@@ -38,12 +38,12 @@ from gui.blocks.map.device_required_placeholder import DeviceRequiredMapPlacehol
 from gui.blocks.map.map_loading_placeholder import MapLoadingPlaceholder
 from gui.blocks.map.map_render_failed_placeholder import MapRenderFailedPlaceholder
 from gui.blocks.map.map_settings import map_settings
-from gui.colors import Theme
 from gui.components import SVG, LeadingIconLabel, ToolButton
 from gui.components.buttons.button_settings import button_settings
 from gui.components.media import get_svg_size
-from gui.icons import GenericIcons, icon_qt_path, icon_qt_path_for_theme
-from gui.settings import Settings
+from gui.constants.colors import Theme
+from gui.constants.icons import GenericIcons, icon_qt_path, icon_qt_path_for_theme
+from gui.constants.settings import Settings
 from gui.signals import signals
 from gui.wrapper import GridLayoutWrapper, HorizontalLayoutWrapper
 from logger import logger

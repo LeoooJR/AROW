@@ -6,8 +6,7 @@ import pytest
 
 from gui.blocks.activity import ActivityLogBlock
 from gui.blocks.device import DeviceSelectionBlock
-from gui.device_panel import DeviceSelectionPanel
-from gui.log_panel import LogPanel
+from gui.panels import DeviceSelectionPanel, LogPanel
 
 pytestmark = pytest.mark.usefixtures("qapp")
 

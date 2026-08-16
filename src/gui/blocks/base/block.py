@@ -6,7 +6,7 @@ from abc import ABC, ABCMeta, abstractmethod
 
 from PySide6.QtCore import QObject
 
-from gui.colors import Theme
+from gui.constants.colors import Theme
 
 
 class QtABCMeta(type(QObject), ABCMeta):  # type: ignore[misc]

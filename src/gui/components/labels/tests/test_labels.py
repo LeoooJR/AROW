@@ -6,7 +6,7 @@ import pytest
 from PySide6.QtWidgets import QLabel
 
 from gui.components.labels import DemiBoldText, HelperText, LeadingIconLabel
-from gui.icons import GenericIcons
+from gui.constants.icons import GenericIcons
 
 pytestmark = pytest.mark.usefixtures("qapp")
 
@@ -43,9 +43,9 @@ def test_leading_icon_label_rejects_invalid_icon_and_ignores_empty_text(qtbot) -
     qtbot.addWidget(label)
 
     with pytest.raises(ValueError):
-        LeadingIconLabel(None, None, "Broken")
+        LeadingIconLabel(None, None, "Broken")  # type: ignore[arg-type]
     with pytest.raises(ValueError):
-        label.set_icon("not-an-icon")
+        label.set_icon("not-an-icon")  # type: ignore[arg-type]
 
     label.set_text(None)
 

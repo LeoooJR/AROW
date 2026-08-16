@@ -8,17 +8,17 @@ from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QToolButton, QWidget
 
-from gui.colors import Theme
 from gui.components.base.component import Component
 from gui.components.buttons.button_settings import button_settings
-from gui.icons import (
+from gui.constants.colors import Theme
+from gui.constants.icons import (
     ApplicationIcons,
     GenericIcons,
     OperatingSystemIcons,
     icon_qt_path,
     icon_qt_path_for_theme,
 )
-from gui.settings import Settings
+from gui.constants.settings import Settings
 
 
 class ToolButton(QToolButton, Component):

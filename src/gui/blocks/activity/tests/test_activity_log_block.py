@@ -7,6 +7,7 @@ Headless CI: use ``QT_QPA_PLATFORM=offscreen`` if the platform plugin fails.
 from __future__ import annotations
 
 import datetime as dt
+from typing import Any
 
 import pytest
 from PySide6.QtWidgets import QWidgetAction
@@ -18,15 +19,15 @@ from gui.blocks.activity import (
     ActivityLogEntry,
     ActivityLogItem,
 )
-from gui.stylesheet import stylesheet_light
+from gui.constants.stylesheet import stylesheet_light
 
 pytestmark = pytest.mark.usefixtures("qapp")
 
 _NOW = dt.datetime(2026, 5, 18, 12, 47, 26)
 
 
-def _entry(**overrides) -> ActivityLogEntry:  # type: ignore[no-untyped-def]
-    defaults = {
+def _entry(**overrides: Any) -> ActivityLogEntry:
+    defaults: dict[str, Any] = {
         "id": "activity-1",
         "timestamp": _NOW,
         "category": "simulation",

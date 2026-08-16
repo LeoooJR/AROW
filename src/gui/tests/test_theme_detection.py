@@ -7,7 +7,7 @@ import subprocess
 import sys
 from types import SimpleNamespace
 
-from gui import colors
+from gui.constants import colors
 
 
 class _FakeWindowsRegistryKey:
@@ -97,7 +97,7 @@ def test_initialize_app_theme_updates_current_theme(monkeypatch) -> None:
 
 
 def test_stylesheet_named_variable_uses_current_app_theme() -> None:
-    from gui import stylesheet as stylesheet_module
+    from gui.constants import stylesheet as stylesheet_module
 
     try:
         colors.set_current_theme("dark")

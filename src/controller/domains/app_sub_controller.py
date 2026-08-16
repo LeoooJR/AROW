@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 from core.entrypoint import ModelEntrypoint
-from gui.window import MainWindow
+from gui.windows import MainWindow
 
 if TYPE_CHECKING:
     from controller.orchestration.app_controller import AppController

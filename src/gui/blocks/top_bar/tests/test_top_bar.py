@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from gui.blocks.top_bar import TopBar
-from gui.colors import get_current_theme, set_current_theme
+from gui.constants.colors import get_current_theme, set_current_theme
 from gui.signals import signals
 
 pytestmark = pytest.mark.usefixtures("qapp")

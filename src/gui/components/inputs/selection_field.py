@@ -7,10 +7,10 @@ from dataclasses import dataclass
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QComboBox, QWidget
 
-from gui.colors import Theme
 from gui.components.base.component import Component
 from gui.components.inputs.input_settings import input_settings
-from gui.settings import Settings
+from gui.constants.colors import Theme
+from gui.constants.settings import Settings
 
 
 class SelectionField(QComboBox, Component):

@@ -7,9 +7,9 @@ from dataclasses import dataclass
 from PySide6.QtCore import Qt, Slot
 from PySide6.QtWidgets import QProgressBar, QSizePolicy, QWidget
 
-from gui.colors import Theme
 from gui.components.base.component import Component
 from gui.components.indicators.indicator_settings import indicator_settings
+from gui.constants.colors import Theme
 
 
 class ProgressBar(QProgressBar, Component):

@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
-from gui import fonts
+from gui.constants import fonts
 
 
 def test_register_bundled_fonts_tolerates_missing_variable_font(
@@ -16,6 +16,10 @@ def test_register_bundled_fonts_tolerates_missing_variable_font(
     (static_dir / "Fallback.ttf").write_text("font")
 
     registered_paths: list[str] = []
+
+    def register_font(path: str) -> int:
+        registered_paths.append(path)
+        return 1
 
     monkeypatch.setattr(
         fonts,
@@ -37,7 +41,7 @@ def test_register_bundled_fonts_tolerates_missing_variable_font(
     monkeypatch.setattr(
         fonts.QFontDatabase,
         "addApplicationFont",
-        lambda path: registered_paths.append(path) or 1,
+        register_font,
     )
 
     fonts.register_bundled_fonts()

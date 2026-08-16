@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from gui.components.buttons import Button, ToolButton, WalkthroughButton
-from gui.icons import GenericIcons, OperatingSystemIcons
+from gui.constants.icons import GenericIcons, OperatingSystemIcons
 from gui.tests.screenshot_helpers import capture_styled_widget_screenshot
 
 pytestmark = pytest.mark.usefixtures("qapp")

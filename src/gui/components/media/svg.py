@@ -9,10 +9,10 @@ from PySide6.QtGui import QPainter
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import QLabel, QWidget
 
-from gui.colors import Theme
 from gui.components.base.component import Component
 from gui.components.media.svg_settings import svg_settings
-from gui.settings import Settings
+from gui.constants.colors import Theme
+from gui.constants.settings import Settings
 
 
 def get_svg_size(font_size: int) -> QSize:

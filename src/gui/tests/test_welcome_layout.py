@@ -6,16 +6,16 @@ import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget
 
-import gui.welcome as welcome_module
-from gui.settings import Settings
-from gui.welcome import WelcomePanel
-from gui.welcome_settings import welcome_settings
+import gui.pages.welcome as welcome_module
+from gui.constants.settings import Settings
+from gui.pages import WelcomePage
+from gui.pages.welcome_settings import welcome_settings
 
 pytestmark = pytest.mark.usefixtures("qapp")
 
 
 def test_welcome_panel_expanded_workspace_mode_caps_and_centers_content(qtbot) -> None:
-    panel = WelcomePanel()
+    panel = WelcomePage()
     qtbot.addWidget(panel)
     panel.resize(1800, 1000)
 
@@ -31,7 +31,7 @@ def test_welcome_panel_expanded_workspace_mode_caps_and_centers_content(qtbot) -
 
 
 def test_welcome_panel_normal_workspace_mode_restores_expanding_content(qtbot) -> None:
-    panel = WelcomePanel()
+    panel = WelcomePage()
     qtbot.addWidget(panel)
 
     panel.set_expanded_workspace_mode(True)
@@ -75,7 +75,7 @@ def test_welcome_panel_theme_refresh_targets_visible_top_card(
     monkeypatch.setattr(welcome_module, "MilestoneTargetBlock", _StubMilestoneCard)
     monkeypatch.setattr(welcome_module, "StartRecentBlock", _StubRecentCard)
 
-    panel = WelcomePanel()
+    panel = WelcomePage()
     qtbot.addWidget(panel)
     panel.show()
 

@@ -15,10 +15,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from gui.colors import Theme
 from gui.components.base.component import Component
 from gui.components.lists.list_settings import list_settings
-from gui.settings import Settings
+from gui.constants.colors import Theme
+from gui.constants.settings import Settings
 
 
 class List(QListWidget, Component):

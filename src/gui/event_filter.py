@@ -1,6 +1,6 @@
 from PySide6.QtCore import QElapsedTimer, QEvent, QObject, QTimer, Signal, Slot
 
-from gui.settings import Settings
+from gui.constants.settings import Settings
 
 
 class ActivityTracker(QObject):

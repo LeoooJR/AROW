@@ -21,7 +21,7 @@ from core.signals import (
 )
 from core.work.startup_work import StartupOutcome
 from gui.signals import signals
-from gui.window import MainWindow
+from gui.windows import MainWindow
 from logger import logger
 
 if TYPE_CHECKING:

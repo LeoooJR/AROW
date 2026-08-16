@@ -10,14 +10,14 @@ from gui.blocks.start import (
     OperatorReadinessBlock,
     StartRecentBlock,
 )
-from gui.colors import Theme
-from gui.settings import Settings
+from gui.constants.colors import Theme
+from gui.constants.settings import Settings
+from gui.pages.welcome_settings import welcome_settings
 from gui.signals import signals
-from gui.welcome_settings import welcome_settings
 from gui.wrapper import HorizontalLayoutWrapper, VerticalLayoutWrapper
 
 
-class WelcomePanel(QFrame):
+class WelcomePage(QFrame):
 
     @dataclass(frozen=True)
     class Text:
@@ -45,7 +45,7 @@ class WelcomePanel(QFrame):
 
         super().__init__(parent)
 
-        self.texts = WelcomePanel.Text()
+        self.texts = WelcomePage.Text()
 
         self.setObjectName("welcome-panel")
         self.setProperty("welcome-panel", True)
@@ -90,7 +90,7 @@ class WelcomePanel(QFrame):
         self.setLayout(layout)
         self._expanded_workspace_mode = False
 
-        self.ui: WelcomePanel.UI = WelcomePanel.UI(
+        self.ui: WelcomePage.UI = WelcomePage.UI(
             briefing_card=briefing_card,
             connection_card=connection_card,
             milestone_card=milestone_card,

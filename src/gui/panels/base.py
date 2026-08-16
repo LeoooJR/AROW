@@ -9,14 +9,14 @@ from PySide6.QtCore import QObject, Qt
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QSizePolicy, QVBoxLayout, QWidget
 
-from gui.colors import Theme
 from gui.components import LeadingIconLabel
-from gui.icons import (
+from gui.constants.colors import Theme
+from gui.constants.icons import (
     ApplicationIcons,
     GenericIcons,
     OperatingSystemIcons,
 )
-from gui.settings import Settings
+from gui.constants.settings import Settings
 
 
 class QtABCMeta(type(QObject), ABCMeta):  # type: ignore[misc]

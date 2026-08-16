@@ -15,10 +15,10 @@ from PySide6.QtCore import (
 from PySide6.QtGui import QColor, QPainter
 from PySide6.QtWidgets import QFrame, QGraphicsOpacityEffect, QWidget
 
-from gui.colors import Theme, get_current_palette
 from gui.components.base.component import Component
 from gui.components.indicators.indicator_settings import indicator_settings
-from gui.settings import Settings
+from gui.constants.colors import Theme, get_current_palette
+from gui.constants.settings import Settings
 
 IndicatorState = str  # "default" | "valid" | "warning" | "error"
 

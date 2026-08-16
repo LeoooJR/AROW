@@ -18,11 +18,15 @@ from PySide6.QtWidgets import (
 from gui import faker as ui_faker
 from gui.blocks.base import Block
 from gui.blocks.card.card_settings import card_settings
-from gui.colors import Theme
 from gui.components import SVG, ConditionIndicator, GroupBox
 from gui.components.media import get_svg_size
-from gui.icons import OperatingSystemIcons, icon_qt_path, icon_qt_path_for_theme
-from gui.settings import Settings
+from gui.constants.colors import Theme
+from gui.constants.icons import (
+    OperatingSystemIcons,
+    icon_qt_path,
+    icon_qt_path_for_theme,
+)
+from gui.constants.settings import Settings
 from gui.signals import signals
 from gui.wrapper import GridLayoutWrapper
 

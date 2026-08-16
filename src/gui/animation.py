@@ -8,7 +8,7 @@ from typing import Literal
 from PySide6.QtCore import QEasingCurve, QPropertyAnimation
 from PySide6.QtWidgets import QWidget
 
-from gui.settings import Settings
+from gui.constants.settings import Settings
 
 Axis = Literal["horizontal", "vertical"]
 

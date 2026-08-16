@@ -20,7 +20,8 @@ from dataclasses import dataclass
 class FontSettings:
     """Font-related settings used throughout the application.
 
-    Primary face is bundled Inter, registered at startup via ``gui.fonts.register_bundled_fonts``
+    Primary face is bundled Inter, registered at startup via
+    ``gui.constants.fonts.register_bundled_fonts``
     (after ``QApplication`` exists). Stylesheet lists sensible system fallbacks if lookup fails.
     """
 

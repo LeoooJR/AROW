@@ -9,7 +9,7 @@ When registering a new bundled font:
    or static cuts under ``<family>/static/``).
 2. Add a ``VariableFonts`` enum member when the family ships a variable font file; otherwise
    rely on ``StaticFonts.discover()`` for static cuts only.
-3. Update ``FontSettings`` in ``src/gui/settings.py`` (``FAMILY``, ``FAMILY_CSS``, weights) when
+3. Update ``FontSettings`` in ``src/gui/constants/settings.py`` (``FAMILY``, ``FAMILY_CSS``, weights) when
    the new face becomes the application default.
 4. Ensure startup calls ``register_bundled_fonts()`` after ``QApplication`` is created
    (see ``src/commands/run/gui.py`` and GUI test helpers).
@@ -25,7 +25,7 @@ from typing import Final
 from loguru import logger
 from PySide6.QtGui import QFontDatabase
 
-_FONTS_BASE: Final[Path] = Path(__file__).resolve().parent / "statics" / "fonts"
+_FONTS_BASE: Final[Path] = Path(__file__).resolve().parent.parent / "statics" / "fonts"
 _INTER_DIR: Path = _FONTS_BASE / "Inter"
 
 

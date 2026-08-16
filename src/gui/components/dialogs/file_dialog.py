@@ -8,8 +8,8 @@ from typing import Final
 from PySide6.QtCore import QDir
 from PySide6.QtWidgets import QFileDialog, QWidget
 
-from gui.colors import Theme
 from gui.components.base.component import Component
+from gui.constants.colors import Theme
 
 
 class FileOpenDialog(QFileDialog, Component):

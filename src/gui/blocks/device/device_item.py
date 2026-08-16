@@ -20,10 +20,10 @@ from PySide6.QtWidgets import (
 from shiboken6 import isValid
 
 from gui.blocks.device.device_settings import device_settings
-from gui.colors import Theme
 from gui.components import StatusBadge, ToolButton
-from gui.icons import GenericIcons, icon_qt_path, icon_qt_path_for_theme
-from gui.settings import Settings
+from gui.constants.colors import Theme
+from gui.constants.icons import GenericIcons, icon_qt_path, icon_qt_path_for_theme
+from gui.constants.settings import Settings
 from gui.signals import signals
 from gui.wrapper import HorizontalLayoutWrapper, VerticalLayoutWrapper
 

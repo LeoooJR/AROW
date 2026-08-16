@@ -5,8 +5,9 @@ AROW is a desktop control surface for Android location spoofing. Its interface s
 This document is the visual target for future GUI work. It complements the
 repository policy in [`AGENTS.md`](AGENTS.md) and the implementation rules in
 [`src/gui/CONTEXT.md`](src/gui/CONTEXT.md): colors belong in
-`src/gui/colors.py`, cross-cutting sizing and spacing in `src/gui/settings.py`,
-shared widget styles in `src/gui/stylesheet.py`, icons in `src/gui/icons.py`, and
+`src/gui/constants/colors.py`, cross-cutting sizing and spacing in
+`src/gui/constants/settings.py`, shared widget styles in
+`src/gui/constants/stylesheet.py`, icons in `src/gui/constants/icons.py`, and
 reusable view pieces in `src/gui/components/` and `src/gui/blocks/`.
 
 ## Design Principles
@@ -291,16 +292,16 @@ Icons should remain simple, mostly monochrome, and functional.
 
 ## Implementation Notes For Future Changes
 
-- Add or adjust color tokens in `src/gui/colors.py`; do not hardcode new hex values in widgets.
-- Add dimensions, spacing, font, and radius values in `src/gui/settings.py` before using them elsewhere.
-- Keep global styling in `src/gui/stylesheet.py`.
+- Add or adjust color tokens in `src/gui/constants/colors.py`; do not hardcode new hex values in widgets.
+- Add dimensions, spacing, font, and radius values in `src/gui/constants/settings.py` before using them elsewhere.
+- Keep global styling in `src/gui/constants/stylesheet.py`.
 - Keep reusable GUI pieces in `src/gui/elements.py`.
 - Keep Qt resource updates in sync with `src/gui/ressources.qrc` and recompile `src/gui/ressources_rc.py` when assets change.
 - Preserve the MVC boundaries: GUI styling belongs in `src/gui`, device metadata in `src/gui/device.py`, ADB behavior in `src/core/adb.py`, and async work through `src/controller/runner.py`.
 
 ## Screenshot Test Architecture
 
-Use offscreen screenshot tests to verify visual design with production styling from `src/gui/stylesheet.py`.
+Use offscreen screenshot tests to verify visual design with production styling from `src/gui/constants/stylesheet.py`.
 
 ### When to use each level
 

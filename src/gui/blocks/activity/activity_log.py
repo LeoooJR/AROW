@@ -30,7 +30,6 @@ from shiboken6 import isValid
 from gui import faker as ui_faker
 from gui.blocks.activity.activity_log_settings import activity_log_settings
 from gui.blocks.base import Block
-from gui.colors import Theme
 from gui.components import (
     File,
     GroupBox,
@@ -38,8 +37,9 @@ from gui.components import (
     List,
     ToolButton,
 )
-from gui.icons import GenericIcons, icon_qt_path, icon_qt_path_for_theme
-from gui.settings import Settings
+from gui.constants.colors import Theme
+from gui.constants.icons import GenericIcons, icon_qt_path, icon_qt_path_for_theme
+from gui.constants.settings import Settings
 from gui.signals import signals
 from gui.wrapper import HorizontalLayoutWrapper, VerticalLayoutWrapper
 

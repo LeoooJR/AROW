@@ -12,10 +12,11 @@ from PySide6.QtWidgets import QApplication
 
 import gui.ressources_rc
 from gui.blocks.activity import ActivityLogItem
-from gui.fonts import register_bundled_fonts
-from gui.settings import Settings
+from gui.constants.fonts import register_bundled_fonts
+from gui.constants.settings import Settings
+from gui.routing import PageRoute
 from gui.signals import signals
-from gui.window import MainWindow
+from gui.windows import MainWindow
 
 
 def test_activity_log_resyncs_after_panel_visibility_sequence(monkeypatch) -> None:
@@ -27,30 +28,32 @@ def test_activity_log_resyncs_after_panel_visibility_sequence(monkeypatch) -> No
     window = MainWindow()
     window.show()
     app.processEvents()
-    body = window.ui.container.ui.body
+    workspace = window.ui.app_shell.ui.workspace
     signals.ADB_SERVER.ADBServerStarted.emit()
 
-    body.set_left_panels_visibility(False)
+    workspace.set_left_panels_visibility(False)
     app.processEvents()
     QTest.qWait(Settings.ANIMATION.PANEL_VISIBILITY_DURATION + 40)
     app.processEvents()
-    body.set_left_panels_visibility(True)
+    workspace.set_left_panels_visibility(True)
     app.processEvents()
     QTest.qWait(Settings.ANIMATION.PANEL_VISIBILITY_DURATION + 40)
     app.processEvents()
-    body.ui.log_panel.refresh_layout(deferred=False)
+    workspace.ui.log_panel.refresh_layout(deferred=False)
 
-    viewport_width = body.ui.log_panel.logs_list().viewport().width()
-    file_display = body.ui.log_panel.file_display_widget()
+    viewport_width = workspace.ui.log_panel.logs_list().viewport().width()
+    file_display = workspace.ui.log_panel.file_display_widget()
     rows = [
         item
-        for item in body.ui.log_panel.logs_list().iter_items()
+        for item in workspace.ui.log_panel.logs_list().iter_items()
         if isinstance(item, ActivityLogItem)
     ]
 
     assert viewport_width > 0
     assert rows
-    assert body.ui.tabs_wrapper.width() > body.ui.right_panels_wrapper.width()
+    assert (
+        workspace.ui.router_wrapper.width() > workspace.ui.right_panels_wrapper.width()
+    )
     assert all(row.sizeHint().width() <= viewport_width for row in rows)
     assert file_display._file_name_label.text().strip()
     assert file_display._file_type_label.isVisible()
@@ -69,18 +72,18 @@ def test_welcome_workspace_mode_tracks_outer_sidebars(monkeypatch) -> None:
     window = MainWindow()
     window.show()
     app.processEvents()
-    body = window.ui.container.ui.body
-    welcome = body.ui.tabs.widget(0)
+    workspace = window.ui.app_shell.ui.workspace
+    welcome = workspace.ui.router.page(PageRoute.WELCOME)
 
-    body.set_left_panels_visibility(False)
+    workspace.set_left_panels_visibility(False)
     app.processEvents()
     assert welcome._expanded_workspace_mode is False
 
-    body.set_right_panels_visibility(False)
+    workspace.set_right_panels_visibility(False)
     app.processEvents()
     assert welcome._expanded_workspace_mode is True
 
-    body.set_left_panels_visibility(True)
+    workspace.set_left_panels_visibility(True)
     app.processEvents()
     assert welcome._expanded_workspace_mode is True
 

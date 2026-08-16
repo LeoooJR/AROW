@@ -9,10 +9,10 @@ from PySide6.QtCore import QSize
 from PySide6.QtGui import QIcon, QPixmap
 from PySide6.QtWidgets import QLabel, QMessageBox, QWidget
 
-from gui.colors import Theme
 from gui.components.base.component import Component
 from gui.components.dialogs.dialog_settings import dialog_settings
-from gui.icons import GenericIcons, icon_qt_path, icon_qt_path_for_theme
+from gui.constants.colors import Theme
+from gui.constants.icons import GenericIcons, icon_qt_path, icon_qt_path_for_theme
 
 
 def _message_dialog_icon_pixmap(qt_path: str) -> QPixmap:
