@@ -13,6 +13,7 @@ def test_root_help_lists_run_command() -> None:
 
     assert result.exit_code == 0
     assert "--json-logs" not in result.stdout
+    assert "--log-dir" not in result.stdout
     assert "run" in result.stdout
 
 
@@ -22,6 +23,7 @@ def test_run_help_lists_gui_command() -> None:
 
     assert result.exit_code == 0
     assert "--json-logs" in result.stdout
+    assert "--log-dir" in result.stdout
     assert "--mock-adb" in result.stdout
     assert "gui" in result.stdout
 
@@ -32,6 +34,7 @@ def test_gui_help_does_not_duplicate_run_options() -> None:
 
     assert result.exit_code == 0
     assert "--json-logs" not in result.stdout
+    assert "--log-dir" not in result.stdout
     assert "--mock-adb" not in result.stdout
 
 

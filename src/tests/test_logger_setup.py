@@ -225,6 +225,29 @@ def test_setup_logger_falls_back_when_primary_log_path_is_unwritable(
     assert os.environ[AROW_LOG_FILE_ENV] == str(expected_fallback)
 
 
+def test_setup_logger_can_disable_fallback_for_explicit_log_path(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    primary = tmp_path / "primary" / "logs" / f"{RUN_IDENTIFIER}.log"
+    fallback_dir = tmp_path / "fallback"
+    calls: list[Path] = []
+
+    def fake_add(sink: str, **_kwargs: object) -> int:
+        calls.append(Path(sink))
+        raise PermissionError("explicit path is not writable")
+
+    monkeypatch.setenv("AROW_LOG_FALLBACK_DIR", str(fallback_dir))
+    monkeypatch.setattr("logger.logger.remove", lambda: None)
+    monkeypatch.setattr("logger.logger.add", fake_add)
+
+    with pytest.raises(PermissionError, match="explicit path is not writable"):
+        setup_logger(primary, allow_fallback=False)
+
+    assert calls == [primary]
+    assert os.environ.get(AROW_LOG_FILE_ENV) != str(primary)
+
+
 def test_setup_logger_uses_default_temp_fallback_dir_when_override_is_unset(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
