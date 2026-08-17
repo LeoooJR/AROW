@@ -45,6 +45,18 @@ def _model_with_server(
     return model_entrypoint, server
 
 
+def test_reconcile_requires_initialized_adb_server(tmp_path: Path) -> None:
+    model_entrypoint = ModelEntrypoint(
+        paths=ApplicationPaths(tmp_path, tmp_path / "config", tmp_path / "src", "linux")
+    )
+
+    with pytest.raises(
+        AttributeError,
+        match="ADB server must be initialized before reconciling paired devices",
+    ):
+        model_entrypoint.reconcile_paired_devices([])
+
+
 def test_reconcile_adds_newly_discovered_device(tmp_path: Path) -> None:
     """A handset absent from paired_devices is added."""
     model_entrypoint, server = _model_with_server(tmp_path)

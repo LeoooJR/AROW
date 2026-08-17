@@ -478,6 +478,20 @@ class PhoneRepository(Repository[Phone]):
         if self._working_device == item:
             self._working_device = None
 
+    def index_by_stable_key(self) -> dict[str, Phone]:
+        """Return the first phone stored for each non-empty stable identity.
+
+        Keeping the first phone makes duplicate stable identities deterministic. The
+        reconciliation engine decides separately whether a key is collision-resistant
+        enough to use for matching.
+        """
+        indexed: dict[str, Phone] = {}
+        for phone in self:
+            stable_key = (phone.stable_key or "").strip()
+            if stable_key and stable_key not in indexed:
+                indexed[stable_key] = phone
+        return indexed
+
     def clear(self) -> None:
         super().clear()
         self._working_device = None

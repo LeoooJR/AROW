@@ -12,6 +12,7 @@ from core.devices.phone import (
     DEFAULT_PHONE_DISPLAY_NAME,
     Phone,
     PhoneDescriptor,
+    PhoneRepository,
 )
 from core.devices.stable_key import (
     FirstTierStableKey,
@@ -463,3 +464,22 @@ class TestPhoneDescriptorHash:
             manufacturer="Fab",
         )
         assert d3 != d1
+
+
+class TestPhoneRepository:
+    """Phone repository indexes used by device-domain workflows."""
+
+    def test_index_by_stable_key_keeps_first_phone_and_skips_blank_keys(
+        self,
+    ) -> None:
+        first = Phone(id="device-1", hardware_serial="SERIAL-1")
+        duplicate = Phone(id="device-2", hardware_serial="SERIAL-1")
+        without_stable_key = Phone(id="device-3")
+        repository = PhoneRepository()
+        for phone in (first, duplicate, without_stable_key):
+            repository.add(phone)
+
+        indexed = repository.index_by_stable_key()
+
+        assert indexed == {"hw:v1:SERIAL-1": first}
+        assert indexed["hw:v1:SERIAL-1"] is first
