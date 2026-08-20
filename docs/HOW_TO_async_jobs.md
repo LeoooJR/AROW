@@ -96,6 +96,42 @@ def _submit_model_entrypoint_async_call(self, *args, **kwargs):
 
 so every domain module shares **one** `AsyncRunner` from `AppController`.
 
+## Recurring async jobs
+
+Recurring controller work uses the app-owned `CronManager`; subcontrollers must
+not construct their own repeating timers. A domain declares immutable `CronJob`
+values through `declare_cron_jobs()`:
+
+```python
+def declare_cron_jobs(self) -> tuple[CronJob, ...]:
+    return (
+        CronJob(
+            interval_ms=30_000,
+            specification=JobSpecification(
+                name="refresh_device_list",
+                fn=self.model_entrypoint.refresh_known_devices,
+                type="thread",
+                coalesce_key="refresh_device_list",
+                at_most_once=True,
+            ),
+            on_completed=self.model_entrypoint.apply_result,
+            on_failed=self.model_entrypoint.apply_failure,
+        ),
+    )
+```
+
+`AppController` collects every domain declaration after signal wiring and calls
+`CronManager.commit()` once. Commit starts one `helper.repeat(...)` Qt timer per
+declaration; the first submission happens only after a full interval. When a
+timer fires, the controller submits the stored `JobSpecification` through the
+same shared `AsyncRunner` and binds the same main-thread lifecycle callbacks as
+event-driven jobs.
+
+Cron job names must be non-empty and unique, intervals must be positive, and no
+declarations may be added after commit. Application shutdown stops all cron
+timers before draining work and shutting down the runner. Fixed intervals are
+process-local; wall-clock expressions and persisted schedules are not supported.
+
 ## Core work contract
 
 AROW’s core async jobs follow a stricter contract now than an arbitrary background callable:

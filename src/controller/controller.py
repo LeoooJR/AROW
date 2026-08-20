@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable
 from typing import Any
 
+from controller.cron import CronJob, CronManager
 from controller.runner import (
     AsyncRunner,
     JobError,
@@ -40,6 +41,7 @@ class Controller(ABC):
         self._model_entrypoint: ModelEntrypoint = model_entrypoint
         self._view: MainWindow | None = view
         self._runner: AsyncRunner = runner if runner is not None else AsyncRunner(view)
+        self._cron_manager = CronManager(self._submit_cron_job)
         if not defer_signal_connect:
             self._connect_view_signals()
             self._connect_model_signals()
@@ -86,6 +88,56 @@ class Controller(ABC):
     def runner(self) -> AsyncRunner:
         """Get the asynchronous runner for the application."""
         return self._runner
+
+    @property
+    def cron_manager(self) -> CronManager:
+        """Get the recurring async job manager for the application."""
+        return self._cron_manager
+
+    def _submit_job_specification(
+        self,
+        specification: JobSpecification,
+        *,
+        on_completed: Callable[[Any], None] | None = None,
+        on_failed: Callable[[Any], None] | None = None,
+        on_cancelled: Callable[[], None] | None = None,
+        on_progress: Callable[[ProgressEvent], None] | None = None,
+    ) -> JobHandler | None:
+        """Submit one specification and bind its main-thread lifecycle callbacks."""
+        handle = self.runner.submit(specification)
+        if handle is None:
+            return None
+        handle_signals = self.runner.bind_handle_signals(handle)
+
+        if on_progress is not None:
+            handle_signals.Progress.connect(on_progress)
+        if on_completed is not None:
+            handle_signals.Completed.connect(on_completed)
+        if on_cancelled is not None:
+            handle_signals.Cancelled.connect(on_cancelled)
+        if on_failed is not None:
+            handle_signals.Failed.connect(on_failed)
+
+        logger.debug(
+            "Model entrypoint job submitted",
+            controller_type=type(self).__name__,
+            model_entrypoint_type=type(self.model_entrypoint).__name__,
+            job_id=handle.job_id,
+            job_name=specification.name,
+            job_type=specification.type,
+            coalesce_key=specification.coalesce_key,
+        )
+        return handle
+
+    def _submit_cron_job(self, job: CronJob) -> JobHandler | None:
+        """Submit a recurring declaration through the shared async runner."""
+        return self._submit_job_specification(
+            job.specification,
+            on_completed=job.on_completed,
+            on_failed=job.on_failed,
+            on_cancelled=job.on_cancelled,
+            on_progress=job.on_progress,
+        )
 
     def _submit_model_entrypoint_async_call(
         self,
@@ -146,27 +198,10 @@ class Controller(ABC):
             at_most_once=at_most_once,
             preflight=preflight,
         )
-        handle = self.runner.submit(job)
-        if handle is None:
-            return None
-        handle_signals = self.runner.bind_handle_signals(handle)
-
-        if on_progress is not None:
-            handle_signals.Progress.connect(on_progress)
-        if on_completed is not None:
-            handle_signals.Completed.connect(on_completed)
-        if on_cancelled is not None:
-            handle_signals.Cancelled.connect(on_cancelled)
-        if on_failed is not None:
-            handle_signals.Failed.connect(on_failed)
-
-        logger.debug(
-            "Model entrypoint job submitted",
-            controller_type=type(self).__name__,
-            model_entrypoint_type=type(self.model_entrypoint).__name__,
-            job_id=handle.job_id,
-            job_name=name,
-            job_type=job_type,
-            coalesce_key=coalesce_key,
+        return self._submit_job_specification(
+            job,
+            on_completed=on_completed,
+            on_failed=on_failed,
+            on_cancelled=on_cancelled,
+            on_progress=on_progress,
         )
-        return handle

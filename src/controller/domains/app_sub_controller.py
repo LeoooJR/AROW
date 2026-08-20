@@ -5,6 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
+from controller.cron import CronJob
 from core.entrypoint import ModelEntrypoint
 from gui.windows import MainWindow
 
@@ -25,6 +26,10 @@ class AppSubController(ABC):
     @property
     def view(self) -> MainWindow:
         return self._app.view
+
+    def declare_cron_jobs(self) -> tuple[CronJob, ...]:
+        """Return recurring async jobs owned by this domain."""
+        return ()
 
     @abstractmethod
     def connect_view_signals(self) -> None:
