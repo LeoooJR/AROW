@@ -47,6 +47,7 @@ class AppController(Controller):
         self._map: MapSubController = MapSubController(self)
         self._connect_view_signals()
         self._connect_model_signals()
+        self._commit_cron_jobs()
         self._sync_activity_log_file_to_view()
         self._send_host_device_information()
         self._adb.run_startup()
@@ -82,6 +83,13 @@ class AppController(Controller):
         self.model_entrypoint.signal_bus.subscribe(
             CoreSignals.ACTIVITY_LOG_FILE_UPDATED, self._on_activity_log_file_updated
         )
+
+    def _commit_cron_jobs(self) -> None:
+        """Collect every domain declaration, then activate the schedule once."""
+        for subcontroller in (self._simulation, self._adb, self._map):
+            for job in subcontroller.declare_cron_jobs():
+                self.cron_manager.declare(job)
+        self.cron_manager.commit()
 
     @validate_model_entrypoint
     @validate_view
@@ -209,6 +217,7 @@ class AppController(Controller):
     def _on_application_about_to_quit(self) -> None:
         """Drain bootstrap async work, run close like other jobs, then tear down runners."""
 
+        self.cron_manager.stop()
         self.view = None  # Ensure the view is not accessible anymore, no data will be forwarded to it
 
         self._wait_for_adb_bootstrap_jobs()  # Waiting for ADB running jobs (pre aboutToQuit signal) to finish before shutting down

@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import builtins
-from collections.abc import Callable
 from typing import Any, cast
 from unittest.mock import MagicMock
 
 import pytest
 from PySide6.QtWidgets import QApplication
 
-import controller.domains.adb_sub_controller as adb_sub_controller_module
+from controller.cron import CronJob
 from controller.domains.adb_sub_controller import (
     _REFRESH_DEVICE_LIST_INTERVAL_MS,
     AdbSubController,
@@ -42,6 +41,7 @@ class _AppStub:
         self.model_entrypoint = ModelEntrypoint()
         self.view = MagicMock()
         self.submitted: list[dict[str, Any]] = []
+        self.cron_submitted: list[CronJob] = []
         self.handle_signals: dict[str, JobHandlerSignals] = {}
         self.runner = MagicMock()
         self.runner.bind_handle_signals = self._bind_handle_signals
@@ -60,6 +60,22 @@ class _AppStub:
             signals.Failed.connect(on_failed)
         if on_cancelled := kwargs.get("on_cancelled"):
             signals.Cancelled.connect(on_cancelled)
+        return handle
+
+    def _submit_cron_job(self, job: CronJob) -> JobHandler:
+        self.cron_submitted.append(job)
+        handle = JobHandler(
+            job_id=f"cron-{len(self.cron_submitted)}",
+            name=job.specification.name,
+        )
+        signals = JobHandlerSignals()
+        self.handle_signals[handle.job_id] = signals
+        if job.on_completed is not None:
+            signals.Completed.connect(job.on_completed)
+        if job.on_failed is not None:
+            signals.Failed.connect(job.on_failed)
+        if job.on_cancelled is not None:
+            signals.Cancelled.connect(job.on_cancelled)
         return handle
 
 
@@ -83,61 +99,36 @@ def _patch_controller_type_checks(
     monkeypatch.setattr(builtins, "isinstance", _isinstance)
 
 
-@pytest.fixture
-def patch_repeat_timer(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
-    """Capture repeat() wiring without starting a real periodic QTimer."""
-
-    captured: dict[str, Any] = {}
-
-    def fake_repeat(ms: int) -> Callable[[Callable[..., Any]], MagicMock]:
-        def inner(function: Callable[..., Any]) -> MagicMock:
-            captured["interval_ms"] = ms
-            captured["fn"] = function
-            return MagicMock(name="refresh_device_list_timer")
-
-        return inner
-
-    monkeypatch.setattr(adb_sub_controller_module, "repeat", fake_repeat)
-    return captured
-
-
-def test_init_wires_repeat_timer_for_refresh(
-    patch_repeat_timer: dict[str, Any],
-) -> None:
+def test_declares_periodic_async_device_refresh() -> None:
     app = _AppStub()
     adb = _make_adb_sub_controller(app)
 
-    assert patch_repeat_timer["interval_ms"] == _REFRESH_DEVICE_LIST_INTERVAL_MS
-    wired_refresh_handler = patch_repeat_timer["fn"]
-    assert getattr(wired_refresh_handler, "__self__", None) is adb
-    assert (
-        wired_refresh_handler.__name__ == adb._on_refresh_device_list_requested.__name__
-    )
+    jobs = adb.declare_cron_jobs()
+
+    assert len(jobs) == 1
+    job = jobs[0]
+    assert job.interval_ms == _REFRESH_DEVICE_LIST_INTERVAL_MS
+    assert job.specification.name == "refresh_device_list"
+    assert job.specification.type == "thread"
+    assert job.specification.coalesce_key == "refresh_device_list"
+    assert job.specification.at_most_once is True
+    assert job.specification.fn == app.model_entrypoint.refresh_known_devices
+    assert job.specification.description == "Refresh device list from ADB"
+    assert job.on_completed == app.model_entrypoint.apply_result
+    assert job.on_failed == app.model_entrypoint.apply_failure
 
 
-def test_on_refresh_device_list_requested_submits_async_job(
-    patch_repeat_timer: dict[str, Any],
-) -> None:
+def test_on_refresh_device_list_requested_submits_async_job() -> None:
     app = _AppStub()
     adb = _make_adb_sub_controller(app)
 
     adb._on_refresh_device_list_requested()
 
-    assert len(app.submitted) == 1
-    submit_kwargs = app.submitted[0]
-    assert submit_kwargs["name"] == "refresh_device_list"
-    assert submit_kwargs["job_type"] == "thread"
-    assert submit_kwargs["coalesce_key"] == "refresh_device_list"
-    assert submit_kwargs["at_most_once"] is True
-    assert submit_kwargs["fn"] == app.model_entrypoint.refresh_known_devices
-    assert submit_kwargs["description"] == "Refresh device list from ADB"
-    assert submit_kwargs["on_completed"] == app.model_entrypoint.apply_result
-    assert submit_kwargs["on_failed"] == app.model_entrypoint.apply_failure
+    assert len(app.cron_submitted) == 1
+    assert app.cron_submitted[0] == adb.declare_cron_jobs()[0]
 
 
-def test_refresh_submission_completed_applies_result(
-    patch_repeat_timer: dict[str, Any],
-) -> None:
+def test_refresh_submission_completed_applies_result() -> None:
     app = _AppStub()
     apply_calls: list[object] = []
     app.model_entrypoint.apply_result = lambda result: apply_calls.append(result)  # type: ignore[method-assign]
@@ -145,14 +136,12 @@ def test_refresh_submission_completed_applies_result(
     outcome = RefreshKnownDevicesOutcome(devices=[Phone(id="device-1", state="device")])
 
     adb._on_refresh_device_list_requested()
-    app.handle_signals["job-1"].Completed.emit(outcome)
+    app.handle_signals["cron-1"].Completed.emit(outcome)
 
     assert apply_calls == [outcome]
 
 
-def test_refresh_submission_failed_applies_failure(
-    patch_repeat_timer: dict[str, Any],
-) -> None:
+def test_refresh_submission_failed_applies_failure() -> None:
     app = _AppStub()
     failure_calls: list[object] = []
     app.model_entrypoint.apply_failure = lambda error: failure_calls.append(error)  # type: ignore[method-assign]
@@ -164,14 +153,12 @@ def test_refresh_submission_failed_applies_failure(
     )
 
     adb._on_refresh_device_list_requested()
-    app.handle_signals["job-1"].Failed.emit(error)
+    app.handle_signals["cron-1"].Failed.emit(error)
 
     assert failure_calls == [error]
 
 
-def test_startup_applies_before_enqueuing_host_identity(
-    patch_repeat_timer: dict[str, Any],
-) -> None:
+def test_startup_applies_before_enqueuing_host_identity() -> None:
     app = _AppStub()
     events: list[str] = []
     app.model_entrypoint.apply_result = lambda result: events.append("applied")  # type: ignore[method-assign]
@@ -187,9 +174,7 @@ def test_startup_applies_before_enqueuing_host_identity(
     assert app.submitted[0]["on_failed"] == app.model_entrypoint.apply_failure
 
 
-def test_startup_does_not_enqueue_host_identity_for_unsupported_payload(
-    patch_repeat_timer: dict[str, Any],
-) -> None:
+def test_startup_does_not_enqueue_host_identity_for_unsupported_payload() -> None:
     app = _AppStub()
     events: list[str] = []
     app.model_entrypoint.apply_result = lambda result: events.append("applied")  # type: ignore[method-assign]
@@ -205,7 +190,6 @@ def test_startup_does_not_enqueue_host_identity_for_unsupported_payload(
 @pytest.mark.parametrize("terminal_signal", ["Completed", "Failed"])
 def test_close_hook_runs_after_core_apply(
     terminal_signal: str,
-    patch_repeat_timer: dict[str, Any],
 ) -> None:
     app = _AppStub()
     events: list[str] = []
@@ -228,7 +212,6 @@ def test_close_hook_runs_after_core_apply(
 
 def test_on_devices_updated_forwards_device_id_rebindings_to_view(
     monkeypatch: pytest.MonkeyPatch,
-    patch_repeat_timer: dict[str, Any],
 ) -> None:
     app = _AppStub()
     adb = _make_adb_sub_controller(app)

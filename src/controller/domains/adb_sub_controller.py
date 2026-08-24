@@ -7,10 +7,12 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import QTimer, Slot
+from PySide6.QtCore import Slot
 
+from controller.cron import CronJob
 from controller.domains.app_sub_controller import AppSubController
-from controller.helper import repeat, validate_model_entrypoint, validate_view
+from controller.helper import validate_model_entrypoint, validate_view
+from controller.runner import JobSpecification
 from core.signals import (
     AdbServerStartedPayload,
     AdbServerStoppedPayload,
@@ -35,14 +37,30 @@ class AdbSubController(AppSubController):
 
     def __init__(self, app: AppController) -> None:
         super().__init__(app)
-        self._refresh_device_list_timer: QTimer = repeat(
-            _REFRESH_DEVICE_LIST_INTERVAL_MS
-        )(self._on_refresh_device_list_requested)
         # One-shot hook after CloseCoreRuntime apply (e.g. quit a nested QEventLoop).
         self._pending_after_close_apply: Callable[[], None] | None = None
 
     def _submit_model_entrypoint_async_call(self, *args, **kwargs):
         return self._app._submit_model_entrypoint_async_call(*args, **kwargs)
+
+    def declare_cron_jobs(self) -> tuple[CronJob, ...]:
+        """Declare periodic ADB discovery through the app-owned cron manager."""
+        return (self._refresh_device_list_cron_job(),)
+
+    def _refresh_device_list_cron_job(self) -> CronJob:
+        return CronJob(
+            interval_ms=_REFRESH_DEVICE_LIST_INTERVAL_MS,
+            specification=JobSpecification(
+                name="refresh_device_list",
+                fn=self.model_entrypoint.refresh_known_devices,
+                description="Refresh device list from ADB",
+                type="thread",
+                coalesce_key="refresh_device_list",
+                at_most_once=True,
+            ),
+            on_completed=self.model_entrypoint.apply_result,
+            on_failed=self.model_entrypoint.apply_failure,
+        )
 
     def connect_view_signals(self) -> None:
         """Connect view signals for ADB and pairing (called from AppController)."""
@@ -146,16 +164,7 @@ class AdbSubController(AppSubController):
     def _on_refresh_device_list_requested(self) -> None:
         """ADB list query on a worker."""
         logger.debug("Device list refresh queued")
-        self._submit_model_entrypoint_async_call(
-            name="refresh_device_list",
-            fn=self.model_entrypoint.refresh_known_devices,
-            description="Refresh device list from ADB",
-            job_type="thread",
-            coalesce_key="refresh_device_list",
-            at_most_once=True,
-            on_completed=self.model_entrypoint.apply_result,
-            on_failed=self.model_entrypoint.apply_failure,
-        )
+        self._app._submit_cron_job(self._refresh_device_list_cron_job())
 
     @Slot(str)
     def _on_remove_device_requested(self, id: str) -> None:
