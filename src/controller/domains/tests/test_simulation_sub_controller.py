@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import builtins
 import json
 from collections.abc import Iterator
 from pathlib import Path
@@ -37,22 +36,6 @@ class _AppProbe:
     def __init__(self, model_entrypoint: ModelEntrypoint) -> None:
         self.model_entrypoint = model_entrypoint
         self.view = MagicMock()
-
-
-def _patch_controller_type_checks(monkeypatch, probe: object) -> None:
-    real_isinstance = builtins.isinstance
-
-    def _isinstance(obj, cls) -> bool:
-        cls_name = getattr(cls, "__name__", "")
-        if cls_name == "MainWindow" and obj is getattr(probe, "view", object()):
-            return True
-        if cls_name == "ModelEntrypoint" and obj is getattr(
-            probe, "model_entrypoint", object()
-        ):
-            return True
-        return real_isinstance(obj, cls)
-
-    monkeypatch.setattr(builtins, "isinstance", _isinstance)
 
 
 def _make_model(tmp_path: Path, *, device: Phone | None = None) -> ModelEntrypoint:
@@ -160,13 +143,12 @@ def test_connect_model_signals_subscribes_to_simulation_events(tmp_path: Path) -
 
 
 def test_device_selection_confirmed_creates_simulation_and_waits_for_signal(
-    monkeypatch, tmp_path: Path, log_records
+    tmp_path: Path, log_records
 ) -> None:
     model_entrypoint = _make_model(
         tmp_path, device=Phone(id="device-1", state="device", model="Pixel")
     )
     subcontroller = _make_subcontroller(model_entrypoint)
-    _patch_controller_type_checks(monkeypatch, subcontroller._app)
     captured: list[str] = []
 
     def capture(payload: SimulationCreatedPayload) -> None:
@@ -193,11 +175,10 @@ def test_device_selection_confirmed_creates_simulation_and_waits_for_signal(
 
 
 def test_device_selection_confirmed_forwards_failure_when_device_is_unknown(
-    monkeypatch, tmp_path: Path
+    tmp_path: Path,
 ) -> None:
     model_entrypoint = _make_model(tmp_path)
     subcontroller = _make_subcontroller(model_entrypoint)
-    _patch_controller_type_checks(monkeypatch, subcontroller._app)
     subcontroller.connect_model_signals()
     created_ids: list[str] = []
 
@@ -251,7 +232,6 @@ def test_on_simulation_created_ignores_payload_without_device(tmp_path: Path) ->
 
 
 def test_remove_device_requested_deletes_simulation_and_forwards_success(
-    monkeypatch,
     tmp_path: Path,
 ) -> None:
     model_entrypoint = _make_model(
@@ -259,7 +239,6 @@ def test_remove_device_requested_deletes_simulation_and_forwards_success(
     )
     simulation_id = _create_simulation_id(model_entrypoint, "device-1")
     subcontroller = _make_subcontroller(model_entrypoint)
-    _patch_controller_type_checks(monkeypatch, subcontroller._app)
     subcontroller.connect_model_signals()
 
     subcontroller._on_remove_device_requested("device-1")
@@ -284,12 +263,10 @@ def test_remove_device_requested_ignores_devices_without_active_simulation(
 
 
 def test_on_simulation_creation_failed_forwards_device_selection_failure(
-    monkeypatch,
     tmp_path: Path,
 ) -> None:
     model_entrypoint = _make_model(tmp_path)
     subcontroller = _make_subcontroller(model_entrypoint)
-    _patch_controller_type_checks(monkeypatch, subcontroller._app)
     payload = SimulationCreationFailedPayload(
         device_id="device-1",
         device_name="Pixel",
@@ -305,12 +282,10 @@ def test_on_simulation_creation_failed_forwards_device_selection_failure(
 
 
 def test_on_simulation_deleted_forwards_remove_active_device_success(
-    monkeypatch,
     tmp_path: Path,
 ) -> None:
     model_entrypoint = _make_model(tmp_path)
     subcontroller = _make_subcontroller(model_entrypoint)
-    _patch_controller_type_checks(monkeypatch, subcontroller._app)
     payload = SimulationDeletedPayload(
         simulation_id="sim-1",
         device_id="device-1",

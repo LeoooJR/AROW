@@ -11,7 +11,6 @@ from PySide6.QtCore import Slot
 
 from controller.cron import CronJob
 from controller.domains.app_sub_controller import AppSubController
-from controller.helper import validate_model_entrypoint, validate_view
 from controller.runner import JobSpecification
 from core.signals import (
     AdbServerStartedPayload,
@@ -100,7 +99,6 @@ class AdbSubController(AppSubController):
         """
         self._startup_core_runtime()
 
-    @validate_model_entrypoint
     def _startup_core_runtime(self) -> None:
         handle = self._submit_model_entrypoint_async_call(
             name="startup_core_runtime",
@@ -117,7 +115,6 @@ class AdbSubController(AppSubController):
             # state and signals have been applied on the Qt main thread.
             handle_signals.Completed.connect(self._on_startup_core_runtime_applied)
 
-    @validate_model_entrypoint
     def _enqueue_host_install_identity_job(self) -> None:
         """
         After startup apply finishes, persist/load install UUID off the main thread and
@@ -135,7 +132,6 @@ class AdbSubController(AppSubController):
 
     ### Slots ###
 
-    @validate_model_entrypoint
     @Slot(str, str, str)
     def _on_authentification_confirmed(
         self, ip: str, port: str, association_code: str
@@ -159,7 +155,6 @@ class AdbSubController(AppSubController):
             on_failed=self.model_entrypoint.apply_failure,
         )
 
-    @validate_model_entrypoint
     @Slot()
     def _on_refresh_device_list_requested(self) -> None:
         """ADB list query on a worker."""
@@ -171,7 +166,6 @@ class AdbSubController(AppSubController):
         """Remove device from ADB on a worker."""
         pass  # TODO: Implement the thread job to remove device
 
-    @validate_model_entrypoint
     def _enqueue_close_core_runtime(
         self,
         *,
@@ -214,29 +208,24 @@ class AdbSubController(AppSubController):
         if hook is not None:
             hook()
 
-    @validate_view
     def _on_adb_server_started(self, payload: AdbServerStartedPayload) -> None:
         self.view.forward_adb_server_started()
 
-    @validate_view
     def _on_adb_server_stopped(self, payload: AdbServerStoppedPayload) -> None:
         self.view.forward_adb_server_stopped()
 
-    @validate_view
     def _on_devices_updated(self, payload: DevicesUpdatedPayload) -> None:
         self.view.forward_devices_updated(
             payload.devices,
             dict(payload.device_id_rebindings),
         )
 
-    @validate_view
     def _on_device_authentification_succeeded(
         self, payload: DeviceAuthentificationSucceededPayload
     ) -> None:
         descriptor = payload.device
         self.view.forward_device_authentification_succeeded(descriptor)
 
-    @validate_view
     def _on_device_authentification_failed(
         self, payload: DeviceAuthentificationFailedPayload
     ) -> None:

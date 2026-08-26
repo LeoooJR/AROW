@@ -14,7 +14,6 @@ from typing import TYPE_CHECKING
 from PySide6.QtCore import Slot
 
 from controller.domains.app_sub_controller import AppSubController
-from controller.helper import validate_model_entrypoint, validate_view
 from controller.runner import JobHandler
 from core.signals import (
     CoreSignals,
@@ -94,7 +93,6 @@ class MapSubController(AppSubController):
             self._on_simulation_location_rejected,
         )
 
-    @validate_model_entrypoint
     @Slot(str)
     def _on_render_map_requested(self, simulation_id: str) -> None:
         """Submit map rendering to a worker process."""
@@ -134,7 +132,6 @@ class MapSubController(AppSubController):
                 self._render_jobs_by_simulation_id[simulation_id] = handle
                 self._bind_render_job_lifecycle(simulation_id, handle)
 
-    @validate_model_entrypoint
     @Slot(str, int, str, int, float, float)
     def _on_simulation_location_requested(
         self,
@@ -164,7 +161,6 @@ class MapSubController(AppSubController):
             longitude=longitude,
         )
 
-    @validate_model_entrypoint
     def _on_simulation_location_validation_requested(
         self, payload: SimulationLocationValidationRequestedPayload
     ) -> None:
@@ -209,7 +205,6 @@ class MapSubController(AppSubController):
             on_failed=self.model_entrypoint.apply_failure,
         )
 
-    @validate_view
     def _on_simulation_location_validated(
         self, payload: SimulationLocationValidatedPayload
     ) -> None:
@@ -233,7 +228,6 @@ class MapSubController(AppSubController):
             label=payload.label,
         )
 
-    @validate_view
     def _on_simulation_location_rejected(
         self, payload: SimulationLocationRejectedPayload
     ) -> None:
@@ -293,18 +287,15 @@ class MapSubController(AppSubController):
     def _on_render_job_cancelled(self, simulation_id: str, job_id: str) -> None:
         self._clear_render_job_if_current(simulation_id, job_id)
 
-    @validate_view
     def _on_map_rendered(self, payload: MapRenderedPayload) -> None:
         self.view.forward_map_rendered(
             payload.simulation_id,
             payload.html_path,
         )
 
-    @validate_view
     def _on_map_render_failed(self, payload: MapRenderFailedPayload) -> None:
         self.view.forward_map_render_failed(payload.simulation_id, payload.reason)
 
-    @validate_view
     def _on_simulation_deleted(self, payload: SimulationDeletedPayload) -> None:
         simulation_id = payload.simulation_id
         handle = self._render_jobs_by_simulation_id.pop(simulation_id, None)

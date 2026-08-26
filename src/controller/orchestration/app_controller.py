@@ -16,7 +16,7 @@ from controller.controller import Controller
 from controller.domains.adb_sub_controller import AdbSubController
 from controller.domains.map_sub_controller import MapSubController
 from controller.domains.simulation_sub_controller import SimulationSubController
-from controller.helper import validate_model_entrypoint, validate_view, watchdog
+from controller.helper import watchdog
 from core.entrypoint import ModelEntrypoint
 from core.signals import ActivityLogFileUpdatedPayload, CoreSignals
 from gui.signals import signals
@@ -91,8 +91,6 @@ class AppController(Controller):
                 self.cron_manager.declare(job)
         self.cron_manager.commit()
 
-    @validate_model_entrypoint
-    @validate_view
     def _send_host_device_information(self) -> None:
         """Send the host device information to the view. Run once after the main window is wired."""
         self.view.forward_host_device_information_updated(
@@ -101,7 +99,6 @@ class AppController(Controller):
             self.model_entrypoint.host.ip,
         )
 
-    @validate_model_entrypoint
     @Slot(str)
     def _on_activity_log_file_update_requested(self, path: str) -> None:
         """Update the app-wide activity log file path."""
@@ -111,7 +108,6 @@ class AppController(Controller):
         )
         self.model_entrypoint.activity_log_file = Path(path)
 
-    @validate_view
     def _on_activity_log_file_updated(
         self, payload: ActivityLogFileUpdatedPayload
     ) -> None:
@@ -122,8 +118,6 @@ class AppController(Controller):
         )
         self.view.forward_activity_log_file_updated(str(payload.path))
 
-    @validate_model_entrypoint
-    @validate_view
     def _sync_activity_log_file_to_view(self) -> None:
         """Push the current activity log file to the view after controller wiring."""
         log_file = self.model_entrypoint.activity_log_file

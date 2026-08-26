@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import builtins
 from typing import Any, cast
 from unittest.mock import MagicMock
 
@@ -81,22 +80,6 @@ class _AppStub:
 
 def _make_adb_sub_controller(app: _AppStub) -> AdbSubController:
     return AdbSubController(cast(AppController, app))
-
-
-def _patch_controller_type_checks(
-    monkeypatch: pytest.MonkeyPatch, probe: _AppStub
-) -> None:
-    real_isinstance = builtins.isinstance
-
-    def _isinstance(obj: object, cls: Any) -> bool:
-        cls_name = getattr(cls, "__name__", "")
-        if cls_name == "MainWindow" and obj is probe.view:
-            return True
-        if cls_name == "ModelEntrypoint" and obj is probe.model_entrypoint:
-            return True
-        return real_isinstance(obj, cls)
-
-    monkeypatch.setattr(builtins, "isinstance", _isinstance)
 
 
 def test_declares_periodic_async_device_refresh() -> None:
@@ -210,12 +193,9 @@ def test_close_hook_runs_after_core_apply(
     assert adb._pending_after_close_apply is None
 
 
-def test_on_devices_updated_forwards_device_id_rebindings_to_view(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_on_devices_updated_forwards_device_id_rebindings_to_view() -> None:
     app = _AppStub()
     adb = _make_adb_sub_controller(app)
-    _patch_controller_type_checks(monkeypatch, app)
     phone = Phone(id="device-1", state="device", model="Pixel")
     payload = DevicesUpdatedPayload(
         devices=[phone.serialize()],
