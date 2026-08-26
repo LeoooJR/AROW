@@ -71,7 +71,7 @@ def test_shutdown_stops_cron_before_runner_teardown(
         after_apply()
 
     probe._adb._enqueue_close_core_runtime.side_effect = enqueue_close
-    probe._map.persist_simulation_repository.side_effect = lambda: events.append(
+    probe._simulation.persist_simulation_repository.side_effect = lambda: events.append(
         "repository-persisted"
     )
     probe.runner.shutdown.side_effect = lambda: events.append("runner-shutdown")

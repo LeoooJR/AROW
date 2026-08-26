@@ -6,10 +6,15 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Protocol, TypeVar
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from core.adb.client import AdbClient
     from core.adb.server import AdbServer
     from core.devices.phone import Phone
-    from core.signals import CoreSignal
+    from core.signals import (
+        CoreSignal,
+        SimulationLocationValidatedPayload,
+    )
     from core.simulation import Simulation
 
 PayloadT = TypeVar("PayloadT")
@@ -31,6 +36,37 @@ class SimulationLookupEntrypoint(CoreSignalEmitter, Protocol):
 
     def get_simulation(self, simulation_id: str) -> Simulation | None:
         """Return the tracked simulation for an id, if it still exists."""
+
+
+class SimulationMutationEntrypoint(SimulationLookupEntrypoint, Protocol):
+    """Entrypoint surface for work that applies simulation state changes."""
+
+    def set_simulation_spoofed_location(
+        self,
+        simulation_id: str,
+        lat: float,
+        lon: float,
+        marker: SimulationLocationValidatedPayload | None = None,
+    ) -> None:
+        """Apply and persist the simulation spoofed location."""
+
+    def clear_rejected_simulation_marker(
+        self,
+        simulation_id: str,
+        *,
+        lat: float,
+        lon: float,
+        km: int,
+        line_code: str,
+        line_troncon: int,
+    ) -> None:
+        """Clear and persist an exactly matching rejected marker."""
+
+    def set_simulation_map_file(self, simulation_id: str, map_file: Path) -> None:
+        """Apply and persist a rendered map path."""
+
+    def clear_simulation_map_file(self, simulation_id: str) -> None:
+        """Clear and persist a rendered map path."""
 
 
 class DeviceReconcileResultProtocol(Protocol):

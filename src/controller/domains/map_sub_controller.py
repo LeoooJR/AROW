@@ -64,10 +64,6 @@ class MapSubController(AppSubController):
             self._on_simulation_location_requested
         )
 
-    def persist_simulation_repository(self) -> None:
-        """Persist map-aware simulation metadata at shutdown."""
-        self.model_entrypoint.persist_simulations()
-
     def connect_model_signals(self) -> None:
         """Subscribe to map-relevant :class:`CoreSignals` values when needed."""
         self.model_entrypoint.signal_bus.subscribe(

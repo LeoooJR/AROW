@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
-from core.entrypoint_protocol import CoreSignalEmitter, SimulationLookupEntrypoint
+from core.entrypoint_protocol import CoreSignalEmitter, SimulationMutationEntrypoint
 from core.exceptions import CoreException
 from core.geo.renderer import MapRenderer
 from core.signals import (
@@ -93,8 +93,8 @@ class RenderMapWork(CoreRuntimeWork[RenderMapOutcome]):
         model_entrypoint: CoreSignalEmitter,
         outcome: RenderMapOutcome,
     ) -> None:
-        lookup_entrypoint = cast(SimulationLookupEntrypoint, model_entrypoint)
-        simulation = lookup_entrypoint.get_simulation(outcome.simulation_id)
+        mutation_entrypoint = cast(SimulationMutationEntrypoint, model_entrypoint)
+        simulation = mutation_entrypoint.get_simulation(outcome.simulation_id)
         if simulation is None:
             try:
                 outcome.html_path.unlink(missing_ok=True)
@@ -110,8 +110,10 @@ class RenderMapWork(CoreRuntimeWork[RenderMapOutcome]):
                 simulation_id=outcome.simulation_id,
             )
             return
-        simulation.map_file = outcome.html_path
-        lookup_entrypoint.emit_core_signal(
+        mutation_entrypoint.set_simulation_map_file(
+            outcome.simulation_id, outcome.html_path
+        )
+        mutation_entrypoint.emit_core_signal(
             CoreSignals.MAP_RENDERED,
             MapRenderedPayload(
                 simulation_id=outcome.simulation_id,
@@ -123,12 +125,12 @@ class RenderMapWork(CoreRuntimeWork[RenderMapOutcome]):
     def apply_failure_main_thread(
         model_entrypoint: CoreSignalEmitter, error: BaseException
     ) -> None:
-        lookup_entrypoint = cast(SimulationLookupEntrypoint, model_entrypoint)
+        mutation_entrypoint = cast(SimulationMutationEntrypoint, model_entrypoint)
         if isinstance(error, RenderMapError):
-            simulation = lookup_entrypoint.get_simulation(error.simulation_id)
+            simulation = mutation_entrypoint.get_simulation(error.simulation_id)
             if simulation is not None:
-                simulation.map_file = None
-                lookup_entrypoint.emit_core_signal(
+                mutation_entrypoint.clear_simulation_map_file(error.simulation_id)
+                mutation_entrypoint.emit_core_signal(
                     CoreSignals.MAP_RENDER_FAILED,
                     MapRenderFailedPayload(
                         simulation_id=error.simulation_id,

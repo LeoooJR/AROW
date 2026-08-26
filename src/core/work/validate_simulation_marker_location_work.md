@@ -34,6 +34,7 @@ sequenceDiagram
             Work-->>Runner: outcome(validated payload)
             Runner->>Entrypoint: apply_result(outcome) on main thread
             Entrypoint->>Work: apply_main_thread(entrypoint, outcome)
+            Work->>Entrypoint: set and persist spoofed location
             Work->>Bus: emit SIMULATION_LOCATION_VALIDATED
             Bus-->>Controller: validated payload
             Controller-->>View: forward validated location
@@ -43,6 +44,7 @@ sequenceDiagram
             Note over Work,Runner: Rejection is a successful job result
             Runner->>Entrypoint: apply_result(outcome) on main thread
             Entrypoint->>Work: apply_main_thread(entrypoint, outcome)
+            Work->>Entrypoint: clear exact rejected persisted marker, if matched
             Work->>Bus: emit SIMULATION_LOCATION_REJECTED
             Bus-->>Controller: rejected payload
             Controller-->>View: forward rejected location
@@ -54,3 +56,7 @@ sequenceDiagram
         end
     end
 ```
+
+The main-thread applier rechecks simulation existence. Outcomes for simulations
+deleted after submission are discarded without mutation or validated/rejected
+signal emission.

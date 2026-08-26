@@ -84,17 +84,6 @@ def _make_map_sub_controller(app: _AppStub) -> MapSubController:
     return MapSubController(cast(AppController, app))
 
 
-def _simulation_metadata_path(
-    model_entrypoint: ModelEntrypoint, simulation_id: str
-) -> Path:
-    return (
-        model_entrypoint.application_dir
-        / "simulations"
-        / simulation_id
-        / "simulation.json"
-    )
-
-
 def _add_simulation(
     model_entrypoint: ModelEntrypoint, simulation_id: str
 ) -> Simulation:
@@ -277,19 +266,6 @@ def test_on_simulation_deleted_cancels_render_job_and_forwards(
     assert app.cancelled_job_ids == ["job-1"]
     assert "sim-1" not in map_controller._render_jobs_by_simulation_id
     app.view.forward_simulation_deleted.assert_called_once_with("sim-1")
-
-
-def test_persist_simulation_repository_delegates_to_model_entrypoint(
-    tmp_path: Path,
-) -> None:
-    app = _AppStub(tmp_path)
-    map_controller = _make_map_sub_controller(app)
-    _add_simulation(app.model_entrypoint, "sim-1")
-
-    map_controller.persist_simulation_repository()
-
-    metadata_path = _simulation_metadata_path(app.model_entrypoint, "sim-1")
-    assert metadata_path.is_file()
 
 
 def test_on_simulation_location_requested_submits_thread_job(

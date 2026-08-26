@@ -244,7 +244,7 @@ class AppController(Controller):
             if shutdown_watchdog.isActive():
                 shutdown_watchdog.stop()
         try:
-            self._map.persist_simulation_repository()
+            self._simulation.persist_simulation_repository()
         except Exception:
             logger.exception("Simulation repository persistence failed during shutdown")
         self.runner.shutdown()

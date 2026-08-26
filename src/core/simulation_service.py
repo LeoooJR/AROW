@@ -198,6 +198,7 @@ class SimulationService:
         if simulation.active == active:
             return
         simulation.active = active
+        self._persist_simulation_best_effort(simulation)
         self._entrypoint.emit_core_signal(
             CoreSignals.SIMULATION_STATE_CHANGED,
             SimulationStateChangedPayload(
@@ -247,12 +248,62 @@ class SimulationService:
         if simulation.map_file == map_file:
             return
         simulation.map_file = map_file
+        self._persist_simulation_best_effort(simulation)
         self._entrypoint.emit_core_signal(
             CoreSignals.SIMULATION_MAP_FILE_CHANGED,
             SimulationMapFileChangedPayload(
                 simulation_id=simulation.id,
                 map_file_path=map_file,
             ),
+        )
+
+    def clear_simulation_map_file(self, simulation_id: str) -> None:
+        """Clear and persist the map path after a render failure."""
+        simulation = self._simulations.get(simulation_id)
+        if simulation is None:
+            raise ValueError(f"Simulation with id {simulation_id} not found")
+        if simulation.map_file is None:
+            return
+        simulation.map_file = None
+        self._persist_simulation_best_effort(simulation)
+
+    def clear_rejected_simulation_marker(
+        self,
+        simulation_id: str,
+        *,
+        lat: float,
+        lon: float,
+        km: int,
+        line_code: str,
+        line_troncon: int,
+    ) -> None:
+        """Clear a persisted marker only when the rejection matches it exactly."""
+        simulation = self._simulations.get(simulation_id)
+        if simulation is None:
+            raise ValueError(f"Simulation with id {simulation_id} not found")
+        current_location = simulation.spoofed_location
+        current_poi = current_location.poi
+        if current_poi is None:
+            return
+        if current_location.lat != lat or current_location.lon != lon:
+            return
+        if current_poi.km != km:
+            return
+        if current_poi.line.code != line_code:
+            return
+        if current_poi.line.troncon != line_troncon:
+            return
+        logger.debug(
+            "Rejected persisted simulation location cleared",
+            simulation_id=simulation_id,
+            km=km,
+            line_code=line_code,
+            line_troncon=line_troncon,
+        )
+        self._set_simulation_location(
+            simulation,
+            "spoofed_location",
+            Location(lat=lat, lon=lon, poi=None),
         )
 
     def _set_simulation_location(
@@ -266,21 +317,21 @@ class SimulationService:
         if current == location:
             return
         setattr(simulation, field_name, location)
+        self._persist_simulation_best_effort(simulation)
         self._entrypoint.emit_core_signal(
             CoreSignals.SIMULATION_POSITION_CHANGED,
             SimulationPositionChangedPayload(simulation_id=simulation.id),
         )
 
-    def persist_simulation(self, simulation_id: str) -> None:
-        """Write one simulation metadata file to disk."""
-        simulation = self._simulations.get(simulation_id)
-        if simulation is None:
-            logger.warning(
-                "Simulation persistence skipped because the simulation was not found",
-                simulation_id=simulation_id,
+    def _persist_simulation_best_effort(self, simulation: Simulation) -> None:
+        """Persist a mutation without changing existing runtime failure semantics."""
+        try:
+            self._simulations.write_simulation(simulation)
+        except Exception:
+            logger.exception(
+                "Simulation persistence failed after state mutation",
+                simulation_id=simulation.id,
             )
-            return
-        self._simulations.write_simulation(simulation)
 
     def delete_simulation(self, simulation: Simulation) -> None:
         """Delete a simulation from the in-memory repository."""

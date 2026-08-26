@@ -386,6 +386,30 @@ class ModelEntrypoint(Entrypoint):
         """Set the simulation map file path and emit map-file changed."""
         self._simulation_service.set_simulation_map_file(simulation_id, map_file)
 
+    def clear_simulation_map_file(self, simulation_id: str) -> None:
+        """Clear and persist the simulation map path after a render failure."""
+        self._simulation_service.clear_simulation_map_file(simulation_id)
+
+    def clear_rejected_simulation_marker(
+        self,
+        simulation_id: str,
+        *,
+        lat: float,
+        lon: float,
+        km: int,
+        line_code: str,
+        line_troncon: int,
+    ) -> None:
+        """Clear a stored marker when a rejection matches it exactly."""
+        self._simulation_service.clear_rejected_simulation_marker(
+            simulation_id,
+            lat=lat,
+            lon=lon,
+            km=km,
+            line_code=line_code,
+            line_troncon=line_troncon,
+        )
+
     def validate_simulation_marker_location(
         self,
         simulation_id: str,
@@ -408,10 +432,6 @@ class ModelEntrypoint(Entrypoint):
             latitude=latitude,
             longitude=longitude,
         ).run()
-
-    def persist_simulation(self, simulation_id: str) -> None:
-        """Write one simulation metadata file to disk."""
-        self._simulation_service.persist_simulation(simulation_id)
 
     def delete_simulation(self, simulation: Simulation) -> None:
         """Delete a simulation by id."""

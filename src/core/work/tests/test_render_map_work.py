@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -13,8 +14,11 @@ from core.signals import (
     CoreSignals,
     MapRenderedPayload,
     MapRenderFailedPayload,
+    SimulationMapFileChangedPayload,
+    SimulationRestoredPayload,
 )
 from core.simulation import Simulation
+from core.tests.signal_test_helpers import seed_adb_startup_for_entrypoint
 from core.work.render_map_work import (
     RenderMapError,
     RenderMapOutcome,
@@ -27,6 +31,15 @@ def _add_simulation(
 ) -> Simulation:
     simulation = Simulation(id=simulation_id)
     model_entrypoint.restore_persisted_simulation(simulation)
+    seed_adb_startup_for_entrypoint(model_entrypoint)
+    model_entrypoint.emit_core_signal(
+        CoreSignals.SIMULATION_RESTORED,
+        SimulationRestoredPayload(
+            simulation_id=simulation_id,
+            device_id="device-1",
+            device_name="Pixel",
+        ),
+    )
     restored = model_entrypoint.get_simulation(simulation_id)
     assert restored is not None
     return restored
@@ -105,14 +118,27 @@ def test_model_entrypoint_render_map_delegates_to_work(
     assert calls == [("sim-1", output_dir)]
 
 
-def test_apply_main_thread_emits_map_rendered() -> None:
-    model_entrypoint = ModelEntrypoint()
-    simulation = _add_simulation(model_entrypoint, "sim-1")
-    emitted: list[tuple[CoreSignal[Any], object]] = []
-    model_entrypoint.emit_core_signal = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
-        (signal, payload)
+def test_apply_main_thread_persists_before_map_rendered(tmp_path: Path) -> None:
+    model_entrypoint = ModelEntrypoint(
+        paths=ApplicationPaths(tmp_path, tmp_path / "config", tmp_path / "src", "linux")
     )
-    html_path = Path("/tmp/sim-1.html")
+    simulation = _add_simulation(model_entrypoint, "sim-1")
+    emitted: list[object] = []
+    html_path = tmp_path / "sim-1.html"
+
+    def capture_map_file(payload: SimulationMapFileChangedPayload) -> None:
+        emitted.append(payload)
+
+    def capture_rendered(payload: MapRenderedPayload) -> None:
+        metadata_path = tmp_path / "simulations" / "sim-1" / "simulation.json"
+        persisted = json.loads(metadata_path.read_text(encoding="utf-8"))
+        assert persisted["map_file"] == str(html_path)
+        emitted.append(payload)
+
+    model_entrypoint.signal_bus.subscribe(
+        CoreSignals.SIMULATION_MAP_FILE_CHANGED, capture_map_file
+    )
+    model_entrypoint.signal_bus.subscribe(CoreSignals.MAP_RENDERED, capture_rendered)
 
     RenderMapWork.apply_main_thread(
         model_entrypoint,
@@ -121,10 +147,8 @@ def test_apply_main_thread_emits_map_rendered() -> None:
 
     assert simulation.map_file == html_path
     assert emitted == [
-        (
-            CoreSignals.MAP_RENDERED,
-            MapRenderedPayload(simulation_id="sim-1", html_path=html_path),
-        )
+        SimulationMapFileChangedPayload(simulation_id="sim-1", map_file_path=html_path),
+        MapRenderedPayload(simulation_id="sim-1", html_path=html_path),
     ]
 
 
@@ -170,14 +194,23 @@ def test_apply_main_thread_orphan_cleanup_swallows_oserror(
     assert emitted == []
 
 
-def test_apply_failure_main_thread_emits_map_render_failed() -> None:
-    model_entrypoint = ModelEntrypoint()
-    simulation = _add_simulation(model_entrypoint, "sim-1")
-    simulation.map_file = Path("/tmp/sim-1.html")
-    emitted: list[tuple[CoreSignal[Any], object]] = []
-    model_entrypoint.emit_core_signal = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
-        (signal, payload)
+def test_apply_failure_main_thread_clears_persists_then_emits(
+    tmp_path: Path,
+) -> None:
+    model_entrypoint = ModelEntrypoint(
+        paths=ApplicationPaths(tmp_path, tmp_path / "config", tmp_path / "src", "linux")
     )
+    simulation = _add_simulation(model_entrypoint, "sim-1")
+    model_entrypoint.set_simulation_map_file("sim-1", tmp_path / "sim-1.html")
+    emitted: list[MapRenderFailedPayload] = []
+
+    def capture_failed(payload: MapRenderFailedPayload) -> None:
+        metadata_path = tmp_path / "simulations" / "sim-1" / "simulation.json"
+        persisted = json.loads(metadata_path.read_text(encoding="utf-8"))
+        assert persisted["map_file"] is None
+        emitted.append(payload)
+
+    model_entrypoint.signal_bus.subscribe(CoreSignals.MAP_RENDER_FAILED, capture_failed)
 
     RenderMapWork.apply_failure_main_thread(
         model_entrypoint,
@@ -185,12 +218,7 @@ def test_apply_failure_main_thread_emits_map_render_failed() -> None:
     )
 
     assert simulation.map_file is None
-    assert emitted == [
-        (
-            CoreSignals.MAP_RENDER_FAILED,
-            MapRenderFailedPayload(simulation_id="sim-1", reason="failed"),
-        )
-    ]
+    assert emitted == [MapRenderFailedPayload(simulation_id="sim-1", reason="failed")]
 
 
 def test_apply_failure_main_thread_skips_emit_when_simulation_missing() -> None:
@@ -219,3 +247,6 @@ def test_apply_failure_main_thread_falls_back_to_generic_error() -> None:
 
     assert len(emitted) == 1
     assert emitted[0][0] == CoreSignals.ERROR_RAISED
+
+
+from application_paths import ApplicationPaths
