@@ -5,6 +5,8 @@ import os
 import threading
 import time
 import traceback as _traceback
+from collections.abc import Iterator
+from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Callable
 
@@ -82,6 +84,158 @@ def _return_pid_threadid() -> tuple[int, int]:
     import threading as _threading
 
     return _os.getpid(), _threading.get_ident()
+
+
+@pytest.fixture(params=["thread", "process"])
+def deadline_pool(
+    request: pytest.FixtureRequest,
+    monkeypatch: pytest.MonkeyPatch,
+) -> Iterator[runner_mod.ThreadPool | runner_mod.ProcessPool]:
+    """Exercise both pool submit paths without opening system process workers."""
+
+    if request.param == "thread":
+        pool: runner_mod.ThreadPool | runner_mod.ProcessPool = runner_mod.ThreadPool(
+            max_workers=1
+        )
+    else:
+        monkeypatch.setattr(
+            runner_mod,
+            "ProcessPoolExecutor",
+            lambda **_kwargs: ThreadPoolExecutor(max_workers=1),
+        )
+        pool = runner_mod.ProcessPool(max_workers=1)
+    yield pool
+    pool.shutdown()
+
+
+def _submit_to_pool(
+    pool: runner_mod.ThreadPool | runner_mod.ProcessPool,
+    *,
+    job: JobSpecification,
+    cancel_token: runner_mod.CancelToken | None = None,
+) -> tuple[
+    Future[Any],
+    threading.Event,
+    list[object],
+    list[str],
+    list[JobError],
+]:
+    terminal = threading.Event()
+    completed: list[object] = []
+    cancelled: list[str] = []
+    failed: list[JobError] = []
+
+    def emit_completed(_job_id: str, result: object) -> None:
+        completed.append(result)
+        terminal.set()
+
+    def emit_cancelled(job_id: str) -> None:
+        cancelled.append(job_id)
+        terminal.set()
+
+    def emit_failed(_job_id: str, error: JobError) -> None:
+        failed.append(error)
+        terminal.set()
+
+    future = pool.submit(
+        "job-1",
+        job,
+        cancel_token or runner_mod.CancelToken(),
+        lambda _job_id, _progress: None,
+        emit_completed,
+        emit_cancelled,
+        emit_failed,
+    )
+    return future, terminal, completed, cancelled, failed
+
+
+class TestPoolDeadlines:
+    def test_fractional_deadline_fails_and_discards_late_result(
+        self,
+        deadline_pool: runner_mod.ThreadPool | runner_mod.ProcessPool,
+    ) -> None:
+        release = threading.Event()
+        future, terminal, completed, cancelled, failed = _submit_to_pool(
+            deadline_pool,
+            job=JobSpecification(
+                name="deadline-job",
+                fn=_wait_on_event,
+                args=(release, "late"),
+                timeout=0.02,
+                type="thread",
+            ),
+        )
+
+        assert terminal.wait(1.0), "timeout failure was not emitted at the deadline"
+        assert completed == []
+        assert cancelled == []
+        assert len(failed) == 1
+        assert failed[0].origin == "deadline-job"
+        assert failed[0].exception_type == "TimeoutError"
+        assert isinstance(failed[0].exception, TimeoutError)
+
+        release.set()
+        assert future.result(timeout=1.0) == "late"
+        time.sleep(0.05)
+        assert completed == []
+        assert len(failed) == 1
+
+    def test_completion_before_deadline_cancels_timeout(
+        self,
+        deadline_pool: runner_mod.ThreadPool | runner_mod.ProcessPool,
+    ) -> None:
+        future, terminal, completed, cancelled, failed = _submit_to_pool(
+            deadline_pool,
+            job=JobSpecification(
+                name="fast-job",
+                fn=_return_value,
+                args=("done",),
+                timeout=0.05,
+                type="thread",
+            ),
+        )
+
+        assert terminal.wait(1.0)
+        assert future.result(timeout=1.0) == "done"
+        time.sleep(0.08)
+        assert completed == ["done"]
+        assert cancelled == []
+        assert failed == []
+
+    def test_cancelled_job_emits_cancelled_instead_of_timeout(
+        self,
+        deadline_pool: runner_mod.ThreadPool | runner_mod.ProcessPool,
+    ) -> None:
+        release = threading.Event()
+        cancel_token = runner_mod.CancelToken()
+        future, terminal, completed, cancelled, failed = _submit_to_pool(
+            deadline_pool,
+            job=JobSpecification(
+                name="cancelled-job",
+                fn=_wait_on_event,
+                args=(release, "late"),
+                timeout=0.02,
+                type="thread",
+            ),
+            cancel_token=cancel_token,
+        )
+        cancel_token.cancel()
+
+        assert terminal.wait(1.0)
+        assert completed == []
+        assert cancelled == ["job-1"]
+        assert failed == []
+
+        release.set()
+        assert future.result(timeout=1.0) == "late"
+
+    @pytest.mark.parametrize(
+        "timeout",
+        [0.0, -1.0, float("inf"), float("nan")],
+    )
+    def test_timeout_must_be_positive_and_finite(self, timeout: float) -> None:
+        with pytest.raises(ValueError, match="positive finite"):
+            JobSpecification(name="invalid-timeout", fn=_return_value, timeout=timeout)
 
 
 class _FakePool:
@@ -190,6 +344,58 @@ def runner_factory(monkeypatch: pytest.MonkeyPatch) -> Callable[..., AsyncRunner
 
 
 class TestAsyncRunnerThreadSignals:
+    def test_thread_timeout_is_marshaled_and_cleans_runner_state(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(runner_mod, "ProcessPool", _FakePool)
+        runner = AsyncRunner()
+        release = threading.Event()
+        runner_failed: list[tuple[str, JobError, int]] = []
+        handle_failed: list[tuple[JobError, int]] = []
+        completed: list[tuple[str, object]] = []
+        main_thread_id = threading.get_ident()
+
+        runner.signals.Failed.connect(
+            lambda job_id, error: runner_failed.append(
+                (job_id, error, threading.get_ident())
+            )
+        )
+        runner.signals.Completed.connect(
+            lambda job_id, result: completed.append((job_id, result))
+        )
+        handle = runner.submit(
+            JobSpecification(
+                name="qt-timeout",
+                fn=_wait_on_event,
+                args=(release, "late"),
+                timeout=0.02,
+                coalesce_key="timeout-test",
+                type="thread",
+            )
+        )
+        assert handle is not None
+        runner.bind_handle_signals(handle).Failed.connect(
+            lambda error: handle_failed.append((error, threading.get_ident()))
+        )
+
+        _process_events_until(lambda: len(runner_failed) == 1)
+
+        assert runner_failed[0][0] == handle.job_id
+        assert runner_failed[0][1].origin == "qt-timeout"
+        assert runner_failed[0][2] == main_thread_id
+        assert handle_failed == [(runner_failed[0][1], main_thread_id)]
+        assert completed == []
+        assert handle.job_id not in runner.history
+        assert "timeout-test" not in runner._coalesce_latest
+
+        release.set()
+        time.sleep(0.05)
+        QApplication.instance().processEvents(QEventLoop.AllEvents, 50)
+        assert completed == []
+        assert len(runner_failed) == 1
+        runner.shutdown()
+
     def test_thread_completed_emits_completed_and_cleans_history(
         self, runner_factory: Callable[..., AsyncRunner]
     ) -> None:

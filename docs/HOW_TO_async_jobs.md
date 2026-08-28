@@ -77,7 +77,7 @@ handle = self._submit_model_entrypoint_async_call(
     on_cancelled=my_on_cancelled,    # Callable[[], None]
     on_progress=my_on_progress,      # Callable[[ProgressEvent], None]
     job_type="auto",                # "auto" | "thread" | "process"
-    timeout=None,                   # seconds, passed to Future.result()
+    timeout=None,                   # positive finite deadline in seconds
     priority=0,
     coalesce_key=None,
 )
@@ -310,6 +310,20 @@ Current built-in keys include:
 - `render_map:<simulation_id>`
 
 Map rendering uses a per-simulation coalesce key so repeated requests for the same simulation collapse to "latest wins" without discarding other simulations' work.
+
+## Deadlines
+
+`timeout` accepts a positive finite number of seconds, including fractional
+values. The deadline starts immediately after the executor accepts the future;
+it is monitored independently from worker completion.
+
+When the deadline expires, the runner emits one `Failed` event whose `JobError`
+retains the job name in `origin`, cleans active/coalescing state, and ignores any
+later worker result. It also calls `Future.cancel()` so queued work is cancelled
+when possible. Python executors cannot safely terminate an already-running thread
+or one process-pool task, so running work is allowed to finish in the background.
+If the job was already marked cancelled, deadline resolution emits `Cancelled`
+instead of `Failed`.
 
 ## Cancellation
 

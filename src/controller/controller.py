@@ -152,7 +152,7 @@ class Controller(ABC):
         on_cancelled: Callable[[], None] | None = None,
         on_progress: Callable[[ProgressEvent], None] | None = None,
         job_type: jobtype = "auto",
-        timeout: int | None = None,
+        timeout: float | None = None,
         priority: int = 0,
         coalesce_key: str | None = None,
         at_most_once: bool = False,

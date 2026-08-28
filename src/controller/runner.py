@@ -1,4 +1,5 @@
 import datetime
+import math
 import traceback as _traceback
 import uuid
 from concurrent.futures import (
@@ -6,8 +7,8 @@ from concurrent.futures import (
     ProcessPoolExecutor,
     ThreadPoolExecutor,
 )
-from concurrent.futures import TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass, field
+from threading import Lock, Timer
 from typing import Any, Callable, Literal, Optional
 
 from loguru import logger
@@ -73,6 +74,20 @@ def _job_error_from_exception(*, job_name: str, exc: Exception) -> JobError:
     )
 
 
+def _job_error_from_timeout(*, job_name: str, timeout: float) -> JobError:
+    """Build a timeout failure that preserves origin and exception metadata."""
+    exception = TimeoutError(f"Job timed out after {timeout:g} seconds")
+    return JobError(
+        message=f"Job timed out after {timeout:g} seconds: {job_name}",
+        traceback="",
+        return_code=None,
+        timestamp=datetime.datetime.now(datetime.timezone.utc),
+        exception=exception,
+        exception_type=type(exception).__qualname__,
+        origin=job_name,
+    )
+
+
 @dataclass(frozen=True)
 class ProgressEvent:
     """
@@ -133,7 +148,7 @@ class JobSpecification:
         metadata={"description": "The keyworded arguments to pass to the function"},
         default_factory=dict,
     )
-    timeout: Optional[int] = field(
+    timeout: float | None = field(
         metadata={"description": "The timeout of the job"}, default=None
     )
     priority: int = field(
@@ -156,6 +171,12 @@ class JobSpecification:
         },
         default=None,
     )
+
+    def __post_init__(self) -> None:
+        if self.timeout is not None and (
+            not math.isfinite(self.timeout) or self.timeout <= 0
+        ):
+            raise ValueError("Job timeout must be a positive finite number of seconds")
 
 
 @dataclass(frozen=True)
@@ -181,6 +202,110 @@ class JobHandlerSignals(QObject):
     Completed = Signal(object)
     Cancelled = Signal()
     Failed = Signal(JobError)
+
+
+def _observe_future(
+    future: Future[Any],
+    *,
+    pool_name: str,
+    job_id: str,
+    job: JobSpecification,
+    cancel_token: CancelToken,
+    emit_completed: Callable[[str, object], None],
+    emit_cancelled: Callable[[str], None],
+    emit_failed: Callable[[str, JobError], None],
+) -> None:
+    """Emit exactly one terminal outcome, independently enforcing the deadline."""
+    state_lock = Lock()
+    terminal_emitted = False
+    deadline_timer: Timer | None = None
+    timeout = job.timeout
+
+    def _claim_terminal() -> bool:
+        nonlocal terminal_emitted
+        with state_lock:
+            if terminal_emitted:
+                return False
+            terminal_emitted = True
+            timer = deadline_timer
+        if timer is not None:
+            timer.cancel()
+        return True
+
+    def _on_done(completed_future: Future[Any]) -> None:
+        if not _claim_terminal():
+            logger.debug(
+                "Late async job result discarded",
+                job_id=job_id,
+                name=job.name,
+                pool=pool_name,
+            )
+            return
+        if cancel_token.is_cancelled():
+            logger.debug(
+                "Cancelled async job result discarded",
+                job_id=job_id,
+                name=job.name,
+                pool=pool_name,
+            )
+            emit_cancelled(job_id)
+            return
+        try:
+            result = completed_future.result()
+        except Exception as error:
+            emit_failed(
+                job_id,
+                _job_error_from_exception(job_name=job.name, exc=error),
+            )
+            return
+        logger.debug(
+            "Async job completed",
+            job_id=job_id,
+            name=job.name,
+            pool=pool_name,
+            result_type=type(result).__name__,
+        )
+        emit_completed(job_id, result)
+
+    def _on_timeout() -> None:
+        if timeout is None:
+            return
+        if not _claim_terminal():
+            return
+        future.cancel()
+        if cancel_token.is_cancelled():
+            logger.debug(
+                "Cancelled async job reached its deadline",
+                job_id=job_id,
+                name=job.name,
+                pool=pool_name,
+                timeout_s=timeout,
+            )
+            emit_cancelled(job_id)
+            return
+        logger.warning(
+            "Async job deadline exceeded",
+            job_id=job_id,
+            name=job.name,
+            pool=pool_name,
+            timeout_s=timeout,
+        )
+        emit_failed(
+            job_id,
+            _job_error_from_timeout(job_name=job.name, timeout=timeout),
+        )
+
+    future.add_done_callback(_on_done)
+    if timeout is None:
+        return
+
+    timer = Timer(timeout, _on_timeout)
+    timer.daemon = True
+    with state_lock:
+        if terminal_emitted:
+            return
+        deadline_timer = timer
+    timer.start()
 
 
 class ProcessPool:
@@ -244,51 +369,16 @@ class ProcessPool:
         )
         fut: Future[Any] = self._executor.submit(fn, *job.args, **job.kwargs)
 
-        def _on_done(f: Future[Any]) -> None:
-            if cancel_token.is_cancelled():
-                logger.debug(
-                    "Cancelled process job callback skipped",
-                    job_id=job_id,
-                    name=job.name,
-                )
-                emit_cancelled(job_id)
-                return
-            try:
-                result = (
-                    f.result(timeout=job.timeout)
-                    if job.timeout is not None
-                    else f.result()
-                )
-                logger.debug(
-                    "Process job completed",
-                    job_id=job_id,
-                    name=job.name,
-                    result_type=type(result).__name__,
-                )
-                emit_completed(job_id, result)
-            except FuturesTimeoutError:
-                logger.warning(
-                    "Process job timed out while collecting its result",
-                    job_id=job_id,
-                    name=job.name,
-                    timeout_s=job.timeout,
-                )
-                emit_failed(
-                    job_id,
-                    JobError(
-                        message=f"Job timed out: {job.name}",
-                        traceback="",
-                        return_code=None,
-                        timestamp=datetime.datetime.now(datetime.timezone.utc),
-                    ),
-                )
-            except Exception as e:
-                emit_failed(
-                    job_id,
-                    _job_error_from_exception(job_name=job.name, exc=e),
-                )
-
-        fut.add_done_callback(_on_done)
+        _observe_future(
+            fut,
+            pool_name="process",
+            job_id=job_id,
+            job=job,
+            cancel_token=cancel_token,
+            emit_completed=emit_completed,
+            emit_cancelled=emit_cancelled,
+            emit_failed=emit_failed,
+        )
         return fut
 
     def shutdown(self) -> None:
@@ -355,51 +445,16 @@ class ThreadPool:
         )
         fut: Future[Any] = self._executor.submit(fn, *job.args, **job.kwargs)
 
-        def _on_done(f: Future[Any]) -> None:
-            if cancel_token.is_cancelled():
-                logger.debug(
-                    "Cancelled thread job callback skipped",
-                    job_id=job_id,
-                    name=job.name,
-                )
-                emit_cancelled(job_id)
-                return
-            try:
-                result = (
-                    f.result(timeout=job.timeout)
-                    if job.timeout is not None
-                    else f.result()
-                )
-                logger.debug(
-                    "Thread job completed",
-                    job_id=job_id,
-                    name=job.name,
-                    result_type=type(result).__name__,
-                )
-                emit_completed(job_id, result)
-            except FuturesTimeoutError:
-                logger.warning(
-                    "Thread job timed out while collecting its result",
-                    job_id=job_id,
-                    name=job.name,
-                    timeout_s=job.timeout,
-                )
-                emit_failed(
-                    job_id,
-                    JobError(
-                        message=f"Job timed out: {job.name}",
-                        traceback="",
-                        return_code=None,
-                        timestamp=datetime.datetime.now(datetime.timezone.utc),
-                    ),
-                )
-            except Exception as e:
-                emit_failed(
-                    job_id,
-                    _job_error_from_exception(job_name=job.name, exc=e),
-                )
-
-        fut.add_done_callback(_on_done)
+        _observe_future(
+            fut,
+            pool_name="thread",
+            job_id=job_id,
+            job=job,
+            cancel_token=cancel_token,
+            emit_completed=emit_completed,
+            emit_cancelled=emit_cancelled,
+            emit_failed=emit_failed,
+        )
         return fut
 
     def shutdown(self) -> None:
