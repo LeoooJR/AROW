@@ -191,6 +191,10 @@ class JobHandler:
         metadata={"description": "The token to cancel the job"},
         default_factory=CancelToken,
     )
+    coalesce_key: str | None = field(
+        metadata={"description": "The coalescing key owned by this job"},
+        default=None,
+    )
 
 
 class JobHandlerSignals(QObject):
@@ -204,6 +208,24 @@ class JobHandlerSignals(QObject):
     Failed = Signal(JobError)
 
 
+@dataclass(frozen=True, slots=True)
+class _CompletedProposal:
+    result: object
+
+
+@dataclass(frozen=True, slots=True)
+class _CancelledProposal:
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class _FailedProposal:
+    error: JobError
+
+
+_TerminalProposal = _CompletedProposal | _CancelledProposal | _FailedProposal
+
+
 def _observe_future(
     future: Future[Any],
     *,
@@ -211,9 +233,7 @@ def _observe_future(
     job_id: str,
     job: JobSpecification,
     cancel_token: CancelToken,
-    emit_completed: Callable[[str, object], None],
-    emit_cancelled: Callable[[str], None],
-    emit_failed: Callable[[str, JobError], None],
+    propose_terminal: Callable[[str, _TerminalProposal], None],
 ) -> None:
     """Emit exactly one terminal outcome, independently enforcing the deadline."""
     state_lock = Lock()
@@ -248,14 +268,16 @@ def _observe_future(
                 name=job.name,
                 pool=pool_name,
             )
-            emit_cancelled(job_id)
+            propose_terminal(job_id, _CancelledProposal())
             return
         try:
             result = completed_future.result()
         except Exception as error:
-            emit_failed(
+            propose_terminal(
                 job_id,
-                _job_error_from_exception(job_name=job.name, exc=error),
+                _FailedProposal(
+                    _job_error_from_exception(job_name=job.name, exc=error)
+                ),
             )
             return
         logger.debug(
@@ -265,7 +287,7 @@ def _observe_future(
             pool=pool_name,
             result_type=type(result).__name__,
         )
-        emit_completed(job_id, result)
+        propose_terminal(job_id, _CompletedProposal(result))
 
     def _on_timeout() -> None:
         if timeout is None:
@@ -281,7 +303,7 @@ def _observe_future(
                 pool=pool_name,
                 timeout_s=timeout,
             )
-            emit_cancelled(job_id)
+            propose_terminal(job_id, _CancelledProposal())
             return
         logger.warning(
             "Async job deadline exceeded",
@@ -290,9 +312,11 @@ def _observe_future(
             pool=pool_name,
             timeout_s=timeout,
         )
-        emit_failed(
+        propose_terminal(
             job_id,
-            _job_error_from_timeout(job_name=job.name, timeout=timeout),
+            _FailedProposal(
+                _job_error_from_timeout(job_name=job.name, timeout=timeout)
+            ),
         )
 
     future.add_done_callback(_on_done)
@@ -349,9 +373,7 @@ class ProcessPool:
         job: JobSpecification,
         cancel_token: CancelToken,
         emit_progress: Callable[[str, ProgressEvent], None],
-        emit_completed: Callable[[str, object], None],
-        emit_cancelled: Callable[[str], None],
-        emit_failed: Callable[[str, JobError], None],
+        propose_terminal: Callable[[str, _TerminalProposal], None],
     ) -> Future[Any]:
         """
         Submit a job to the process pool. Callbacks run in the executor's thread;
@@ -375,9 +397,7 @@ class ProcessPool:
             job_id=job_id,
             job=job,
             cancel_token=cancel_token,
-            emit_completed=emit_completed,
-            emit_cancelled=emit_cancelled,
-            emit_failed=emit_failed,
+            propose_terminal=propose_terminal,
         )
         return fut
 
@@ -426,9 +446,7 @@ class ThreadPool:
         job: JobSpecification,
         cancel_token: CancelToken,
         emit_progress: Callable[[str, ProgressEvent], None],
-        emit_completed: Callable[[str, object], None],
-        emit_cancelled: Callable[[str], None],
-        emit_failed: Callable[[str, JobError], None],
+        propose_terminal: Callable[[str, _TerminalProposal], None],
     ) -> Future[Any]:
         """
         Submit a job to the thread pool.
@@ -451,9 +469,7 @@ class ThreadPool:
             job_id=job_id,
             job=job,
             cancel_token=cancel_token,
-            emit_completed=emit_completed,
-            emit_cancelled=emit_cancelled,
-            emit_failed=emit_failed,
+            propose_terminal=propose_terminal,
         )
         return fut
 
@@ -488,9 +504,7 @@ class AsyncRunner(QObject):
     """
 
     _progress_ready = Signal(str, ProgressEvent)
-    _completed_ready = Signal(str, object)
-    _cancelled_ready = Signal(str)
-    _failed_ready = Signal(str, JobError)
+    _terminal_ready = Signal(str, object)
 
     def __init__(self, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
@@ -525,16 +539,8 @@ class AsyncRunner(QObject):
             self._emit_progress_safe,
             Qt.ConnectionType.QueuedConnection,
         )
-        self._completed_ready.connect(
-            self._emit_completed_safe,
-            Qt.ConnectionType.QueuedConnection,
-        )
-        self._cancelled_ready.connect(
-            self._emit_cancelled_safe,
-            Qt.ConnectionType.QueuedConnection,
-        )
-        self._failed_ready.connect(
-            self._emit_failed_safe,
+        self._terminal_ready.connect(
+            self._commit_terminal,
             Qt.ConnectionType.QueuedConnection,
         )
 
@@ -566,7 +572,10 @@ class AsyncRunner(QObject):
         job_id: str = uuid.uuid4().hex
         cancel_token = CancelToken()
         job_handler = JobHandler(
-            job_id=job_id, name=job.name, cancel_token=cancel_token
+            job_id=job_id,
+            name=job.name,
+            cancel_token=cancel_token,
+            coalesce_key=job.coalesce_key,
         )
         job_handler_signals = JobHandlerSignals()
 
@@ -601,14 +610,8 @@ class AsyncRunner(QObject):
         def _marshal_progress(_job_id: str, _progress: ProgressEvent) -> None:
             self._progress_ready.emit(_job_id, _progress)
 
-        def _marshal_completed(_job_id: str, _result: object) -> None:
-            self._completed_ready.emit(_job_id, _result)
-
-        def _marshal_cancelled(_job_id: str) -> None:
-            self._cancelled_ready.emit(_job_id)
-
-        def _marshal_failed(_job_id: str, _error: JobError) -> None:
-            self._failed_ready.emit(_job_id, _error)
+        def _marshal_terminal(_job_id: str, _proposal: _TerminalProposal) -> None:
+            self._terminal_ready.emit(_job_id, _proposal)
 
         job_type = self._resolve_job_type(job)
         logger.debug(
@@ -624,9 +627,7 @@ class AsyncRunner(QObject):
                 job,
                 cancel_token,
                 _marshal_progress,
-                _marshal_completed,
-                _marshal_cancelled,
-                _marshal_failed,
+                _marshal_terminal,
             )
         elif job_type == "thread":
             self._thread_pool.submit(
@@ -634,9 +635,7 @@ class AsyncRunner(QObject):
                 job,
                 cancel_token,
                 _marshal_progress,
-                _marshal_completed,
-                _marshal_cancelled,
-                _marshal_failed,
+                _marshal_terminal,
             )
         else:
             raise ValueError(f"Invalid job type: {job_type}")
@@ -702,63 +701,70 @@ class AsyncRunner(QObject):
         if tup:
             tup[1].Progress.emit(evt)
 
-    def _emit_completed_safe(self, job_id: str, result: Any) -> None:
-        """Emit completed on main thread and cleanup."""
+    def _commit_terminal(self, job_id: str, proposal: _TerminalProposal) -> None:
+        """Commit one terminal outcome using the latest main-thread job state."""
         tup = self.history.get(job_id)
-        job_name = tup[0].name if tup else ""
-        logger.debug(
-            "Async job completion emitted",
-            job_id=job_id,
-            name=job_name,
-            result_type=type(result).__name__,
-        )
-        self._signals.Completed.emit(job_id, result)
-        if tup:
-            tup[1].Completed.emit(result)
-        self._cleanup(job_id)
+        if tup is None:
+            logger.debug(
+                "Late async terminal proposal discarded",
+                job_id=job_id,
+                proposal_type=type(proposal).__name__,
+            )
+            return
 
-    def _emit_cancelled_safe(self, job_id: str) -> None:
-        """Emit cancelled on main thread and cleanup."""
-        tup = self.history.get(job_id)
-        job_name = tup[0].name if tup else ""
+        handle, handle_signals = tup
+        is_superseded = (
+            handle.coalesce_key is not None
+            and self._coalesce_latest.get(handle.coalesce_key) != job_id
+        )
+        if handle.cancel_token.is_cancelled() or is_superseded:
+            proposal = _CancelledProposal()
+
+        self._cleanup(handle)
+
+        if isinstance(proposal, _CompletedProposal):
+            logger.debug(
+                "Async job completion emitted",
+                job_id=job_id,
+                name=handle.name,
+                result_type=type(proposal.result).__name__,
+            )
+            self._signals.Completed.emit(job_id, proposal.result)
+            handle_signals.Completed.emit(proposal.result)
+            return
+
+        if isinstance(proposal, _FailedProposal):
+            error = proposal.error
+            logger.error(
+                "Async job failed",
+                job_id=job_id,
+                name=handle.name,
+                message=error.message,
+                return_code=error.return_code,
+                traceback=error.traceback or None,
+            )
+            self._signals.Failed.emit(job_id, error)
+            handle_signals.Failed.emit(error)
+            return
+
         logger.debug(
             "Async job cancellation emitted",
             job_id=job_id,
-            name=job_name,
+            name=handle.name,
         )
         self._signals.Cancelled.emit(job_id)
-        if tup:
-            tup[1].Cancelled.emit()
-        self._cleanup(job_id)
+        handle_signals.Cancelled.emit()
 
-    def _emit_failed_safe(self, job_id: str, error: JobError) -> None:
-        """Emit failed on main thread and cleanup."""
-        tup = self.history.get(job_id)
-        job_name = tup[0].name if tup else ""
-        logger.error(
-            "Async job failed",
-            job_id=job_id,
-            name=job_name,
-            message=error.message,
-            return_code=error.return_code,
-            traceback=error.traceback or None,
-        )
-        self._signals.Failed.emit(job_id, error)
-        tup = self.history.get(job_id)
-        if tup:
-            tup[1].Failed.emit(error)
-        self._cleanup(job_id)
-
-    def _cleanup(self, job_id: str) -> None:
-        """Remove job from history and from coalesce key if it is the latest."""
+    def _cleanup(self, handle: JobHandler) -> None:
+        """Remove a terminal job and its current coalescing entry."""
+        job_id = handle.job_id
         self.history.pop(job_id, None)
-        for key, latest_id in list(self._coalesce_latest.items()):
-            if latest_id == job_id:
-                logger.debug(
-                    "Async job coalescing state cleared",
-                    job_id=job_id,
-                    coalesce_key=key,
-                )
-                del self._coalesce_latest[key]
-                break
+        key = handle.coalesce_key
+        if key is not None and self._coalesce_latest.get(key) == job_id:
+            logger.debug(
+                "Async job coalescing state cleared",
+                job_id=job_id,
+                coalesce_key=key,
+            )
+            del self._coalesce_latest[key]
         logger.debug("Async job history cleared", job_id=job_id)

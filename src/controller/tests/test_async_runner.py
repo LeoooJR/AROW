@@ -125,16 +125,13 @@ def _submit_to_pool(
     cancelled: list[str] = []
     failed: list[JobError] = []
 
-    def emit_completed(_job_id: str, result: object) -> None:
-        completed.append(result)
-        terminal.set()
-
-    def emit_cancelled(job_id: str) -> None:
-        cancelled.append(job_id)
-        terminal.set()
-
-    def emit_failed(_job_id: str, error: JobError) -> None:
-        failed.append(error)
+    def propose_terminal(job_id: str, proposal: runner_mod._TerminalProposal) -> None:
+        if isinstance(proposal, runner_mod._CompletedProposal):
+            completed.append(proposal.result)
+        elif isinstance(proposal, runner_mod._CancelledProposal):
+            cancelled.append(job_id)
+        else:
+            failed.append(proposal.error)
         terminal.set()
 
     future = pool.submit(
@@ -142,9 +139,7 @@ def _submit_to_pool(
         job,
         cancel_token or runner_mod.CancelToken(),
         lambda _job_id, _progress: None,
-        emit_completed,
-        emit_cancelled,
-        emit_failed,
+        propose_terminal,
     )
     return future, terminal, completed, cancelled, failed
 
@@ -243,8 +238,8 @@ class _FakePool:
     Minimal pool replacement for tests.
 
     It does not use threads/processes; it only simulates the async framework
-    contract by calling `emit_completed` / `emit_failed` / `emit_cancelled`,
-    while letting `AsyncRunner` handle Qt signal marshaling + cleanup.
+    contract by proposing a terminal outcome while letting `AsyncRunner` handle
+    Qt signal marshaling, final arbitration, and cleanup.
     """
 
     def __init__(
@@ -266,27 +261,27 @@ class _FakePool:
         job: JobSpecification,
         cancel_token: Any,
         _emit_progress: Callable[[str, object], None],
-        emit_completed: Callable[[str, object], None],
-        emit_cancelled: Callable[[str], None],
-        emit_failed: Callable[[str, JobError], None],
+        propose_terminal: Callable[[str, runner_mod._TerminalProposal], None],
     ) -> None:
         if self._pool_name is not None and self._pool_by_job_id is not None:
             self._pool_by_job_id[job_id] = self._pool_name
 
         def _complete() -> None:
             if cancel_token.is_cancelled():
-                emit_cancelled(job_id)
+                propose_terminal(job_id, runner_mod._CancelledProposal())
                 return
 
             try:
                 if job.fn is None:
                     raise ValueError("JobSpecification.fn must be set (callable)")
                 result = job.fn(*job.args, **job.kwargs)
-                emit_completed(job_id, result)
+                propose_terminal(job_id, runner_mod._CompletedProposal(result))
             except Exception as e:  # noqa: BLE001 - test helper
-                emit_failed(
+                propose_terminal(
                     job_id,
-                    runner_mod._job_error_from_exception(job_name=job.name, exc=e),
+                    runner_mod._FailedProposal(
+                        runner_mod._job_error_from_exception(job_name=job.name, exc=e)
+                    ),
                 )
 
         if self._pending is not None:
@@ -511,6 +506,167 @@ class TestAsyncRunnerThreadSignals:
         assert cancelled[0] == handle.job_id
         assert handle.job_id not in runner.history
 
+        runner.shutdown()
+
+
+class TestAsyncRunnerTerminalCommit:
+    def test_queued_completion_becomes_cancelled_when_cancelled_before_dispatch(
+        self, runner_factory: Callable[..., AsyncRunner]
+    ) -> None:
+        runner = runner_factory()
+        runner_completed: list[tuple[str, object]] = []
+        runner_cancelled: list[str] = []
+        handle_completed: list[object] = []
+        handle_cancelled: list[bool] = []
+        runner.signals.Completed.connect(
+            lambda job_id, result: runner_completed.append((job_id, result))
+        )
+        runner.signals.Cancelled.connect(lambda job_id: runner_cancelled.append(job_id))
+
+        handle = runner.submit(
+            JobSpecification(
+                name="queued-completion",
+                fn=_return_value,
+                args=("stale",),
+                type="thread",
+            )
+        )
+        assert handle is not None
+        handle_signals = runner.bind_handle_signals(handle)
+        handle_signals.Completed.connect(handle_completed.append)
+        handle_signals.Cancelled.connect(lambda: handle_cancelled.append(True))
+
+        runner.cancel(handle.job_id)
+        _process_events_until(lambda: runner_cancelled == [handle.job_id])
+
+        assert runner_completed == []
+        assert handle_completed == []
+        assert handle_cancelled == [True]
+        assert handle.job_id not in runner.history
+        runner.shutdown()
+
+    def test_superseded_queued_completion_cannot_clear_latest_job(
+        self, runner_factory: Callable[..., AsyncRunner]
+    ) -> None:
+        runner = runner_factory()
+        completed: list[tuple[str, object]] = []
+        cancelled: list[str] = []
+        state_seen_when_first_cancelled: list[tuple[str | None, bool]] = []
+        runner.signals.Completed.connect(
+            lambda job_id, result: completed.append((job_id, result))
+        )
+        runner.signals.Cancelled.connect(lambda job_id: cancelled.append(job_id))
+
+        first = runner.submit(
+            JobSpecification(
+                name="first",
+                fn=_return_value,
+                args=("stale",),
+                coalesce_key="location",
+                type="thread",
+            )
+        )
+        assert first is not None
+        first_signals = runner.bind_handle_signals(first)
+
+        second = runner.submit(
+            JobSpecification(
+                name="second",
+                fn=_return_value,
+                args=("current",),
+                coalesce_key="location",
+                type="thread",
+            )
+        )
+        assert second is not None
+        first_signals.Cancelled.connect(
+            lambda: state_seen_when_first_cancelled.append(
+                (
+                    runner._coalesce_latest.get("location"),
+                    second.job_id in runner.history,
+                )
+            )
+        )
+
+        _process_events_until(lambda: len(cancelled) == 1 and len(completed) == 1)
+
+        assert cancelled == [first.job_id]
+        assert completed == [(second.job_id, "current")]
+        assert state_seen_when_first_cancelled == [(second.job_id, True)]
+        assert runner.history == {}
+        assert "location" not in runner._coalesce_latest
+        runner.shutdown()
+
+    @pytest.mark.parametrize(
+        "proposal",
+        [
+            runner_mod._FailedProposal(
+                runner_mod._job_error_from_exception(
+                    job_name="queued-failure", exc=RuntimeError("boom")
+                )
+            ),
+            runner_mod._FailedProposal(
+                runner_mod._job_error_from_timeout(
+                    job_name="queued-timeout", timeout=0.01
+                )
+            ),
+        ],
+        ids=["failure", "timeout"],
+    )
+    def test_cancellation_suppresses_queued_failure_proposals(
+        self,
+        runner_factory: Callable[..., AsyncRunner],
+        proposal: runner_mod._FailedProposal,
+    ) -> None:
+        pending: dict[str, Callable[[], None]] = {}
+        runner = runner_factory(thread_pending=pending)
+        failed: list[tuple[str, JobError]] = []
+        cancelled: list[str] = []
+        runner.signals.Failed.connect(
+            lambda job_id, error: failed.append((job_id, error))
+        )
+        runner.signals.Cancelled.connect(lambda job_id: cancelled.append(job_id))
+        handle = runner.submit(
+            JobSpecification(name="queued-terminal", fn=_return_value, type="thread")
+        )
+        assert handle is not None
+
+        runner._terminal_ready.emit(handle.job_id, proposal)
+        runner.cancel(handle.job_id)
+        _process_events_until(lambda: cancelled == [handle.job_id])
+
+        assert failed == []
+        assert handle.job_id not in runner.history
+        runner.shutdown()
+
+    def test_late_duplicate_terminal_proposal_is_ignored(
+        self, runner_factory: Callable[..., AsyncRunner]
+    ) -> None:
+        runner = runner_factory()
+        completed: list[tuple[str, object]] = []
+        cancelled: list[str] = []
+        runner.signals.Completed.connect(
+            lambda job_id, result: completed.append((job_id, result))
+        )
+        runner.signals.Cancelled.connect(lambda job_id: cancelled.append(job_id))
+        handle = runner.submit(
+            JobSpecification(
+                name="one-terminal-event",
+                fn=_return_value,
+                args=("first",),
+                type="thread",
+            )
+        )
+        assert handle is not None
+        _process_events_until(lambda: completed == [(handle.job_id, "first")])
+
+        runner._terminal_ready.emit(
+            handle.job_id, runner_mod._CompletedProposal("duplicate")
+        )
+        QApplication.instance().processEvents(QEventLoop.AllEvents, 50)
+
+        assert completed == [(handle.job_id, "first")]
+        assert cancelled == []
         runner.shutdown()
 
 

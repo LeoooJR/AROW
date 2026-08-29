@@ -325,9 +325,21 @@ or one process-pool task, so running work is allowed to finish in the background
 If the job was already marked cancelled, deadline resolution emits `Cancelled`
 instead of `Failed`.
 
+Executor completion, failure, cancellation, and deadline expiry are terminal
+proposals rather than immediately visible events. They cross the Qt queue and
+are committed on the main thread. Immediately before committing, the runner
+rechecks whether the job was cancelled or superseded by a newer job with the
+same coalescing key. Either condition converts the queued proposal to
+`Cancelled`, including a queued completion or failure. The runner removes the
+job from active history and coalescing state before notifying runner-level and
+handle-level listeners, so reentrant listeners observe a terminal job as
+inactive. Duplicate or late proposals after that commit are ignored.
+
 ## Cancellation
 
-- **`runner.cancel(handle.job_id)`** marks the job cancelled.
+- **`runner.cancel(handle.job_id)`** marks the job cancelled. Cancellation is
+  revalidated at the main-thread terminal commit point, after any worker outcome
+  has crossed the Qt queue.
 - The worker **`fn` does not automatically receive `CancelToken`** today; long-running core code would need an explicit contract if cooperative cancellation inside **`fn`** is required.
 
 ## Progress updates
