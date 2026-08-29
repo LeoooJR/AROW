@@ -16,7 +16,7 @@ from controller.runner import JobSpecification
 def _job(name: str) -> CronJob:
     return CronJob(
         interval_ms=1_000,
-        specification=JobSpecification(name=name, fn=lambda: None),
+        specification=JobSpecification(name=name, fn=lambda: None, type="thread"),
     )
 
 

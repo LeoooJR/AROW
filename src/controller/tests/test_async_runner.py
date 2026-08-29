@@ -8,7 +8,7 @@ import traceback as _traceback
 from collections.abc import Iterator
 from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Callable, cast
+from typing import Any, Callable
 
 import pytest
 
@@ -230,7 +230,16 @@ class TestPoolDeadlines:
     )
     def test_timeout_must_be_positive_and_finite(self, timeout: float) -> None:
         with pytest.raises(ValueError, match="positive finite"):
-            JobSpecification(name="invalid-timeout", fn=_return_value, timeout=timeout)
+            JobSpecification(
+                name="invalid-timeout",
+                fn=_return_value,
+                timeout=timeout,
+                type="thread",
+            )
+
+    def test_job_type_is_required(self) -> None:
+        with pytest.raises(TypeError, match="type"):
+            JobSpecification(name="missing-type", fn=_return_value)  # type: ignore[call-arg]
 
 
 class _FakePool:
@@ -773,62 +782,6 @@ class TestAsyncRunnerProcessAndCoalesce:
 
         runner.shutdown()
 
-    def test_auto_resolves_job_type_process_vs_thread_by_name_and_coalesce_key(
-        self,
-        runner_factory: Callable[..., AsyncRunner],
-    ) -> None:
-        pool_by_job_id: dict[str, str] = {}
-        runner = runner_factory(pool_by_job_id=pool_by_job_id)
-
-        completed_results: dict[str, object] = {}
-
-        def on_completed(job_id: str, result: object) -> None:
-            completed_results[job_id] = result
-
-        runner.signals.Completed.connect(on_completed)
-
-        # Auto -> process (name contains "map")
-        spec_process = JobSpecification(
-            name="map creation",
-            description="",
-            fn=_return_value,
-            args=("process-result",),
-            kwargs={},
-            timeout=None,
-            priority=0,
-            coalesce_key=None,
-            type="auto",
-        )
-        handle_process = runner.submit(spec_process)
-        assert handle_process is not None
-
-        # Auto -> thread (coalesce_key == "location")
-        spec_thread = JobSpecification(
-            name="location update",
-            description="",
-            fn=_return_value,
-            args=("thread-result",),
-            kwargs={},
-            timeout=None,
-            priority=0,
-            coalesce_key="location",
-            type="auto",
-        )
-        handle_thread = runner.submit(spec_thread)
-        assert handle_thread is not None
-
-        _process_events_until(
-            lambda: handle_process.job_id in completed_results
-            and handle_thread.job_id in completed_results
-        )
-
-        assert pool_by_job_id[handle_process.job_id] == "process"
-        assert pool_by_job_id[handle_thread.job_id] == "thread"
-        assert completed_results[handle_process.job_id] == "process-result"
-        assert completed_results[handle_thread.job_id] == "thread-result"
-
-        runner.shutdown()
-
     def test_completed_coalesced_job_clears_latest_tracking(
         self, runner_factory: Callable[..., AsyncRunner]
     ) -> None:
@@ -927,26 +880,6 @@ class TestAsyncRunnerProcessAndCoalesce:
 
 
 class TestAsyncRunnerPreflight:
-    def test_invalid_job_type_is_rejected_before_runner_state_is_registered(
-        self,
-        runner_factory: Callable[..., AsyncRunner],
-    ) -> None:
-        runner = runner_factory()
-
-        with pytest.raises(ValueError, match="Invalid job type"):
-            runner.submit(
-                JobSpecification(
-                    name="invalid-dispatch",
-                    fn=_return_value,
-                    coalesce_key="invalid-dispatch",
-                    type=cast(runner_mod.jobtype, "invalid"),
-                )
-            )
-
-        assert runner.history == {}
-        assert "invalid-dispatch" not in runner._coalesce_latest
-        runner.shutdown()
-
     def test_preflight_false_skips_submission_without_side_effects(
         self,
         runner_factory: Callable[..., AsyncRunner],

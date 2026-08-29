@@ -182,7 +182,7 @@ def test_controller_cron_submission_uses_shared_runner_and_callbacks() -> None:
     failed: list[JobError] = []
     cancelled: list[str] = []
     progressed: list[ProgressEvent] = []
-    specification = JobSpecification(name="scheduled", fn=lambda: "done")
+    specification = JobSpecification(name="scheduled", fn=lambda: "done", type="thread")
     job = CronJob(
         interval_ms=100,
         specification=specification,

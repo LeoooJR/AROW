@@ -26,7 +26,8 @@ Heavy or blocking operations should run **outside** the GUI thread. The app rout
 
 1. **Something triggers the controller** — for example a categorized `signals` handler (e.g. `signals.DEVICE.RefreshDeviceListRequested` from `gui.signals`), a menu action, or a model event wired in `_connect_model_signals`.
 2. **The controller submits a job** — usually via `Controller._submit_model_entrypoint_async_call(...)`, which wraps `AsyncRunner.submit(JobSpecification(...))` and binds per-job signals.
-3. **The runner picks a pool** — thread vs process from `job_type` or `"auto"` (see below).
+3. **The runner picks a pool** — thread vs process from the required, explicit
+   `job_type` (see below).
 4. **The worker runs `JobSpecification.fn`** — usually a `ModelEntrypoint` method that instantiates a `CoreRuntimeWork` and calls its blocking `run()`. This runs in a **worker thread or process**, not on the Qt main thread.
 5. **Completion is marshaled to the main thread** — `AsyncRunner` uses internal Qt signals with `QueuedConnection` so **`Completed`**, **`Failed`**, and **`Cancelled`** slots run on the GUI thread.
 6. **The core entrypoint applies the outcome** — controller submissions wire completion directly to `ModelEntrypoint.apply_result(...)` and failure directly to `apply_failure(...)`. The entrypoint dispatches to the registered work applier, and the view updates from core-bus signals.
@@ -73,6 +74,7 @@ When you add a new core runtime job, keep this catalog in sync so result/failure
 handle = self._submit_model_entrypoint_async_call(
     name="my_job",
     fn=my_callable,
+    job_type="thread",              # required: "thread" | "process"
     description="Optional human-readable description",
     args=(),
     kwargs={},
@@ -80,7 +82,6 @@ handle = self._submit_model_entrypoint_async_call(
     on_failed=my_on_failed,          # Callable[[JobError], None]
     on_cancelled=my_on_cancelled,    # Callable[[], None]
     on_progress=my_on_progress,      # Callable[[ProgressEvent], None]
-    job_type="auto",                # "auto" | "thread" | "process"
     timeout=None,                   # positive finite deadline in seconds
     priority=0,
     coalesce_key=None,
@@ -277,7 +278,7 @@ job = JobSpecification(
     fn=callable,
     args=(),
     kwargs={},
-    type="thread",        # or "process" or "auto"
+    type="thread",        # required; use "process" for CPU-heavy work
     coalesce_key=None,
     timeout=None,
 )
@@ -291,12 +292,10 @@ signals.Failed.connect(my_failed_slot)
 
 ## Thread vs process (`job_type`)
 
-`AsyncRunner._resolve_job_type` decides **`"auto"`** jobs:
-
-- Explicit **`"thread"`** or **`"process"`** always wins.
-- For **`"auto"`**, the **name** (lowercased) and **`coalesce_key`** steer the choice: map-like / network-ish defaults favor **process**; **location** / **device** keys favor **thread**; otherwise the default is **process** so the UI stays responsive under CPU-heavy work.
-
-When you know the workload (quick I/O vs heavy CPU), set **`job_type`** explicitly instead of relying on naming.
+Every job must choose **`"thread"`** or **`"process"`** explicitly. Use a thread
+for I/O-bound or quick work and a process for CPU-heavy work that must not occupy
+the GUI process. The runner does not infer the pool from job names or coalescing
+keys.
 
 **Process pool caveat:** work runs in a separate process. The target callable must be **picklable** (top-level functions or picklable objects). Prefer **`"thread"`** for lambdas that close over complex objects, or keep **`fn`** as a module-level or clearly picklable entry point.
 

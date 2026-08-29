@@ -144,6 +144,7 @@ class Controller(ABC):
         *,
         name: str,
         fn: Callable[..., Any],
+        job_type: jobtype,
         description: str = "",
         args: tuple[Any, ...] = (),
         kwargs: dict[str, Any] | None = None,
@@ -151,7 +152,6 @@ class Controller(ABC):
         on_failed: Callable[[JobError], None] | None = None,
         on_cancelled: Callable[[], None] | None = None,
         on_progress: Callable[[ProgressEvent], None] | None = None,
-        job_type: jobtype = "auto",
         timeout: float | None = None,
         priority: int = 0,
         coalesce_key: str | None = None,
@@ -175,7 +175,7 @@ class Controller(ABC):
             on_failed: Callback to execute when the job fails.
             on_cancelled: Callback to execute when the job is cancelled.
             on_progress: Callback to execute when the job progresses.
-            job_type: Type of the job (auto, thread, process).
+            job_type: Executor type of the job (thread or process).
             timeout: Timeout for the job.
             priority: Priority of the job (0-100).
             coalesce_key: Key to coalesce the job (none, location, network, device).

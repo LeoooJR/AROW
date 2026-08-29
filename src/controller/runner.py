@@ -17,11 +17,9 @@ from PySide6.QtCore import QObject, Qt, Signal
 
 from logger import resolve_worker_application_log_file_path, setup_worker_logger
 
-jobtype = Literal["auto", "thread", "process"]
-resolvedjobtype = Literal["thread", "process"]
+jobtype = Literal["thread", "process"]
 jobstatus = Literal["pending", "running", "completed", "cancelled", "failed"]
 jobpriority = Literal["low", "medium", "high"]
-jobcoalescekey = Literal["none", "location", "network", "device"]
 jobtimeout = Literal["none", "short", "medium", "long"]
 jobpreflight = Callable[[], bool]
 
@@ -160,7 +158,7 @@ class JobSpecification:
         metadata={"description": "The key to coalesce the job"}, default=None
     )  # Submitting a job while there is already one running with the same coalesce key will cancel the previous job (the job still run to completion, here "cancel" means that the result will be discarded)
     type: jobtype = field(
-        metadata={"description": "The type of the job"}, default="auto"
+        metadata={"description": "The executor type of the job"}, kw_only=True
     )
     at_most_once: bool = field(
         metadata={"description": "At most one job running with the same coalesce key"},
@@ -508,12 +506,11 @@ class AsyncRunner(QObject):
         if not self._passes_preflight(job):
             return None
 
-        job_type = self._resolve_job_type(job)
         job_handler = self._register_job(job)
         if job_handler is None:
             return None
 
-        self._dispatch(job_type, job, job_handler)
+        self._dispatch(job.type, job, job_handler)
         return job_handler
 
     def _passes_preflight(self, job: JobSpecification) -> bool:
@@ -577,7 +574,7 @@ class AsyncRunner(QObject):
 
     def _dispatch(
         self,
-        job_type: resolvedjobtype,
+        job_type: jobtype,
         job: JobSpecification,
         job_handler: JobHandler,
     ) -> None:
@@ -609,29 +606,6 @@ class AsyncRunner(QObject):
         logger.info("Async runner shutdown started")
         self._process_pool.shutdown()
         self._thread_pool.shutdown()
-
-    def _resolve_job_type(self, job_spec: JobSpecification) -> resolvedjobtype:
-        """
-        Resolve execution type from spec. When type is "auto", choose process vs
-        thread from task semantics: map/network/heavy work -> process; location/
-        device quick updates -> thread.
-        """
-        if job_spec.type == "thread":
-            return "thread"
-        if job_spec.type == "process":
-            return "process"
-        if job_spec.type == "auto":
-            name_lower = (job_spec.name or "").lower()
-            key = (job_spec.coalesce_key or "").lower()
-            # Map creation and network-related work: CPU/heavy -> process
-            if "map" in name_lower or key == "network" or key == "none":
-                return "process"
-            # Location/device updates: typically I/O or quick -> thread
-            if key in ("location", "device"):
-                return "thread"
-            # Default: heavier work in process to keep UI responsive
-            return "process"
-        raise ValueError(f"Invalid job type: {job_spec.type!r}")
 
     def cancel(self, job_id: str) -> None:
         """Mark job as cancelled (next completion callback will emit Cancelled)."""

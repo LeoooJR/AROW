@@ -89,9 +89,8 @@ flowchart TD
 
 - `preflight`: evaluated synchronously before a `job_id` or runner state is
   created. `False` returns `None` without opening worker work.
-- `type`: explicit `"thread"` or `"process"` wins. `"auto"` sends map-like and
-  network work to the process pool, location/device work to the thread pool, and
-  defaults to the process pool.
+- `type`: a required explicit `"thread"` or `"process"` choice. The runner never
+  infers a pool from the job name or coalescing key.
 - `coalesce_key`: identifies jobs where only the latest result is useful.
 - `at_most_once`: rejects a new job while the keyed job is active. Without it, a
   new keyed job cancels the previous token and becomes current.
@@ -104,10 +103,10 @@ The returned `JobHandler` is opaque application state: use its `job_id` for
 cancellation and pass it to `bind_handle_signals()` while it remains active.
 
 `submit()` is intentionally a short orchestration pipeline. It validates the
-callable, checks `_passes_preflight()`, resolves the pool before state mutation,
-registers the job through `_register_job()`, and delegates execution to
-`_dispatch()`. Coalescing policy is isolated in `_reserve_coalescing_slot()`, and
-worker callbacks cross into Qt through the reusable `_marshal_progress()` and
+callable, checks `_passes_preflight()`, registers the job through
+`_register_job()`, and delegates its explicit pool choice to `_dispatch()`.
+Coalescing policy is isolated in `_reserve_coalescing_slot()`, and worker
+callbacks cross into Qt through the reusable `_marshal_progress()` and
 `_marshal_terminal()` methods. Keep new submission policy in the focused helper
 that owns it instead of adding branches back to `submit()`.
 
