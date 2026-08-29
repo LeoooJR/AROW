@@ -2,7 +2,11 @@
 
 This guide describes the current async job path in AROW: how controllers submit blocking core work, what a `CoreRuntimeWork` must return, how results and failures are applied on the Qt main thread, how process-backed map rendering fits into the same pipeline, and how runtime logging remains traceable across workers.
 
-It matches the implementation in `src/controller/runner.py`, the domain subcontrollers under `src/controller/domains/`, `src/core/entrypoint.py`, and `src/core/work/`.
+It matches the implementation in `src/controller/runner.py`, the domain
+subcontrollers under `src/controller/domains/`, `src/core/entrypoint.py`, and
+`src/core/work/`. For the runner's internal state machine, deadline arbitration,
+and Qt terminal commit point, see
+[`src/controller/runner.md`](../src/controller/runner.md).
 
 Each work module has a same-basename Markdown companion with a visual trace from
 controller submission through main-thread application. The built-in job table
