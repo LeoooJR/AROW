@@ -8,7 +8,7 @@ import traceback as _traceback
 from collections.abc import Iterator
 from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
 import pytest
 
@@ -927,6 +927,26 @@ class TestAsyncRunnerProcessAndCoalesce:
 
 
 class TestAsyncRunnerPreflight:
+    def test_invalid_job_type_is_rejected_before_runner_state_is_registered(
+        self,
+        runner_factory: Callable[..., AsyncRunner],
+    ) -> None:
+        runner = runner_factory()
+
+        with pytest.raises(ValueError, match="Invalid job type"):
+            runner.submit(
+                JobSpecification(
+                    name="invalid-dispatch",
+                    fn=_return_value,
+                    coalesce_key="invalid-dispatch",
+                    type=cast(runner_mod.jobtype, "invalid"),
+                )
+            )
+
+        assert runner.history == {}
+        assert "invalid-dispatch" not in runner._coalesce_latest
+        runner.shutdown()
+
     def test_preflight_false_skips_submission_without_side_effects(
         self,
         runner_factory: Callable[..., AsyncRunner],

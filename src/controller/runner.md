@@ -19,6 +19,8 @@ is still current, cleans the job, and only then emits public signals.
 | Owner | State and responsibility |
 |---|---|
 | Controller / Qt main thread | Calls `submit()` and `cancel()`. Owns `history`, `_coalesce_latest`, and all application-visible signals. |
+| `_ExecutorPool` | Implements executor submission, future observation, and shutdown once for both pool types. |
+| `ThreadPool` / `ProcessPool` | Thin subclasses that construct the appropriate executor; the process variant also configures isolated worker logging. |
 | Thread or process executor | Runs `JobSpecification.fn(*args, **kwargs)`. Running work is not forcibly stopped. |
 | Future observer | Arbitrates future completion against the deadline under a lock. Exactly one terminal proposal wins. |
 | Deadline timer | Starts after executor submission, calls `Future.cancel()` best-effort, and proposes a timeout failure if it wins. |
@@ -100,6 +102,14 @@ flowchart TD
 
 The returned `JobHandler` is opaque application state: use its `job_id` for
 cancellation and pass it to `bind_handle_signals()` while it remains active.
+
+`submit()` is intentionally a short orchestration pipeline. It validates the
+callable, checks `_passes_preflight()`, resolves the pool before state mutation,
+registers the job through `_register_job()`, and delegates execution to
+`_dispatch()`. Coalescing policy is isolated in `_reserve_coalescing_slot()`, and
+worker callbacks cross into Qt through the reusable `_marshal_progress()` and
+`_marshal_terminal()` methods. Keep new submission policy in the focused helper
+that owns it instead of adding branches back to `submit()`.
 
 ## Why terminal handling has two stages
 
