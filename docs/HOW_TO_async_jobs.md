@@ -133,8 +133,9 @@ same shared `AsyncRunner` and binds the same main-thread lifecycle callbacks as
 event-driven jobs.
 
 Cron job names must be non-empty and unique, intervals must be positive, and no
-declarations may be added after commit. Application shutdown stops all cron
-timers before draining work and shutting down the runner. Fixed intervals are
+declarations may be added after commit. Application shutdown pauses all cron
+timers before draining work; an aborted shutdown resumes them, while successful
+teardown stops them permanently. Fixed intervals are
 process-local; wall-clock expressions and persisted schedules are not supported.
 
 ## Core work contract
@@ -334,7 +335,7 @@ are committed on the main thread. Immediately before committing, the runner
 rechecks whether the job was cancelled or superseded by a newer job with the
 same coalescing key. Either condition converts the queued proposal to
 `Cancelled`, including a queued completion or failure. The runner removes the
-job from active history and coalescing state before notifying runner-level and
+job from private active state and coalescing state before notifying runner-level and
 handle-level listeners, so reentrant listeners observe a terminal job as
 inactive. Duplicate or late proposals after that commit are ignored.
 
@@ -358,7 +359,13 @@ Core runtime submissions use one callback boundary:
 3. Register the work/outcome pair in `core/work/works_repository.py`; `ModelEntrypoint` uses that catalog to select `apply_main_thread` and uses the job origin to select `apply_failure_main_thread`.
 4. Keep orchestration-only behavior in the owning subcontroller. If it must run after core application, bind a second per-job signal after `_submit_model_entrypoint_async_call(...)` returns. Qt invokes slots in connection order, so the entrypoint applier runs first.
 
-Examples of controller-owned lifecycle behavior are startup chaining to host identity, releasing the close-time shutdown waiter, and clearing tracked map render handles. These handlers must not duplicate model mutation or core signal emission.
+Examples of controller-owned lifecycle behavior are startup chaining to host identity and clearing tracked map render handles. Application shutdown instead uses `AsyncRunner.request_drain(...)`: drain evaluation runs after terminal listeners, so synchronously chained jobs are included before quiescence becomes visible. These handlers must not duplicate model mutation or core signal emission.
+
+`cancel_active(excluding_names=...)` and `request_drain(timeout)` are the public
+shutdown primitives. Cancellation changes eventual visibility but does not stop
+running Python work. A drain completes asynchronously on the Qt main thread only
+when no registered jobs remain, and its first empty check is queued so callers
+can bind `Drained` and `TimedOut` before either signal is possible.
 
 ## Device refresh and reconciliation
 
@@ -420,7 +427,7 @@ Tests with a fake runner live under **`src/core/tests/test_async_runner.py`** fo
 
 | Symptom | What to check |
 |--------|------|
-| Refresh requests are ignored while one is running | This is expected with `at_most_once=True`; confirm the active job eventually leaves runner history. |
+| Refresh requests are ignored while one is running | This is expected with `at_most_once=True`; use `is_active(handle)` while debugging and confirm the active job eventually commits. |
 | A work fails before its body runs | Check `@preflight(...)` conditions and the work’s `error_to_raise=` mapping. |
 | `apply_result(...)` logs “unsupported result type” | The returned outcome type is not registered in the built-in work catalog and has no custom applier. |
 | A reconnect creates a second device row instead of updating the existing one | The handset probably lacks a Tier-1 `hw:v1:` stable key, so reconciliation intentionally avoids merging on Tier-2 fingerprint keys. |

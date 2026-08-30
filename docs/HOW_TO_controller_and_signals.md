@@ -114,16 +114,23 @@ Constraints:
 
 ### Shutdown
 
-`AppController._on_application_about_to_quit()` does more than just stop the runner:
+`MainWindow` uses managed close only after `AppController` enables it. The first
+close request is ignored so Qt's main event loop stays available, interaction is
+disabled, and `ApplicationShutdownRequested` starts an event-driven state
+machine:
 
-1. Detaches the view reference.
-2. Waits for bootstrap jobs (`startup_core_runtime`, `host_install_identity`) to finish, fail, or cancel.
-3. Enqueues `close_core_runtime`.
-4. Waits for close to apply on the main thread.
-5. Persists simulation metadata.
-6. Shuts down the shared `AsyncRunner`.
+1. Pause recurring jobs, cancel non-bootstrap outcomes, and ask `AsyncRunner` to
+   drain without exposing its active-job storage.
+2. Preserve `startup_core_runtime` and its synchronously chained
+   `host_install_identity` job until both have committed on the Qt main thread.
+3. Delegate `close_core_runtime` to `AdbSubController.run_shutdown()` and drain
+   again so its core result or failure applier finishes before teardown.
+4. Persist simulation metadata, stop cron permanently, shut down the runner,
+   and permit the final window close.
 
-This is why ADB startup and close work should continue to use the controller/runner pipeline instead of bespoke threads or direct shutdown calls.
+A pre-close drain timeout restores the UI and cron schedule. Once ADB close has
+started it is not reversible: a timeout warns the user but keeps Qt alive until
+the close job actually commits. No shutdown phase uses a nested `QEventLoop`.
 
 ## Adding a new controller-driven flow
 

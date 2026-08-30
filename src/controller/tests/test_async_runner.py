@@ -18,7 +18,7 @@ from PySide6.QtCore import QEventLoop
 from PySide6.QtWidgets import QApplication
 
 import controller.runner as runner_mod
-from controller.runner import AsyncRunner, JobError, JobSpecification
+from controller.runner import AsyncRunner, JobError, JobHandler, JobSpecification
 
 pytestmark = [pytest.mark.async_jobs]
 
@@ -347,6 +347,145 @@ def runner_factory(monkeypatch: pytest.MonkeyPatch) -> Callable[..., AsyncRunner
     return _factory
 
 
+class TestAsyncRunnerDrain:
+    def test_empty_drain_completes_asynchronously_on_main_thread(
+        self, runner_factory: Callable[..., AsyncRunner]
+    ) -> None:
+        runner = runner_factory()
+        main_thread_id = threading.get_ident()
+        drained_threads: list[int] = []
+
+        drain = runner.request_drain(timeout=1.0)
+        drain.Drained.connect(lambda: drained_threads.append(threading.get_ident()))
+
+        assert drained_threads == []
+        _process_events_until(lambda: drained_threads == [main_thread_id])
+        runner.shutdown()
+
+    def test_drain_waits_for_every_active_job(
+        self, runner_factory: Callable[..., AsyncRunner]
+    ) -> None:
+        pending: dict[str, Callable[[], None]] = {}
+        runner = runner_factory(thread_pending=pending)
+        first = runner.submit(
+            JobSpecification(name="first", fn=lambda: 1, type="thread")
+        )
+        second = runner.submit(
+            JobSpecification(name="second", fn=lambda: 2, type="thread")
+        )
+        assert first is not None
+        assert second is not None
+        drained: list[bool] = []
+        drain = runner.request_drain(timeout=1.0)
+        drain.Drained.connect(lambda: drained.append(True))
+
+        pending[first.job_id]()
+        _process_events_until(lambda: not runner.is_active(first))
+        QApplication.instance().processEvents(QEventLoop.AllEvents, 50)
+        assert drained == []
+
+        pending[second.job_id]()
+        _process_events_until(lambda: drained == [True])
+        runner.shutdown()
+
+    def test_drain_includes_job_chained_from_terminal_listener(
+        self, runner_factory: Callable[..., AsyncRunner]
+    ) -> None:
+        pending: dict[str, Callable[[], None]] = {}
+        runner = runner_factory(thread_pending=pending)
+        drained: list[bool] = []
+        first = runner.submit(
+            JobSpecification(name="startup", fn=lambda: "started", type="thread")
+        )
+        assert first is not None
+
+        chained: list[JobHandler] = []
+
+        def submit_chained(_result: object) -> None:
+            handle = runner.submit(
+                JobSpecification(
+                    name="host-identity",
+                    fn=lambda: "identified",
+                    type="thread",
+                )
+            )
+            assert handle is not None
+            chained.append(handle)
+
+        runner.bind_handle_signals(first).Completed.connect(submit_chained)
+        drain = runner.request_drain(timeout=1.0)
+        drain.Drained.connect(lambda: drained.append(True))
+
+        pending[first.job_id]()
+        _process_events_until(lambda: len(chained) == 1)
+        QApplication.instance().processEvents(QEventLoop.AllEvents, 50)
+        assert drained == []
+
+        pending[chained[0].job_id]()
+        _process_events_until(lambda: drained == [True])
+        runner.shutdown()
+
+    def test_cancel_active_preserves_named_lifecycle_jobs(
+        self, runner_factory: Callable[..., AsyncRunner]
+    ) -> None:
+        pending: dict[str, Callable[[], None]] = {}
+        runner = runner_factory(thread_pending=pending)
+        bootstrap = runner.submit(
+            JobSpecification(name="startup", fn=lambda: None, type="thread")
+        )
+        disposable = runner.submit(
+            JobSpecification(name="render", fn=lambda: None, type="thread")
+        )
+        assert bootstrap is not None
+        assert disposable is not None
+
+        runner.cancel_active(excluding_names={"startup"})
+
+        assert not bootstrap.cancel_token.is_cancelled()
+        assert disposable.cancel_token.is_cancelled()
+        pending[bootstrap.job_id]()
+        pending[disposable.job_id]()
+        _process_events_until(
+            lambda: not runner.is_active(bootstrap) and not runner.is_active(disposable)
+        )
+        runner.shutdown()
+
+    def test_drain_timeout_is_terminal_for_the_observer_only(
+        self, runner_factory: Callable[..., AsyncRunner]
+    ) -> None:
+        pending: dict[str, Callable[[], None]] = {}
+        runner = runner_factory(thread_pending=pending)
+        handle = runner.submit(
+            JobSpecification(name="blocked", fn=lambda: None, type="thread")
+        )
+        assert handle is not None
+        timed_out: list[bool] = []
+        drained: list[bool] = []
+        drain = runner.request_drain(timeout=0.01)
+        drain.TimedOut.connect(lambda: timed_out.append(True))
+        drain.Drained.connect(lambda: drained.append(True))
+
+        _process_events_until(lambda: timed_out == [True])
+        assert runner.is_active(handle)
+        pending[handle.job_id]()
+        _process_events_until(lambda: not runner.is_active(handle))
+        assert drained == []
+        runner.shutdown()
+
+    @pytest.mark.parametrize("timeout", [0.0, -1.0, float("inf"), float("nan")])
+    def test_drain_timeout_must_be_positive_and_finite(
+        self,
+        timeout: float,
+        runner_factory: Callable[..., AsyncRunner],
+    ) -> None:
+        runner = runner_factory()
+
+        with pytest.raises(ValueError, match="positive finite"):
+            runner.request_drain(timeout)
+
+        runner.shutdown()
+
+
 class TestAsyncRunnerThreadSignals:
     def test_thread_timeout_is_marshaled_and_cleans_runner_state(
         self,
@@ -390,7 +529,7 @@ class TestAsyncRunnerThreadSignals:
         assert runner_failed[0][2] == main_thread_id
         assert handle_failed == [(runner_failed[0][1], main_thread_id)]
         assert completed == []
-        assert handle.job_id not in runner.history
+        assert not runner.is_active(handle)
         assert "timeout-test" not in runner._coalesce_latest
 
         release.set()
@@ -430,12 +569,12 @@ class TestAsyncRunnerThreadSignals:
         )
         handle = runner.submit(spec)
         assert handle is not None
-        assert handle.job_id in runner.history
+        assert runner.is_active(handle)
 
         _process_events_until(lambda: len(completed) == 1 or len(failed) == 1)
         assert failed == []
         assert completed[0][1] == "ok"
-        assert handle.job_id not in runner.history
+        assert not runner.is_active(handle)
 
         runner.shutdown()
 
@@ -465,7 +604,7 @@ class TestAsyncRunnerThreadSignals:
         )
         handle = runner.submit(spec)
         assert handle is not None
-        assert handle.job_id in runner.history
+        assert runner.is_active(handle)
 
         _process_events_until(lambda: len(failed) == 1)
         assert completed == []
@@ -477,7 +616,7 @@ class TestAsyncRunnerThreadSignals:
         assert err.exception_type == "RuntimeError"
         assert isinstance(err.exception, RuntimeError)
         assert str(err.exception) == "boom"
-        assert handle.job_id not in runner.history
+        assert not runner.is_active(handle)
 
         runner.shutdown()
 
@@ -513,7 +652,7 @@ class TestAsyncRunnerThreadSignals:
         _process_events_until(lambda: len(cancelled) == 1)
         assert completed == []
         assert cancelled[0] == handle.job_id
-        assert handle.job_id not in runner.history
+        assert not runner.is_active(handle)
 
         runner.shutdown()
 
@@ -551,7 +690,7 @@ class TestAsyncRunnerTerminalCommit:
         assert runner_completed == []
         assert handle_completed == []
         assert handle_cancelled == [True]
-        assert handle.job_id not in runner.history
+        assert not runner.is_active(handle)
         runner.shutdown()
 
     def test_superseded_queued_completion_cannot_clear_latest_job(
@@ -592,7 +731,7 @@ class TestAsyncRunnerTerminalCommit:
             lambda: state_seen_when_first_cancelled.append(
                 (
                     runner._coalesce_latest.get("location"),
-                    second.job_id in runner.history,
+                    runner.is_active(second),
                 )
             )
         )
@@ -602,7 +741,7 @@ class TestAsyncRunnerTerminalCommit:
         assert cancelled == [first.job_id]
         assert completed == [(second.job_id, "current")]
         assert state_seen_when_first_cancelled == [(second.job_id, True)]
-        assert runner.history == {}
+        assert runner._active_jobs == {}
         assert "location" not in runner._coalesce_latest
         runner.shutdown()
 
@@ -645,7 +784,7 @@ class TestAsyncRunnerTerminalCommit:
         _process_events_until(lambda: cancelled == [handle.job_id])
 
         assert failed == []
-        assert handle.job_id not in runner.history
+        assert not runner.is_active(handle)
         runner.shutdown()
 
     def test_late_duplicate_terminal_proposal_is_ignored(
@@ -706,7 +845,7 @@ class TestAsyncRunnerProcessAndCoalesce:
         )
         handle = runner.submit(spec)
         assert handle is not None
-        assert handle.job_id in runner.history
+        assert runner.is_active(handle)
 
         _process_events_until(lambda: len(failed) == 1)
         assert completed == []
@@ -714,7 +853,7 @@ class TestAsyncRunnerProcessAndCoalesce:
         assert _job_id == handle.job_id
         assert "Job failed: process-failure" in err.message
         assert "boom" in err.message
-        assert handle.job_id not in runner.history
+        assert not runner.is_active(handle)
 
         runner.shutdown()
 
@@ -761,8 +900,8 @@ class TestAsyncRunnerProcessAndCoalesce:
         )
         handle2 = runner.submit(spec2)
         assert handle2 is not None
-        assert handle1.job_id in runner.history
-        assert handle2.job_id in runner.history
+        assert runner.is_active(handle1)
+        assert runner.is_active(handle2)
 
         assert handle1.job_id in pending
         assert handle2.job_id in pending
@@ -777,8 +916,8 @@ class TestAsyncRunnerProcessAndCoalesce:
         assert completed[0][0] == handle2.job_id
         assert completed[0][1] == "job-2-result"
 
-        assert handle1.job_id not in runner.history
-        assert handle2.job_id not in runner.history
+        assert not runner.is_active(handle1)
+        assert not runner.is_active(handle2)
 
         runner.shutdown()
 
@@ -802,7 +941,7 @@ class TestAsyncRunnerProcessAndCoalesce:
         )
         assert handle is not None
 
-        _process_events_until(lambda: handle.job_id not in runner.history)
+        _process_events_until(lambda: not runner.is_active(handle))
         assert "device" not in runner._coalesce_latest
 
         runner.shutdown()
@@ -838,7 +977,7 @@ class TestAsyncRunnerProcessAndCoalesce:
         )
         handle1 = runner.submit(spec1)
         assert handle1 is not None
-        assert handle1.job_id in runner.history
+        assert runner.is_active(handle1)
         assert handle1.job_id in pending
 
         spec2 = JobSpecification(
@@ -855,8 +994,8 @@ class TestAsyncRunnerProcessAndCoalesce:
         )
         handle2 = runner.submit(spec2)
         assert handle2 is None
-        assert len(runner.history) == 1
-        assert handle1.job_id in runner.history
+        assert len(runner._active_jobs) == 1
+        assert runner.is_active(handle1)
         assert not handle1.cancel_token.is_cancelled()
         assert len(pending) == 1
 
@@ -865,7 +1004,7 @@ class TestAsyncRunnerProcessAndCoalesce:
         assert cancelled == []
         assert completed[0][0] == handle1.job_id
         assert completed[0][1] == "refresh-1-result"
-        assert handle1.job_id not in runner.history
+        assert not runner.is_active(handle1)
         assert "refresh_device_list" not in runner._coalesce_latest
 
         runner.shutdown()
@@ -908,7 +1047,7 @@ class TestAsyncRunnerPreflight:
 
         assert handle is None
         assert preflight_calls == ["called"]
-        assert runner.history == {}
+        assert runner._active_jobs == {}
         assert "preflight-test" not in runner._coalesce_latest
 
         runner.shutdown()
@@ -940,7 +1079,7 @@ class TestAsyncRunnerPreflight:
         )
 
         assert handle is not None
-        assert handle.job_id in runner.history
+        assert runner.is_active(handle)
         assert handle.job_id in pending
 
         pending[handle.job_id]()

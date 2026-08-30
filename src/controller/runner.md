@@ -18,7 +18,8 @@ is still current, cleans the job, and only then emits public signals.
 
 | Owner | State and responsibility |
 |---|---|
-| Controller / Qt main thread | Calls `submit()` and `cancel()`. Owns `history`, `_coalesce_latest`, and all application-visible signals. |
+| Controller / Qt main thread | Calls the runner's submission, cancellation, and drain APIs without inspecting internal job storage. |
+| `AsyncRunner` | Owns `_active_jobs`, `_coalesce_latest`, pending drains, and all application-visible signals. |
 | `_ExecutorPool` | Implements executor submission, future observation, and shutdown once for both pool types. |
 | `ThreadPool` / `ProcessPool` | Thin subclasses that construct the appropriate executor; the process variant also configures isolated worker logging. |
 | Thread or process executor | Runs `JobSpecification.fn(*args, **kwargs)`. Running work is not forcibly stopped. |
@@ -38,24 +39,30 @@ flowchart TD
         D --> E{"coalesce_key already active?"}
         E -- "at_most_once" --> E0["Return None; existing job remains current"]
         E -- "latest wins" --> E1["Cancel previous token;<br/>record new job as latest"]
-        E -- "no" --> F["Record history and optional latest key"]
+        E -- "no" --> F["Record active job and optional latest key"]
         E1 --> F
         F --> G["Resolve thread or process pool"]
 
         X["cancel(job_id)"] --> X1["Set active handle's CancelToken"]
         Y["New job with same key"] --> E
 
-        Q["_terminal_ready<br/>QueuedConnection"] --> R{"job still in history?"}
+        Q["_terminal_ready<br/>QueuedConnection"] --> R{"job still active?"}
         R -- "no" --> R0["Discard duplicate or late proposal"]
         R -- "yes" --> S{"cancelled or superseded?"}
         S -- "yes" --> T["Replace proposal with Cancelled"]
         S -- "no" --> U["Keep proposed outcome"]
-        T --> V["Remove history and only this job's<br/>current coalescing entry"]
+        T --> V["Remove active job and only this job's<br/>current coalescing entry"]
         U --> V
         V --> W{"Committed proposal"}
         W -- "Completed" --> W1["Runner Completed, then handle Completed"]
         W -- "Failed / timeout" --> W2["Runner Failed, then handle Failed"]
         W -- "Cancelled" --> W3["Runner Cancelled, then handle Cancelled"]
+        W1 --> Z["Queue drain evaluation after listeners"]
+        W2 --> Z
+        W3 --> Z
+        Z --> Z1{"active jobs remain?"}
+        Z1 -- "no" --> Z2["Emit Drained for pending observers"]
+        Z1 -- "yes" --> Z3["Keep observing"]
 
         P0["_progress_ready<br/>QueuedConnection"] --> P1["Runner Progress;<br/>handle Progress if still active"]
     end
@@ -100,7 +107,8 @@ flowchart TD
   it to reorder work.
 
 The returned `JobHandler` is opaque application state: use its `job_id` for
-cancellation and pass it to `bind_handle_signals()` while it remains active.
+cancellation, `is_active(handle)` for supported inspection, and pass it to
+`bind_handle_signals()` while it remains active.
 
 `submit()` is intentionally a short orchestration pipeline. It validates the
 callable, checks `_passes_preflight()`, registers the job through
@@ -134,7 +142,7 @@ A proposal can wait in Qt's event queue while the user cancels its job or a newe
 job takes ownership of the same coalescing key. `_commit_terminal()` therefore
 checks the latest main-thread state immediately before visibility:
 
-1. A proposal for a job absent from `history` is late or duplicated and is
+1. A proposal for a job absent from `_active_jobs` is late or duplicated and is
    discarded.
 2. A cancelled or superseded job commits as `Cancelled`, regardless of whether
    the queued proposal was completion, failure, or timeout.
@@ -148,16 +156,29 @@ until the Qt main thread commits it.**
 
 ## State invariants
 
-- `history[job_id]` contains the active `JobHandler` and its
+- `_active_jobs[job_id]` contains the active `JobHandler` and its
   `JobHandlerSignals`.
 - `_coalesce_latest[key]` points only to the current job for that key.
 - Cleaning an older superseded job must not remove the newer job's coalescing
   entry.
 - A terminal commit removes active state exactly once before emitting public
   terminal signals.
-- A missing history entry makes all later terminal proposals inert.
+- A missing active-job entry makes all later terminal proposals inert.
 - Cancellation changes terminal visibility; it does not terminate already
-  running Python work or inject `CancelToken` into `fn`.
+running Python work or inject `CancelToken` into `fn`.
+
+## Cancellation and draining
+
+`cancel_active(excluding_names=...)` marks every non-preserved active job as
+cancelled. It does not remove jobs immediately; each still reaches the Qt
+terminal commit point as `Cancelled`.
+
+`request_drain(timeout)` returns a `DrainHandle` with `Drained` and `TimedOut`
+signals. The initial empty check and every post-terminal check are queued. In
+particular, drain evaluation happens after runner-level and handle-level terminal
+listeners, allowing a listener to submit a lifecycle successor without a false
+quiescent interval. A timeout ends only that observation and never cancels or
+removes active jobs. Passing `None` waits without a deadline.
 
 Progress follows a separate queued path. Runner-level `Progress` is forwarded
 when its Qt event arrives; handle-level `Progress` is emitted only if the job is
@@ -174,9 +195,10 @@ expected transition is missing.
 | `submit()` returns `None` | `preflight`, `at_most_once`, and `coalesce_key` | Submission was intentionally skipped before executor dispatch. |
 | Expected completion becomes cancellation | `CancelToken.is_cancelled()` and `_coalesce_latest[key]` at commit | The job was cancelled or replaced while its proposal waited in Qt. |
 | Timeout appears while work continues | Deadline log followed by worker activity | Expected: running executor work cannot be killed; its late result is ignored. |
-| No second terminal signal for a late result | `history` membership and “Late async … discarded” logs | Expected at-most-once behavior after timeout or cleanup. |
+| No second terminal signal for a late result | `_active_jobs` membership and “Late async … discarded” logs | Expected at-most-once behavior after timeout or cleanup. |
 | A new coalesced job disappears unexpectedly | `_cleanup()` key comparison | Cleanup must delete a key only when it still points to the finishing `job_id`. |
-| Callback cannot be bound | `history` membership before `bind_handle_signals()` | Binding happened after terminal cleanup; bind immediately after submission. |
+| Callback cannot be bound | `is_active(handle)` before `bind_handle_signals()` | Binding happened after terminal cleanup; bind immediately after submission. |
+| Drain never completes | Active-job log attached to “Async runner drain timed out” | A running job has not yet proposed and committed its terminal state. |
 | Failure lacks useful routing | `JobError.origin`, `exception_type`, and `traceback` | `origin` should be the `JobSpecification.name`; timeout tracebacks are intentionally empty. |
 | UI callback runs on the wrong thread | `_terminal_ready` connection and runner affinity | The internal signal must remain a `QueuedConnection`, and the runner must live on the Qt main thread. |
 

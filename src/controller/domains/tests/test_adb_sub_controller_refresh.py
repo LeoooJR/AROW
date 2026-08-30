@@ -170,27 +170,19 @@ def test_startup_does_not_enqueue_host_identity_for_unsupported_payload() -> Non
     assert events == ["applied"]
 
 
-@pytest.mark.parametrize("terminal_signal", ["Completed", "Failed"])
-def test_close_hook_runs_after_core_apply(
-    terminal_signal: str,
-) -> None:
+def test_run_shutdown_submits_close_with_core_appliers() -> None:
     app = _AppStub()
-    events: list[str] = []
-    app.model_entrypoint.apply_result = lambda result: events.append("applied")  # type: ignore[method-assign]
-    app.model_entrypoint.apply_failure = lambda error: events.append("failed")  # type: ignore[method-assign]
     adb = _make_adb_sub_controller(app)
 
-    adb._enqueue_close_core_runtime(after_apply=lambda: events.append("hook"))
-    payload = (
-        object()
-        if terminal_signal == "Completed"
-        else JobError(message="boom", traceback="", origin="close_core_runtime")
-    )
-    getattr(app.handle_signals["job-1"], terminal_signal).emit(payload)
+    adb.run_shutdown()
 
-    expected_apply = "applied" if terminal_signal == "Completed" else "failed"
-    assert events == [expected_apply, "hook"]
-    assert adb._pending_after_close_apply is None
+    submission = app.submitted[0]
+    assert submission["name"] == "close_core_runtime"
+    assert submission["fn"] == app.model_entrypoint.close_core_runtime
+    assert submission["job_type"] == "thread"
+    assert submission["coalesce_key"] == "close"
+    assert submission["on_completed"] == app.model_entrypoint.apply_result
+    assert submission["on_failed"] == app.model_entrypoint.apply_failure
 
 
 def test_on_devices_updated_forwards_device_id_rebindings_to_view() -> None:

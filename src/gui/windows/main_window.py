@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Final
 
 from PySide6.QtCore import QSize, Slot
-from PySide6.QtGui import QColor, QFont, QPalette, QPixmap
+from PySide6.QtGui import QCloseEvent, QColor, QFont, QPalette, QPixmap
 from PySide6.QtWidgets import QApplication, QMainWindow, QMessageBox
 
 import gui.ressources_rc  # noqa: F401
@@ -119,6 +119,10 @@ class MainWindow(QMainWindow):
         simulation_location_rejected_toast: str = (
             "Invalid map location for marker {km} on line {line_code}-{line_troncon}: {reason}."
         )
+        shutdown_failed_toast: str = "Application shutdown was cancelled: {reason}."
+        shutdown_delayed_toast: str = (
+            "Application shutdown is taking longer while ADB finishes closing."
+        )
 
     @dataclass
     class UI:
@@ -133,6 +137,9 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self._device_selection_dialog_open: bool = False
+        self._managed_shutdown_enabled = False
+        self._shutdown_pending = False
+        self._shutdown_permitted = False
 
         self.ui: MainWindow.UI
         self.texts = MainWindow.Text()
@@ -215,6 +222,31 @@ class MainWindow(QMainWindow):
         #### Signals for handling the device selection workflow ####
         signals.DEVICE.DeviceSelectionRequested.connect(
             self._on_device_selection_requested
+        )
+
+    def enable_managed_shutdown(self) -> None:
+        """Route future window-close requests through the controller lifecycle."""
+        self._managed_shutdown_enabled = True
+
+    def abort_managed_shutdown(self, reason: str) -> None:
+        """Restore interaction after shutdown could not safely proceed."""
+        self._shutdown_pending = False
+        self.setEnabled(True)
+        self.ui.app_shell.post_toast(
+            self.texts.shutdown_failed_toast.format(reason=reason),
+            level="error",
+        )
+
+    def complete_managed_shutdown(self) -> None:
+        """Permit and perform the final close after controller teardown."""
+        self._shutdown_permitted = True
+        self.close()
+
+    def report_managed_shutdown_delay(self) -> None:
+        """Notify the user while a non-reversible ADB close remains pending."""
+        self.ui.app_shell.post_toast(
+            self.texts.shutdown_delayed_toast,
+            level="warning",
         )
 
     ### Slots ###
@@ -452,3 +484,16 @@ class MainWindow(QMainWindow):
         super().resizeEvent(event)
         if hasattr(self, "ui") and self.ui.authentication_overlay is not None:
             self.ui.authentication_overlay.setGeometry(self.ui.app_shell.rect())
+
+    def closeEvent(self, event: QCloseEvent) -> None:
+        """Delay managed closes until the controller completes async teardown."""
+        if not self._managed_shutdown_enabled or self._shutdown_permitted:
+            super().closeEvent(event)
+            return
+
+        event.ignore()
+        if self._shutdown_pending:
+            return
+        self._shutdown_pending = True
+        self.setEnabled(False)
+        signals.UI.ApplicationShutdownRequested.emit()

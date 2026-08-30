@@ -4,7 +4,6 @@ ADB and device list orchestration (server lifecycle, pairing, list refresh, core
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Slot
@@ -33,11 +32,6 @@ _REFRESH_DEVICE_LIST_INTERVAL_MS = 30000
 
 class AdbSubController(AppSubController):
     """Subcontroller for ADB server and device list flows (no own AsyncRunner)."""
-
-    def __init__(self, app: AppController) -> None:
-        super().__init__(app)
-        # One-shot hook after CloseCoreRuntime apply (e.g. quit a nested QEventLoop).
-        self._pending_after_close_apply: Callable[[], None] | None = None
 
     def _submit_model_entrypoint_async_call(self, *args, **kwargs):
         return self._app._submit_model_entrypoint_async_call(*args, **kwargs)
@@ -98,6 +92,18 @@ class AdbSubController(AppSubController):
         Invoked from AppController after all signal wiring is in place.
         """
         self._startup_core_runtime()
+
+    def run_shutdown(self) -> None:
+        """Stop the core ADB runtime through the shared asynchronous runner."""
+        self._submit_model_entrypoint_async_call(
+            name="close_core_runtime",
+            fn=self.model_entrypoint.close_core_runtime,
+            description="Stop ADB server and detach core runtime",
+            job_type="thread",
+            coalesce_key="close",
+            on_completed=self.model_entrypoint.apply_result,
+            on_failed=self.model_entrypoint.apply_failure,
+        )
 
     def _startup_core_runtime(self) -> None:
         handle = self._submit_model_entrypoint_async_call(
@@ -166,29 +172,6 @@ class AdbSubController(AppSubController):
         """Remove device from ADB on a worker."""
         pass  # TODO: Implement the thread job to remove device
 
-    def _enqueue_close_core_runtime(
-        self,
-        *,
-        after_apply: Callable[[], None] | None = None,
-    ) -> None:
-        """Stop ADB on a worker and apply its outcome on the main thread."""
-        self._pending_after_close_apply = after_apply
-        handle = self._submit_model_entrypoint_async_call(
-            name="close_core_runtime",
-            fn=self.model_entrypoint.close_core_runtime,
-            description="Stop ADB server and detach core runtime",
-            job_type="thread",
-            coalesce_key="close",
-            on_completed=self.model_entrypoint.apply_result,
-            on_failed=self.model_entrypoint.apply_failure,
-        )
-        if handle is not None:
-            handle_signals = self._app.runner.bind_handle_signals(handle)
-            # These are connected after the core appliers above, so the shutdown
-            # waiter is released only once main-thread application has finished.
-            handle_signals.Completed.connect(self._on_close_core_runtime_applied)
-            handle_signals.Failed.connect(self._on_close_core_runtime_applied)
-
     @Slot(object)
     def _on_startup_core_runtime_applied(self, result: object) -> None:
         """Chain host identity only after a validated startup outcome was applied."""
@@ -199,14 +182,6 @@ class AdbSubController(AppSubController):
             )
             return
         self._enqueue_host_install_identity_job()
-
-    @Slot(object)
-    def _on_close_core_runtime_applied(self, _result_or_error: object) -> None:
-        """Consume the one-shot shutdown hook after close success or failure apply."""
-        hook = self._pending_after_close_apply
-        self._pending_after_close_apply = None
-        if hook is not None:
-            hook()
 
     def _on_adb_server_started(self, payload: AdbServerStartedPayload) -> None:
         self.view.forward_adb_server_started()
