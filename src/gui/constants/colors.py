@@ -194,7 +194,11 @@ class Colors(Enum):
     SUCCESS_SOFT = Color("Success Soft", "#EAF7F0", "rgba(85, 192, 131, 0.16)")
     SUCCESS_BORDER = Color("Success Border", "#BFE6D0", "rgba(85, 192, 131, 0.32)")
     ERROR = Color("Error", "#D9544D", "#F07167")
+    ERROR_SOFT = Color("Error Soft", "#FCEBEA", "rgba(240, 113, 103, 0.14)")
+    ERROR_BORDER = Color("Error Border", "#F2C3C0", "rgba(240, 113, 103, 0.34)")
     WARNING = Color("Warning", "#D98A24", "#E6A04A")
+    WARNING_SOFT = Color("Warning Soft", "#FFF5E7", "rgba(230, 160, 74, 0.14)")
+    WARNING_BORDER = Color("Warning Border", "#F1D5AC", "rgba(230, 160, 74, 0.34)")
     INFO = Color("Info", "#2F6FED", "#7AA2FF")
     WHITE = Color("White", "#FFFFFF", "#FAF9F6")
     BLACK = Color("Black", "#0A0A0A", "#FAF9F6")
@@ -244,7 +248,11 @@ class Palette:
     HIGHLIGHT: str
     SUCCESS: str
     ERROR: str
+    ERROR_SOFT: str
+    ERROR_BORDER: str
     WARNING: str
+    WARNING_SOFT: str
+    WARNING_BORDER: str
     INFO: str
     PLACEHOLDER: str
     PLACEHOLDER_TEXT: str

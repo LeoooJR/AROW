@@ -24,6 +24,16 @@ class AuthentificationCardSettings:
 
 
 @dataclass(frozen=True)
+class ShutdownCardSettings:
+    """Managed-shutdown card dimensions."""
+
+    MIN_WIDTH: int = 380
+    MAX_WIDTH: int = 520
+    STATUS_ICON_SIZE: int = 48
+    STATUS_GLYPH_SIZE: int = 20
+
+
+@dataclass(frozen=True)
 class AttentionHighlightSettings:
     """Shared pulse-highlight animation timing for attention drawers."""
 
@@ -37,6 +47,7 @@ class ContainerSettings:
 
     PLACEHOLDER = PlaceHolderSettings()
     AUTHENTIFICATION_CARD = AuthentificationCardSettings()
+    SHUTDOWN_CARD = ShutdownCardSettings()
     ATTENTION_HIGHLIGHT = AttentionHighlightSettings()
 
 

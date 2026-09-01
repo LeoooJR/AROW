@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import datetime
 import os
 import threading
 import time
-import traceback as _traceback
 from collections.abc import Iterator
 from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
@@ -271,7 +269,8 @@ class _FakePool:
         cancel_token: Any,
         _emit_progress: Callable[[str, object], None],
         propose_terminal: Callable[[str, runner_mod._TerminalProposal], None],
-    ) -> None:
+    ) -> Future[Any]:
+        future: Future[Any] = Future()
         if self._pool_name is not None and self._pool_by_job_id is not None:
             self._pool_by_job_id[job_id] = self._pool_name
 
@@ -284,8 +283,10 @@ class _FakePool:
                 if job.fn is None:
                     raise ValueError("JobSpecification.fn must be set (callable)")
                 result = job.fn(*job.args, **job.kwargs)
+                future.set_result(result)
                 propose_terminal(job_id, runner_mod._CompletedProposal(result))
             except Exception as e:  # noqa: BLE001 - test helper
+                future.set_exception(e)
                 propose_terminal(
                     job_id,
                     runner_mod._FailedProposal(
@@ -295,10 +296,10 @@ class _FakePool:
 
         if self._pending is not None:
             self._pending[job_id] = _complete
-            return None
+            return future
 
         _complete()
-        return None
+        return future
 
     def shutdown(self) -> None:
         if self._shutdown_cb is not None:
@@ -448,6 +449,32 @@ class TestAsyncRunnerDrain:
         _process_events_until(
             lambda: not runner.is_active(bootstrap) and not runner.is_active(disposable)
         )
+        runner.shutdown()
+
+    def test_cancelled_hung_job_drains_before_worker_finishes(
+        self, runner_factory: Callable[..., AsyncRunner]
+    ) -> None:
+        pending: dict[str, Callable[[], None]] = {}
+        runner = runner_factory(thread_pending=pending)
+        handle = runner.submit(
+            JobSpecification(name="hung-refresh", fn=lambda: None, type="thread")
+        )
+        assert handle is not None
+        cancelled: list[str] = []
+        drained: list[bool] = []
+        runner.signals.Cancelled.connect(cancelled.append)
+
+        runner.cancel(handle.job_id)
+        drain = runner.request_drain(timeout=1.0)
+        drain.Drained.connect(lambda: drained.append(True))
+
+        _process_events_until(lambda: drained == [True])
+        assert cancelled == [handle.job_id]
+        assert handle.job_id in pending
+
+        pending[handle.job_id]()
+        QApplication.instance().processEvents(QEventLoop.AllEvents, 50)
+        assert cancelled == [handle.job_id]
         runner.shutdown()
 
     def test_drain_timeout_is_terminal_for_the_observer_only(
@@ -1016,6 +1043,31 @@ class TestAsyncRunnerProcessAndCoalesce:
         assert len(duplicate_records) == 1
         assert duplicate_records[0]["level"].name == "DEBUG"
         assert duplicate_records[0]["extra"]["reason"] == "at_most_once"
+
+    def test_cancelled_at_most_once_job_does_not_block_replacement(
+        self, runner_factory: Callable[..., AsyncRunner]
+    ) -> None:
+        pending: dict[str, Callable[[], None]] = {}
+        runner = runner_factory(thread_pending=pending)
+        specification = JobSpecification(
+            name="refresh",
+            fn=lambda: "refreshed",
+            coalesce_key="refresh_device_list",
+            at_most_once=True,
+            type="thread",
+        )
+        first = runner.submit(specification)
+        assert first is not None
+
+        runner.cancel(first.job_id)
+        replacement = runner.submit(specification)
+
+        assert replacement is not None
+        assert replacement.job_id != first.job_id
+        _process_events_until(lambda: not runner.is_active(first))
+        pending[replacement.job_id]()
+        _process_events_until(lambda: not runner.is_active(replacement))
+        runner.shutdown()
 
 
 class TestAsyncRunnerPreflight:

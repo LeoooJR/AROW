@@ -33,10 +33,19 @@ class _AppControllerProbe:
         AppController._on_application_shutdown_requested
     )
     _await_runner_drain = AppController._await_runner_drain
-    _abort_shutdown = AppController._abort_shutdown
+    _continue_waiting_for_background_work = (
+        AppController._continue_waiting_for_background_work
+    )
+    _on_application_shutdown_wait_requested = (
+        AppController._on_application_shutdown_wait_requested
+    )
+    _on_application_force_close_requested = (
+        AppController._on_application_force_close_requested
+    )
     _begin_adb_shutdown = AppController._begin_adb_shutdown
     _continue_waiting_for_adb_close = AppController._continue_waiting_for_adb_close
     _finalize_shutdown = AppController._finalize_shutdown
+    _persist_simulations_best_effort = AppController._persist_simulations_best_effort
 
     def __init__(self) -> None:
         self._shutdown_state = _ShutdownState.RUNNING
@@ -46,6 +55,8 @@ class _AppControllerProbe:
         self._adb = MagicMock()
         self._simulation = MagicMock()
         self.view = MagicMock()
+        self.force_exit = MagicMock()
+        self._force_exit = self.force_exit
 
 
 def test_shutdown_cancels_noncritical_jobs_and_ignores_duplicate_request() -> None:
@@ -89,18 +100,22 @@ def test_shutdown_delegates_adb_close_then_finalizes_in_order() -> None:
     assert probe.view is None
 
 
-def test_pre_close_drain_timeout_aborts_and_restores_application() -> None:
+def test_pre_close_drain_timeout_offers_choice_and_keeps_draining() -> None:
     probe = _AppControllerProbe()
 
     probe._on_application_shutdown_requested()
     probe.runner.drain_requests[0][1].TimedOut.emit()
 
-    assert probe._shutdown_state is _ShutdownState.RUNNING
-    probe.cron_manager.resume.assert_called_once_with()
-    probe.view.abort_managed_shutdown.assert_called_once_with(
-        "background work did not finish in time"
-    )
+    assert probe._shutdown_state is _ShutdownState.WAITING_FOR_QUIESCENCE
+    probe.view.show_background_shutdown_decision.assert_called_once_with()
+    assert probe.runner.drain_requests[1][0] is None
     probe._adb.run_shutdown.assert_not_called()
+
+    probe._on_application_shutdown_wait_requested()
+    probe.view.show_managed_shutdown_waiting.assert_called_once_with()
+
+    probe.runner.drain_requests[1][1].Drained.emit()
+    probe._adb.run_shutdown.assert_called_once_with()
 
 
 def test_close_timeout_keeps_window_disabled_until_unbounded_drain() -> None:
@@ -111,7 +126,7 @@ def test_close_timeout_keeps_window_disabled_until_unbounded_drain() -> None:
     probe.runner.drain_requests[1][1].TimedOut.emit()
 
     assert probe._shutdown_state is _ShutdownState.WAITING_FOR_CLOSE
-    probe.view.report_managed_shutdown_delay.assert_called_once_with()
+    probe.view.show_adb_shutdown_decision.assert_called_once_with()
     assert probe.runner.drain_requests[2][0] is None
     probe.runner.shutdown.assert_not_called()
 
@@ -119,6 +134,39 @@ def test_close_timeout_keeps_window_disabled_until_unbounded_drain() -> None:
 
     probe.runner.shutdown.assert_called_once_with()
     assert probe._shutdown_state is _ShutdownState.FINALIZED
+
+
+def test_force_close_performs_best_effort_teardown_then_hard_exit() -> None:
+    probe = _AppControllerProbe()
+    events: list[str] = []
+    probe._simulation.persist_simulation_repository.side_effect = lambda: events.append(
+        "persist"
+    )
+    probe.cron_manager.stop.side_effect = lambda: events.append("cron-stop")
+    probe.runner.shutdown.side_effect = lambda: events.append("runner-stop")
+    probe.force_exit.side_effect = lambda code: events.append(f"exit:{code}")
+
+    probe._on_application_shutdown_requested()
+    probe.runner.drain_requests[0][1].TimedOut.emit()
+    probe._on_application_force_close_requested()
+    probe._on_application_force_close_requested()
+
+    assert events == ["persist", "cron-stop", "runner-stop", "exit:1"]
+    assert probe._shutdown_state is _ShutdownState.FORCING
+    probe._adb.run_shutdown.assert_not_called()
+
+
+def test_force_close_exits_when_persistence_fails() -> None:
+    probe = _AppControllerProbe()
+    probe._simulation.persist_simulation_repository.side_effect = RuntimeError("disk")
+
+    probe._on_application_shutdown_requested()
+    probe.runner.drain_requests[0][1].TimedOut.emit()
+    probe._on_application_force_close_requested()
+
+    probe.cron_manager.stop.assert_called_once_with()
+    probe.runner.shutdown.assert_called_once_with()
+    probe.force_exit.assert_called_once_with(1)
 
 
 def test_persistence_failure_does_not_prevent_final_teardown() -> None:

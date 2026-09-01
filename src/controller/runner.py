@@ -206,6 +206,15 @@ class JobHandlerSignals(QObject):
     Failed = Signal(JobError)
 
 
+@dataclass(slots=True)
+class _ActiveJob:
+    """Runner-owned state for one job until its Qt terminal commit."""
+
+    handle: JobHandler
+    signals: JobHandlerSignals
+    future: Future[Any] | None = None
+
+
 class DrainHandle(QObject):
     """Signals for one asynchronous request to observe runner quiescence."""
 
@@ -488,7 +497,7 @@ class AsyncRunner(QObject):
             process_pool=type(self._process_pool).__name__,
             thread_pool=type(self._thread_pool).__name__,
         )
-        self._active_jobs: dict[str, tuple[JobHandler, JobHandlerSignals]] = {}
+        self._active_jobs: dict[str, _ActiveJob] = {}
         self._coalesce_latest: dict[str, str] = {}
         self._drains: dict[str, tuple[DrainHandle, QTimer | None]] = {}
         self._progress_ready.connect(
@@ -542,9 +551,9 @@ class AsyncRunner(QObject):
         )
         if not self._reserve_coalescing_slot(job, job_handler):
             return None
-        self._active_jobs[job_handler.job_id] = (
-            job_handler,
-            JobHandlerSignals(),
+        self._active_jobs[job_handler.job_id] = _ActiveJob(
+            handle=job_handler,
+            signals=JobHandlerSignals(),
         )
         return job_handler
 
@@ -557,9 +566,13 @@ class AsyncRunner(QObject):
             return True
 
         latest_job_id = self._coalesce_latest.get(key)
+        active_job = (
+            self._active_jobs.get(latest_job_id) if latest_job_id is not None else None
+        )
         active_job_id = (
             latest_job_id
-            if latest_job_id is not None and latest_job_id in self._active_jobs
+            if active_job is not None
+            and not active_job.handle.cancel_token.is_cancelled()
             else None
         )
         if active_job_id is not None and job.at_most_once:
@@ -596,13 +609,16 @@ class AsyncRunner(QObject):
             coalesce_key=job.coalesce_key,
         )
         pool = self._thread_pool if job_type == "thread" else self._process_pool
-        pool.submit(
+        future = pool.submit(
             job_handler.job_id,
             job,
             job_handler.cancel_token,
             self._marshal_progress,
             self._marshal_terminal,
         )
+        active_job = self._active_jobs.get(job_handler.job_id)
+        if active_job is not None:
+            active_job.future = future
 
     def _marshal_progress(self, job_id: str, progress: ProgressEvent) -> None:
         self._progress_ready.emit(job_id, progress)
@@ -623,9 +639,9 @@ class AsyncRunner(QObject):
     ) -> None:
         """Cancel every active job except explicitly preserved lifecycle jobs."""
         excluded = frozenset(excluding_names)
-        for handle, _signals in tuple(self._active_jobs.values()):
-            if handle.name not in excluded:
-                self.cancel(handle.job_id)
+        for active_job in tuple(self._active_jobs.values()):
+            if active_job.handle.name not in excluded:
+                self.cancel(active_job.handle.job_id)
 
     def request_drain(self, timeout: float | None) -> DrainHandle:
         """Observe runner quiescence without nesting or blocking the Qt event loop."""
@@ -656,15 +672,20 @@ class AsyncRunner(QObject):
         return handle.job_id in self._active_jobs
 
     def cancel(self, job_id: str) -> None:
-        """Mark job as cancelled (next completion callback will emit Cancelled)."""
-        tup = self._active_jobs.get(job_id)
-        if tup:
+        """Promptly commit cancellation and discard any eventual worker outcome."""
+        active_job = self._active_jobs.get(job_id)
+        if active_job is not None:
             logger.debug(
                 "Async job cancellation requested",
                 job_id=job_id,
-                name=tup[0].name,
+                name=active_job.handle.name,
             )
-            tup[0].cancel_token.cancel()
+            if active_job.handle.cancel_token.is_cancelled():
+                return
+            active_job.handle.cancel_token.cancel()
+            if active_job.future is not None:
+                active_job.future.cancel()
+            self._terminal_ready.emit(job_id, _CancelledProposal())
         else:
             logger.debug(
                 "Async job cancellation ignored because the job is no longer active",
@@ -676,19 +697,19 @@ class AsyncRunner(QObject):
         Return per-job signals for this handle. Use in controller:
         hs = runner.bind_handle_signals(handle); hs.Completed.connect(...)
         """
-        return self._active_jobs[handle.job_id][1]
+        return self._active_jobs[handle.job_id].signals
 
     def _emit_progress_safe(self, job_id: str, evt: ProgressEvent) -> None:
         """Emit progress on main thread (runner + handle signals)."""
         self._signals.Progress.emit(job_id, evt)
-        tup = self._active_jobs.get(job_id)
-        if tup:
-            tup[1].Progress.emit(evt)
+        active_job = self._active_jobs.get(job_id)
+        if active_job is not None:
+            active_job.signals.Progress.emit(evt)
 
     def _commit_terminal(self, job_id: str, proposal: _TerminalProposal) -> None:
         """Commit one terminal outcome using the latest main-thread job state."""
-        tup = self._active_jobs.get(job_id)
-        if tup is None:
+        active_job = self._active_jobs.get(job_id)
+        if active_job is None:
             logger.debug(
                 "Late async terminal proposal discarded",
                 job_id=job_id,
@@ -696,7 +717,8 @@ class AsyncRunner(QObject):
             )
             return
 
-        handle, handle_signals = tup
+        handle = active_job.handle
+        handle_signals = active_job.signals
         is_superseded = (
             handle.coalesce_key is not None
             and self._coalesce_latest.get(handle.coalesce_key) != job_id
@@ -778,7 +800,8 @@ class AsyncRunner(QObject):
             "Async runner drain timed out",
             drain_id=drain_id,
             active_jobs=tuple(
-                (job.job_id, job.name) for job, _signals in self._active_jobs.values()
+                (active.handle.job_id, active.handle.name)
+                for active in self._active_jobs.values()
             ),
         )
         handle.TimedOut.emit()

@@ -116,8 +116,8 @@ Constraints:
 
 `MainWindow` uses managed close only after `AppController` enables it. The first
 close request is ignored so Qt's main event loop stays available, interaction is
-disabled, and `ApplicationShutdownRequested` starts an event-driven state
-machine:
+blocked by a full-shell shutdown overlay, and `ApplicationShutdownRequested`
+starts an event-driven state machine:
 
 1. Pause recurring jobs, cancel non-bootstrap outcomes, and ask `AsyncRunner` to
    drain without exposing its active-job storage.
@@ -128,9 +128,12 @@ machine:
 4. Persist simulation metadata, stop cron permanently, shut down the runner,
    and permit the final window close.
 
-A pre-close drain timeout restores the UI and cron schedule. Once ADB close has
-started it is not reversible: a timeout warns the user but keeps Qt alive until
-the close job actually commits. No shutdown phase uses a nested `QEventLoop`.
+Either drain timeout opens the designed Wait / Force Close card and switches to
+an unbounded drain. Waiting keeps the event loop alive until the job commits;
+force close performs best-effort persistence and nonblocking teardown before a
+hard process exit, because Python cannot safely terminate a hung executor
+thread. The overlay is a normal Qt widget and no shutdown phase uses a nested
+`QEventLoop` or native modal dialog.
 
 ## Adding a new controller-driven flow
 

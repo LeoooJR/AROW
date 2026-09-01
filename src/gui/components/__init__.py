@@ -4,7 +4,13 @@ Reusable GUI components organized by category under ``gui.components``.
 
 from gui.components.base import Component, QtABCMeta
 from gui.components.buttons import Button, ToolButton, WalkthroughButton
-from gui.components.containers import AuthentificationCard, GroupBox, PlaceHolder
+from gui.components.containers import (
+    AuthentificationCard,
+    GroupBox,
+    PlaceHolder,
+    ShutdownCard,
+    ShutdownCardMode,
+)
 from gui.components.dialogs import (
     FileOpenDialog,
     FileSaveDialog,
@@ -60,6 +66,8 @@ __all__ = [
     "QtABCMeta",
     "SVG",
     "SelectionField",
+    "ShutdownCard",
+    "ShutdownCardMode",
     "StatusBadge",
     "StatusBadgeKind",
     "Toast",

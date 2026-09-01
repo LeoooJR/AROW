@@ -302,7 +302,7 @@ keys.
 
 ## Coalescing
 
-If **`coalesce_key`** is set, submitting a new job with the same key **cancels the previous** pending job for that key (the runner marks its cancel token so completion resolves as **cancelled** rather than competing with the new job). Use this for “latest wins” flows.
+If **`coalesce_key`** is set, submitting a new job with the same key **cancels the previous** pending job for that key. Cancellation promptly queues a Qt `Cancelled` commit and releases the key; the worker may continue but cannot compete with the new job. Use this for “latest wins” flows.
 
 Current built-in keys include:
 
@@ -341,9 +341,10 @@ inactive. Duplicate or late proposals after that commit are ignored.
 
 ## Cancellation
 
-- **`runner.cancel(handle.job_id)`** marks the job cancelled. Cancellation is
-  revalidated at the main-thread terminal commit point, after any worker outcome
-  has crossed the Qt queue.
+- **`runner.cancel(handle.job_id)`** marks the job cancelled, calls
+  `Future.cancel()` best-effort, and promptly queues a `Cancelled` proposal. The
+  main-thread commit releases active/coalescing state without waiting for the
+  worker; any later outcome is ignored.
 - The worker **`fn` does not automatically receive `CancelToken`** today; long-running core code would need an explicit contract if cooperative cancellation inside **`fn`** is required.
 
 ## Progress updates
@@ -362,10 +363,11 @@ Core runtime submissions use one callback boundary:
 Examples of controller-owned lifecycle behavior are startup chaining to host identity and clearing tracked map render handles. Application shutdown instead uses `AsyncRunner.request_drain(...)`: drain evaluation runs after terminal listeners, so synchronously chained jobs are included before quiescence becomes visible. These handlers must not duplicate model mutation or core signal emission.
 
 `cancel_active(excluding_names=...)` and `request_drain(timeout)` are the public
-shutdown primitives. Cancellation changes eventual visibility but does not stop
-running Python work. A drain completes asynchronously on the Qt main thread only
-when no registered jobs remain, and its first empty check is queued so callers
-can bind `Drained` and `TimedOut` before either signal is possible.
+shutdown primitives. Cancellation ends application-visible ownership promptly
+but does not stop running Python work. A drain completes asynchronously on the
+Qt main thread once no registered jobs remain, and its first empty check is
+queued so callers can bind `Drained` and `TimedOut` before either signal is
+possible.
 
 ## Device refresh and reconciliation
 

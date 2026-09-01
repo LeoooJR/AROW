@@ -43,7 +43,7 @@ flowchart TD
         E1 --> F
         F --> G["Resolve thread or process pool"]
 
-        X["cancel(job_id)"] --> X1["Set active handle's CancelToken"]
+        X["cancel(job_id)"] --> X1["Set CancelToken; Future.cancel best-effort;<br/>queue Cancelled proposal"]
         Y["New job with same key"] --> E
 
         Q["_terminal_ready<br/>QueuedConnection"] --> R{"job still active?"}
@@ -87,7 +87,7 @@ flowchart TD
         I -. "optional progress source" .-> P0
     end
 
-    X1 -. "revalidated only at commit" .-> S
+    X1 --> Q
 ```
 
 ## Submission decisions
@@ -156,22 +156,25 @@ until the Qt main thread commits it.**
 
 ## State invariants
 
-- `_active_jobs[job_id]` contains the active `JobHandler` and its
-  `JobHandlerSignals`.
+- `_active_jobs[job_id]` contains the active `JobHandler`, its
+  `JobHandlerSignals`, and the submitted `Future`.
 - `_coalesce_latest[key]` points only to the current job for that key.
 - Cleaning an older superseded job must not remove the newer job's coalescing
   entry.
 - A terminal commit removes active state exactly once before emitting public
   terminal signals.
 - A missing active-job entry makes all later terminal proposals inert.
-- Cancellation changes terminal visibility; it does not terminate already
-running Python work or inject `CancelToken` into `fn`.
+- Cancellation promptly queues the Qt terminal commit and calls
+  `Future.cancel()` best-effort; it does not terminate already-running Python
+  work or inject `CancelToken` into `fn`.
 
 ## Cancellation and draining
 
 `cancel_active(excluding_names=...)` marks every non-preserved active job as
-cancelled. It does not remove jobs immediately; each still reaches the Qt
-terminal commit point as `Cancelled`.
+cancelled and queues its Qt terminal proposal immediately. The commit removes
+runner state even when executor work is hung, so a drain and later
+`at_most_once` submission are not held hostage by an abandoned worker. A late
+worker proposal finds no active entry and is discarded.
 
 `request_drain(timeout)` returns a `DrainHandle` with `Drained` and `TimedOut`
 signals. The initial empty check and every post-terminal check are queued. In

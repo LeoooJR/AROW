@@ -24,7 +24,7 @@ from gui.constants.settings import Settings
 from gui.constants.stylesheet import stylesheet, stylesheet_dark, stylesheet_light
 from gui.event_filter import ActivityTracker
 from gui.layouts import AppShell
-from gui.overlays import AuthenticationOverlay
+from gui.overlays import AuthenticationOverlay, ShutdownOverlay
 from gui.signals import signals
 from logger import logger
 
@@ -119,10 +119,6 @@ class MainWindow(QMainWindow):
         simulation_location_rejected_toast: str = (
             "Invalid map location for marker {km} on line {line_code}-{line_troncon}: {reason}."
         )
-        shutdown_failed_toast: str = "Application shutdown was cancelled: {reason}."
-        shutdown_delayed_toast: str = (
-            "Application shutdown is taking longer while ADB finishes closing."
-        )
 
     @dataclass
     class UI:
@@ -130,6 +126,7 @@ class MainWindow(QMainWindow):
 
         app_shell: AppShell
         authentication_overlay: AuthenticationOverlay
+        shutdown_overlay: ShutdownOverlay
 
     def __init__(self):
         """Create the main window, layout, and signal wiring."""
@@ -193,8 +190,15 @@ class MainWindow(QMainWindow):
         authentication_overlay.raise_()
         authentication_overlay.setVisible(False)
 
+        shutdown_overlay = ShutdownOverlay(app_shell)
+        shutdown_overlay.setGeometry(app_shell.rect())
+        shutdown_overlay.raise_()
+        shutdown_overlay.setVisible(False)
+
         self.ui = MainWindow.UI(
-            app_shell=app_shell, authentication_overlay=authentication_overlay
+            app_shell=app_shell,
+            authentication_overlay=authentication_overlay,
+            shutdown_overlay=shutdown_overlay,
         )
 
         self._connect_signals()
@@ -223,31 +227,33 @@ class MainWindow(QMainWindow):
         signals.DEVICE.DeviceSelectionRequested.connect(
             self._on_device_selection_requested
         )
+        self.ui.shutdown_overlay.WaitRequested.connect(
+            signals.UI.ApplicationShutdownWaitRequested.emit
+        )
+        self.ui.shutdown_overlay.ForceCloseRequested.connect(
+            signals.UI.ApplicationForceCloseRequested.emit
+        )
 
     def enable_managed_shutdown(self) -> None:
         """Route future window-close requests through the controller lifecycle."""
         self._managed_shutdown_enabled = True
-
-    def abort_managed_shutdown(self, reason: str) -> None:
-        """Restore interaction after shutdown could not safely proceed."""
-        self._shutdown_pending = False
-        self.setEnabled(True)
-        self.ui.app_shell.post_toast(
-            self.texts.shutdown_failed_toast.format(reason=reason),
-            level="error",
-        )
 
     def complete_managed_shutdown(self) -> None:
         """Permit and perform the final close after controller teardown."""
         self._shutdown_permitted = True
         self.close()
 
-    def report_managed_shutdown_delay(self) -> None:
-        """Notify the user while a non-reversible ADB close remains pending."""
-        self.ui.app_shell.post_toast(
-            self.texts.shutdown_delayed_toast,
-            level="warning",
-        )
+    def show_background_shutdown_decision(self) -> None:
+        """Offer wait or force close while pre-close work remains active."""
+        self.ui.shutdown_overlay.show_background_work_decision()
+
+    def show_adb_shutdown_decision(self) -> None:
+        """Offer wait or force close while Android teardown remains active."""
+        self.ui.shutdown_overlay.show_adb_close_decision()
+
+    def show_managed_shutdown_waiting(self) -> None:
+        """Show continued shutdown progress while retaining force close."""
+        self.ui.shutdown_overlay.show_waiting()
 
     ### Slots ###
 
@@ -272,6 +278,7 @@ class MainWindow(QMainWindow):
         )
         self.ui.app_shell.apply_theme_icons(theme)
         self.ui.authentication_overlay.apply_theme_icons(theme)
+        self.ui.shutdown_overlay.apply_theme_icons(theme)
 
     @Slot()
     def _on_idle(self) -> None:
@@ -480,10 +487,11 @@ class MainWindow(QMainWindow):
         signals.ACTIVITY_LOG.ActivityLogFileUpdated.emit(log_file_path)
 
     def resizeEvent(self, event) -> None:
-        """Keep authentication overlay covering the full main container."""
+        """Keep shell-blocking overlays covering the full main container."""
         super().resizeEvent(event)
-        if hasattr(self, "ui") and self.ui.authentication_overlay is not None:
+        if hasattr(self, "ui"):
             self.ui.authentication_overlay.setGeometry(self.ui.app_shell.rect())
+            self.ui.shutdown_overlay.setGeometry(self.ui.app_shell.rect())
 
     def closeEvent(self, event: QCloseEvent) -> None:
         """Delay managed closes until the controller completes async teardown."""
@@ -493,7 +501,9 @@ class MainWindow(QMainWindow):
 
         event.ignore()
         if self._shutdown_pending:
+            self.ui.shutdown_overlay.raise_()
             return
         self._shutdown_pending = True
-        self.setEnabled(False)
+        self.ui.shutdown_overlay.setGeometry(self.ui.app_shell.rect())
+        self.ui.shutdown_overlay.show_closing()
         signals.UI.ApplicationShutdownRequested.emit()

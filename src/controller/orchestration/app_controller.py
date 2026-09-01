@@ -5,9 +5,11 @@ composed of *SubController domain objects.
 
 from __future__ import annotations
 
+import os
 from collections.abc import Callable
 from enum import Enum
 from pathlib import Path
+from typing import NoReturn
 
 from PySide6.QtCore import Slot
 
@@ -22,7 +24,7 @@ from gui.signals import signals
 from gui.windows import MainWindow
 from logger import logger
 
-# Warn or abort when one shutdown drain exceeds this duration.
+# Offer wait/force-close choices when one shutdown drain exceeds this duration.
 _SHUTDOWN_DRAIN_TIMEOUT_S = 60.0
 
 # Async jobs that must finish (or fail/cancel) before quit runs close/shutdown.
@@ -32,8 +34,10 @@ _ADB_BOOTSTRAP_JOB_NAMES = frozenset({"startup_core_runtime", "host_install_iden
 class _ShutdownState(Enum):
     RUNNING = "running"
     QUIESCING = "quiescing"
+    WAITING_FOR_QUIESCENCE = "waiting-for-quiescence"
     CLOSING_ADB = "closing-adb"
     WAITING_FOR_CLOSE = "waiting-for-close"
+    FORCING = "forcing"
     FINALIZED = "finalized"
 
 
@@ -43,12 +47,19 @@ class AppController(Controller):
     delegates ADB, simulation, and map concerns to *SubController instances.
     """
 
-    def __init__(self, model_entrypoint: ModelEntrypoint, view: MainWindow) -> None:
+    def __init__(
+        self,
+        model_entrypoint: ModelEntrypoint,
+        view: MainWindow,
+        *,
+        force_exit: Callable[[int], NoReturn] = os._exit,
+    ) -> None:
         # Subcontrollers need a fully constructed app reference; defer signal
         # wiring in Controller until children exist.
         super().__init__(model_entrypoint, view, defer_signal_connect=True)
         self._shutdown_state = _ShutdownState.RUNNING
         self._shutdown_drain: DrainHandle | None = None
+        self._force_exit = force_exit
         self._simulation: SimulationSubController = SimulationSubController(
             self
         )  # Create simulation subcontroller before adb subcontroller to avoid race condition, signals are connected in the order of creation
@@ -83,6 +94,12 @@ class AppController(Controller):
         )
         signals.UI.ApplicationShutdownRequested.connect(
             self._on_application_shutdown_requested
+        )
+        signals.UI.ApplicationShutdownWaitRequested.connect(
+            self._on_application_shutdown_wait_requested
+        )
+        signals.UI.ApplicationForceCloseRequested.connect(
+            self._on_application_force_close_requested
         )
 
     def _connect_model_signals(self) -> None:
@@ -148,7 +165,7 @@ class AppController(Controller):
         self._await_runner_drain(
             timeout=_SHUTDOWN_DRAIN_TIMEOUT_S,
             on_drained=self._begin_adb_shutdown,
-            on_timed_out=self._abort_shutdown,
+            on_timed_out=self._continue_waiting_for_background_work,
         )
 
     def _await_runner_drain(
@@ -166,23 +183,50 @@ class AppController(Controller):
             drain.TimedOut.connect(on_timed_out)
 
     @Slot()
-    def _abort_shutdown(self) -> None:
-        """Restore normal operation when pre-close work cannot quiesce safely."""
+    def _continue_waiting_for_background_work(self) -> None:
+        """Offer an escape while continuing to observe pre-close work."""
         if self._shutdown_state is not _ShutdownState.QUIESCING:
             return
         logger.warning(
-            "Application shutdown aborted because active jobs did not drain",
+            "Application shutdown is waiting for active background work",
             timeout_s=_SHUTDOWN_DRAIN_TIMEOUT_S,
         )
-        self._shutdown_drain = None
-        self._shutdown_state = _ShutdownState.RUNNING
-        self.cron_manager.resume()
-        self.view.abort_managed_shutdown("background work did not finish in time")
+        self._shutdown_state = _ShutdownState.WAITING_FOR_QUIESCENCE
+        self.view.show_background_shutdown_decision()
+        self._await_runner_drain(timeout=None, on_drained=self._begin_adb_shutdown)
+
+    @Slot()
+    def _on_application_shutdown_wait_requested(self) -> None:
+        """Acknowledge continued waiting without changing the active drain."""
+        if self._shutdown_state not in {
+            _ShutdownState.WAITING_FOR_QUIESCENCE,
+            _ShutdownState.WAITING_FOR_CLOSE,
+        }:
+            return
+        self.view.show_managed_shutdown_waiting()
+
+    @Slot()
+    def _on_application_force_close_requested(self) -> None:
+        """Perform best-effort teardown, then terminate despite hung workers."""
+        if self._shutdown_state not in {
+            _ShutdownState.WAITING_FOR_QUIESCENCE,
+            _ShutdownState.WAITING_FOR_CLOSE,
+        }:
+            return
+        self._shutdown_state = _ShutdownState.FORCING
+        logger.warning("Forced application shutdown requested")
+        self._persist_simulations_best_effort()
+        self.cron_manager.stop()
+        self.runner.shutdown()
+        self._force_exit(1)
 
     @Slot()
     def _begin_adb_shutdown(self) -> None:
         """Submit domain-owned ADB close after every earlier job is terminal."""
-        if self._shutdown_state is not _ShutdownState.QUIESCING:
+        if self._shutdown_state not in {
+            _ShutdownState.QUIESCING,
+            _ShutdownState.WAITING_FOR_QUIESCENCE,
+        }:
             return
         self._shutdown_drain = None
         self._shutdown_state = _ShutdownState.CLOSING_ADB
@@ -190,9 +234,8 @@ class AppController(Controller):
             self._adb.run_shutdown()
         except Exception:
             logger.exception("Core runtime shutdown submission failed")
-            self._shutdown_state = _ShutdownState.RUNNING
-            self.cron_manager.resume()
-            self.view.abort_managed_shutdown("ADB shutdown could not be started")
+            self._shutdown_state = _ShutdownState.CLOSING_ADB
+            self._finalize_shutdown()
             return
         self._await_runner_drain(
             timeout=_SHUTDOWN_DRAIN_TIMEOUT_S,
@@ -210,7 +253,7 @@ class AppController(Controller):
             timeout_s=_SHUTDOWN_DRAIN_TIMEOUT_S,
         )
         self._shutdown_state = _ShutdownState.WAITING_FOR_CLOSE
-        self.view.report_managed_shutdown_delay()
+        self.view.show_adb_shutdown_decision()
         self._await_runner_drain(
             timeout=None,
             on_drained=self._finalize_shutdown,
@@ -226,12 +269,16 @@ class AppController(Controller):
             return
         self._shutdown_drain = None
         self._shutdown_state = _ShutdownState.FINALIZED
-        try:
-            self._simulation.persist_simulation_repository()
-        except Exception:
-            logger.exception("Simulation repository persistence failed during shutdown")
+        self._persist_simulations_best_effort()
         self.cron_manager.stop()
         self.runner.shutdown()
         view = self.view
         view.complete_managed_shutdown()
         self.view = None
+
+    def _persist_simulations_best_effort(self) -> None:
+        """Persist simulation state without preventing final or forced teardown."""
+        try:
+            self._simulation.persist_simulation_repository()
+        except Exception:
+            logger.exception("Simulation repository persistence failed during shutdown")
