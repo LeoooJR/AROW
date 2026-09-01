@@ -7,14 +7,23 @@ from commands import app
 runner = CliRunner()
 
 
-def test_root_help_lists_run_command() -> None:
-    """The root application exposes commands grouped under ``run``."""
+def test_root_help_lists_command_groups() -> None:
+    """The root application exposes its command groups."""
     result = runner.invoke(app, ["--help"])
 
     assert result.exit_code == 0
     assert "--json-logs" not in result.stdout
     assert "--log-dir" not in result.stdout
+    assert "query" in result.stdout
     assert "run" in result.stdout
+
+
+def test_query_help_lists_milestone_command() -> None:
+    """The query group exposes the milestone lookup command."""
+    result = runner.invoke(app, ["query", "--help"])
+
+    assert result.exit_code == 0
+    assert "milestone" in result.stdout
 
 
 def test_run_help_lists_gui_command() -> None:
