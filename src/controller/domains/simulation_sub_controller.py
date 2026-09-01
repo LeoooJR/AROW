@@ -9,20 +9,13 @@ from typing import TYPE_CHECKING
 from PySide6.QtCore import Slot
 
 from controller.domains.app_sub_controller import AppSubController
-from controller.helper import validate_model_entrypoint, validate_view
 from core.signals import (
     CoreSignals,
-    MapRenderedPayload,
     SimulationCreatedPayload,
     SimulationCreationFailedPayload,
     SimulationDeletedPayload,
     SimulationDeleteSkippedPayload,
-    SimulationLocationRejectedPayload,
-    SimulationLocationValidatedPayload,
-    SimulationMapFileChangedPayload,
-    SimulationPositionChangedPayload,
     SimulationRestoredPayload,
-    SimulationStateChangedPayload,
 )
 from gui.signals import signals
 from logger import logger
@@ -66,111 +59,10 @@ class SimulationSubController(AppSubController):
             CoreSignals.SIMULATION_DELETE_SKIPPED,
             self._on_simulation_delete_skipped,
         )
-        self.model_entrypoint.signal_bus.subscribe(
-            CoreSignals.MAP_RENDERED,
-            self._on_map_rendered,
-        )
-        self.model_entrypoint.signal_bus.subscribe(
-            CoreSignals.SIMULATION_STATE_CHANGED,
-            self._on_simulation_state_changed,
-        )
-        self.model_entrypoint.signal_bus.subscribe(
-            CoreSignals.SIMULATION_POSITION_CHANGED,
-            self._on_simulation_position_changed,
-        )
-        self.model_entrypoint.signal_bus.subscribe(
-            CoreSignals.SIMULATION_MAP_FILE_CHANGED,
-            self._on_simulation_map_file_changed,
-        )
-        self.model_entrypoint.signal_bus.subscribe(
-            CoreSignals.SIMULATION_LOCATION_VALIDATED,
-            self._on_simulation_location_validated,
-        )
-        self.model_entrypoint.signal_bus.subscribe(
-            CoreSignals.SIMULATION_LOCATION_REJECTED,
-            self._on_simulation_location_rejected,
-        )
 
-    @validate_model_entrypoint
-    def _on_map_rendered(self, payload: MapRenderedPayload) -> None:
-        """Refresh persisted metadata when simulation map file changes."""
-        self.model_entrypoint.persist_simulation(payload.simulation_id)
-
-    @validate_model_entrypoint
-    def _on_simulation_state_changed(
-        self, payload: SimulationStateChangedPayload
-    ) -> None:
-        """Refresh persisted metadata when simulation execution state changes."""
-        self.model_entrypoint.persist_simulation(payload.simulation_id)
-
-    @validate_model_entrypoint
-    def _on_simulation_position_changed(
-        self, payload: SimulationPositionChangedPayload
-    ) -> None:
-        """Refresh persisted metadata when simulation location changes."""
-        self.model_entrypoint.persist_simulation(payload.simulation_id)
-
-    @validate_model_entrypoint
-    def _on_simulation_map_file_changed(
-        self, payload: SimulationMapFileChangedPayload
-    ) -> None:
-        """Refresh persisted metadata when simulation map file changes."""
-        self.model_entrypoint.persist_simulation(payload.simulation_id)
-
-    @validate_model_entrypoint
-    def _on_simulation_location_validated(
-        self, payload: SimulationLocationValidatedPayload
-    ) -> None:
-        """Apply validated map milestone selection to simulation spoofed location."""
-        self.model_entrypoint.set_simulation_spoofed_location(
-            payload.simulation_id,
-            payload.lat,
-            payload.lon,
-            payload,
-        )
-
-    @validate_model_entrypoint
-    def _on_simulation_location_rejected(
-        self, payload: SimulationLocationRejectedPayload
-    ) -> None:
-        """
-        Clear a stored spoofed milestone when async revalidation rejects it.
-
-        Restored simulations can carry a persisted validated milestone from an
-        older dataset. When the async revalidation path rejects that exact
-        stored marker, drop only the persisted POI so stale metadata is not
-        kept in memory or written back to disk. Ordinary invalid clicks do not
-        match the current stored marker and are ignored here.
-        """
-        simulation = self.model_entrypoint.get_simulation(payload.simulation_id)
-        if simulation is None:
-            return
-        current_location = simulation.spoofed_location
-        current_poi = current_location.poi
-        if current_poi is None:
-            return
-        if current_location.lat != payload.lat or current_location.lon != payload.lon:
-            return
-        if current_poi.km != payload.km:
-            return
-        if current_poi.line.code != payload.line_code:
-            return
-        if current_poi.line.troncon != payload.line_troncon:
-            return
-        logger.debug(
-            "Rejected persisted simulation location cleared",
-            simulation_id=payload.simulation_id,
-            km=payload.km,
-            line_code=payload.line_code,
-            line_troncon=payload.line_troncon,
-            reason=payload.reason,
-        )
-        self.model_entrypoint.set_simulation_spoofed_location(
-            payload.simulation_id,
-            payload.lat,
-            payload.lon,
-            None,
-        )
+    def persist_simulation_repository(self) -> None:
+        """Persist simulation metadata and the repository index at shutdown."""
+        self.model_entrypoint.persist_simulations()
 
     def is_simulation_active(self, id: str) -> bool:
         """Check if the simulation is active."""
@@ -236,7 +128,6 @@ class SimulationSubController(AppSubController):
             )
             return
 
-    @validate_model_entrypoint
     @Slot(str, str)
     def _on_device_selection_confirmed(self, device_id: str, device_name: str) -> None:
         """In-memory selection of the active device (UI thread)."""
@@ -270,7 +161,6 @@ class SimulationSubController(AppSubController):
             payload.device_name,
         )
 
-    @validate_view
     def _on_simulation_creation_failed(
         self, payload: SimulationCreationFailedPayload
     ) -> None:
@@ -280,7 +170,6 @@ class SimulationSubController(AppSubController):
             payload.device_name,
         )
 
-    @validate_view
     def _on_simulation_deleted(self, payload: SimulationDeletedPayload) -> None:
         """Forward active-device removal success when the payload carries device context."""
         if payload.device_id is None:
@@ -291,7 +180,6 @@ class SimulationSubController(AppSubController):
             return
         self.view.forward_remove_active_device_succeeded(payload.device_id)
 
-    @validate_view
     def _on_simulation_delete_skipped(
         self, payload: SimulationDeleteSkippedPayload
     ) -> None:

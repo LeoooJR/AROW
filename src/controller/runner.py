@@ -1,25 +1,24 @@
 import datetime
+import math
 import traceback as _traceback
 import uuid
+from collections.abc import Collection
 from concurrent.futures import (
+    Executor,
     Future,
     ProcessPoolExecutor,
     ThreadPoolExecutor,
 )
-from concurrent.futures import TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass, field
-from typing import Any, Callable, Literal, Optional
+from threading import Lock, Timer
+from typing import Any, Callable, ClassVar, Literal, Optional
 
 from loguru import logger
-from PySide6.QtCore import QObject, Qt, Signal
+from PySide6.QtCore import QObject, Qt, QTimer, Signal
 
 from logger import resolve_worker_application_log_file_path, setup_worker_logger
 
-jobtype = Literal["auto", "thread", "process"]
-jobstatus = Literal["pending", "running", "completed", "cancelled", "failed"]
-jobpriority = Literal["low", "medium", "high"]
-jobcoalescekey = Literal["none", "location", "network", "device"]
-jobtimeout = Literal["none", "short", "medium", "long"]
+jobtype = Literal["thread", "process"]
 jobpreflight = Callable[[], bool]
 
 
@@ -69,6 +68,20 @@ def _job_error_from_exception(*, job_name: str, exc: Exception) -> JobError:
         timestamp=datetime.datetime.now(datetime.timezone.utc),
         exception=exc,
         exception_type=type(exc).__qualname__,
+        origin=job_name,
+    )
+
+
+def _job_error_from_timeout(*, job_name: str, timeout: float) -> JobError:
+    """Build a timeout failure that preserves origin and exception metadata."""
+    exception = TimeoutError(f"Job timed out after {timeout:g} seconds")
+    return JobError(
+        message=f"Job timed out after {timeout:g} seconds: {job_name}",
+        traceback="",
+        return_code=None,
+        timestamp=datetime.datetime.now(datetime.timezone.utc),
+        exception=exception,
+        exception_type=type(exception).__qualname__,
         origin=job_name,
     )
 
@@ -133,7 +146,7 @@ class JobSpecification:
         metadata={"description": "The keyworded arguments to pass to the function"},
         default_factory=dict,
     )
-    timeout: Optional[int] = field(
+    timeout: float | None = field(
         metadata={"description": "The timeout of the job"}, default=None
     )
     priority: int = field(
@@ -143,7 +156,7 @@ class JobSpecification:
         metadata={"description": "The key to coalesce the job"}, default=None
     )  # Submitting a job while there is already one running with the same coalesce key will cancel the previous job (the job still run to completion, here "cancel" means that the result will be discarded)
     type: jobtype = field(
-        metadata={"description": "The type of the job"}, default="auto"
+        metadata={"description": "The executor type of the job"}, kw_only=True
     )
     at_most_once: bool = field(
         metadata={"description": "At most one job running with the same coalesce key"},
@@ -156,6 +169,12 @@ class JobSpecification:
         },
         default=None,
     )
+
+    def __post_init__(self) -> None:
+        if self.timeout is not None and (
+            not math.isfinite(self.timeout) or self.timeout <= 0
+        ):
+            raise ValueError("Job timeout must be a positive finite number of seconds")
 
 
 @dataclass(frozen=True)
@@ -170,6 +189,10 @@ class JobHandler:
         metadata={"description": "The token to cancel the job"},
         default_factory=CancelToken,
     )
+    coalesce_key: str | None = field(
+        metadata={"description": "The coalescing key owned by this job"},
+        default=None,
+    )
 
 
 class JobHandlerSignals(QObject):
@@ -183,236 +206,248 @@ class JobHandlerSignals(QObject):
     Failed = Signal(JobError)
 
 
-class ProcessPool:
+@dataclass(slots=True)
+class _ActiveJob:
+    """Runner-owned state for one job until its Qt terminal commit."""
+
+    handle: JobHandler
+    signals: JobHandlerSignals
+    future: Future[Any] | None = None
+
+
+class DrainHandle(QObject):
+    """Signals for one asynchronous request to observe runner quiescence."""
+
+    Drained = Signal()
+    TimedOut = Signal()
+
+
+@dataclass(frozen=True, slots=True)
+class _CompletedProposal:
+    result: object
+
+
+@dataclass(frozen=True, slots=True)
+class _CancelledProposal:
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class _FailedProposal:
+    error: JobError
+
+
+_TerminalProposal = _CompletedProposal | _CancelledProposal | _FailedProposal
+
+
+def _observe_future(
+    future: Future[Any],
+    *,
+    pool_name: str,
+    job_id: str,
+    job: JobSpecification,
+    cancel_token: CancelToken,
+    propose_terminal: Callable[[str, _TerminalProposal], None],
+) -> None:
+    """Emit exactly one terminal outcome, independently enforcing the deadline."""
+    state_lock = Lock()
+    terminal_emitted = False
+    deadline_timer: Timer | None = None
+    timeout = job.timeout
+
+    def _claim_terminal() -> bool:
+        nonlocal terminal_emitted
+        with state_lock:
+            if terminal_emitted:
+                return False
+            terminal_emitted = True
+            timer = deadline_timer
+        if timer is not None:
+            timer.cancel()
+        return True
+
+    def _on_done(completed_future: Future[Any]) -> None:
+        if not _claim_terminal():
+            logger.debug(
+                "Late async job result discarded",
+                job_id=job_id,
+                name=job.name,
+                pool=pool_name,
+            )
+            return
+        if cancel_token.is_cancelled():
+            logger.debug(
+                "Cancelled async job result discarded",
+                job_id=job_id,
+                name=job.name,
+                pool=pool_name,
+            )
+            propose_terminal(job_id, _CancelledProposal())
+            return
+        try:
+            result = completed_future.result()
+        except Exception as error:
+            propose_terminal(
+                job_id,
+                _FailedProposal(
+                    _job_error_from_exception(job_name=job.name, exc=error)
+                ),
+            )
+            return
+        logger.debug(
+            "Async job completed",
+            job_id=job_id,
+            name=job.name,
+            pool=pool_name,
+            result_type=type(result).__name__,
+        )
+        propose_terminal(job_id, _CompletedProposal(result))
+
+    def _on_timeout() -> None:
+        if timeout is None:
+            return
+        if not _claim_terminal():
+            return
+        future.cancel()
+        if cancel_token.is_cancelled():
+            logger.debug(
+                "Cancelled async job reached its deadline",
+                job_id=job_id,
+                name=job.name,
+                pool=pool_name,
+                timeout_s=timeout,
+            )
+            propose_terminal(job_id, _CancelledProposal())
+            return
+        logger.warning(
+            "Async job deadline exceeded",
+            job_id=job_id,
+            name=job.name,
+            pool=pool_name,
+            timeout_s=timeout,
+        )
+        propose_terminal(
+            job_id,
+            _FailedProposal(
+                _job_error_from_timeout(job_name=job.name, timeout=timeout)
+            ),
+        )
+
+    future.add_done_callback(_on_done)
+    if timeout is None:
+        return
+
+    timer = Timer(timeout, _on_timeout)
+    timer.daemon = True
+    with state_lock:
+        if terminal_emitted:
+            return
+        deadline_timer = timer
+    timer.start()
+
+
+class _ExecutorPool:
+    """Shared executor submission, observation, and shutdown behavior."""
+
+    __slots__ = ("_max_workers", "_executor")
+    _display_name: ClassVar[str]
+    _pool_name: ClassVar[str]
+
+    def __init__(self, max_workers: Optional[int] = None) -> None:
+        self._max_workers = max_workers
+        try:
+            self._executor = self._create_executor(max_workers)
+        except (NotImplementedError, OSError, PermissionError) as e:
+            logger.error(
+                f"{self._display_name} pool initialization failed",
+                error=e,
+            )
+            raise RuntimeError(
+                f"Failed to initialize {self._pool_name} pool on this system"
+            ) from e
+        logger.debug(
+            f"{self._display_name} pool initialized",
+            max_workers=max_workers,
+        )
+
+    def _create_executor(self, max_workers: int | None) -> Executor:
+        raise NotImplementedError
+
+    def submit(
+        self,
+        job_id: str,
+        job: JobSpecification,
+        cancel_token: CancelToken,
+        emit_progress: Callable[[str, ProgressEvent], None],
+        propose_terminal: Callable[[str, _TerminalProposal], None],
+    ) -> Future[Any]:
+        """Submit work and attach the shared terminal observer."""
+        if job.fn is None:
+            raise ValueError("JobSpecification.fn must be set (callable)")
+        fn = job.fn
+        logger.debug(
+            f"{self._display_name} job queued",
+            job_id=job_id,
+            name=job.name,
+            timeout_s=job.timeout,
+            fn=getattr(fn, "__qualname__", repr(fn)),
+        )
+        fut: Future[Any] = self._executor.submit(fn, *job.args, **job.kwargs)
+
+        _observe_future(
+            fut,
+            pool_name=self._pool_name,
+            job_id=job_id,
+            job=job,
+            cancel_token=cancel_token,
+            propose_terminal=propose_terminal,
+        )
+        return fut
+
+    def shutdown(self) -> None:
+        """Request non-blocking executor shutdown and cancel queued work."""
+        logger.debug(
+            f"{self._display_name} pool shutdown requested",
+            cancel_futures=True,
+        )
+        self._executor.shutdown(wait=False, cancel_futures=True)
+        logger.debug(
+            f"{self._display_name} pool shutdown completed",
+            max_workers=self._max_workers,
+        )
+
+
+class ProcessPool(_ExecutorPool):
     """
     Process pool to execute jobs (CPU-heavy work, e.g. map creation).
     """
 
-    __slots__ = ("_max_workers", "_executor")
+    __slots__ = ()
+    _display_name = "Process"
+    _pool_name = "process"
 
-    def __init__(self, max_workers: Optional[int] = None) -> None:
-        try:
-            self._max_workers: int | None = max_workers
-            worker_log_path = resolve_worker_application_log_file_path(
-                process_id="{pid}"
-            )
-            logger.debug(
-                "Opening process pool",
-                max_workers=max_workers,
-                path=str(worker_log_path),
-            )
-            self._executor: ProcessPoolExecutor = ProcessPoolExecutor(
-                max_workers=max_workers,
-                initializer=setup_worker_logger,
-            )
-        except (NotImplementedError, OSError, PermissionError) as e:
-            logger.error(
-                "Process pool initialization failed",
-                error=e,
-            )
-            raise RuntimeError(
-                "Failed to initialize process pool on this system"
-            ) from e
+    def _create_executor(self, max_workers: int | None) -> Executor:
+        worker_log_path = resolve_worker_application_log_file_path(process_id="{pid}")
         logger.debug(
-            "Process pool initialized",
+            "Opening process pool",
             max_workers=max_workers,
+            path=str(worker_log_path),
         )
-
-    def submit(
-        self,
-        job_id: str,
-        job: JobSpecification,
-        cancel_token: CancelToken,
-        emit_progress: Callable[[str, ProgressEvent], None],
-        emit_completed: Callable[[str, object], None],
-        emit_cancelled: Callable[[str], None],
-        emit_failed: Callable[[str, JobError], None],
-    ) -> Future[Any]:
-        """
-        Submit a job to the process pool. Callbacks run in the executor's thread;
-        callers must marshal to the main thread if needed (e.g. for Qt signals).
-        """
-        if job.fn is None:
-            raise ValueError("JobSpecification.fn must be set (callable)")
-        fn = job.fn
-        logger.debug(
-            "Process job queued",
-            job_id=job_id,
-            name=job.name,
-            timeout_s=job.timeout,
-            fn=getattr(fn, "__qualname__", repr(fn)),
-        )
-        fut: Future[Any] = self._executor.submit(fn, *job.args, **job.kwargs)
-
-        def _on_done(f: Future[Any]) -> None:
-            if cancel_token.is_cancelled():
-                logger.debug(
-                    "Cancelled process job callback skipped",
-                    job_id=job_id,
-                    name=job.name,
-                )
-                emit_cancelled(job_id)
-                return
-            try:
-                result = (
-                    f.result(timeout=job.timeout)
-                    if job.timeout is not None
-                    else f.result()
-                )
-                logger.debug(
-                    "Process job completed",
-                    job_id=job_id,
-                    name=job.name,
-                    result_type=type(result).__name__,
-                )
-                emit_completed(job_id, result)
-            except FuturesTimeoutError:
-                logger.warning(
-                    "Process job timed out while collecting its result",
-                    job_id=job_id,
-                    name=job.name,
-                    timeout_s=job.timeout,
-                )
-                emit_failed(
-                    job_id,
-                    JobError(
-                        message=f"Job timed out: {job.name}",
-                        traceback="",
-                        return_code=None,
-                        timestamp=datetime.datetime.now(datetime.timezone.utc),
-                    ),
-                )
-            except Exception as e:
-                emit_failed(
-                    job_id,
-                    _job_error_from_exception(job_name=job.name, exc=e),
-                )
-
-        fut.add_done_callback(_on_done)
-        return fut
-
-    def shutdown(self) -> None:
-        """
-        Shutdown the process pool
-        """
-        logger.debug("Process pool shutdown requested", cancel_futures=True)
-        if self._executor is not None:  # check if the executor is initialized
-            self._executor.shutdown(wait=False, cancel_futures=True)
-        else:
-            logger.debug("Process pool shutdown skipped because no executor exists")
-        logger.debug(
-            "Process pool shutdown completed",
-            max_workers=self._max_workers,
-        )
-
-
-class ThreadPool:
-    """
-    Thread pool to execute jobs (I/O or quick tasks; same callback contract as ProcessPool).
-    """
-
-    __slots__ = ("_max_workers", "_executor")
-
-    def __init__(self, max_workers: Optional[int] = None) -> None:
-        try:
-            self._max_workers: int | None = max_workers
-            self._executor: ThreadPoolExecutor = ThreadPoolExecutor(
-                max_workers=max_workers
-            )
-        except (NotImplementedError, OSError, PermissionError) as e:
-            logger.error(
-                "Thread pool initialization failed",
-                error=e,
-            )
-            raise RuntimeError("Failed to initialize thread pool on this system") from e
-        logger.debug(
-            "Thread pool initialized",
+        return ProcessPoolExecutor(
             max_workers=max_workers,
+            initializer=setup_worker_logger,
         )
 
-    def submit(
-        self,
-        job_id: str,
-        job: JobSpecification,
-        cancel_token: CancelToken,
-        emit_progress: Callable[[str, ProgressEvent], None],
-        emit_completed: Callable[[str, object], None],
-        emit_cancelled: Callable[[str], None],
-        emit_failed: Callable[[str, JobError], None],
-    ) -> Future[Any]:
-        """
-        Submit a job to the thread pool.
-        """
-        if job.fn is None:
-            raise ValueError("JobSpecification.fn must be set (callable)")
-        fn = job.fn
-        logger.debug(
-            "Thread job queued",
-            job_id=job_id,
-            name=job.name,
-            timeout_s=job.timeout,
-            fn=getattr(fn, "__qualname__", repr(fn)),
-        )
-        fut: Future[Any] = self._executor.submit(fn, *job.args, **job.kwargs)
 
-        def _on_done(f: Future[Any]) -> None:
-            if cancel_token.is_cancelled():
-                logger.debug(
-                    "Cancelled thread job callback skipped",
-                    job_id=job_id,
-                    name=job.name,
-                )
-                emit_cancelled(job_id)
-                return
-            try:
-                result = (
-                    f.result(timeout=job.timeout)
-                    if job.timeout is not None
-                    else f.result()
-                )
-                logger.debug(
-                    "Thread job completed",
-                    job_id=job_id,
-                    name=job.name,
-                    result_type=type(result).__name__,
-                )
-                emit_completed(job_id, result)
-            except FuturesTimeoutError:
-                logger.warning(
-                    "Thread job timed out while collecting its result",
-                    job_id=job_id,
-                    name=job.name,
-                    timeout_s=job.timeout,
-                )
-                emit_failed(
-                    job_id,
-                    JobError(
-                        message=f"Job timed out: {job.name}",
-                        traceback="",
-                        return_code=None,
-                        timestamp=datetime.datetime.now(datetime.timezone.utc),
-                    ),
-                )
-            except Exception as e:
-                emit_failed(
-                    job_id,
-                    _job_error_from_exception(job_name=job.name, exc=e),
-                )
+class ThreadPool(_ExecutorPool):
+    """Thread pool for I/O-bound or quick work."""
 
-        fut.add_done_callback(_on_done)
-        return fut
+    __slots__ = ()
+    _display_name = "Thread"
+    _pool_name = "thread"
 
-    def shutdown(self) -> None:
-        """Shutdown the thread pool."""
-        logger.debug("Thread pool shutdown requested", cancel_futures=True)
-        if self._executor is not None:  # check if the executor is initialized
-            self._executor.shutdown(wait=False, cancel_futures=True)
-        else:
-            logger.debug("Thread pool shutdown skipped because no executor exists")
-        logger.debug(
-            "Thread pool shutdown completed",
-            max_workers=self._max_workers,
-        )
+    def _create_executor(self, max_workers: int | None) -> Executor:
+        return ThreadPoolExecutor(max_workers=max_workers)
 
 
 class RunnerSignals(QObject):
@@ -433,9 +468,7 @@ class AsyncRunner(QObject):
     """
 
     _progress_ready = Signal(str, ProgressEvent)
-    _completed_ready = Signal(str, object)
-    _cancelled_ready = Signal(str)
-    _failed_ready = Signal(str, JobError)
+    _terminal_ready = Signal(str, object)
 
     def __init__(self, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
@@ -451,7 +484,7 @@ class AsyncRunner(QObject):
                 "Failed to initialize async runner on this system"
             ) from e
         try:
-            self._process_pool: ProcessPool | ThreadPool = ProcessPool()
+            self._process_pool: _ExecutorPool = ProcessPool()
         except RuntimeError as e:
             logger.warning(
                 "Process pool unavailable; process jobs will use the thread pool",
@@ -464,22 +497,15 @@ class AsyncRunner(QObject):
             process_pool=type(self._process_pool).__name__,
             thread_pool=type(self._thread_pool).__name__,
         )
-        self.history: dict[str, tuple[JobHandler, JobHandlerSignals]] = {}
+        self._active_jobs: dict[str, _ActiveJob] = {}
         self._coalesce_latest: dict[str, str] = {}
+        self._drains: dict[str, tuple[DrainHandle, QTimer | None]] = {}
         self._progress_ready.connect(
             self._emit_progress_safe,
             Qt.ConnectionType.QueuedConnection,
         )
-        self._completed_ready.connect(
-            self._emit_completed_safe,
-            Qt.ConnectionType.QueuedConnection,
-        )
-        self._cancelled_ready.connect(
-            self._emit_cancelled_safe,
-            Qt.ConnectionType.QueuedConnection,
-        )
-        self._failed_ready.connect(
-            self._emit_failed_safe,
+        self._terminal_ready.connect(
+            self._commit_terminal,
             Qt.ConnectionType.QueuedConnection,
         )
 
@@ -489,104 +515,116 @@ class AsyncRunner(QObject):
         return self._signals
 
     def submit(self, job: JobSpecification) -> JobHandler | None:
-        """
-        Submit a job to the async runner. Validates spec and dispatches to
-        process or thread pool according to _resolve_job_type.
-        Returns:
-            JobHandler | None: JobHandler for the job. This can be used to cancel the job. None if the job was not submitted.
-        """
+        """Validate, register, and dispatch a job, or return ``None`` if skipped."""
         if job.fn is None:
             raise ValueError("JobSpecification.fn must be set (callable)")
-
-        if job.preflight is not None and not job.preflight():
-            logger.debug(
-                "Async job submission skipped",
-                name=job.name,
-                coalesce_key=job.coalesce_key,
-                job_type=job.type,
-                reason="preflight",
-            )
+        if not self._passes_preflight(job):
             return None
 
-        job_id: str = uuid.uuid4().hex
-        cancel_token = CancelToken()
-        job_handler = JobHandler(
-            job_id=job_id, name=job.name, cancel_token=cancel_token
+        job_handler = self._register_job(job)
+        if job_handler is None:
+            return None
+
+        self._dispatch(job.type, job, job_handler)
+        return job_handler
+
+    def _passes_preflight(self, job: JobSpecification) -> bool:
+        """Return whether submission may proceed, logging an expected skip."""
+        if job.preflight is None or job.preflight():
+            return True
+        logger.debug(
+            "Async job submission skipped",
+            name=job.name,
+            coalesce_key=job.coalesce_key,
+            job_type=job.type,
+            reason="preflight",
         )
-        job_handler_signals = JobHandlerSignals()
+        return False
 
-        if job.coalesce_key is not None:
-            latest_job = self._coalesce_latest.get(job.coalesce_key)
-            if latest_job and latest_job in self.history:
-                # "At most one" coalescing
-                if job.at_most_once:
-                    logger.debug(
-                        "Async job submission skipped",
-                        coalesce_key=job.coalesce_key,
-                        reason="at_most_once",
-                    )
-                    return None
-                logger.debug(
-                    "Previous coalesced async job superseded",
-                    coalesce_key=job.coalesce_key,
-                    previous_job_id=latest_job,
-                    new_job_id=job_id,
-                    name=job.name,
-                )
-                # "Latest wins" coalescing
-                self.cancel(
-                    latest_job
-                )  # Cancel the previous job (emits Cancelled signal at the end of the job)
-            self._coalesce_latest[job.coalesce_key] = (
-                job_id  # Update the latest job id for this coalesce key
+    def _register_job(self, job: JobSpecification) -> JobHandler | None:
+        """Create a handle and reserve its active/coalescing state."""
+        job_handler = JobHandler(
+            job_id=uuid.uuid4().hex,
+            name=job.name,
+            cancel_token=CancelToken(),
+            coalesce_key=job.coalesce_key,
+        )
+        if not self._reserve_coalescing_slot(job, job_handler):
+            return None
+        self._active_jobs[job_handler.job_id] = _ActiveJob(
+            handle=job_handler,
+            signals=JobHandlerSignals(),
+        )
+        return job_handler
+
+    def _reserve_coalescing_slot(
+        self, job: JobSpecification, job_handler: JobHandler
+    ) -> bool:
+        """Apply at-most-once or latest-wins policy for a keyed job."""
+        key = job.coalesce_key
+        if key is None:
+            return True
+
+        latest_job_id = self._coalesce_latest.get(key)
+        active_job = (
+            self._active_jobs.get(latest_job_id) if latest_job_id is not None else None
+        )
+        active_job_id = (
+            latest_job_id
+            if active_job is not None
+            and not active_job.handle.cancel_token.is_cancelled()
+            else None
+        )
+        if active_job_id is not None and job.at_most_once:
+            logger.debug(
+                "Async job submission skipped",
+                coalesce_key=key,
+                reason="at_most_once",
             )
+            return False
+        if active_job_id is not None:
+            logger.debug(
+                "Previous coalesced async job superseded",
+                coalesce_key=key,
+                previous_job_id=active_job_id,
+                new_job_id=job_handler.job_id,
+                name=job.name,
+            )
+            self.cancel(active_job_id)
+        self._coalesce_latest[key] = job_handler.job_id
+        return True
 
-        self.history[job_id] = (job_handler, job_handler_signals)
-
-        def _marshal_progress(_job_id: str, _progress: ProgressEvent) -> None:
-            self._progress_ready.emit(_job_id, _progress)
-
-        def _marshal_completed(_job_id: str, _result: object) -> None:
-            self._completed_ready.emit(_job_id, _result)
-
-        def _marshal_cancelled(_job_id: str) -> None:
-            self._cancelled_ready.emit(_job_id)
-
-        def _marshal_failed(_job_id: str, _error: JobError) -> None:
-            self._failed_ready.emit(_job_id, _error)
-
-        job_type = self._resolve_job_type(job)
+    def _dispatch(
+        self,
+        job_type: jobtype,
+        job: JobSpecification,
+        job_handler: JobHandler,
+    ) -> None:
+        """Send a registered job to its resolved executor pool."""
         logger.debug(
             "Async job submitted",
-            job_id=job_id,
+            job_id=job_handler.job_id,
             name=job.name,
             job_type=job_type,
             coalesce_key=job.coalesce_key,
         )
-        if job_type == "process":
-            self._process_pool.submit(
-                job_id,
-                job,
-                cancel_token,
-                _marshal_progress,
-                _marshal_completed,
-                _marshal_cancelled,
-                _marshal_failed,
-            )
-        elif job_type == "thread":
-            self._thread_pool.submit(
-                job_id,
-                job,
-                cancel_token,
-                _marshal_progress,
-                _marshal_completed,
-                _marshal_cancelled,
-                _marshal_failed,
-            )
-        else:
-            raise ValueError(f"Invalid job type: {job_type}")
+        pool = self._thread_pool if job_type == "thread" else self._process_pool
+        future = pool.submit(
+            job_handler.job_id,
+            job,
+            job_handler.cancel_token,
+            self._marshal_progress,
+            self._marshal_terminal,
+        )
+        active_job = self._active_jobs.get(job_handler.job_id)
+        if active_job is not None:
+            active_job.future = future
 
-        return job_handler
+    def _marshal_progress(self, job_id: str, progress: ProgressEvent) -> None:
+        self._progress_ready.emit(job_id, progress)
+
+    def _marshal_terminal(self, job_id: str, proposal: _TerminalProposal) -> None:
+        self._terminal_ready.emit(job_id, proposal)
 
     def shutdown(self) -> None:
         """Shutdown process and thread pools."""
@@ -594,39 +632,60 @@ class AsyncRunner(QObject):
         self._process_pool.shutdown()
         self._thread_pool.shutdown()
 
-    def _resolve_job_type(self, job_spec: JobSpecification) -> jobtype:
-        """
-        Resolve execution type from spec. When type is "auto", choose process vs
-        thread from task semantics: map/network/heavy work -> process; location/
-        device quick updates -> thread.
-        """
-        if job_spec.type == "thread":
-            return "thread"
-        if job_spec.type == "process":
-            return "process"
-        if job_spec.type == "auto":
-            name_lower = (job_spec.name or "").lower()
-            key = (job_spec.coalesce_key or "").lower()
-            # Map creation and network-related work: CPU/heavy -> process
-            if "map" in name_lower or key == "network" or key == "none":
-                return "process"
-            # Location/device updates: typically I/O or quick -> thread
-            if key in ("location", "device"):
-                return "thread"
-            # Default: heavier work in process to keep UI responsive
-            return "process"
-        raise ValueError(f"Invalid job type: {job_spec.type!r}")
+    def cancel_active(
+        self,
+        *,
+        excluding_names: Collection[str] = (),
+    ) -> None:
+        """Cancel every active job except explicitly preserved lifecycle jobs."""
+        excluded = frozenset(excluding_names)
+        for active_job in tuple(self._active_jobs.values()):
+            if active_job.handle.name not in excluded:
+                self.cancel(active_job.handle.job_id)
+
+    def request_drain(self, timeout: float | None) -> DrainHandle:
+        """Observe runner quiescence without nesting or blocking the Qt event loop."""
+        if timeout is not None and (not math.isfinite(timeout) or timeout <= 0):
+            raise ValueError(
+                "Drain timeout must be a positive finite number of seconds"
+            )
+
+        drain_id = uuid.uuid4().hex
+        handle = DrainHandle()
+        timer: QTimer | None = None
+        if timeout is not None:
+            timer = QTimer(handle)
+            timer.setSingleShot(True)
+            timer.timeout.connect(
+                lambda drain_id=drain_id: self._timeout_drain(drain_id)
+            )
+            timer.start(max(1, round(timeout * 1_000)))
+        self._drains[drain_id] = (handle, timer)
+
+        # Always defer the first observation so callers can bind signals before
+        # an already-empty runner reports quiescence.
+        QTimer.singleShot(0, self._evaluate_drains)
+        return handle
+
+    def is_active(self, handle: JobHandler) -> bool:
+        """Return whether *handle* still represents an active runner job."""
+        return handle.job_id in self._active_jobs
 
     def cancel(self, job_id: str) -> None:
-        """Mark job as cancelled (next completion callback will emit Cancelled)."""
-        tup = self.history.get(job_id)
-        if tup:
+        """Promptly commit cancellation and discard any eventual worker outcome."""
+        active_job = self._active_jobs.get(job_id)
+        if active_job is not None:
             logger.debug(
                 "Async job cancellation requested",
                 job_id=job_id,
-                name=tup[0].name,
+                name=active_job.handle.name,
             )
-            tup[0].cancel_token.cancel()
+            if active_job.handle.cancel_token.is_cancelled():
+                return
+            active_job.handle.cancel_token.cancel()
+            if active_job.future is not None:
+                active_job.future.cancel()
+            self._terminal_ready.emit(job_id, _CancelledProposal())
         else:
             logger.debug(
                 "Async job cancellation ignored because the job is no longer active",
@@ -638,72 +697,111 @@ class AsyncRunner(QObject):
         Return per-job signals for this handle. Use in controller:
         hs = runner.bind_handle_signals(handle); hs.Completed.connect(...)
         """
-        return self.history[handle.job_id][1]
+        return self._active_jobs[handle.job_id].signals
 
     def _emit_progress_safe(self, job_id: str, evt: ProgressEvent) -> None:
         """Emit progress on main thread (runner + handle signals)."""
         self._signals.Progress.emit(job_id, evt)
-        tup = self.history.get(job_id)
-        if tup:
-            tup[1].Progress.emit(evt)
+        active_job = self._active_jobs.get(job_id)
+        if active_job is not None:
+            active_job.signals.Progress.emit(evt)
 
-    def _emit_completed_safe(self, job_id: str, result: Any) -> None:
-        """Emit completed on main thread and cleanup."""
-        tup = self.history.get(job_id)
-        job_name = tup[0].name if tup else ""
-        logger.debug(
-            "Async job completion emitted",
-            job_id=job_id,
-            name=job_name,
-            result_type=type(result).__name__,
+    def _commit_terminal(self, job_id: str, proposal: _TerminalProposal) -> None:
+        """Commit one terminal outcome using the latest main-thread job state."""
+        active_job = self._active_jobs.get(job_id)
+        if active_job is None:
+            logger.debug(
+                "Late async terminal proposal discarded",
+                job_id=job_id,
+                proposal_type=type(proposal).__name__,
+            )
+            return
+
+        handle = active_job.handle
+        handle_signals = active_job.signals
+        is_superseded = (
+            handle.coalesce_key is not None
+            and self._coalesce_latest.get(handle.coalesce_key) != job_id
         )
-        self._signals.Completed.emit(job_id, result)
-        if tup:
-            tup[1].Completed.emit(result)
-        self._cleanup(job_id)
+        if handle.cancel_token.is_cancelled() or is_superseded:
+            proposal = _CancelledProposal()
 
-    def _emit_cancelled_safe(self, job_id: str) -> None:
-        """Emit cancelled on main thread and cleanup."""
-        tup = self.history.get(job_id)
-        job_name = tup[0].name if tup else ""
-        logger.debug(
-            "Async job cancellation emitted",
-            job_id=job_id,
-            name=job_name,
-        )
-        self._signals.Cancelled.emit(job_id)
-        if tup:
-            tup[1].Cancelled.emit()
-        self._cleanup(job_id)
+        self._cleanup(handle)
 
-    def _emit_failed_safe(self, job_id: str, error: JobError) -> None:
-        """Emit failed on main thread and cleanup."""
-        tup = self.history.get(job_id)
-        job_name = tup[0].name if tup else ""
-        logger.error(
-            "Async job failed",
-            job_id=job_id,
-            name=job_name,
-            message=error.message,
-            return_code=error.return_code,
-            traceback=error.traceback or None,
-        )
-        self._signals.Failed.emit(job_id, error)
-        tup = self.history.get(job_id)
-        if tup:
-            tup[1].Failed.emit(error)
-        self._cleanup(job_id)
+        if isinstance(proposal, _CompletedProposal):
+            logger.debug(
+                "Async job completion emitted",
+                job_id=job_id,
+                name=handle.name,
+                result_type=type(proposal.result).__name__,
+            )
+            self._signals.Completed.emit(job_id, proposal.result)
+            handle_signals.Completed.emit(proposal.result)
+        elif isinstance(proposal, _FailedProposal):
+            error = proposal.error
+            logger.error(
+                "Async job failed",
+                job_id=job_id,
+                name=handle.name,
+                message=error.message,
+                return_code=error.return_code,
+                traceback=error.traceback or None,
+            )
+            self._signals.Failed.emit(job_id, error)
+            handle_signals.Failed.emit(error)
+        else:
+            logger.debug(
+                "Async job cancellation emitted",
+                job_id=job_id,
+                name=handle.name,
+            )
+            self._signals.Cancelled.emit(job_id)
+            handle_signals.Cancelled.emit()
 
-    def _cleanup(self, job_id: str) -> None:
-        """Remove job from history and from coalesce key if it is the latest."""
-        self.history.pop(job_id, None)
-        for key, latest_id in list(self._coalesce_latest.items()):
-            if latest_id == job_id:
-                logger.debug(
-                    "Async job coalescing state cleared",
-                    job_id=job_id,
-                    coalesce_key=key,
-                )
-                del self._coalesce_latest[key]
-                break
+        # Terminal listeners can synchronously enqueue follow-up jobs. Observe
+        # quiescence on the next Qt turn so those jobs join the same drain.
+        QTimer.singleShot(0, self._evaluate_drains)
+
+    def _cleanup(self, handle: JobHandler) -> None:
+        """Remove a terminal job and its current coalescing entry."""
+        job_id = handle.job_id
+        self._active_jobs.pop(job_id, None)
+        key = handle.coalesce_key
+        if key is not None and self._coalesce_latest.get(key) == job_id:
+            logger.debug(
+                "Async job coalescing state cleared",
+                job_id=job_id,
+                coalesce_key=key,
+            )
+            del self._coalesce_latest[key]
         logger.debug("Async job history cleared", job_id=job_id)
+
+    def _evaluate_drains(self) -> None:
+        """Complete pending drains once no registered job remains active."""
+        if self._active_jobs:
+            return
+        for drain_id in tuple(self._drains):
+            state = self._drains.pop(drain_id, None)
+            if state is None:
+                continue
+            handle, timer = state
+            if timer is not None:
+                timer.stop()
+            logger.debug("Async runner drained", drain_id=drain_id)
+            handle.Drained.emit()
+
+    def _timeout_drain(self, drain_id: str) -> None:
+        """Fail one pending drain without mutating the jobs it observes."""
+        state = self._drains.pop(drain_id, None)
+        if state is None:
+            return
+        handle, _timer = state
+        logger.warning(
+            "Async runner drain timed out",
+            drain_id=drain_id,
+            active_jobs=tuple(
+                (active.handle.job_id, active.handle.name)
+                for active in self._active_jobs.values()
+            ),
+        )
+        handle.TimedOut.emit()

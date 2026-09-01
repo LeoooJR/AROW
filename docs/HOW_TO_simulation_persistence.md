@@ -62,15 +62,13 @@ If the same device is selected again later, the existing simulation is reused ra
 ### On state, location, and map changes
 
 Simulation metadata is refreshed incrementally rather than only at shutdown.
+`SimulationService` writes the affected simulation from the same operation that
+changes its active state, locations, or map path. Persistence is attempted before
+the corresponding core signal is emitted, so signal consumers observe the applied
+and persisted state without controller wiring.
 
-`SimulationSubController` subscribes to:
-
-- `SIMULATION_STATE_CHANGED`
-- `SIMULATION_POSITION_CHANGED`
-- `SIMULATION_MAP_FILE_CHANGED`
-- `MAP_RENDERED`
-
-For each of those signals it calls `ModelEntrypoint.persist_simulation(simulation_id)`, which rewrites only that simulation's `simulation.json`.
+Incremental writes are best-effort. A write failure is logged, while the in-memory
+mutation and signal emission are retained to match existing runtime behavior.
 
 This means the persisted JSON follows runtime changes for:
 
@@ -81,7 +79,9 @@ This means the persisted JSON follows runtime changes for:
 
 ### On bulk persistence
 
-`ModelEntrypoint.persist_simulations()` rewrites every simulation metadata file and then rewrites `index.json`. `MapSubController.persist_simulation_repository()` uses this path for shutdown-oriented persistence.
+`ModelEntrypoint.persist_simulations()` rewrites every simulation metadata file and
+then rewrites `index.json`. At shutdown, `AppController` delegates this domain action
+to `SimulationSubController.persist_simulation_repository()`.
 
 JSON writes are atomic: files are written through a `*.tmp` sibling and then replaced in place.
 
@@ -163,14 +163,18 @@ Map HTML is rendered by `RenderMapWork` into:
 <application_dir>/simulations/<simulation_id>/map/<simulation_id>.html
 ```
 
-`RenderMapWork.apply_main_thread(...)` sets `simulation.map_file` and emits `MAP_RENDERED`. `SimulationSubController` hears that signal and persists the updated `map_file` back into `simulation.json`.
+`RenderMapWork.apply_main_thread(...)` calls the typed core map mutation API. The
+service stores and persists `simulation.map_file`, emits
+`SIMULATION_MAP_FILE_CHANGED`, and the work applier then emits `MAP_RENDERED`.
 
 Later, when the UI requests the same map again, `MapSubController._on_render_map_requested(...)` checks `simulation.map_file` first:
 
 - if the HTML file still exists, it forwards that cached path directly to the view
 - otherwise it submits a new process-backed render job
 
-If rendering fails with `RenderMapError`, the main-thread failure path clears `simulation.map_file` and emits `MAP_RENDER_FAILED`.
+If rendering fails with `RenderMapError`, the main-thread failure path clears and
+persists `simulation.map_file` through the core service before emitting
+`MAP_RENDER_FAILED`.
 
 ## Constraints and pitfalls
 

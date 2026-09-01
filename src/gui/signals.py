@@ -21,6 +21,9 @@ from PySide6.QtCore import QObject, Signal
 class UISignals(QObject):
     """UI chrome, panels, palette, and map-tab activation signals."""
 
+    ApplicationShutdownRequested = Signal()
+    ApplicationShutdownWaitRequested = Signal()
+    ApplicationForceCloseRequested = Signal()
     UpdatePaletteSignal = Signal(str)
     DisplayLeftPanelsRequested = Signal()
     HideLeftPanelsRequested = Signal()

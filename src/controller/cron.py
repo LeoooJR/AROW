@@ -40,6 +40,7 @@ class CronManager:
         self._declarations: dict[str, CronJob] = {}
         self._timers: dict[str, QTimer] = {}
         self._committed = False
+        self._paused = False
         self._stopped = False
 
     def declare(self, job: CronJob) -> None:
@@ -60,18 +61,43 @@ class CronManager:
         if self._committed:
             raise RuntimeError("cron jobs are already committed")
         self._committed = True
+        self._activate_timers()
+
+    def _activate_timers(self) -> None:
+        """Create timers for every declaration while scheduling is active."""
         for name, job in self._declarations.items():
             self._timers[name] = repeat(job.interval_ms)(lambda job=job: self._run(job))
+
+    def pause(self) -> None:
+        """Temporarily suspend every timer while preserving declarations."""
+        if self._stopped or self._paused:
+            return
+        self._paused = True
+        for timer in self._timers.values():
+            timer.stop()
+        self._timers.clear()
+
+    def resume(self) -> None:
+        """Resume a previously paused committed schedule."""
+        if self._stopped:
+            raise RuntimeError("stopped cron jobs cannot be resumed")
+        if not self._committed:
+            raise RuntimeError("cron jobs must be committed before resume")
+        if not self._paused:
+            return
+        self._paused = False
+        self._activate_timers()
 
     def stop(self) -> None:
         """Stop and release all active timers. Safe to call repeatedly."""
         self._stopped = True
+        self._paused = False
         for timer in self._timers.values():
             timer.stop()
         self._timers.clear()
 
     def _run(self, job: CronJob) -> None:
-        if self._stopped:
+        if self._stopped or self._paused:
             return
         try:
             self._submit(job)

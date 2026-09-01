@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import builtins
-import json
 from collections.abc import Iterator
 from pathlib import Path
 from typing import cast
@@ -19,17 +17,10 @@ from core.devices.phone import Phone
 from core.entrypoint import ModelEntrypoint
 from core.signals import (
     CoreSignals,
-    MapRenderedPayload,
     SimulationCreatedPayload,
     SimulationCreationFailedPayload,
     SimulationDeletedPayload,
-    SimulationLocationRejectedPayload,
-    SimulationLocationValidatedPayload,
-    SimulationMapFileChangedPayload,
-    SimulationPositionChangedPayload,
-    SimulationStateChangedPayload,
 )
-from core.tests.geo_fixtures import SAMPLE_LATITUDE, SAMPLE_LONGITUDE
 from core.tests.signal_test_helpers import seed_adb_startup_for_entrypoint
 
 
@@ -37,22 +28,6 @@ class _AppProbe:
     def __init__(self, model_entrypoint: ModelEntrypoint) -> None:
         self.model_entrypoint = model_entrypoint
         self.view = MagicMock()
-
-
-def _patch_controller_type_checks(monkeypatch, probe: object) -> None:
-    real_isinstance = builtins.isinstance
-
-    def _isinstance(obj, cls) -> bool:
-        cls_name = getattr(cls, "__name__", "")
-        if cls_name == "MainWindow" and obj is getattr(probe, "view", object()):
-            return True
-        if cls_name == "ModelEntrypoint" and obj is getattr(
-            probe, "model_entrypoint", object()
-        ):
-            return True
-        return real_isinstance(obj, cls)
-
-    monkeypatch.setattr(builtins, "isinstance", _isinstance)
 
 
 def _make_model(tmp_path: Path, *, device: Phone | None = None) -> ModelEntrypoint:
@@ -79,17 +54,6 @@ def _view_mock(subcontroller: SimulationSubController) -> MagicMock:
     return cast(MagicMock, cast(_AppProbe, subcontroller._app).view)
 
 
-def _simulation_metadata_path(
-    model_entrypoint: ModelEntrypoint, simulation_id: str
-) -> Path:
-    return (
-        model_entrypoint.application_dir
-        / "simulations"
-        / simulation_id
-        / "simulation.json"
-    )
-
-
 def _create_simulation_id(model_entrypoint: ModelEntrypoint, device_id: str) -> str:
     """Create a simulation and return its id via SIMULATION_CREATED."""
     captured: list[str] = []
@@ -112,7 +76,7 @@ def test_connect_model_signals_subscribes_to_simulation_events(tmp_path: Path) -
 
     subcontroller.connect_model_signals()
 
-    assert subscribe.call_count == 11
+    assert subscribe.call_count == 5
     subscribe.assert_any_call(
         CoreSignals.SIMULATION_CREATED,
         subcontroller._on_simulation_created,
@@ -133,40 +97,15 @@ def test_connect_model_signals_subscribes_to_simulation_events(tmp_path: Path) -
         CoreSignals.SIMULATION_DELETE_SKIPPED,
         subcontroller._on_simulation_delete_skipped,
     )
-    subscribe.assert_any_call(
-        CoreSignals.MAP_RENDERED,
-        subcontroller._on_map_rendered,
-    )
-    subscribe.assert_any_call(
-        CoreSignals.SIMULATION_STATE_CHANGED,
-        subcontroller._on_simulation_state_changed,
-    )
-    subscribe.assert_any_call(
-        CoreSignals.SIMULATION_POSITION_CHANGED,
-        subcontroller._on_simulation_position_changed,
-    )
-    subscribe.assert_any_call(
-        CoreSignals.SIMULATION_MAP_FILE_CHANGED,
-        subcontroller._on_simulation_map_file_changed,
-    )
-    subscribe.assert_any_call(
-        CoreSignals.SIMULATION_LOCATION_VALIDATED,
-        subcontroller._on_simulation_location_validated,
-    )
-    subscribe.assert_any_call(
-        CoreSignals.SIMULATION_LOCATION_REJECTED,
-        subcontroller._on_simulation_location_rejected,
-    )
 
 
 def test_device_selection_confirmed_creates_simulation_and_waits_for_signal(
-    monkeypatch, tmp_path: Path, log_records
+    tmp_path: Path, log_records
 ) -> None:
     model_entrypoint = _make_model(
         tmp_path, device=Phone(id="device-1", state="device", model="Pixel")
     )
     subcontroller = _make_subcontroller(model_entrypoint)
-    _patch_controller_type_checks(monkeypatch, subcontroller._app)
     captured: list[str] = []
 
     def capture(payload: SimulationCreatedPayload) -> None:
@@ -193,11 +132,10 @@ def test_device_selection_confirmed_creates_simulation_and_waits_for_signal(
 
 
 def test_device_selection_confirmed_forwards_failure_when_device_is_unknown(
-    monkeypatch, tmp_path: Path
+    tmp_path: Path,
 ) -> None:
     model_entrypoint = _make_model(tmp_path)
     subcontroller = _make_subcontroller(model_entrypoint)
-    _patch_controller_type_checks(monkeypatch, subcontroller._app)
     subcontroller.connect_model_signals()
     created_ids: list[str] = []
 
@@ -251,7 +189,6 @@ def test_on_simulation_created_ignores_payload_without_device(tmp_path: Path) ->
 
 
 def test_remove_device_requested_deletes_simulation_and_forwards_success(
-    monkeypatch,
     tmp_path: Path,
 ) -> None:
     model_entrypoint = _make_model(
@@ -259,7 +196,6 @@ def test_remove_device_requested_deletes_simulation_and_forwards_success(
     )
     simulation_id = _create_simulation_id(model_entrypoint, "device-1")
     subcontroller = _make_subcontroller(model_entrypoint)
-    _patch_controller_type_checks(monkeypatch, subcontroller._app)
     subcontroller.connect_model_signals()
 
     subcontroller._on_remove_device_requested("device-1")
@@ -284,12 +220,10 @@ def test_remove_device_requested_ignores_devices_without_active_simulation(
 
 
 def test_on_simulation_creation_failed_forwards_device_selection_failure(
-    monkeypatch,
     tmp_path: Path,
 ) -> None:
     model_entrypoint = _make_model(tmp_path)
     subcontroller = _make_subcontroller(model_entrypoint)
-    _patch_controller_type_checks(monkeypatch, subcontroller._app)
     payload = SimulationCreationFailedPayload(
         device_id="device-1",
         device_name="Pixel",
@@ -305,12 +239,10 @@ def test_on_simulation_creation_failed_forwards_device_selection_failure(
 
 
 def test_on_simulation_deleted_forwards_remove_active_device_success(
-    monkeypatch,
     tmp_path: Path,
 ) -> None:
     model_entrypoint = _make_model(tmp_path)
     subcontroller = _make_subcontroller(model_entrypoint)
-    _patch_controller_type_checks(monkeypatch, subcontroller._app)
     payload = SimulationDeletedPayload(
         simulation_id="sim-1",
         device_id="device-1",
@@ -348,286 +280,13 @@ def test_run_stop_pause_and_resume_update_simulation_active_state(
     assert model_entrypoint.is_simulation_active(simulation_id) is False
 
 
-def test_run_persists_active_state_to_metadata(tmp_path: Path) -> None:
-    model_entrypoint = _make_model(
-        tmp_path, device=Phone(id="device-1", state="device", model="Pixel")
-    )
-    subcontroller = _make_subcontroller(model_entrypoint)
-    subcontroller.connect_model_signals()
-    simulation_id = _create_simulation_id(model_entrypoint, "device-1")
-
-    subcontroller.run(simulation_id)
-
-    metadata_path = _simulation_metadata_path(model_entrypoint, simulation_id)
-    payload = json.loads(metadata_path.read_text(encoding="utf-8"))
-    assert payload["active"] is True
-
-
-def test_set_simulation_spoofed_location_persists_metadata(tmp_path: Path) -> None:
-    model_entrypoint = _make_model(
-        tmp_path, device=Phone(id="device-1", state="device", model="Pixel")
-    )
-    subcontroller = _make_subcontroller(model_entrypoint)
-    subcontroller.connect_model_signals()
-    simulation_id = _create_simulation_id(model_entrypoint, "device-1")
-    lat, lon = 48.85, 2.35
-
-    model_entrypoint.set_simulation_spoofed_location(simulation_id, lat, lon)
-
-    metadata_path = _simulation_metadata_path(model_entrypoint, simulation_id)
-    payload = json.loads(metadata_path.read_text(encoding="utf-8"))
-    assert payload["spoofed_location"] == {
-        "lat": lat,
-        "lon": lon,
-        "poi": None,
-    }
-
-
-def test_map_rendered_persists_latest_map_file_to_metadata(tmp_path: Path) -> None:
-    model_entrypoint = _make_model(
-        tmp_path, device=Phone(id="device-1", state="device", model="Pixel")
-    )
-    subcontroller = _make_subcontroller(model_entrypoint)
-    subcontroller.connect_model_signals()
-    simulation_id = _create_simulation_id(model_entrypoint, "device-1")
-    html_path = tmp_path / "rendered" / "sim-1.html"
-    html_path.parent.mkdir(parents=True, exist_ok=True)
-    html_path.write_text("<html></html>", encoding="utf-8")
-
-    model_entrypoint.set_simulation_map_file(simulation_id, html_path)
-    subcontroller._on_map_rendered(
-        MapRenderedPayload(simulation_id=simulation_id, html_path=html_path)
-    )
-
-    metadata_path = _simulation_metadata_path(model_entrypoint, simulation_id)
-    payload = json.loads(metadata_path.read_text(encoding="utf-8"))
-    assert payload["map_file"] == str(html_path)
-
-
-def test_set_simulation_map_file_emits_map_file_changed_with_simulation_id(
+def test_persist_simulation_repository_delegates_to_model_entrypoint(
     tmp_path: Path,
 ) -> None:
-    model_entrypoint = _make_model(
-        tmp_path, device=Phone(id="device-1", state="device", model="Pixel")
-    )
-    simulation_id = _create_simulation_id(model_entrypoint, "device-1")
-    html_path = tmp_path / "rendered" / "sim-1.html"
-    captured: list[SimulationMapFileChangedPayload] = []
-
-    def capture_map_file(payload: SimulationMapFileChangedPayload) -> None:
-        captured.append(payload)
-
-    model_entrypoint.signal_bus.subscribe(
-        CoreSignals.SIMULATION_MAP_FILE_CHANGED,
-        capture_map_file,
-    )
-
-    model_entrypoint.set_simulation_map_file(simulation_id, html_path)
-
-    assert len(captured) == 1
-    assert captured[0].simulation_id == simulation_id
-    assert captured[0].map_file_path == html_path
-
-
-def test_set_simulation_map_file_persists_metadata(tmp_path: Path) -> None:
-    model_entrypoint = _make_model(
-        tmp_path, device=Phone(id="device-1", state="device", model="Pixel")
-    )
+    model_entrypoint = _make_model(tmp_path)
     subcontroller = _make_subcontroller(model_entrypoint)
-    subcontroller.connect_model_signals()
-    simulation_id = _create_simulation_id(model_entrypoint, "device-1")
-    html_path = tmp_path / "rendered" / "sim-2.html"
-    html_path.parent.mkdir(parents=True, exist_ok=True)
-    html_path.write_text("<html></html>", encoding="utf-8")
+    model_entrypoint.persist_simulations = MagicMock()  # type: ignore[method-assign]
 
-    model_entrypoint.set_simulation_map_file(simulation_id, html_path)
+    subcontroller.persist_simulation_repository()
 
-    metadata_path = _simulation_metadata_path(model_entrypoint, simulation_id)
-    payload = json.loads(metadata_path.read_text(encoding="utf-8"))
-    assert payload["map_file"] == str(html_path)
-
-
-def test_set_simulation_active_emits_state_changed_with_simulation_id(
-    tmp_path: Path,
-) -> None:
-    model_entrypoint = _make_model(
-        tmp_path, device=Phone(id="device-1", state="device", model="Pixel")
-    )
-    simulation_id = _create_simulation_id(model_entrypoint, "device-1")
-    captured: list[SimulationStateChangedPayload] = []
-
-    def capture_state(payload: SimulationStateChangedPayload) -> None:
-        captured.append(payload)
-
-    model_entrypoint.signal_bus.subscribe(
-        CoreSignals.SIMULATION_STATE_CHANGED,
-        capture_state,
-    )
-
-    model_entrypoint.set_simulation_active(simulation_id, True)
-
-    assert len(captured) == 1
-    assert captured[0].simulation_id == simulation_id
-    assert captured[0].active is True
-
-
-def test_set_simulation_real_location_emits_position_changed_with_simulation_id(
-    tmp_path: Path,
-) -> None:
-    model_entrypoint = _make_model(
-        tmp_path, device=Phone(id="device-1", state="device", model="Pixel")
-    )
-    simulation_id = _create_simulation_id(model_entrypoint, "device-1")
-    lat, lon = 1.0, 2.0
-    captured: list[SimulationPositionChangedPayload] = []
-
-    def capture_position(payload: SimulationPositionChangedPayload) -> None:
-        captured.append(payload)
-
-    model_entrypoint.signal_bus.subscribe(
-        CoreSignals.SIMULATION_POSITION_CHANGED,
-        capture_position,
-    )
-
-    model_entrypoint.set_simulation_real_location(simulation_id, lat, lon)
-
-    assert len(captured) == 1
-    assert captured[0].simulation_id == simulation_id
-
-
-def test_simulation_location_validated_updates_spoofed_location_and_persists(
-    tmp_path: Path,
-) -> None:
-    model_entrypoint = _make_model(
-        tmp_path, device=Phone(id="device-1", state="device", model="Pixel")
-    )
-    subcontroller = _make_subcontroller(model_entrypoint)
-    simulation_id = _create_simulation_id(model_entrypoint, "device-1")
-    captured: list[SimulationLocationValidatedPayload] = []
-
-    def capture(payload: SimulationLocationValidatedPayload) -> None:
-        captured.append(payload)
-
-    model_entrypoint.signal_bus.subscribe(
-        CoreSignals.SIMULATION_LOCATION_VALIDATED, capture
-    )
-    outcome = model_entrypoint.validate_simulation_marker_location(
-        simulation_id,
-        1,
-        "001000",
-        1,
-        48.88533318609319,
-        2.363530409238113,
-    )
-    model_entrypoint.apply_result(outcome)
-    assert len(captured) == 1
-    payload = captured[0]
-
-    subcontroller.connect_model_signals()
-    subcontroller._on_simulation_location_validated(payload)
-
-    simulation = model_entrypoint.get_simulation(simulation_id)
-    assert simulation is not None
-    assert simulation.spoofed_location.lat == pytest.approx(payload.lat)
-    assert simulation.spoofed_location.lon == pytest.approx(payload.lon)
-    assert simulation.spoofed_location.poi is not None
-    assert simulation.spoofed_location.poi.id == "001000-1-1"
-    assert simulation.spoofed_location.poi.is_validated
-    metadata_path = _simulation_metadata_path(model_entrypoint, simulation_id)
-    persisted = json.loads(metadata_path.read_text(encoding="utf-8"))
-    assert persisted["spoofed_location"]["lat"] == pytest.approx(payload.lat)
-    assert persisted["spoofed_location"]["lon"] == pytest.approx(payload.lon)
-    assert persisted["spoofed_location"]["poi"]["km"] == 1
-    assert persisted["spoofed_location"]["poi"]["line"]["code"] == "001000"
-
-
-def test_simulation_location_rejected_clears_matching_persisted_marker(
-    tmp_path: Path,
-) -> None:
-    model_entrypoint = _make_model(
-        tmp_path, device=Phone(id="device-1", state="device", model="Pixel")
-    )
-    subcontroller = _make_subcontroller(model_entrypoint)
-    subcontroller.connect_model_signals()
-    simulation_id = _create_simulation_id(model_entrypoint, "device-1")
-    outcome = model_entrypoint.validate_simulation_marker_location(
-        simulation_id,
-        1,
-        "001000",
-        1,
-        SAMPLE_LATITUDE,
-        SAMPLE_LONGITUDE,
-    )
-    assert outcome.validated is not None
-    model_entrypoint.set_simulation_spoofed_location(
-        simulation_id,
-        outcome.validated.lat,
-        outcome.validated.lon,
-        outcome.validated,
-    )
-
-    subcontroller._on_simulation_location_rejected(
-        SimulationLocationRejectedPayload(
-            simulation_id=simulation_id,
-            km=1,
-            line_code="001000",
-            line_troncon=1,
-            lat=SAMPLE_LATITUDE,
-            lon=SAMPLE_LONGITUDE,
-            reason="Unknown milestone after dataset refresh",
-        )
-    )
-
-    simulation = model_entrypoint.get_simulation(simulation_id)
-    assert simulation is not None
-    assert simulation.spoofed_location.lat == pytest.approx(SAMPLE_LATITUDE)
-    assert simulation.spoofed_location.lon == pytest.approx(SAMPLE_LONGITUDE)
-    assert simulation.spoofed_location.poi is None
-    metadata_path = _simulation_metadata_path(model_entrypoint, simulation_id)
-    persisted = json.loads(metadata_path.read_text(encoding="utf-8"))
-    assert persisted["spoofed_location"]["lat"] == pytest.approx(SAMPLE_LATITUDE)
-    assert persisted["spoofed_location"]["lon"] == pytest.approx(SAMPLE_LONGITUDE)
-    assert persisted["spoofed_location"]["poi"] is None
-
-
-def test_simulation_location_rejected_ignores_non_matching_marker(
-    tmp_path: Path,
-) -> None:
-    model_entrypoint = _make_model(
-        tmp_path, device=Phone(id="device-1", state="device", model="Pixel")
-    )
-    subcontroller = _make_subcontroller(model_entrypoint)
-    subcontroller.connect_model_signals()
-    simulation_id = _create_simulation_id(model_entrypoint, "device-1")
-    outcome = model_entrypoint.validate_simulation_marker_location(
-        simulation_id,
-        1,
-        "001000",
-        1,
-        SAMPLE_LATITUDE,
-        SAMPLE_LONGITUDE,
-    )
-    assert outcome.validated is not None
-    model_entrypoint.set_simulation_spoofed_location(
-        simulation_id,
-        outcome.validated.lat,
-        outcome.validated.lon,
-        outcome.validated,
-    )
-
-    subcontroller._on_simulation_location_rejected(
-        SimulationLocationRejectedPayload(
-            simulation_id=simulation_id,
-            km=999,
-            line_code="001000",
-            line_troncon=1,
-            lat=0.0,
-            lon=0.0,
-            reason="User clicked an invalid marker",
-        )
-    )
-
-    simulation = model_entrypoint.get_simulation(simulation_id)
-    assert simulation is not None
-    assert simulation.spoofed_location.poi is not None
-    assert simulation.spoofed_location.poi.id == "001000-1-1"
+    model_entrypoint.persist_simulations.assert_called_once_with()

@@ -15,8 +15,9 @@ sequenceDiagram
     participant Work as CloseCoreRuntimeWork
     participant Bus as Core signal bus
 
-    App->>Controller: enqueue close with after_apply hook
+    App->>Controller: run_shutdown()
     Controller->>Runner: submit close_core_runtime<br/>thread, latest wins
+    App->>Runner: request_drain(timeout)
     Runner->>Entrypoint: close_core_runtime() in worker thread
     alt no active ADB server
         Entrypoint-->>Runner: CloseOutcome(adb_server=None)
@@ -35,17 +36,19 @@ sequenceDiagram
             Work->>Work: log warning and keep state unchanged
         end
         Runner->>Controller: Completed, after apply_result
-        Controller-->>App: invoke after_apply hook
     else stop or preflight fails
         Work--xRunner: exception in JobError<br/>origin close_core_runtime
         Runner->>Entrypoint: apply_failure(job_error) on main thread
         Entrypoint->>Work: apply_failure_main_thread(entrypoint, exception)
         Work->>Bus: emit ERROR_RAISED
         Runner->>Controller: Failed, after apply_failure
-        Controller-->>App: invoke after_apply hook
     end
+    Runner-->>App: Drained after terminal listeners
     App->>App: persist simulations, then runner.shutdown()
 ```
 
-The shutdown event loop is released only by the post-apply handler (or its
-watchdog), so runner shutdown cannot normally overtake result/failure application.
+The runner evaluates drains after runner-level and handle-level terminal
+listeners. The entrypoint result or failure applier therefore completes before
+`Drained` advances application teardown. No nested Qt event loop or controller
+callback hook is involved. If the close deadline expires, the application stays
+alive and an unbounded drain continues observing the already-started close.

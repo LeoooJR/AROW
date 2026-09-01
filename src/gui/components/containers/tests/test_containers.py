@@ -3,9 +3,16 @@
 from __future__ import annotations
 
 import pytest
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QLabel, QVBoxLayout
 
-from gui.components.containers import AuthentificationCard, GroupBox, PlaceHolder
+from gui.components.containers import (
+    AuthentificationCard,
+    GroupBox,
+    PlaceHolder,
+    ShutdownCard,
+    ShutdownCardMode,
+)
 from gui.constants.icons import GenericIcons, icon_qt_path
 from gui.signals import signals
 
@@ -97,3 +104,41 @@ def test_authentification_card_logs_user_cancellation(qtbot, log_records) -> Non
     record = log_records[-1]
     assert record["level"].name == "INFO"
     assert record["message"] == "Device pairing cancelled"
+
+
+def test_shutdown_card_transitions_between_progress_and_decision(qtbot) -> None:
+    card = ShutdownCard()
+    qtbot.addWidget(card)
+
+    assert card.mode is ShutdownCardMode.CLOSING
+    assert card.ui.wait_button.isHidden()
+    assert card.ui.force_button.isHidden()
+
+    card.show_decision("Background work is still active.")
+
+    assert card.mode is ShutdownCardMode.DECISION
+    assert card.ui.description.text() == "Background work is still active."
+    assert not card.ui.wait_button.isHidden()
+    assert not card.ui.force_button.isHidden()
+
+    card.show_waiting()
+
+    assert card.mode is ShutdownCardMode.WAITING
+    assert card.ui.wait_button.isHidden()
+    assert not card.ui.force_button.isHidden()
+
+
+def test_shutdown_card_escape_selects_wait_only_from_decision(qtbot) -> None:
+    card = ShutdownCard()
+    qtbot.addWidget(card)
+    waits: list[bool] = []
+    card.WaitRequested.connect(lambda: waits.append(True))
+
+    card.show_closing()
+    qtbot.keyClick(card, Qt.Key.Key_Escape)
+    card.show_decision("Choose safely.")
+    qtbot.keyClick(card, Qt.Key.Key_Escape)
+    card.show_waiting()
+    qtbot.keyClick(card, Qt.Key.Key_Escape)
+
+    assert waits == [True]

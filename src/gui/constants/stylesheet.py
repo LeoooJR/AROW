@@ -477,6 +477,49 @@ QWidget#authentification-overlay {{
     background-color: rgba(0, 0, 0, 0.16);
 }}
 
+QWidget#shutdown-overlay {{
+    background-color: rgba(0, 0, 0, 0.22);
+}}
+
+QFrame#card[shutdown-card="true"] {{
+    border-color: {palette.WARNING_BORDER};
+}}
+
+QFrame#card[shutdown-card="true"] QFrame[shutdown-status-halo="true"] {{
+    background-color: {palette.WARNING_SOFT};
+    border: 1px solid {palette.WARNING_BORDER};
+    border-radius: {container_settings.SHUTDOWN_CARD.STATUS_ICON_SIZE // 2}px;
+}}
+
+QFrame#card[shutdown-card="true"] QLabel[shutdown-caution="true"] {{
+    background-color: {palette.WARNING_SOFT};
+    border: 1px solid {palette.WARNING_BORDER};
+    border-radius: {Settings.BORDER_RADIUS.MD}px;
+    color: {palette.WARNING};
+    padding: 8px 10px;
+}}
+
+QFrame#card[shutdown-card="true"] QPushButton[destructive-action="true"] {{
+    background-color: {palette.ERROR_SOFT};
+    border: 1px solid {palette.ERROR_BORDER};
+    color: {palette.ERROR};
+}}
+
+QFrame#card[shutdown-card="true"] QPushButton[destructive-action="true"]:hover,
+QFrame#card[shutdown-card="true"] QPushButton[destructive-action="true"]:focus {{
+    background-color: {palette.ERROR_BORDER};
+    border-color: {palette.ERROR};
+}}
+
+QFrame#card[shutdown-card="true"] QPushButton[destructive-action="true"]:pressed {{
+    background-color: {palette.ERROR};
+    color: {palette.SURFACE_ELEVATED};
+}}
+
+QFrame#card[shutdown-card="true"] QPushButton:focus {{
+    border: 2px solid {palette.BORDER_STRONG};
+}}
+
 QFrame[place-holder="true"] {{
     background-color: {palette.SURFACE_MUTED};
     border: 1px solid {palette.BORDER_SUBTLE};

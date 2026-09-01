@@ -2,7 +2,11 @@
 
 This guide describes the current async job path in AROW: how controllers submit blocking core work, what a `CoreRuntimeWork` must return, how results and failures are applied on the Qt main thread, how process-backed map rendering fits into the same pipeline, and how runtime logging remains traceable across workers.
 
-It matches the implementation in `src/controller/runner.py`, the domain subcontrollers under `src/controller/domains/`, `src/core/entrypoint.py`, and `src/core/work/`.
+It matches the implementation in `src/controller/runner.py`, the domain
+subcontrollers under `src/controller/domains/`, `src/core/entrypoint.py`, and
+`src/core/work/`. For the runner's internal state machine, deadline arbitration,
+and Qt terminal commit point, see
+[`src/controller/runner.md`](../src/controller/runner.md).
 
 Each work module has a same-basename Markdown companion with a visual trace from
 controller submission through main-thread application. The built-in job table
@@ -22,7 +26,8 @@ Heavy or blocking operations should run **outside** the GUI thread. The app rout
 
 1. **Something triggers the controller** — for example a categorized `signals` handler (e.g. `signals.DEVICE.RefreshDeviceListRequested` from `gui.signals`), a menu action, or a model event wired in `_connect_model_signals`.
 2. **The controller submits a job** — usually via `Controller._submit_model_entrypoint_async_call(...)`, which wraps `AsyncRunner.submit(JobSpecification(...))` and binds per-job signals.
-3. **The runner picks a pool** — thread vs process from `job_type` or `"auto"` (see below).
+3. **The runner picks a pool** — thread vs process from the required, explicit
+   `job_type` (see below).
 4. **The worker runs `JobSpecification.fn`** — usually a `ModelEntrypoint` method that instantiates a `CoreRuntimeWork` and calls its blocking `run()`. This runs in a **worker thread or process**, not on the Qt main thread.
 5. **Completion is marshaled to the main thread** — `AsyncRunner` uses internal Qt signals with `QueuedConnection` so **`Completed`**, **`Failed`**, and **`Cancelled`** slots run on the GUI thread.
 6. **The core entrypoint applies the outcome** — controller submissions wire completion directly to `ModelEntrypoint.apply_result(...)` and failure directly to `apply_failure(...)`. The entrypoint dispatches to the registered work applier, and the view updates from core-bus signals.
@@ -69,6 +74,7 @@ When you add a new core runtime job, keep this catalog in sync so result/failure
 handle = self._submit_model_entrypoint_async_call(
     name="my_job",
     fn=my_callable,
+    job_type="thread",              # required: "thread" | "process"
     description="Optional human-readable description",
     args=(),
     kwargs={},
@@ -76,8 +82,7 @@ handle = self._submit_model_entrypoint_async_call(
     on_failed=my_on_failed,          # Callable[[JobError], None]
     on_cancelled=my_on_cancelled,    # Callable[[], None]
     on_progress=my_on_progress,      # Callable[[ProgressEvent], None]
-    job_type="auto",                # "auto" | "thread" | "process"
-    timeout=None,                   # seconds, passed to Future.result()
+    timeout=None,                   # positive finite deadline in seconds
     priority=0,
     coalesce_key=None,
 )
@@ -128,8 +133,9 @@ same shared `AsyncRunner` and binds the same main-thread lifecycle callbacks as
 event-driven jobs.
 
 Cron job names must be non-empty and unique, intervals must be positive, and no
-declarations may be added after commit. Application shutdown stops all cron
-timers before draining work and shutting down the runner. Fixed intervals are
+declarations may be added after commit. Application shutdown pauses all cron
+timers before draining work; an aborted shutdown resumes them, while successful
+teardown stops them permanently. Fixed intervals are
 process-local; wall-clock expressions and persisted schedules are not supported.
 
 ## Core work contract
@@ -273,7 +279,7 @@ job = JobSpecification(
     fn=callable,
     args=(),
     kwargs={},
-    type="thread",        # or "process" or "auto"
+    type="thread",        # required; use "process" for CPU-heavy work
     coalesce_key=None,
     timeout=None,
 )
@@ -287,18 +293,16 @@ signals.Failed.connect(my_failed_slot)
 
 ## Thread vs process (`job_type`)
 
-`AsyncRunner._resolve_job_type` decides **`"auto"`** jobs:
-
-- Explicit **`"thread"`** or **`"process"`** always wins.
-- For **`"auto"`**, the **name** (lowercased) and **`coalesce_key`** steer the choice: map-like / network-ish defaults favor **process**; **location** / **device** keys favor **thread**; otherwise the default is **process** so the UI stays responsive under CPU-heavy work.
-
-When you know the workload (quick I/O vs heavy CPU), set **`job_type`** explicitly instead of relying on naming.
+Every job must choose **`"thread"`** or **`"process"`** explicitly. Use a thread
+for I/O-bound or quick work and a process for CPU-heavy work that must not occupy
+the GUI process. The runner does not infer the pool from job names or coalescing
+keys.
 
 **Process pool caveat:** work runs in a separate process. The target callable must be **picklable** (top-level functions or picklable objects). Prefer **`"thread"`** for lambdas that close over complex objects, or keep **`fn`** as a module-level or clearly picklable entry point.
 
 ## Coalescing
 
-If **`coalesce_key`** is set, submitting a new job with the same key **cancels the previous** pending job for that key (the runner marks its cancel token so completion resolves as **cancelled** rather than competing with the new job). Use this for “latest wins” flows.
+If **`coalesce_key`** is set, submitting a new job with the same key **cancels the previous** pending job for that key. Cancellation promptly queues a Qt `Cancelled` commit and releases the key; the worker may continue but cannot compete with the new job. Use this for “latest wins” flows.
 
 Current built-in keys include:
 
@@ -311,9 +315,36 @@ Current built-in keys include:
 
 Map rendering uses a per-simulation coalesce key so repeated requests for the same simulation collapse to "latest wins" without discarding other simulations' work.
 
+## Deadlines
+
+`timeout` accepts a positive finite number of seconds, including fractional
+values. The deadline starts immediately after the executor accepts the future;
+it is monitored independently from worker completion.
+
+When the deadline expires, the runner emits one `Failed` event whose `JobError`
+retains the job name in `origin`, cleans active/coalescing state, and ignores any
+later worker result. It also calls `Future.cancel()` so queued work is cancelled
+when possible. Python executors cannot safely terminate an already-running thread
+or one process-pool task, so running work is allowed to finish in the background.
+If the job was already marked cancelled, deadline resolution emits `Cancelled`
+instead of `Failed`.
+
+Executor completion, failure, cancellation, and deadline expiry are terminal
+proposals rather than immediately visible events. They cross the Qt queue and
+are committed on the main thread. Immediately before committing, the runner
+rechecks whether the job was cancelled or superseded by a newer job with the
+same coalescing key. Either condition converts the queued proposal to
+`Cancelled`, including a queued completion or failure. The runner removes the
+job from private active state and coalescing state before notifying runner-level and
+handle-level listeners, so reentrant listeners observe a terminal job as
+inactive. Duplicate or late proposals after that commit are ignored.
+
 ## Cancellation
 
-- **`runner.cancel(handle.job_id)`** marks the job cancelled.
+- **`runner.cancel(handle.job_id)`** marks the job cancelled, calls
+  `Future.cancel()` best-effort, and promptly queues a `Cancelled` proposal. The
+  main-thread commit releases active/coalescing state without waiting for the
+  worker; any later outcome is ignored.
 - The worker **`fn` does not automatically receive `CancelToken`** today; long-running core code would need an explicit contract if cooperative cancellation inside **`fn`** is required.
 
 ## Progress updates
@@ -329,7 +360,14 @@ Core runtime submissions use one callback boundary:
 3. Register the work/outcome pair in `core/work/works_repository.py`; `ModelEntrypoint` uses that catalog to select `apply_main_thread` and uses the job origin to select `apply_failure_main_thread`.
 4. Keep orchestration-only behavior in the owning subcontroller. If it must run after core application, bind a second per-job signal after `_submit_model_entrypoint_async_call(...)` returns. Qt invokes slots in connection order, so the entrypoint applier runs first.
 
-Examples of controller-owned lifecycle behavior are startup chaining to host identity, releasing the close-time shutdown waiter, and clearing tracked map render handles. These handlers must not duplicate model mutation or core signal emission.
+Examples of controller-owned lifecycle behavior are startup chaining to host identity and clearing tracked map render handles. Application shutdown instead uses `AsyncRunner.request_drain(...)`: drain evaluation runs after terminal listeners, so synchronously chained jobs are included before quiescence becomes visible. These handlers must not duplicate model mutation or core signal emission.
+
+`cancel_active(excluding_names=...)` and `request_drain(timeout)` are the public
+shutdown primitives. Cancellation ends application-visible ownership promptly
+but does not stop running Python work. A drain completes asynchronously on the
+Qt main thread once no registered jobs remain, and its first empty check is
+queued so callers can bind `Drained` and `TimedOut` before either signal is
+possible.
 
 ## Device refresh and reconciliation
 
@@ -391,7 +429,7 @@ Tests with a fake runner live under **`src/core/tests/test_async_runner.py`** fo
 
 | Symptom | What to check |
 |--------|------|
-| Refresh requests are ignored while one is running | This is expected with `at_most_once=True`; confirm the active job eventually leaves runner history. |
+| Refresh requests are ignored while one is running | This is expected with `at_most_once=True`; use `is_active(handle)` while debugging and confirm the active job eventually commits. |
 | A work fails before its body runs | Check `@preflight(...)` conditions and the work’s `error_to_raise=` mapping. |
 | `apply_result(...)` logs “unsupported result type” | The returned outcome type is not registered in the built-in work catalog and has no custom applier. |
 | A reconnect creates a second device row instead of updating the existing one | The handset probably lacks a Tier-1 `hw:v1:` stable key, so reconciliation intentionally avoids merging on Tier-2 fingerprint keys. |

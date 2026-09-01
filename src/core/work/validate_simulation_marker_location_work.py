@@ -5,11 +5,11 @@ Map milestone validation on a worker thread; core-bus emit on the Qt main thread
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from shapely.geometry import Point
 
-from core.entrypoint_protocol import CoreSignalEmitter
+from core.entrypoint_protocol import CoreSignalEmitter, SimulationMutationEntrypoint
 from core.geo.exceptions import MilestoneValidationError, RailwayValidationError
 from core.geo.milestone import Milestone
 from core.geo.railway import Railway
@@ -129,7 +129,23 @@ class ValidateSimulationMarkerLocationWork(
         model_entrypoint: CoreSignalEmitter,
         outcome: ValidateSimulationMarkerLocationOutcome,
     ) -> None:
+        mutation_entrypoint = cast(SimulationMutationEntrypoint, model_entrypoint)
         if outcome.validated is not None:
+            if (
+                mutation_entrypoint.get_simulation(outcome.validated.simulation_id)
+                is None
+            ):
+                logger.warning(
+                    "Validated simulation location discarded because the simulation no longer exists",
+                    simulation_id=outcome.validated.simulation_id,
+                )
+                return
+            mutation_entrypoint.set_simulation_spoofed_location(
+                outcome.validated.simulation_id,
+                outcome.validated.lat,
+                outcome.validated.lon,
+                outcome.validated,
+            )
             logger.info(
                 "Simulation location validated",
                 simulation_id=outcome.validated.simulation_id,
@@ -143,6 +159,23 @@ class ValidateSimulationMarkerLocationWork(
             )
             return
         if outcome.rejected is not None:
+            if (
+                mutation_entrypoint.get_simulation(outcome.rejected.simulation_id)
+                is None
+            ):
+                logger.warning(
+                    "Rejected simulation location discarded because the simulation no longer exists",
+                    simulation_id=outcome.rejected.simulation_id,
+                )
+                return
+            mutation_entrypoint.clear_rejected_simulation_marker(
+                outcome.rejected.simulation_id,
+                lat=outcome.rejected.lat,
+                lon=outcome.rejected.lon,
+                km=outcome.rejected.km,
+                line_code=outcome.rejected.line_code,
+                line_troncon=outcome.rejected.line_troncon,
+            )
             logger.warning(
                 "Simulation location rejected",
                 simulation_id=outcome.rejected.simulation_id,

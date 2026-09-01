@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import builtins
 import tempfile
 from pathlib import Path
 from typing import Any, cast
@@ -81,35 +80,8 @@ class _AppStub:
         return handle
 
 
-def _patch_controller_type_checks(
-    monkeypatch: pytest.MonkeyPatch, probe: _AppStub
-) -> None:
-    real_isinstance = builtins.isinstance
-
-    def _isinstance(obj, cls) -> bool:
-        cls_name = getattr(cls, "__name__", "")
-        if cls_name == "MainWindow" and obj is probe.view:
-            return True
-        if cls_name == "ModelEntrypoint" and obj is probe.model_entrypoint:
-            return True
-        return real_isinstance(obj, cls)
-
-    monkeypatch.setattr(builtins, "isinstance", _isinstance)
-
-
 def _make_map_sub_controller(app: _AppStub) -> MapSubController:
     return MapSubController(cast(AppController, app))
-
-
-def _simulation_metadata_path(
-    model_entrypoint: ModelEntrypoint, simulation_id: str
-) -> Path:
-    return (
-        model_entrypoint.application_dir
-        / "simulations"
-        / simulation_id
-        / "simulation.json"
-    )
 
 
 def _add_simulation(
@@ -182,9 +154,8 @@ def test_simulation_exists_preflight_rejects_missing_simulation() -> None:
     assert preflight() is False
 
 
-def test_on_map_rendered_forwards_to_view(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_on_map_rendered_forwards_to_view() -> None:
     app = _AppStub()
-    _patch_controller_type_checks(monkeypatch, app)
     map_controller = _make_map_sub_controller(app)
     payload = MapRenderedPayload(
         simulation_id="sim-1", html_path=Path("/tmp/sim-1.html")
@@ -198,9 +169,8 @@ def test_on_map_rendered_forwards_to_view(monkeypatch: pytest.MonkeyPatch) -> No
     )
 
 
-def test_on_map_render_failed_forwards_to_view(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_on_map_render_failed_forwards_to_view() -> None:
     app = _AppStub()
-    _patch_controller_type_checks(monkeypatch, app)
     map_controller = _make_map_sub_controller(app)
     payload = MapRenderFailedPayload(simulation_id="sim-1", reason="failed")
 
@@ -280,11 +250,9 @@ def test_render_job_completed_from_superseded_job_keeps_current_handle(
 
 
 def test_on_simulation_deleted_cancels_render_job_and_forwards(
-    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     app = _AppStub(tmp_path)
-    _patch_controller_type_checks(monkeypatch, app)
     map_controller = _make_map_sub_controller(app)
     simulation = _add_simulation(app.model_entrypoint, "sim-1")
     map_controller._render_jobs_by_simulation_id["sim-1"] = JobHandler(
@@ -300,25 +268,10 @@ def test_on_simulation_deleted_cancels_render_job_and_forwards(
     app.view.forward_simulation_deleted.assert_called_once_with("sim-1")
 
 
-def test_persist_simulation_repository_delegates_to_model_entrypoint(
-    tmp_path: Path,
-) -> None:
-    app = _AppStub(tmp_path)
-    map_controller = _make_map_sub_controller(app)
-    _add_simulation(app.model_entrypoint, "sim-1")
-
-    map_controller.persist_simulation_repository()
-
-    metadata_path = _simulation_metadata_path(app.model_entrypoint, "sim-1")
-    assert metadata_path.is_file()
-
-
 def test_on_simulation_location_requested_submits_thread_job(
-    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     app = _AppStub(tmp_path)
-    _patch_controller_type_checks(monkeypatch, app)
     map_controller = _make_map_sub_controller(app)
     _add_simulation(app.model_entrypoint, "sim-1")
 
@@ -354,11 +307,9 @@ def test_on_simulation_location_requested_submits_thread_job(
 
 
 def test_on_simulation_location_requested_skips_when_simulation_missing(
-    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     app = _AppStub(tmp_path)
-    _patch_controller_type_checks(monkeypatch, app)
     map_controller = _make_map_sub_controller(app)
 
     map_controller._on_simulation_location_requested(
@@ -374,11 +325,9 @@ def test_on_simulation_location_requested_skips_when_simulation_missing(
 
 
 def test_on_simulation_location_rejected_forwards_to_view(
-    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     app = _AppStub(tmp_path)
-    _patch_controller_type_checks(monkeypatch, app)
     map_controller = _make_map_sub_controller(app)
     payload = SimulationLocationRejectedPayload(
         simulation_id="sim-1",
@@ -404,11 +353,9 @@ def test_on_simulation_location_rejected_forwards_to_view(
 
 
 def test_on_simulation_location_validated_forwards_to_view(
-    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     app = _AppStub(tmp_path)
-    _patch_controller_type_checks(monkeypatch, app)
     map_controller = _make_map_sub_controller(app)
     payload = SimulationLocationValidatedPayload(
         simulation_id="sim-1",
@@ -439,11 +386,9 @@ def test_on_simulation_location_validated_forwards_to_view(
 
 
 def test_on_simulation_location_validation_requested_submits_async_job(
-    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     app = _AppStub(tmp_path)
-    _patch_controller_type_checks(monkeypatch, app)
     map_controller = _make_map_sub_controller(app)
     _add_simulation(app.model_entrypoint, "sim-1")
     payload = SimulationLocationValidationRequestedPayload(

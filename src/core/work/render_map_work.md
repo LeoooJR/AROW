@@ -34,7 +34,8 @@ sequenceDiagram
                 Runner->>Entrypoint: apply_result(outcome) on main thread
                 Entrypoint->>Work: apply_main_thread(entrypoint, outcome)
                 alt simulation still exists
-                    Work->>Entrypoint: set simulation.map_file
+                    Work->>Entrypoint: set and persist simulation.map_file
+                    Entrypoint->>Bus: emit SIMULATION_MAP_FILE_CHANGED
                     Work->>Bus: emit MAP_RENDERED
                     Bus-->>Controller: rendered payload
                     Controller-->>View: forward rendered map
@@ -47,7 +48,7 @@ sequenceDiagram
                 Runner->>Entrypoint: apply_failure(job_error) on main thread
                 Entrypoint->>Work: apply_failure_main_thread(entrypoint, error)
                 alt simulation still exists
-                    Work->>Entrypoint: clear simulation.map_file
+                    Work->>Entrypoint: clear and persist simulation.map_file
                     Work->>Bus: emit MAP_RENDER_FAILED
                     Bus-->>Controller: failure payload
                     Controller-->>View: forward render failure
@@ -62,4 +63,5 @@ sequenceDiagram
 
 Deleting a simulation also cancels its tracked render handle. If a newer render
 supersedes an older one, only the current handle is cleared when terminal signals
-arrive.
+arrive. A completed render for an already deleted simulation is discarded and its
+orphan HTML file is removed best-effort.

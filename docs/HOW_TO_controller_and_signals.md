@@ -114,16 +114,26 @@ Constraints:
 
 ### Shutdown
 
-`AppController._on_application_about_to_quit()` does more than just stop the runner:
+`MainWindow` uses managed close only after `AppController` enables it. The first
+close request is ignored so Qt's main event loop stays available, interaction is
+blocked by a full-shell shutdown overlay, and `ApplicationShutdownRequested`
+starts an event-driven state machine:
 
-1. Detaches the view reference.
-2. Waits for bootstrap jobs (`startup_core_runtime`, `host_install_identity`) to finish, fail, or cancel.
-3. Enqueues `close_core_runtime`.
-4. Waits for close to apply on the main thread.
-5. Persists simulation metadata.
-6. Shuts down the shared `AsyncRunner`.
+1. Pause recurring jobs, cancel non-bootstrap outcomes, and ask `AsyncRunner` to
+   drain without exposing its active-job storage.
+2. Preserve `startup_core_runtime` and its synchronously chained
+   `host_install_identity` job until both have committed on the Qt main thread.
+3. Delegate `close_core_runtime` to `AdbSubController.run_shutdown()` and drain
+   again so its core result or failure applier finishes before teardown.
+4. Persist simulation metadata, stop cron permanently, shut down the runner,
+   and permit the final window close.
 
-This is why ADB startup and close work should continue to use the controller/runner pipeline instead of bespoke threads or direct shutdown calls.
+Either drain timeout opens the designed Wait / Force Close card and switches to
+an unbounded drain. Waiting keeps the event loop alive until the job commits;
+force close performs best-effort persistence and nonblocking teardown before a
+hard process exit, because Python cannot safely terminate a hung executor
+thread. The overlay is a normal Qt widget and no shutdown phase uses a nested
+`QEventLoop` or native modal dialog.
 
 ## Adding a new controller-driven flow
 

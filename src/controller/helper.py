@@ -1,79 +1,9 @@
-"""Shared decorator helpers for controller and *SubController methods."""
+"""Qt timer helpers for controller and *SubController methods."""
 
 from collections.abc import Callable
 from typing import Any
 
 from PySide6.QtCore import QTimer
-
-from core.entrypoint import ModelEntrypoint
-from gui.windows import MainWindow
-from logger import logger
-
-
-def validate_model_entrypoint(function: Callable[..., Any]) -> Callable[..., Any]:
-    """Validate the model entrypoint for the function.
-
-    Args:
-        function: Function to validate the model entrypoint for.
-
-    Returns:
-        Function: Function with the model entrypoint validated.
-    """
-
-    def wrapper(self, *args: Any, **kwargs: Any) -> Any:
-        if hasattr(self, "model_entrypoint"):
-            if not isinstance(self.model_entrypoint, ModelEntrypoint):
-                logger.warning(
-                    "Controller model entrypoint type mismatch",
-                    model_entrypoint_type=type(self.model_entrypoint).__name__,
-                )
-                return
-        elif hasattr(self, "_subcontroller"):
-            if not isinstance(self._subcontroller.model_entrypoint, ModelEntrypoint):
-                logger.warning(
-                    "Controller model entrypoint type mismatch",
-                    model_entrypoint_type=type(
-                        self._subcontroller.model_entrypoint
-                    ).__name__,
-                )
-                return
-        else:
-            raise ValueError("Model entrypoint not found")
-        return function(self, *args, **kwargs)
-
-    return wrapper
-
-
-def validate_view(function: Callable[..., Any]) -> Callable[..., Any]:
-    """Validate the view for the function.
-
-    Args:
-        function: Function to validate the view for.
-
-    Returns:
-        Function: Function with the view validated.
-    """
-
-    def wrapper(self, *args: Any, **kwargs: Any) -> Any:
-        if hasattr(self, "view"):
-            if not isinstance(self.view, MainWindow):
-                logger.warning(
-                    "Controller view type mismatch",
-                    view_type=type(self.view).__name__,
-                )
-                return
-        elif hasattr(self, "_subcontroller"):
-            if not isinstance(self._subcontroller.view, MainWindow):
-                logger.warning(
-                    "Controller view type mismatch",
-                    view_type=type(self._subcontroller.view).__name__,
-                )
-                return
-        else:
-            raise ValueError("View not found")
-        return function(self, *args, **kwargs)
-
-    return wrapper
 
 
 def delay(ms: int) -> Callable[[Callable[..., Any]], QTimer]:

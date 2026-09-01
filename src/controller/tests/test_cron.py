@@ -146,6 +146,37 @@ def test_stop_stops_all_timers_and_is_idempotent(
     submit.assert_not_called()
 
 
+def test_pause_and_resume_recreate_committed_timers(
+    repeat_probe: tuple[list[tuple[int, Callable[[], None]]], list[_TimerStub]],
+) -> None:
+    callbacks, timers = repeat_probe
+    submit = MagicMock()
+    manager = CronManager(submit)
+    job = _cron_job()
+    manager.declare(job)
+    manager.commit()
+
+    manager.pause()
+    callbacks[0][1]()
+    manager.resume()
+    callbacks[1][1]()
+
+    assert timers[0].stop_calls == 1
+    assert len(timers) == 2
+    submit.assert_called_once_with(job)
+
+
+def test_stopped_schedule_cannot_be_resumed(
+    repeat_probe: tuple[list[tuple[int, Callable[[], None]]], list[_TimerStub]],
+) -> None:
+    manager = CronManager(MagicMock())
+    manager.commit()
+    manager.stop()
+
+    with pytest.raises(RuntimeError, match="cannot be resumed"):
+        manager.resume()
+
+
 class _RunnerStub:
     def __init__(self) -> None:
         self.submitted: list[JobSpecification] = []
@@ -182,7 +213,7 @@ def test_controller_cron_submission_uses_shared_runner_and_callbacks() -> None:
     failed: list[JobError] = []
     cancelled: list[str] = []
     progressed: list[ProgressEvent] = []
-    specification = JobSpecification(name="scheduled", fn=lambda: "done")
+    specification = JobSpecification(name="scheduled", fn=lambda: "done", type="thread")
     job = CronJob(
         interval_ms=100,
         specification=specification,
