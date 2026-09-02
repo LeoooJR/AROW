@@ -56,8 +56,7 @@ def _metadata_card(milestone: Milestone, *, terminal_width: int) -> Panel:
         (
             "Milestone",
             (
-                ("Identifier", milestone.id),
-                ("PK label", milestone.label),
+                ("Label", milestone.label),
                 ("Kilometer", str(milestone.km)),
                 ("Type", milestone.type),
                 ("Latitude", f"{milestone.geometry.y:.6f}"),
