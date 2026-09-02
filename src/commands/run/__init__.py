@@ -7,7 +7,9 @@ import typer
 
 from commands.run.gui import gui
 from commands.run.options import RunOptions
+from commands.style import configure_typer_styles
 
+configure_typer_styles()
 app = typer.Typer()
 
 
