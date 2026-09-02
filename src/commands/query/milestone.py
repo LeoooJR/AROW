@@ -1,9 +1,12 @@
 """Command for querying a milestone from the bundled railway referentials."""
 
-from typing import Annotated
+from io import StringIO
+from typing import Annotated, Final
 
+import segno
 import typer
 from rich import box
+from rich.console import Group
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
@@ -13,6 +16,9 @@ from core.geo.exceptions import MilestoneValidationError, RailwayValidationError
 from core.geo.milestone import Milestone
 from core.geo.railway import Railway
 
+_QR_SIDE_BY_SIDE_MIN_WIDTH: Final[int] = 96
+_STANDARD_QR_TERMINAL_WIDTH: Final[int] = 29
+
 
 def _railway_code(value: str) -> str:
     """Require the official six-digit numeric railway code format."""
@@ -21,7 +27,25 @@ def _railway_code(value: str) -> str:
     return value
 
 
-def _metadata_card(milestone: Milestone) -> Panel:
+def _milestone_qr(milestone: Milestone) -> Text:
+    """Render the canonical milestone ID as a compact standard terminal QR code."""
+    qr_code = segno.make(milestone.id, micro=False)
+    output = StringIO()
+    qr_code.terminal(out=output, compact=True)
+    rows = output.getvalue().rstrip("\n").splitlines()
+    if rows and rows[-1] == "▀" * len(rows[-1]):
+        # Segno pairs the odd final quiet-zone row with a transparent lower half.
+        # Complete that lower half in white instead of exposing the black canvas.
+        rows[-1] = "█" * len(rows[-1])
+    return Text(
+        "\n".join(rows),
+        style="#ffffff on #000000",
+        no_wrap=True,
+        overflow="crop",
+    )
+
+
+def _metadata_card(milestone: Milestone, *, terminal_width: int) -> Panel:
     """Build a terminal card for a validated milestone and its railway."""
     line = milestone.line
     metadata = Table.grid(padding=(0, 2), expand=True)
@@ -58,6 +82,16 @@ def _metadata_card(milestone: Milestone) -> Panel:
         for label, value in rows:
             metadata.add_row(label, value)
 
+    qr_code = _milestone_qr(milestone)
+    if terminal_width >= _QR_SIDE_BY_SIDE_MIN_WIDTH:
+        content = Table.grid(expand=True)
+        content.add_column(ratio=1)
+        content.add_column(width=3)
+        content.add_column(width=_STANDARD_QR_TERMINAL_WIDTH, no_wrap=True)
+        content.add_row(metadata, "", qr_code)
+    else:
+        content = Group(metadata, Text(""), qr_code)
+
     title = Text.assemble(
         ("Milestone target", "bold"),
         ("  ● Ready", "arow.success"),
@@ -67,7 +101,7 @@ def _metadata_card(milestone: Milestone) -> Panel:
         style="arow.muted",
     )
     return Panel(
-        metadata,
+        content,
         title=title,
         subtitle=subtitle,
         title_align="left",
@@ -117,7 +151,8 @@ def milestone(
         create_console(stderr=True).print(message)
         raise typer.Exit(1) from error
 
-    create_console().print(_metadata_card(resolved_milestone))
+    console = create_console()
+    console.print(_metadata_card(resolved_milestone, terminal_width=console.width))
 
 
 __all__ = ["milestone"]
