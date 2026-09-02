@@ -90,4 +90,16 @@ PYTHONPATH=src python -m main query milestone 001000 1 1
 ```
 
 When the milestone exists, AROW prints a Rich metadata card with its canonical PK
-label, coordinates, railway details, and reference dataset sources.
+label, coordinates, railway details, and primary-key QR code.
+
+### Query a railway
+
+Query the bundled railway referentials by the railway's composite primary key: a
+six-digit line code and positive section number:
+
+```bash
+PYTHONPATH=src python -m main query railway 001000 1
+```
+
+When the railway exists, AROW prints its concise metadata and a QR code encoding
+the composite key, such as `001000-1`.

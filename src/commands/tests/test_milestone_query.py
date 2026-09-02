@@ -3,7 +3,7 @@
 from io import StringIO
 from types import SimpleNamespace
 from typing import cast
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, PropertyMock, patch
 
 import pytest
 from rich.console import Console
@@ -12,7 +12,7 @@ from shapely.geometry import Point
 from typer.testing import CliRunner
 
 from commands import app
-from commands.query.milestone import _metadata_card, _milestone_qr
+from commands.query.presentation import MetadataSections, QueryMetadataCard
 from commands.style import AROW_THEME
 from core.geo.exceptions import MilestoneValidationError, RailwayValidationError
 from core.geo.milestone import Milestone
@@ -55,6 +55,39 @@ def _render_card(card, *, width: int) -> str:
     return output.getvalue()
 
 
+def _milestone_card(milestone: Milestone, *, terminal_width: int) -> QueryMetadataCard:
+    line = milestone.line
+    sections: MetadataSections = (
+        (
+            "Milestone",
+            (
+                ("Label", milestone.label),
+                ("Kilometer", str(milestone.km)),
+                ("Type", milestone.type),
+                ("Latitude", f"{milestone.geometry.y:.6f}"),
+                ("Longitude", f"{milestone.geometry.x:.6f}"),
+            ),
+        ),
+        (
+            "Railway",
+            (
+                ("Gaïa ID", line.id),
+                ("Code", line.code),
+                ("Section", str(line.troncon)),
+                ("Label", line.label),
+                ("Type", line.type),
+            ),
+        ),
+    )
+    return QueryMetadataCard(
+        title="Milestone target",
+        subtitle=f"PK {milestone.label} · line {line.code} · section {line.troncon}",
+        sections=sections,
+        primary_key=milestone.id,
+        terminal_width=terminal_width,
+    )
+
+
 def test_milestone_qr_encodes_canonical_primary_key() -> None:
     """The QR payload is the standard milestone ID rendered in compact form."""
     milestone = _milestone(_railway())
@@ -65,8 +98,8 @@ def test_milestone_qr_encodes_canonical_primary_key() -> None:
         out.write("██\n▀▀\n")
 
     qr_code.terminal.side_effect = write_terminal
-    with patch("commands.query.milestone.segno.make", return_value=qr_code) as make:
-        rendered = _milestone_qr(milestone)
+    with patch("commands.query.presentation.segno.make", return_value=qr_code) as make:
+        rendered = _milestone_card(milestone, terminal_width=80).qr_code
 
     make.assert_called_once_with("001000-1-1", micro=False)
     qr_code.terminal.assert_called_once()
@@ -87,12 +120,14 @@ def test_milestone_card_uses_responsive_qr_layout(
     """The QR stacks below metadata until the wide-card breakpoint."""
     milestone = _milestone(_railway())
 
-    with patch(
-        "commands.query.milestone._milestone_qr",
+    with patch.object(
+        QueryMetadataCard,
+        "qr_code",
+        new_callable=PropertyMock,
         return_value=Text("QR-CODE", no_wrap=True),
     ):
         output = _render_card(
-            _metadata_card(milestone, terminal_width=terminal_width),
+            _milestone_card(milestone, terminal_width=terminal_width).panel,
             width=terminal_width,
         )
 
@@ -112,11 +147,13 @@ def test_wide_qr_does_not_style_table_spacing() -> None:
     qr_code = Text(qr_row, style="#ffffff on #000000", no_wrap=True)
     console = Console(width=120, theme=AROW_THEME)
 
-    with patch(
-        "commands.query.milestone._milestone_qr",
+    with patch.object(
+        QueryMetadataCard,
+        "qr_code",
+        new_callable=PropertyMock,
         return_value=qr_code,
     ):
-        card = _metadata_card(milestone, terminal_width=120)
+        card = _milestone_card(milestone, terminal_width=120).panel
         segments = list(console.render(card, console.options))
 
     background_segments = [
@@ -151,7 +188,6 @@ def test_milestone_query_renders_complete_metadata_card() -> None:
         "Milestone",
         "Railway",
         "█",
-        "001000-1-1",
         "001+000",
         "Kilometer",
         "48.885333",
@@ -166,21 +202,43 @@ def test_milestone_query_renders_complete_metadata_card() -> None:
 
 
 @pytest.mark.parametrize(
-    "arguments",
+    ("arguments", "expected_error"),
     [
-        ["query", "milestone", "1000", "1", "1"],
-        ["query", "milestone", "ABCDEF", "1", "1"],
-        ["query", "milestone", "001000", "0", "1"],
-        ["query", "milestone", "001000", "1", "0"],
-        ["query", "milestone", "001000", "-1", "1"],
-        ["query", "milestone", "001000", "1", "-1"],
+        (
+            ["query", "milestone", "1000", "1", "1"],
+            "must contain exactly six digits",
+        ),
+        (
+            ["query", "milestone", "ABCDEF", "1", "1"],
+            "must contain exactly six digits",
+        ),
+        (
+            ["query", "milestone", "001000", "0", "1"],
+            "section must be a positive integer",
+        ),
+        (
+            ["query", "milestone", "001000", "1", "0"],
+            "milestone code must be a positive integer",
+        ),
+        (
+            ["query", "milestone", "001000", "-1", "1"],
+            "section must be a positive integer",
+        ),
+        (
+            ["query", "milestone", "001000", "1", "-1"],
+            "milestone code must be a positive integer",
+        ),
     ],
 )
-def test_milestone_query_rejects_invalid_arguments(arguments: list[str]) -> None:
+def test_milestone_query_rejects_invalid_arguments(
+    arguments: list[str], expected_error: str
+) -> None:
     """CLI inputs must use a six-digit line code and positive integer indexes."""
-    result = runner.invoke(app, arguments)
+    result = runner.invoke(app, arguments, terminal_width=120)
 
     assert result.exit_code == 2
+    normalized_error = " ".join(result.stderr.replace("│", " ").split())
+    assert expected_error in normalized_error
 
 
 @pytest.mark.parametrize(
@@ -205,7 +263,7 @@ def test_milestone_query_reports_lookup_failure(
     railway_result = railway if isinstance(error, MilestoneValidationError) else error
 
     with (
-        patch("commands.query.milestone.segno.make") as make_qr,
+        patch("commands.query.presentation.segno.make") as make_qr,
         patch(
             "commands.query.milestone.Railway.validate",
             side_effect=(
