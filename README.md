@@ -79,3 +79,27 @@ PYTHONPATH=src python -m main run --log-dir ./arow-logs --json-logs --mock-adb g
 when needed. The main log keeps its UUID4 filename and worker logs remain beside
 it. An explicitly requested directory must be writable; startup fails clearly
 instead of silently redirecting those logs to the temporary fallback directory.
+
+### Query a milestone
+
+Query the bundled railway referentials by six-digit railway code, section, and
+positive integer kilometer code:
+
+```bash
+PYTHONPATH=src python -m main query milestone 001000 1 1
+```
+
+When the milestone exists, AROW prints a Rich metadata card with its canonical PK
+label, coordinates, railway details, and primary-key QR code.
+
+### Query a railway
+
+Query the bundled railway referentials by the railway's composite primary key: a
+six-digit line code and positive section number:
+
+```bash
+PYTHONPATH=src python -m main query railway 001000 1
+```
+
+When the railway exists, AROW prints its concise metadata and a QR code encoding
+the composite key, such as `001000-1`.
