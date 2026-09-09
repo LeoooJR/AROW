@@ -9,16 +9,16 @@ from collections import OrderedDict
 from core.adb.binary import AdbBinary
 from core.adb.command import (
     ADB_HISTORY_MAX_ENTRIES,
-    AdbCommand,
+    AdbCommandInvocation,
     AdbCommandResult,
     AdbCommandResultStatus,
     AdbCommands,
+    AdbCommandSpec,
     _log_safe_argv,
     _log_safe_command_line,
     _log_safe_output_preview,
 )
 from core.adb.exceptions import AdbClientException, AdbServerException
-from core.adb.parser import ADBCommandParser
 from core.adb.retry import (
     adb_status_from_process,
     adb_status_from_timeout,
@@ -37,7 +37,7 @@ class AdbServer:
     def __init__(self, binary: AdbBinary):
         self.binary = binary
         self._history: OrderedDict[
-            datetime.datetime, tuple[AdbCommand, AdbCommandResult]
+            datetime.datetime, tuple[AdbCommandSpec[object], AdbCommandResult]
         ] = OrderedDict()
         self._paired_devices: PhoneRepository = PhoneRepository()
         self._mdns_available: bool = False
@@ -49,14 +49,18 @@ class AdbServer:
     @property
     def history(
         self,
-    ) -> OrderedDict[datetime.datetime, tuple[AdbCommand, AdbCommandResult]]:
+    ) -> OrderedDict[
+        datetime.datetime, tuple[AdbCommandSpec[object], AdbCommandResult]
+    ]:
         """Get the history of the adb server."""
         return self._history
 
     @history.setter
     def history(
         self,
-        history: OrderedDict[datetime.datetime, tuple[AdbCommand, AdbCommandResult]],
+        history: OrderedDict[
+            datetime.datetime, tuple[AdbCommandSpec[object], AdbCommandResult]
+        ],
     ) -> None:
         """Set the history of the adb server."""
         self._history = history
@@ -66,7 +70,9 @@ class AdbServer:
         """Delete the history of the adb server."""
         self._history.clear()
 
-    def add_to_history(self, command: AdbCommand, result: AdbCommandResult) -> None:
+    def add_to_history(
+        self, command: AdbCommandSpec[object], result: AdbCommandResult
+    ) -> None:
         """Add to the history of the adb server."""
         self._history[datetime.datetime.now()] = (command, result)
         self._prune_history()
@@ -76,7 +82,7 @@ class AdbServer:
         while len(self._history) > ADB_HISTORY_MAX_ENTRIES:
             self._history.popitem(last=False)
 
-    def remove_from_history(self, command: AdbCommand) -> None:
+    def remove_from_history(self, command: AdbCommandSpec[object]) -> None:
         """Remove from the history of the adb server."""
         self._history = OrderedDict(
             (time, entry)
@@ -88,11 +94,13 @@ class AdbServer:
         """Get the time of the last command."""
         return next(reversed(self.history))
 
-    def get_last_from_history(self) -> tuple[AdbCommand, AdbCommandResult]:
+    def get_last_from_history(
+        self,
+    ) -> tuple[AdbCommandSpec[object], AdbCommandResult]:
         """Get the last command and result."""
         return self.history[self.get_last_command_time()]
 
-    def get_last_command(self) -> AdbCommand:
+    def get_last_command(self) -> AdbCommandSpec[object]:
         """Get the last command."""
         return self.get_last_from_history()[0]
 
@@ -147,8 +155,8 @@ class AdbServer:
 
     def start(self) -> None:
         """Start the adb server."""
-        command = AdbCommands.START_SERVER.value
-        result = self._execute(command)
+        command = AdbCommands.START_SERVER
+        result = self._execute(command.invoke())
         if result.status != AdbCommandResultStatus.SUCCESS:
             raise AdbServerException(f"Failed to start adb server: {result}")
         # Get known devices
@@ -157,8 +165,8 @@ class AdbServer:
 
     def stop(self) -> None:
         """Stop the adb server."""
-        command = AdbCommands.KILL_SERVER.value
-        result = self._execute(command)
+        command = AdbCommands.KILL_SERVER
+        result = self._execute(command.invoke())
         if result.status != AdbCommandResultStatus.SUCCESS:
             raise AdbServerException(f"Failed to stop adb server: {result}")
 
@@ -175,14 +183,15 @@ class AdbServer:
         """
         Read ADB binary metadata without constructing or starting the ADB server.
         """
-        command = AdbCommands.GET_BINARY_VERSION.value
-        argv = [str(binary.path), command.command, *command.args]
-        timeout_seconds = timeout_seconds_for(command, scope="server")
+        command = AdbCommands.GET_BINARY_VERSION
+        invocation = command.invoke()
+        argv = invocation.argv(binary.path)
+        timeout_seconds = timeout_seconds_for(command)
         logger.debug(
             "ADB binary version read started",
             adb_path=str(binary.path),
-            argv=_log_safe_argv(command, argv),
-            command_line=_log_safe_command_line(command, argv),
+            argv=_log_safe_argv(invocation, binary.path),
+            command_line=_log_safe_command_line(invocation, binary.path),
             timeout_s=timeout_seconds,
         )
         try:
@@ -213,7 +222,7 @@ class AdbServer:
             raise AdbServerException(
                 f"Failed to read ADB binary version: {result.status.name}"
             )
-        parsed = ADBCommandParser.GET_BINARY_VERSION.parse(result.output or "")
+        parsed = command.parse(result.output or "")
         if not parsed.version or not parsed.build_version:
             raise AdbServerException(
                 "Failed to parse ADB binary version from --version output"
@@ -227,9 +236,9 @@ class AdbServer:
         This preflight is advisory: startup should continue even when the check is
         unsupported, returns an unknown output shape, or fails on the host.
         """
-        command = AdbCommands.MDNS_CHECK.value
+        command = AdbCommands.MDNS_CHECK
         try:
-            result = self._execute(command)
+            result = self._execute(command.invoke())
         except AdbServerException as exc:
             logger.warning(
                 "ADB mDNS availability could not be checked",
@@ -247,7 +256,7 @@ class AdbServer:
             )
             self._mdns_available = False
             return self._mdns_available
-        self._mdns_available = ADBCommandParser.MDNS_CHECK.parse(result.output or "")
+        self._mdns_available = command.parse(result.output or "")
         logger.debug("ADB mDNS availability refreshed", available=self._mdns_available)
         return self._mdns_available
 
@@ -269,36 +278,38 @@ class AdbServer:
         so this method only inspects the recorded lifecycle command history.
         """
         for command, result in reversed(self.history.values()):
-            if command == AdbCommands.KILL_SERVER.value:
+            if command == AdbCommands.KILL_SERVER:
                 return result.status == AdbCommandResultStatus.ERROR
-            if command == AdbCommands.START_SERVER.value:
+            if command == AdbCommands.START_SERVER:
                 return result.status == AdbCommandResultStatus.SUCCESS
         logger.warning("ADB server state is unknown because lifecycle history is empty")
         return False
 
     def get_known_devices(self) -> list[Phone]:
         """Get the known devices."""
-        command = AdbCommands.GET_DEVICES.value
+        command = AdbCommands.GET_DEVICES
         try:
-            result = self._execute(command)
+            result = self._execute(command.invoke())
             raise_server_for_result(command, result)
         except AdbServerException as e:
             raise AdbClientException(f"Failed to get known devices: {e}") from e
-        return ADBCommandParser.GET_DEVICES.parse(result.output or "")
+        return command.parse(result.output or "")
 
-    def _execute(self, command: AdbCommand) -> AdbCommandResult:
+    def _execute(self, invocation: AdbCommandInvocation[object]) -> AdbCommandResult:
         """
         Execute a command with Tenacity-backed retries on transient subprocess failures.
         """
 
+        command = invocation.spec
+
         def _attempt(timeout_seconds: float) -> AdbCommandResult:
-            argv: list[str] = [str(self.binary.path), command.command, *command.args]
+            argv = invocation.argv(self.binary.path)
             logger.debug(
                 "ADB server command started",
                 adb_path=str(self.binary.path),
-                command=command.command,
-                argv=_log_safe_argv(command, argv),
-                command_line=_log_safe_command_line(command, argv),
+                command=command.argv[0],
+                argv=_log_safe_argv(invocation, self.binary.path),
+                command_line=_log_safe_command_line(invocation, self.binary.path),
                 timeout_s=timeout_seconds,
             )
             try:
@@ -314,7 +325,7 @@ class AdbServer:
                 logger.debug(
                     "ADB server command timed out",
                     adb_path=str(self.binary.path),
-                    command=command.command,
+                    command=command.argv[0],
                     error=error,
                 )
                 return AdbCommandResult(
@@ -327,7 +338,7 @@ class AdbServer:
                 )
             except subprocess.CalledProcessError as exc:
                 raise AdbServerException(
-                    f"Failed to execute command: {command.command} {command.args}"
+                    f"Failed to execute command: {command.argv}"
                 ) from exc
             except OSError as exc:
                 raise AdbServerException(
@@ -336,7 +347,7 @@ class AdbServer:
             logger.debug(
                 "ADB server command completed",
                 adb_path=str(self.binary.path),
-                command=command.command,
+                command=command.argv[0],
                 return_code=completed.returncode,
                 stdout=_log_safe_output_preview(completed.stdout.strip(), command),
                 stderr=_log_safe_output_preview(completed.stderr.strip(), command),

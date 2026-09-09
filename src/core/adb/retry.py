@@ -16,9 +16,10 @@ from tenacity import (
 )
 
 from core.adb.command import (
-    AdbCommand,
     AdbCommandResult,
     AdbCommandResultStatus,
+    AdbCommandSpec,
+    AdbRetryPolicy,
     _redacted_log_value,
 )
 from core.adb.exceptions import AdbClientException, AdbServerException
@@ -127,46 +128,51 @@ def return_last_adb_retry_outcome(retry_state: Any) -> AdbCommandResult:
     return outcome.result()
 
 
-def _adb_failure_message(command: AdbCommand, result: AdbCommandResult) -> str:
+def _adb_failure_message(
+    command: AdbCommandSpec[object], result: AdbCommandResult
+) -> str:
     """Build one consistent exception message from a non-success result."""
     detail = (result.error or result.output or result.status.name).strip()
-    return f"Failed to execute command: {command.command} {command.args}: {detail}"
+    return f"Failed to execute command: {command.argv}: {detail}"
 
 
-def raise_client_for_result(command: AdbCommand, result: AdbCommandResult) -> None:
+def raise_client_for_result(
+    command: AdbCommandSpec[object], result: AdbCommandResult
+) -> None:
     """Raise the client exception for a non-success result."""
     if result.status != AdbCommandResultStatus.SUCCESS:
         raise AdbClientException(_adb_failure_message(command, result))
 
 
-def raise_server_for_result(command: AdbCommand, result: AdbCommandResult) -> None:
+def raise_server_for_result(
+    command: AdbCommandSpec[object], result: AdbCommandResult
+) -> None:
     """Raise the server exception for a non-success result."""
     if result.status != AdbCommandResultStatus.SUCCESS:
         raise AdbServerException(_adb_failure_message(command, result))
 
 
-def retry_profile_for(command: AdbCommand, *, scope: AdbRetryScope) -> _AdbRetryProfile:
+def retry_profile_for(command: AdbCommandSpec[object]) -> _AdbRetryProfile:
     """Select the optimized retry boundaries for an ADB command."""
-    cmd = command.command
-    if cmd == "pair":
+    if command.retry_policy is AdbRetryPolicy.PAIR:
         return _AdbRetryProfile(
             stop=stop_after_attempt(3) | stop_after_delay(8),
             wait=wait_exponential_jitter(initial=0.3, max=2.0, jitter=0.2),
             timeout_seconds=15.0,
         )
-    if cmd == "kill-server":
+    if command.retry_policy is AdbRetryPolicy.KILL_SERVER:
         return _AdbRetryProfile(
             stop=stop_after_attempt(2) | stop_after_delay(3),
             wait=wait_fixed(0.5),
             timeout_seconds=5.0,
         )
-    if cmd in ("start-server", "get-state", "devices"):
+    if command.retry_policy is AdbRetryPolicy.DAEMON:
         return _AdbRetryProfile(
             stop=stop_after_attempt(3) | stop_after_delay(5),
             wait=wait_exponential_jitter(initial=0.2, max=1.5, jitter=0.1),
             timeout_seconds=10.0,
         )
-    if cmd == "shell" or scope == "client":
+    if command.retry_policy is AdbRetryPolicy.CLIENT:
         return _AdbRetryProfile(
             stop=stop_after_attempt(2) | stop_after_delay(3),
             wait=wait_exponential_jitter(initial=0.15, max=1.0, jitter=0.1),
@@ -179,9 +185,9 @@ def retry_profile_for(command: AdbCommand, *, scope: AdbRetryScope) -> _AdbRetry
     )
 
 
-def timeout_seconds_for(command: AdbCommand, *, scope: AdbRetryScope) -> float:
+def timeout_seconds_for(command: AdbCommandSpec[object]) -> float:
     """Return the subprocess timeout without applying the command's retry policy."""
-    return retry_profile_for(command, scope=scope).timeout_seconds
+    return retry_profile_for(command).timeout_seconds
 
 
 def _make_adb_retry_before(
@@ -237,14 +243,14 @@ def _make_adb_retry_after(
 
 
 def execute_with_adb_retry(
-    command: AdbCommand,
+    command: AdbCommandSpec[object],
     *,
     scope: AdbRetryScope,
     phone_id: str | None,
     attempt: AdbAttempt,
 ) -> AdbCommandResult:
     """Execute an ADB attempt callable under the command's retry policy."""
-    profile = retry_profile_for(command, scope=scope)
+    profile = retry_profile_for(command)
     retryer = Retrying(
         stop=profile.stop,
         wait=profile.wait,
@@ -253,12 +259,12 @@ def execute_with_adb_retry(
         reraise=True,
         before=_make_adb_retry_before(
             scope=scope,
-            command_name=command.command,
+            command_name=command.argv[0],
             phone_id=phone_id,
         ),
         after=_make_adb_retry_after(
             scope=scope,
-            command_name=command.command,
+            command_name=command.argv[0],
             phone_id=phone_id,
         ),
         retry_error_callback=return_last_adb_retry_outcome,

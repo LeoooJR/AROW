@@ -12,8 +12,8 @@ import pytest
 from application_paths import APPLICATION_PATHS, ApplicationPaths
 from core import ADB_BINARY_BUILD_NUMBER, ADB_BINARY_BUILD_VERSION, ADB_BINARY_VERSION
 from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
-from core.adb.command import AdbCommands
-from core.adb.parser import ADBCommandParser
+from core.adb.command import AdbCommands, AdbCommandSpec, AdbRetryPolicy
+from core.adb.exceptions import AdbClientException
 from core.entrypoint import ModelEntrypoint
 from core.signals import CoreSignal, CoreSignals
 
@@ -34,15 +34,15 @@ def test_mock_runtime_defaults_use_centralized_binary_path() -> None:
 
 def test_mock_server_mdns_check_output_matches_parser() -> None:
     server = MockAdbServer(state=MockAdbState(seed=809, initial_devices=1))
-    result = server._execute(AdbCommands.MDNS_CHECK.value)
+    result = server._execute(AdbCommands.MDNS_CHECK.invoke())
 
-    assert ADBCommandParser.MDNS_CHECK.parse(result.output) is True
+    assert AdbCommands.MDNS_CHECK.parse(result.output) is True
 
 
 def test_mock_server_binary_version_output_matches_parser() -> None:
     server = MockAdbServer(state=MockAdbState(seed=810, initial_devices=1))
-    result = server._execute(AdbCommands.GET_BINARY_VERSION.value)
-    parsed = ADBCommandParser.GET_BINARY_VERSION.parse(result.output)
+    result = server._execute(AdbCommands.GET_BINARY_VERSION.invoke())
+    parsed = AdbCommands.GET_BINARY_VERSION.parse(result.output)
 
     assert parsed.version == ADB_BINARY_VERSION
     assert parsed.build_version == ADB_BINARY_BUILD_VERSION
@@ -114,3 +114,26 @@ def test_mock_server_restart_repopulates_devices() -> None:
     assert len(server.paired_devices) == 2
     server.restart()
     assert len(server.paired_devices) == 2
+
+
+def test_mock_notification_succeeds_through_public_client_api() -> None:
+    state = MockAdbState(seed=811, initial_devices=1)
+    server = MockAdbServer(state=state)
+    client = MockAdbClient(state=state)
+    phone = next(iter(server.paired_devices))
+
+    assert client.send_notification(phone, "Private title", "Private message") is True
+
+
+def test_mock_rejects_unregistered_spec_with_known_argv() -> None:
+    client = MockAdbClient(state=MockAdbState(seed=812, initial_devices=1))
+    lookalike = AdbCommandSpec(
+        name="UNREGISTERED_DEVICES_LOOKALIKE",
+        description="Not the canonical devices specification",
+        argv=AdbCommands.GET_DEVICES.argv,
+        parser=AdbCommands.GET_DEVICES.parser,
+        retry_policy=AdbRetryPolicy.DAEMON,
+    )
+
+    with pytest.raises(AdbClientException, match="Unsupported mock ADB client"):
+        client._execute(lookalike.invoke())

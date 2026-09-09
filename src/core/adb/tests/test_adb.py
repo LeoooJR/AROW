@@ -9,6 +9,7 @@ import datetime
 import subprocess
 import time
 from collections import OrderedDict
+from dataclasses import FrozenInstanceError
 from pathlib import Path
 
 import pytest
@@ -19,10 +20,12 @@ from core.adb.binary import AdbBinary
 from core.adb.client import AdbClient
 from core.adb.command import (
     ADB_HISTORY_MAX_ENTRIES,
-    AdbCommand,
+    AdbCommandInvocation,
     AdbCommandResult,
     AdbCommandResultStatus,
     AdbCommands,
+    AdbCommandSpec,
+    AdbRetryPolicy,
     _log_safe_argv,
     _log_safe_command_line,
     _log_safe_output_preview,
@@ -36,6 +39,53 @@ pytestmark = [pytest.mark.adb, pytest.mark.adb_server]
 
 
 # --- Fixtures ---
+
+
+class TestAdbCommandSpecification:
+    """Canonical command specifications and invocations."""
+
+    def test_specification_is_immutable_and_hashable(self) -> None:
+        command = AdbCommands.GET_DEVICES
+
+        assert command.argv == ("devices", "-l")
+        assert hash(command) == hash(command)
+        with pytest.raises(FrozenInstanceError):
+            setattr(command, "argv", ("devices",))
+
+    def test_invocation_builds_complete_argv(self, adb_binary_path: Path) -> None:
+        invocation = AdbCommands.SEND_NOTIFICATION.invoke(
+            "-t", "Train ready", "-m", "Board now"
+        )
+
+        assert invocation.argv(adb_binary_path, device_id="device-123") == [
+            str(adb_binary_path),
+            "-s",
+            "device-123",
+            "shell",
+            "cmd",
+            "notification",
+            "post",
+            "-n",
+            "ARROW",
+            "-t",
+            "Train ready",
+            "-m",
+            "Board now",
+        ]
+        assert AdbCommands.GET_DEVICES.invoke().argv(adb_binary_path) == [
+            str(adb_binary_path),
+            "devices",
+            "-l",
+        ]
+
+    def test_catalog_exposes_typed_specifications(self) -> None:
+        command = AdbCommands.PAIR
+
+        assert isinstance(command, AdbCommandSpec)
+        assert command.retry_policy is AdbRetryPolicy.PAIR
+        assert isinstance(
+            command.invoke("10.0.0.2:41000", "123456"), AdbCommandInvocation
+        )
 
 
 @pytest.fixture
@@ -120,14 +170,16 @@ class TestAdbServerStartSuccess:
         """start() records the command result and stores known devices."""
         phone = Phone(id="abc123", name="device:Pixel", state="device")
 
-        def fake_execute(command: AdbCommand) -> AdbCommandResult:
+        def fake_execute(
+            invocation: AdbCommandInvocation[object],
+        ) -> AdbCommandResult:
             result = AdbCommandResult(
                 status=AdbCommandResultStatus.SUCCESS,
                 output="",
                 error="",
                 return_code=0,
             )
-            server.add_to_history(command, result)
+            server.add_to_history(invocation.spec, result)
             return result
 
         monkeypatch.setattr(server, "_execute", fake_execute)
@@ -142,7 +194,9 @@ class TestAdbServerStartSuccess:
     ) -> None:
         """refresh_mdns_availability stores and returns a parsed success signal."""
 
-        def fake_execute(_command: AdbCommand) -> AdbCommandResult:
+        def fake_execute(
+            _invocation: AdbCommandInvocation[object],
+        ) -> AdbCommandResult:
             return AdbCommandResult(
                 status=AdbCommandResultStatus.SUCCESS,
                 output="mdns daemon version [Openscreen discovery 0.0.0]\n",
@@ -160,7 +214,9 @@ class TestAdbServerStartSuccess:
     ) -> None:
         """mDNS preflight failures are advisory and leave availability false."""
 
-        def fake_execute(_command: AdbCommand) -> AdbCommandResult:
+        def fake_execute(
+            _invocation: AdbCommandInvocation[object],
+        ) -> AdbCommandResult:
             return AdbCommandResult(
                 status=AdbCommandResultStatus.ERROR,
                 output="",
@@ -179,7 +235,9 @@ class TestAdbServerStartSuccess:
     ) -> None:
         """mDNS preflight exceptions are advisory and leave availability false."""
 
-        def fake_execute(_command: AdbCommand) -> AdbCommandResult:
+        def fake_execute(
+            _invocation: AdbCommandInvocation[object],
+        ) -> AdbCommandResult:
             raise AdbServerException("mdns check failed")
 
         server._mdns_available = True
@@ -219,7 +277,7 @@ class TestAdbServerHealthProbe:
         self, server: AdbServer
     ) -> None:
         server.add_to_history(
-            AdbCommands.START_SERVER.value,
+            AdbCommands.START_SERVER,
             AdbCommandResult(
                 status=AdbCommandResultStatus.SUCCESS,
                 output="",
@@ -233,7 +291,7 @@ class TestAdbServerHealthProbe:
         self, server: AdbServer
     ) -> None:
         server.add_to_history(
-            AdbCommands.START_SERVER.value,
+            AdbCommands.START_SERVER,
             AdbCommandResult(
                 status=AdbCommandResultStatus.SUCCESS,
                 output="",
@@ -242,7 +300,7 @@ class TestAdbServerHealthProbe:
             ),
         )
         server.add_to_history(
-            AdbCommands.KILL_SERVER.value,
+            AdbCommands.KILL_SERVER,
             AdbCommandResult(
                 status=AdbCommandResultStatus.SUCCESS,
                 output="",
@@ -270,12 +328,11 @@ class TestAdbClientDeviceStatus:
         phone = Phone(id="abc123", state="device")
 
         def fake_execute(
-            command: AdbCommand,
+            invocation: AdbCommandInvocation[object],
             target_phone: Phone | None = None,
-            positional_arguments: list[str] | None = None,
         ) -> AdbCommandResult:
             assert target_phone is phone
-            assert command.command == "get-state"
+            assert invocation.spec is AdbCommands.STATUS
             return AdbCommandResult(
                 status=AdbCommandResultStatus.SUCCESS,
                 output="device\n",
@@ -288,8 +345,8 @@ class TestAdbClientDeviceStatus:
         assert client.status(phone) == "device"
 
     def test_status_command_describes_device_state_not_server(self) -> None:
-        status = AdbCommands.STATUS.value
-        assert status.command == "get-state"
+        status = AdbCommands.STATUS
+        assert status.argv == ("get-state",)
         assert "device" in status.description.casefold()
         assert "server" not in status.name.casefold()
 
@@ -432,20 +489,22 @@ class TestAdbServerKillSuccess:
     ) -> None:
         """Killing the ADB server with a valid binary succeeds."""
 
-        def fake_execute(command: AdbCommand) -> AdbCommandResult:
+        def fake_execute(
+            invocation: AdbCommandInvocation[object],
+        ) -> AdbCommandResult:
             result = AdbCommandResult(
                 status=AdbCommandResultStatus.SUCCESS,
                 output="",
                 error="",
                 return_code=0,
             )
-            server.add_to_history(command, result)
+            server.add_to_history(invocation.spec, result)
             return result
 
         monkeypatch.setattr(server, "_execute", fake_execute)
         server.stop()
         last_cmd, last_result = server.get_last_from_history()
-        assert last_cmd == AdbCommands.KILL_SERVER.value
+        assert last_cmd == AdbCommands.KILL_SERVER
         assert last_result.status == AdbCommandResultStatus.SUCCESS
 
     def test_server_execute_kill_returns_success_status(
@@ -459,7 +518,7 @@ class TestAdbServerKillSuccess:
             return _completed_process(argv, returncode=0)
 
         monkeypatch.setattr(subprocess, "run", fake_run)
-        result = server._execute(AdbCommands.KILL_SERVER.value)
+        result = server._execute(AdbCommands.KILL_SERVER.invoke())
         assert result.status == AdbCommandResultStatus.SUCCESS
         assert result.return_code == 0
 
@@ -492,7 +551,7 @@ class TestAdbServerStartError:
         with pytest.raises(
             AdbServerException, match="Failed to run ADB binary|Failed to execute"
         ):
-            server._execute(AdbCommands.START_SERVER.value)
+            server._execute(AdbCommands.START_SERVER.invoke())
 
 
 # --- Kill server: error ---
@@ -512,7 +571,7 @@ class TestAdbServerKillError:
         with pytest.raises(
             AdbServerException, match="Failed to run ADB binary|Failed to execute"
         ):
-            server._execute(AdbCommands.KILL_SERVER.value)
+            server._execute(AdbCommands.KILL_SERVER.invoke())
 
 
 # --- Execute result shape ---
@@ -537,7 +596,7 @@ class TestAdbServerExecuteResult:
             )
 
         monkeypatch.setattr(subprocess, "run", fake_run)
-        result = server._execute(AdbCommands.START_SERVER.value)
+        result = server._execute(AdbCommands.START_SERVER.invoke())
         assert result.status == AdbCommandResultStatus.SUCCESS
         assert result.return_code == 0
         assert result.phone is None
@@ -555,9 +614,9 @@ class TestAdbServerExecuteResult:
             return _completed_process(argv, returncode=0)
 
         monkeypatch.setattr(subprocess, "run", fake_run)
-        server._execute(AdbCommands.KILL_SERVER.value)
+        server._execute(AdbCommands.KILL_SERVER.invoke())
         assert len(server.history) >= 1
-        server._execute(AdbCommands.START_SERVER.value)
+        server._execute(AdbCommands.START_SERVER.invoke())
         assert len(server.history) >= 2
 
     def test_get_known_devices_skips_malformed_output(
@@ -573,7 +632,9 @@ class TestAdbServerExecuteResult:
             ]
         )
 
-        def fake_execute(_command: AdbCommand) -> AdbCommandResult:
+        def fake_execute(
+            _invocation: AdbCommandInvocation[object],
+        ) -> AdbCommandResult:
             return AdbCommandResult(
                 status=AdbCommandResultStatus.SUCCESS,
                 output=output,
@@ -595,24 +656,22 @@ class TestAdbServerExecuteResult:
             [
                 (
                     datetime.datetime(2026, 1, 1, 10, 0, 0),
-                    (AdbCommands.START_SERVER.value, start_result),
+                    (AdbCommands.START_SERVER, start_result),
                 ),
                 (
                     datetime.datetime(2026, 1, 1, 10, 0, 1),
-                    (AdbCommands.KILL_SERVER.value, kill_result),
+                    (AdbCommands.KILL_SERVER, kill_result),
                 ),
                 (
                     datetime.datetime(2026, 1, 1, 10, 0, 2),
-                    (AdbCommands.START_SERVER.value, start_result),
+                    (AdbCommands.START_SERVER, start_result),
                 ),
             ]
         )
 
-        server.remove_from_history(AdbCommands.START_SERVER.value)
+        server.remove_from_history(AdbCommands.START_SERVER)
 
-        assert list(server.history.values()) == [
-            (AdbCommands.KILL_SERVER.value, kill_result)
-        ]
+        assert list(server.history.values()) == [(AdbCommands.KILL_SERVER, kill_result)]
 
     def test_remove_from_history_noops_when_absent(self, server: AdbServer) -> None:
         """remove_from_history does not raise when no entry matches the command."""
@@ -621,16 +680,14 @@ class TestAdbServerExecuteResult:
             [
                 (
                     datetime.datetime(2026, 1, 1, 10, 0, 0),
-                    (AdbCommands.KILL_SERVER.value, result),
+                    (AdbCommands.KILL_SERVER, result),
                 )
             ]
         )
 
-        server.remove_from_history(AdbCommands.START_SERVER.value)
+        server.remove_from_history(AdbCommands.START_SERVER)
 
-        assert list(server.history.values()) == [
-            (AdbCommands.KILL_SERVER.value, result)
-        ]
+        assert list(server.history.values()) == [(AdbCommands.KILL_SERVER, result)]
 
     def test_server_history_is_capped_to_recent_entries(
         self, server: AdbServer
@@ -638,7 +695,7 @@ class TestAdbServerExecuteResult:
         """Server history keeps newest entries only."""
         for _ in range(ADB_HISTORY_MAX_ENTRIES + 3):
             server.add_to_history(
-                AdbCommands.START_SERVER.value,
+                AdbCommands.START_SERVER,
                 AdbCommandResult(status=AdbCommandResultStatus.SUCCESS),
             )
 
@@ -655,7 +712,7 @@ class TestAdbClientHistory:
 
         for _ in range(ADB_HISTORY_MAX_ENTRIES + 3):
             client.add_to_history(
-                AdbCommands.GET_DEVICES.value,
+                AdbCommands.GET_DEVICES,
                 AdbCommandResult(status=AdbCommandResultStatus.SUCCESS),
             )
 
@@ -671,22 +728,22 @@ class TestAdbClientHistory:
             [
                 (
                     datetime.datetime(2026, 1, 1, 10, 0, 0),
-                    (AdbCommands.GET_DEVICES.value, devices_result),
+                    (AdbCommands.GET_DEVICES, devices_result),
                 ),
                 (
                     datetime.datetime(2026, 1, 1, 10, 0, 1),
-                    (AdbCommands.PAIR.value, pair_result),
+                    (AdbCommands.PAIR, pair_result),
                 ),
                 (
                     datetime.datetime(2026, 1, 1, 10, 0, 2),
-                    (AdbCommands.GET_DEVICES.value, devices_result),
+                    (AdbCommands.GET_DEVICES, devices_result),
                 ),
             ]
         )
 
-        client.remove_from_history(AdbCommands.GET_DEVICES.value)
+        client.remove_from_history(AdbCommands.GET_DEVICES)
 
-        assert list(client.history.values()) == [(AdbCommands.PAIR.value, pair_result)]
+        assert list(client.history.values()) == [(AdbCommands.PAIR, pair_result)]
 
     def test_client_remove_from_history_noops_when_absent(
         self, adb_binary: AdbBinary
@@ -697,14 +754,14 @@ class TestAdbClientHistory:
             [
                 (
                     datetime.datetime(2026, 1, 1, 10, 0, 0),
-                    (AdbCommands.PAIR.value, result),
+                    (AdbCommands.PAIR, result),
                 )
             ]
         )
 
-        client.remove_from_history(AdbCommands.GET_DEVICES.value)
+        client.remove_from_history(AdbCommands.GET_DEVICES)
 
-        assert list(client.history.values()) == [(AdbCommands.PAIR.value, result)]
+        assert list(client.history.values()) == [(AdbCommands.PAIR, result)]
 
 
 class TestAdbCommandResultDefaults:
@@ -727,14 +784,13 @@ class TestAdbClientSendNotification:
         """Notification title/message are passed as argv values, not shell-quoted."""
         client = AdbClient(adb_binary)
         phone = Phone(id="abc123", name="Pixel", state="device")
-        calls: list[tuple[AdbCommand, Phone | None, list[str] | None]] = []
+        calls: list[tuple[AdbCommandInvocation[object], Phone | None]] = []
 
         def fake_execute(
-            command: AdbCommand,
+            invocation: AdbCommandInvocation[object],
             phone_arg: Phone | None = None,
-            positional_arguments: list[str] | None = None,
         ) -> AdbCommandResult:
-            calls.append((command, phone_arg, positional_arguments))
+            calls.append((invocation, phone_arg))
             return AdbCommandResult(
                 status=AdbCommandResultStatus.SUCCESS,
                 output="posting:\n",
@@ -747,9 +803,10 @@ class TestAdbClientSendNotification:
         assert client.send_notification(phone, "Hello there", "it's ready") is True
         assert calls == [
             (
-                AdbCommands.SEND_NOTIFICATION.value,
+                AdbCommands.SEND_NOTIFICATION.invoke(
+                    "-t", "Hello there", "-m", "it's ready"
+                ),
                 phone,
-                ["-t", "Hello there", "-m", "it's ready"],
             )
         ]
 
@@ -758,41 +815,25 @@ class TestAdbLogRedaction:
     """Log-only ADB command redaction helpers."""
 
     def test_pairing_code_is_redacted_from_log_safe_argv(self) -> None:
-        argv = ["/adb", "pair", "10.0.0.2:41000", "123456"]
-        safe = _log_safe_argv(AdbCommands.PAIR.value, argv)
+        invocation = AdbCommands.PAIR.invoke("10.0.0.2:41000", "123456")
+        safe = _log_safe_argv(invocation, Path("/adb"))
         assert "123456" not in safe
         assert safe == ["/adb", "pair", "10.0.0.2:41000", "<redacted>"]
 
     def test_device_id_is_redacted_from_log_safe_command_line(self) -> None:
-        argv = [
-            "/adb",
-            "-s",
-            "adb-secret-device._adb-tls-connect._tcp",
-            "shell",
-            "getprop",
-            "ro.serialno",
-        ]
-        safe_line = _log_safe_command_line(AdbCommands.GET_SERIAL_NO.value, argv)
+        safe_line = _log_safe_command_line(
+            AdbCommands.GET_SERIAL_NO.invoke(),
+            Path("/adb"),
+            device_id="adb-secret-device._adb-tls-connect._tcp",
+        )
         assert "adb-secret-device" not in safe_line
         assert "<redacted>" in safe_line
 
     def test_notification_payload_is_redacted_from_log_safe_argv(self) -> None:
-        argv = [
-            "/adb",
-            "-s",
-            "device-1",
-            "shell",
-            "cmd",
-            "notification",
-            "post",
-            "-n",
-            "ARROW",
-            "-t",
-            "Private title",
-            "-m",
-            "Private message",
-        ]
-        safe = _log_safe_argv(AdbCommands.SEND_NOTIFICATION.value, argv)
+        invocation = AdbCommands.SEND_NOTIFICATION.invoke(
+            "-t", "Private title", "-m", "Private message"
+        )
+        safe = _log_safe_argv(invocation, Path("/adb"), device_id="device-1")
         assert "device-1" not in safe
         assert "Private title" not in safe
         assert "Private message" not in safe
@@ -801,6 +842,6 @@ class TestAdbLogRedaction:
 
     def test_sensitive_output_preview_is_redacted(self) -> None:
         output = "adb-secret-device device product:x model:y device:z transport_id:1"
-        assert _log_safe_output_preview(output, AdbCommands.GET_DEVICES.value) == (
+        assert _log_safe_output_preview(output, AdbCommands.GET_DEVICES) == (
             "<redacted>"
         )

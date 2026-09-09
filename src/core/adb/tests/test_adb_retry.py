@@ -14,10 +14,12 @@ from tenacity import stop_after_attempt, wait_none
 from core.adb.binary import AdbBinary
 from core.adb.client import AdbClient
 from core.adb.command import (
-    AdbCommand,
+    AdbCommandInvocation,
     AdbCommandResult,
     AdbCommandResultStatus,
     AdbCommands,
+    AdbCommandSpec,
+    AdbRetryPolicy,
 )
 from core.adb.exceptions import AdbClientException, AdbServerException
 from core.adb.retry import (
@@ -29,9 +31,9 @@ from core.adb.server import AdbServer
 from core.devices.phone import Phone, PhoneRepository
 
 
-def _fast_profile(command: AdbCommand, *, scope: str) -> _AdbRetryProfile:
+def _fast_profile(command: AdbCommandSpec[object]) -> _AdbRetryProfile:
     """Deterministic retry profile for tests: three attempts, no sleep."""
-    cmd = command.command
+    cmd = command.argv[0]
     if cmd == "pair":
         timeout_seconds = 15.0
     elif cmd == "kill-server":
@@ -137,7 +139,7 @@ class TestAdbClientExecuteRetry:
         monkeypatch.setattr(subprocess, "run", fake_run)
 
         result = adb_client._execute(
-            AdbCommands.GET_PRODUCT_MODEL.value,
+            AdbCommands.GET_PRODUCT_MODEL.invoke(),
             Phone(id="abc123", state="device"),
         )
 
@@ -166,7 +168,7 @@ class TestAdbClientExecuteRetry:
             return _completed_process(argv, returncode=0, stdout="ok\n")
 
         monkeypatch.setattr(subprocess, "run", fake_run)
-        result = adb_client._execute(AdbCommands.GET_DEVICES.value)
+        result = adb_client._execute(AdbCommands.GET_DEVICES.invoke())
         assert calls["count"] == 3
         assert result.status == AdbCommandResultStatus.SUCCESS
         assert result.return_code == 0
@@ -199,7 +201,7 @@ class TestAdbClientExecuteRetry:
         monkeypatch.setattr(subprocess, "run", fake_run)
 
         result = adb_client._execute(
-            AdbCommands.GET_PRODUCT_MODEL.value,
+            AdbCommands.GET_PRODUCT_MODEL.invoke(),
             Phone(id="abc123", state="device"),
         )
 
@@ -212,8 +214,8 @@ class TestAdbClientExecuteRetry:
         )
         history_entries = list(adb_client.history.values())
         assert [entry[0] for entry in history_entries] == [
-            AdbCommands.GET_DEVICES.value,
-            AdbCommands.GET_PRODUCT_MODEL.value,
+            AdbCommands.GET_DEVICES,
+            AdbCommands.GET_PRODUCT_MODEL,
         ]
         assert history_entries[-1][1] == result
 
@@ -244,9 +246,8 @@ class TestAdbClientExecuteRetry:
         monkeypatch.setattr(subprocess, "run", fake_run)
 
         result = adb_client._execute(
-            AdbCommands.SEND_NOTIFICATION.value,
+            AdbCommands.SEND_NOTIFICATION.invoke("-t", "Title", "-m", "Message"),
             Phone(id="abc123", state="device"),
-            ["-t", "Title", "-m", "Message"],
         )
 
         assert result.status == AdbCommandResultStatus.ERROR
@@ -314,7 +315,7 @@ class TestAdbClientExecuteRetry:
         monkeypatch.setattr(subprocess, "run", fake_run)
 
         result = adb_client._execute(
-            AdbCommands.GET_PRODUCT_MODEL.value,
+            AdbCommands.GET_PRODUCT_MODEL.invoke(),
             Phone(id="abc123", state="device"),
         )
 
@@ -348,7 +349,7 @@ class TestAdbClientExecuteRetry:
         monkeypatch.setattr(subprocess, "run", fake_run)
 
         result = adb_client._execute(
-            AdbCommands.GET_PRODUCT_MODEL.value,
+            AdbCommands.GET_PRODUCT_MODEL.invoke(),
             Phone(id="abc123", state="device"),
         )
 
@@ -376,9 +377,8 @@ class TestAdbClientExecuteRetry:
 
         monkeypatch.setattr(subprocess, "run", fake_run)
         result = adb_client._execute(
-            AdbCommands.PAIR.value,
+            AdbCommands.PAIR.invoke("127.0.0.1:5555", "000000"),
             None,
-            ["127.0.0.1:5555", "000000"],
         )
         assert calls["count"] == 1
         assert result.status == AdbCommandResultStatus.ERROR
@@ -400,7 +400,7 @@ class TestAdbClientExecuteRetry:
 
         monkeypatch.setattr(subprocess, "run", fake_run)
         with pytest.raises(AdbClientException, match="Failed to run ADB binary"):
-            adb_client._execute(AdbCommands.GET_DEVICES.value)
+            adb_client._execute(AdbCommands.GET_DEVICES.invoke())
         assert calls["count"] == 1
 
     def test_targeted_oserror_preserves_exception_chain_after_failed_probe(
@@ -421,7 +421,7 @@ class TestAdbClientExecuteRetry:
 
         with pytest.raises(AdbClientException) as exc_info:
             adb_client._execute(
-                AdbCommands.GET_PRODUCT_MODEL.value,
+                AdbCommands.GET_PRODUCT_MODEL.invoke(),
                 Phone(id="abc123", state="device"),
             )
 
@@ -447,7 +447,7 @@ class TestAdbClientExecuteRetry:
             raise subprocess.TimeoutExpired(cmd=argv, timeout=timeout)
 
         monkeypatch.setattr(subprocess, "run", fake_run)
-        result = adb_client._execute(AdbCommands.GET_DEVICES.value)
+        result = adb_client._execute(AdbCommands.GET_DEVICES.invoke())
         assert calls["count"] == 3
         assert result.status == AdbCommandResultStatus.TIMEOUT
         assert "timed out" in result.error
@@ -456,9 +456,8 @@ class TestAdbClientExecuteRetry:
         self, adb_client: AdbClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         def fake_execute(
-            command: AdbCommand,
+            invocation: AdbCommandInvocation[object],
             phone: Phone | None = None,
-            positional_arguments: list[str] | None = None,
         ) -> AdbCommandResult:
             return AdbCommandResult(
                 status=AdbCommandResultStatus.ERROR,
@@ -474,7 +473,9 @@ class TestAdbClientExecuteRetry:
     def test_shell_getter_returns_empty_from_non_success_result(
         self, adb_client: AdbClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        def fake_execute(command: AdbCommand, phone: Phone) -> AdbCommandResult:
+        def fake_execute(
+            invocation: AdbCommandInvocation[object], phone: Phone
+        ) -> AdbCommandResult:
             return AdbCommandResult(
                 status=AdbCommandResultStatus.TRANSIENT_ERROR,
                 output="",
@@ -510,7 +511,7 @@ class TestAdbServerExecuteRetry:
             )
 
         monkeypatch.setattr(subprocess, "run", fake_run)
-        result = adb_server._execute(AdbCommands.START_SERVER.value)
+        result = adb_server._execute(AdbCommands.START_SERVER.invoke())
         assert calls["count"] == 2
         assert result.status == AdbCommandResultStatus.SUCCESS
         assert result.return_code == 0
@@ -531,7 +532,7 @@ class TestAdbServerExecuteRetry:
             return _completed_process(argv, returncode=1, stderr="unauthorized")
 
         monkeypatch.setattr(subprocess, "run", fake_run)
-        result = adb_server._execute(AdbCommands.GET_DEVICES.value)
+        result = adb_server._execute(AdbCommands.GET_DEVICES.invoke())
         assert calls["count"] == 1
         assert result.status == AdbCommandResultStatus.ERROR
         assert result.error == "unauthorized"
@@ -551,7 +552,7 @@ class TestAdbServerExecuteRetry:
             return _completed_process(argv, returncode=1, stderr="device offline")
 
         monkeypatch.setattr(subprocess, "run", fake_run)
-        result = adb_server._execute(AdbCommands.GET_DEVICES.value)
+        result = adb_server._execute(AdbCommands.GET_DEVICES.invoke())
         assert calls["count"] == 3
         assert result.status == AdbCommandResultStatus.TRANSIENT_ERROR
         assert result.error == "device offline"
@@ -561,11 +562,23 @@ class TestRetryProfiles:
     """Sanity checks for command-specific retry boundaries."""
 
     def test_pair_profile_has_wider_window_than_shell(self) -> None:
-        pair = retry_profile_for(AdbCommands.PAIR.value, scope="client")
-        shell = retry_profile_for(AdbCommands.GET_SERIAL_NO.value, scope="client")
+        pair = retry_profile_for(AdbCommands.PAIR)
+        shell = retry_profile_for(AdbCommands.GET_SERIAL_NO)
         assert pair.timeout_seconds >= shell.timeout_seconds
 
     def test_kill_server_profile_is_minimal(self) -> None:
-        kill = retry_profile_for(AdbCommands.KILL_SERVER.value, scope="server")
-        start = retry_profile_for(AdbCommands.START_SERVER.value, scope="server")
+        kill = retry_profile_for(AdbCommands.KILL_SERVER)
+        start = retry_profile_for(AdbCommands.START_SERVER)
         assert kill.timeout_seconds <= start.timeout_seconds
+
+    def test_profile_uses_metadata_not_argv_shape(self) -> None:
+        pair_lookalike = AdbCommandSpec(
+            name="Pair lookalike",
+            description="Uses pair argv with the default retry policy",
+            argv=("pair",),
+            parser=str.strip,
+            retry_policy=AdbRetryPolicy.DEFAULT,
+        )
+
+        assert retry_profile_for(pair_lookalike).timeout_seconds == 10.0
+        assert retry_profile_for(AdbCommands.PAIR).timeout_seconds == 15.0

@@ -1,26 +1,21 @@
 """
-ADB stdout/stderr parsers and command-to-parser registry.
+Typed ADB stdout/stderr parsers.
 
 When adding a parser:
-1. Add a focused ``_parse_*`` helper.
-2. Add an ``ADBCommandParser`` member.
-3. Register the command/parser pair in ``ADB_COMMAND_PARSERS``.
-4. Capture representative output and add parser tests.
+1. Add a focused ``parse_*`` function.
+2. Attach it to the command specification in ``core.adb.command``.
+3. Capture representative output and add parser tests.
 """
 
 from __future__ import annotations
 
 import ipaddress
 import re
-from enum import Enum, member
 from pathlib import Path
-from typing import Any, Callable, Final
+from typing import Final
 
 from core.adb.binary import AdbBinary
-from core.adb.command import AdbCommands
 from core.devices.phone import Phone
-
-ParserFn = Callable[[str], Any]
 
 _PAIR_SUCCESS_LINE = re.compile(
     r"Successfully\s+paired\s+to\s+(\S+)\s+\[guid=([^\]]+)\]",
@@ -37,16 +32,12 @@ _SHELL_ENRICHMENT_KEY_RO_SERIALNO: Final[str] = "ro_serialno"
 ShellEnrichmentProperties = dict[str, str | int | None]
 
 
-def _make_strip_parser() -> ParserFn:
-    """Build a distinct callable for Enum members that only need stripped stdout."""
-
-    def _fn(output: str) -> str:
-        return output.strip()
-
-    return _fn
+def parse_stripped_output(output: str) -> str:
+    """Return stripped ADB output for simple scalar commands."""
+    return output.strip()
 
 
-def _parse_pair(output: str) -> Phone | None:
+def parse_pair(output: str) -> Phone | None:
     """
     Parse `adb pair` stdout/stderr into a ``Phone``.
 
@@ -81,12 +72,12 @@ def _parse_pair(output: str) -> Phone | None:
     return None
 
 
-def _parse_mdns_check(output: str) -> bool:
+def parse_mdns_check(output: str) -> bool:
     """Return True when `adb mdns check` reports a running mDNS daemon."""
     return "mdns daemon version" in output.casefold()
 
 
-def _parse_binary_version(output: str) -> AdbBinary:
+def parse_binary_version(output: str) -> AdbBinary:
     """Parse `adb --version` output into bundled binary metadata."""
     version = ""
     build_version: str | None = None
@@ -118,7 +109,7 @@ def _parse_binary_version(output: str) -> AdbBinary:
     )
 
 
-def _parse_devices(output: str) -> list[Phone]:
+def parse_devices(output: str) -> list[Phone]:
     """Parse `adb devices -l` stdout into `Phone` rows; skip malformed lines."""
     phones: list[Phone] = []
     for raw in output.splitlines():
@@ -169,7 +160,7 @@ def parse_device_state_from_listing(output: str, device_id: str) -> str | None:
     return None
 
 
-def _parse_optional_int_line(output: str) -> int | None:
+def parse_optional_int_line(output: str) -> int | None:
     """Parse a lone integer line; return ``None`` for empty or invalid output."""
     text = output.strip()
     if not text:
@@ -180,7 +171,7 @@ def _parse_optional_int_line(output: str) -> int | None:
         return None
 
 
-def _parse_shell_enrichment_properties(output: str) -> ShellEnrichmentProperties:
+def parse_shell_enrichment_properties(output: str) -> ShellEnrichmentProperties:
     """Parse batch shell enrichment output as one ``key=value`` per line."""
     parsed: ShellEnrichmentProperties = {
         _SHELL_ENRICHMENT_KEY_MANUFACTURER: "",
@@ -200,7 +191,7 @@ def _parse_shell_enrichment_properties(output: str) -> ShellEnrichmentProperties
         if key not in valid_keys:
             continue
         if key == _SHELL_ENRICHMENT_KEY_SDK:
-            parsed[key] = _parse_optional_int_line(value)
+            parsed[key] = parse_optional_int_line(value)
             continue
         parsed[key] = value.strip()
     return parsed
@@ -220,7 +211,7 @@ def _coerce_dumpsys_scalar(text: str) -> int | bool | str:
         return text.strip()
 
 
-def _parse_battery(output: str) -> dict[str, int | bool | str]:
+def parse_battery(output: str) -> dict[str, int | bool | str]:
     """Parse the key/value body from ``adb shell dumpsys battery``."""
     parsed: dict[str, int | bool | str] = {}
     in_section = False
@@ -242,7 +233,7 @@ def _parse_battery(output: str) -> dict[str, int | bool | str]:
     return parsed
 
 
-def _parse_window_summary(output: str) -> dict[str, str | bool | None]:
+def parse_window_summary(output: str) -> dict[str, str | bool | None]:
     """Extract the small window-manager summary consumed by the application."""
     summary: dict[str, str | bool | None] = {}
     match = re.search(r"mAwake=(true|false)", output)
@@ -266,53 +257,6 @@ def _parse_window_summary(output: str) -> dict[str, str | bool | None]:
     return summary
 
 
-def _parse_notification_post(output: str) -> bool:
+def parse_notification_post(output: str) -> bool:
     """True when `cmd notification post` echoed a posting confirmation."""
     return "posting:" in output.lower()
-
-
-class ADBCommandParser(Enum):
-    """Structured parsing for stdout shapes documented in adb-commands-output."""
-
-    PAIR = member(_parse_pair)
-    MDNS_CHECK = member(_parse_mdns_check)
-    GET_BINARY_VERSION = member(_parse_binary_version)
-    GET_DEVICES = member(_parse_devices)
-    GET_ANDROID_VERSION = member(_make_strip_parser())
-    GET_MANUFACTURER = member(_make_strip_parser())
-    GET_DEVICE_NAME = member(_make_strip_parser())
-    GET_PRODUCT_MODEL = member(_make_strip_parser())
-    GET_SDK_VERSION = member(_parse_optional_int_line)
-    GET_LOCATION_MODE = member(_parse_optional_int_line)
-    GET_SERIAL_NO = member(_make_strip_parser())
-    GET_SHELL_ENRICHMENT_PROPERTIES = member(_parse_shell_enrichment_properties)
-    GET_BATTERY_INFOS = member(_parse_battery)
-    DUMPSYS_WINDOW = member(_parse_window_summary)
-    SEND_NOTIFICATION = member(_parse_notification_post)
-
-    def parse(self, output: str) -> Any:
-        """Parse raw adb stdout (or stderr if piped) using this command's rules."""
-        parser = self.value
-        if not callable(parser):
-            raise TypeError(f"{self} has no callable parser")
-        return parser(output)
-
-
-ADB_COMMAND_PARSERS: dict[AdbCommands, ADBCommandParser] = {
-    AdbCommands.MDNS_CHECK: ADBCommandParser.MDNS_CHECK,
-    AdbCommands.GET_BINARY_VERSION: ADBCommandParser.GET_BINARY_VERSION,
-    AdbCommands.GET_DEVICES: ADBCommandParser.GET_DEVICES,
-    AdbCommands.GET_ANDROID_VERSION: ADBCommandParser.GET_ANDROID_VERSION,
-    AdbCommands.GET_MANUFACTURER: ADBCommandParser.GET_MANUFACTURER,
-    AdbCommands.GET_DEVICE_NAME: ADBCommandParser.GET_DEVICE_NAME,
-    AdbCommands.GET_PRODUCT_MODEL: ADBCommandParser.GET_PRODUCT_MODEL,
-    AdbCommands.GET_SDK_VERSION: ADBCommandParser.GET_SDK_VERSION,
-    AdbCommands.GET_LOCATION_MODE: ADBCommandParser.GET_LOCATION_MODE,
-    AdbCommands.GET_SERIAL_NO: ADBCommandParser.GET_SERIAL_NO,
-    AdbCommands.GET_SHELL_ENRICHMENT_PROPERTIES: (
-        ADBCommandParser.GET_SHELL_ENRICHMENT_PROPERTIES
-    ),
-    AdbCommands.GET_BATTERY_INFOS: ADBCommandParser.GET_BATTERY_INFOS,
-    AdbCommands.DUMPSYS_WINDOW: ADBCommandParser.DUMPSYS_WINDOW,
-    AdbCommands.SEND_NOTIFICATION: ADBCommandParser.SEND_NOTIFICATION,
-}

@@ -1,45 +1,100 @@
-"""
-ADB command descriptors, result models, history limits, and log redaction.
-
-When adding a command:
-1. Add an ``AdbCommands`` member with its ``AdbCommand`` descriptor.
-2. Register output parsing in ``core.adb.parser`` when the command has structured output.
-3. Tune retry behavior in ``core.adb.retry`` when the default profile is unsuitable.
-4. Update the redaction helpers below when argv or output may contain sensitive values.
-5. Expose the command from ``AdbClient`` or ``AdbServer`` when model code needs it.
-"""
+"""Immutable ADB command specifications, invocations, results, and log redaction."""
 
 from __future__ import annotations
 
 import datetime
 import shlex
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Final
+from enum import Enum, auto
+from pathlib import Path
+from typing import Callable, Final, Generic, TypeVar
 
+from core.adb.binary import AdbBinary
+from core.adb.parser import (
+    ShellEnrichmentProperties,
+    parse_battery,
+    parse_binary_version,
+    parse_devices,
+    parse_mdns_check,
+    parse_notification_post,
+    parse_optional_int_line,
+    parse_pair,
+    parse_shell_enrichment_properties,
+    parse_stripped_output,
+    parse_window_summary,
+)
 from core.devices.phone import Phone
 
 _REDACTED_LOG_VALUE: Final[str] = "<redacted>"
 _LOG_PREVIEW_LIMIT: Final[int] = 200
 ADB_HISTORY_MAX_ENTRIES: Final[int] = 100
 
+ParsedT_co = TypeVar("ParsedT_co", covariant=True)
+
 
 class AdbCommandResultStatus(Enum):
-    """
-    Status of the command execution.
-
-    SUCCESS: The command executed successfully.
-    ERROR: Non-retryable command failure (auth, permissions, invalid input, etc.).
-    TIMEOUT: The subprocess timed out.
-    TRANSIENT_ERROR: Retryable failure after retries are exhausted.
-    UNKNOWN_ERROR: Unclassified failure (reserved for future use).
-    """
+    """Status of an ADB command execution."""
 
     SUCCESS = 0
     ERROR = 1
     TIMEOUT = 2
     TRANSIENT_ERROR = 3
     UNKNOWN_ERROR = 4
+
+
+class AdbRetryPolicy(Enum):
+    """Retry profile identity selected explicitly by each command specification."""
+
+    PAIR = auto()
+    KILL_SERVER = auto()
+    DAEMON = auto()
+    CLIENT = auto()
+    DEFAULT = auto()
+
+
+@dataclass(frozen=True, slots=True)
+class AdbLogPolicy:
+    """Declarative rules for rendering an invocation safely in logs."""
+
+    output_sensitive: bool = False
+    sensitive_dynamic_arg_indexes: frozenset[int] = frozenset()
+
+
+@dataclass(frozen=True, slots=True)
+class AdbCommandSpec(Generic[ParsedT_co]):
+    """Static, typed definition of one logical ADB command."""
+
+    name: str
+    description: str
+    argv: tuple[str, ...]
+    parser: Callable[[str], ParsedT_co]
+    retry_policy: AdbRetryPolicy
+    log_policy: AdbLogPolicy = AdbLogPolicy()
+
+    def parse(self, output: str) -> ParsedT_co:
+        """Parse raw ADB output using this command's declared parser."""
+        return self.parser(output)
+
+    def invoke(self, *dynamic_args: str) -> AdbCommandInvocation[ParsedT_co]:
+        """Bind runtime arguments to this specification."""
+        return AdbCommandInvocation(spec=self, dynamic_args=tuple(dynamic_args))
+
+
+@dataclass(frozen=True, slots=True)
+class AdbCommandInvocation(Generic[ParsedT_co]):
+    """One immutable invocation of an ADB command specification."""
+
+    spec: AdbCommandSpec[ParsedT_co]
+    dynamic_args: tuple[str, ...] = ()
+
+    def argv(self, binary_path: Path, *, device_id: str | None = None) -> list[str]:
+        """Build the complete argument-safe subprocess argv."""
+        values = [str(binary_path)]
+        if device_id is not None:
+            values.extend(("-s", device_id))
+        values.extend(self.spec.argv)
+        values.extend(self.dynamic_args)
+        return values
 
 
 @dataclass(frozen=True)
@@ -68,113 +123,122 @@ class AdbCommandResult:
     )
 
 
-@dataclass(unsafe_hash=True, frozen=True)
-class AdbCommand:
-    """ADB command descriptor."""
+class AdbCommands:
+    """Canonical namespace of typed ADB command specifications."""
 
-    name: str = field(
-        metadata={"description": "The name of the command"}, default="", hash=True
-    )
-    description: str = field(
-        metadata={"description": "The description of the command"}, default=""
-    )
-    command: str = field(metadata={"description": "The command to execute"}, default="")
-    args: list[str] = field(
-        metadata={"description": "The arguments to pass to the command"},
-        default_factory=list,
-    )
-    sending_rate: int = field(
-        metadata={"description": "The sending rate of the command"}, default=0
-    )
-
-
-class AdbCommands(Enum):
-    """ADB command catalog."""
-
-    START_SERVER = AdbCommand(
+    START_SERVER: Final[AdbCommandSpec[str]] = AdbCommandSpec(
         name="Start ADB Server",
         description="Start the ADB server",
-        command="start-server",
+        argv=("start-server",),
+        parser=parse_stripped_output,
+        retry_policy=AdbRetryPolicy.DAEMON,
     )
-    KILL_SERVER = AdbCommand(
+    KILL_SERVER: Final[AdbCommandSpec[str]] = AdbCommandSpec(
         name="Kill ADB Server",
         description="Kill the ADB server",
-        command="kill-server",
+        argv=("kill-server",),
+        parser=parse_stripped_output,
+        retry_policy=AdbRetryPolicy.KILL_SERVER,
     )
-    STATUS = AdbCommand(
+    STATUS: Final[AdbCommandSpec[str]] = AdbCommandSpec(
         name="Get device state",
         description="Get the ADB connection state of a specific device (adb get-state)",
-        command="get-state",
+        argv=("get-state",),
+        parser=parse_stripped_output,
+        retry_policy=AdbRetryPolicy.DAEMON,
     )
-    GET_DEVICES = AdbCommand(
+    GET_DEVICES: Final[AdbCommandSpec[list[Phone]]] = AdbCommandSpec(
         name="Get devices",
         description="Get the devices",
-        command="devices",
-        args=["-l"],
+        argv=("devices", "-l"),
+        parser=parse_devices,
+        retry_policy=AdbRetryPolicy.DAEMON,
+        log_policy=AdbLogPolicy(output_sensitive=True),
     )
-    PAIR = AdbCommand(
+    PAIR: Final[AdbCommandSpec[Phone | None]] = AdbCommandSpec(
         name="Pair with a device",
         description="Pair with a device",
-        command="pair",
+        argv=("pair",),
+        parser=parse_pair,
+        retry_policy=AdbRetryPolicy.PAIR,
+        log_policy=AdbLogPolicy(
+            output_sensitive=True,
+            sensitive_dynamic_arg_indexes=frozenset((1,)),
+        ),
     )
-    MDNS_CHECK = AdbCommand(
+    MDNS_CHECK: Final[AdbCommandSpec[bool]] = AdbCommandSpec(
         name="Check mDNS availability",
         description="Check whether ADB mDNS discovery is available",
-        command="mdns",
-        args=["check"],
+        argv=("mdns", "check"),
+        parser=parse_mdns_check,
+        retry_policy=AdbRetryPolicy.DEFAULT,
     )
-    GET_BINARY_VERSION = AdbCommand(
+    GET_BINARY_VERSION: Final[AdbCommandSpec[AdbBinary]] = AdbCommandSpec(
         name="Get ADB binary version",
         description="Read bundled ADB binary version metadata",
-        command="--version",
+        argv=("--version",),
+        parser=parse_binary_version,
+        retry_policy=AdbRetryPolicy.DEFAULT,
     )
-    GET_DEVICE_NAME = AdbCommand(
+    GET_DEVICE_NAME: Final[AdbCommandSpec[str]] = AdbCommandSpec(
         name="Get device name",
         description="Get the name of the device",
-        command="shell",
-        args=["getprop", "device_name"],
+        argv=("shell", "getprop", "device_name"),
+        parser=parse_stripped_output,
+        retry_policy=AdbRetryPolicy.CLIENT,
     )
-    GET_ANDROID_VERSION = AdbCommand(
+    GET_ANDROID_VERSION: Final[AdbCommandSpec[str]] = AdbCommandSpec(
         name="Get Android version",
         description="Get the Android version",
-        command="shell",
-        args=["getprop", "ro.build.version.release"],
+        argv=("shell", "getprop", "ro.build.version.release"),
+        parser=parse_stripped_output,
+        retry_policy=AdbRetryPolicy.CLIENT,
     )
-    GET_BATTERY_INFOS = AdbCommand(
-        name="Get battery infos",
-        description="Get the battery infos",
-        command="shell",
-        args=["dumpsys", "battery"],
+    GET_BATTERY_INFOS: Final[AdbCommandSpec[dict[str, int | bool | str]]] = (
+        AdbCommandSpec(
+            name="Get battery infos",
+            description="Get the battery infos",
+            argv=("shell", "dumpsys", "battery"),
+            parser=parse_battery,
+            retry_policy=AdbRetryPolicy.CLIENT,
+        )
     )
-    GET_MANUFACTURER = AdbCommand(
+    GET_MANUFACTURER: Final[AdbCommandSpec[str]] = AdbCommandSpec(
         name="Get manufacturer",
         description="Get the manufacturer",
-        command="shell",
-        args=["getprop", "ro.product.manufacturer"],
+        argv=("shell", "getprop", "ro.product.manufacturer"),
+        parser=parse_stripped_output,
+        retry_policy=AdbRetryPolicy.CLIENT,
     )
-    GET_SERIAL_NO = AdbCommand(
+    GET_SERIAL_NO: Final[AdbCommandSpec[str]] = AdbCommandSpec(
         name="Serial (ro.serialno)",
         description="Hardware serial via ro.serialno (adb shell getprop ro.serialno)",
-        command="shell",
-        args=["getprop", "ro.serialno"],
+        argv=("shell", "getprop", "ro.serialno"),
+        parser=parse_stripped_output,
+        retry_policy=AdbRetryPolicy.CLIENT,
+        log_policy=AdbLogPolicy(output_sensitive=True),
     )
-    GET_PRODUCT_MODEL = AdbCommand(
+    GET_PRODUCT_MODEL: Final[AdbCommandSpec[str]] = AdbCommandSpec(
         name="Get product model",
         description="Commercial model string (ro.product.model)",
-        command="shell",
-        args=["getprop", "ro.product.model"],
+        argv=("shell", "getprop", "ro.product.model"),
+        parser=parse_stripped_output,
+        retry_policy=AdbRetryPolicy.CLIENT,
     )
-    GET_SDK_VERSION = AdbCommand(
+    GET_SDK_VERSION: Final[AdbCommandSpec[int | None]] = AdbCommandSpec(
         name="Get SDK version",
         description="Android API level (ro.build.version.sdk)",
-        command="shell",
-        args=["getprop", "ro.build.version.sdk"],
+        argv=("shell", "getprop", "ro.build.version.sdk"),
+        parser=parse_optional_int_line,
+        retry_policy=AdbRetryPolicy.CLIENT,
     )
-    GET_SHELL_ENRICHMENT_PROPERTIES = AdbCommand(
+    GET_SHELL_ENRICHMENT_PROPERTIES: Final[
+        AdbCommandSpec[ShellEnrichmentProperties]
+    ] = AdbCommandSpec(
         name="Get shell enrichment properties",
         description="Batch getprops used to enrich device metadata",
-        command="shell",
-        args=[
+        argv=(
+            "shell",
             "sh",
             "-c",
             (
@@ -185,31 +249,36 @@ class AdbCommands(Enum):
                 "printf 'sdk=%s\\n' \"$(getprop ro.build.version.sdk)\"; "
                 "printf 'ro_serialno=%s\\n' \"$(getprop ro.serialno)\""
             ),
-        ],
+        ),
+        parser=parse_shell_enrichment_properties,
+        retry_policy=AdbRetryPolicy.CLIENT,
+        log_policy=AdbLogPolicy(output_sensitive=True),
     )
-    GET_LOCATION_MODE = AdbCommand(
+    GET_LOCATION_MODE: Final[AdbCommandSpec[int | None]] = AdbCommandSpec(
         name="Get location mode",
         description="Secure settings location_mode (0 off, 3 high accuracy, etc.)",
-        command="shell",
-        args=["settings", "get", "secure", "location_mode"],
+        argv=("shell", "settings", "get", "secure", "location_mode"),
+        parser=parse_optional_int_line,
+        retry_policy=AdbRetryPolicy.CLIENT,
     )
-    DUMPSYS_WINDOW = AdbCommand(
-        name="Dump window manager",
-        description="Large window manager dump (parse summary via ADBCommandParser)",
-        command="shell",
-        args=["dumpsys", "window"],
+    DUMPSYS_WINDOW: Final[AdbCommandSpec[dict[str, str | bool | None]]] = (
+        AdbCommandSpec(
+            name="Dump window manager",
+            description="Large window manager dump parsed into a focused summary",
+            argv=("shell", "dumpsys", "window"),
+            parser=parse_window_summary,
+            retry_policy=AdbRetryPolicy.CLIENT,
+        )
     )
-    SEND_NOTIFICATION = AdbCommand(
+    SEND_NOTIFICATION: Final[AdbCommandSpec[bool]] = AdbCommandSpec(
         name="Post connection notification",
         description="Show a status notification on the device after connect",
-        command="shell",
-        args=[
-            "cmd",
-            "notification",
-            "post",
-            "-n",
-            "ARROW",
-        ],
+        argv=("shell", "cmd", "notification", "post", "-n", "ARROW"),
+        parser=parse_notification_post,
+        retry_policy=AdbRetryPolicy.CLIENT,
+        log_policy=AdbLogPolicy(
+            sensitive_dynamic_arg_indexes=frozenset((1, 3)),
+        ),
     )
 
 
@@ -220,76 +289,43 @@ def _redacted_log_value(value: str | None) -> str | None:
     return _REDACTED_LOG_VALUE
 
 
-def _command_is_notification_post(command: AdbCommand) -> bool:
-    args = tuple(command.args)
-    return command.command == "shell" and args[:3] == ("cmd", "notification", "post")
-
-
-def _command_has_location_payload(command: AdbCommand) -> bool:
-    """Return whether a command is expected to carry a location payload."""
-    name = command.name.casefold()
-    return "send location" in name or "set mock location" in name
-
-
-def _command_output_is_sensitive(command: AdbCommand) -> bool:
-    """Return whether output may contain pairing, device, or payload secrets."""
-    if command.command in ("pair", "devices"):
-        return True
-    if tuple(command.args) == ("getprop", "ro.serialno"):
-        return True
-    if command.name == "Get shell enrichment properties":
-        return True
-    return _command_has_location_payload(command)
-
-
-def _log_safe_argv(command: AdbCommand, argv: list[str]) -> list[str]:
-    """Build a log-only argv copy with sensitive values redacted."""
-    safe: list[str] = []
-    pair_value_index = -1
-    if command.command == "pair":
-        try:
-            pair_value_index = argv.index("pair") + 2
-        except ValueError:
-            pair_value_index = -1
-    command_index = -1
-    if _command_has_location_payload(command) and command.command:
-        try:
-            command_index = argv.index(command.command)
-        except ValueError:
-            command_index = -1
-
-    redact_next_option_value = False
-    for index, value in enumerate(argv):
-        if redact_next_option_value:
-            safe.append(_REDACTED_LOG_VALUE)
-            redact_next_option_value = False
-            continue
-        if value == "-s":
-            safe.append(value)
-            redact_next_option_value = True
-            continue
-        if _command_is_notification_post(command) and value in ("-t", "-m"):
-            safe.append(value)
-            redact_next_option_value = True
-            continue
-        if pair_value_index == index:
-            safe.append(_REDACTED_LOG_VALUE)
-            continue
-        if command_index >= 0 and index > command_index:
-            safe.append(_REDACTED_LOG_VALUE)
-            continue
-        safe.append(value)
+def _log_safe_argv(
+    invocation: AdbCommandInvocation[object],
+    binary_path: Path,
+    *,
+    device_id: str | None = None,
+) -> list[str]:
+    """Build the complete log-only argv from declarative sensitivity metadata."""
+    safe = [str(binary_path)]
+    if device_id is not None:
+        safe.extend(("-s", _REDACTED_LOG_VALUE))
+    safe.extend(invocation.spec.argv)
+    sensitive_indexes = invocation.spec.log_policy.sensitive_dynamic_arg_indexes
+    safe.extend(
+        _REDACTED_LOG_VALUE if index in sensitive_indexes else value
+        for index, value in enumerate(invocation.dynamic_args)
+    )
     return safe
 
 
-def _log_safe_command_line(command: AdbCommand, argv: list[str]) -> str:
-    """Return a shell-like command preview from the redacted argv copy."""
-    return " ".join(shlex.quote(arg) for arg in _log_safe_argv(command, argv))
+def _log_safe_command_line(
+    invocation: AdbCommandInvocation[object],
+    binary_path: Path,
+    *,
+    device_id: str | None = None,
+) -> str:
+    """Return a shell-like preview of the invocation's redacted argv."""
+    return " ".join(
+        shlex.quote(arg)
+        for arg in _log_safe_argv(invocation, binary_path, device_id=device_id)
+    )
 
 
-def _log_safe_output_preview(output: str, command: AdbCommand | None = None) -> str:
+def _log_safe_output_preview(
+    output: str, command: AdbCommandSpec[object] | None = None
+) -> str:
     """Keep output logs redacted and bounded without changing stored results."""
-    if command is not None and output and _command_output_is_sensitive(command):
+    if command is not None and output and command.log_policy.output_sensitive:
         return _REDACTED_LOG_VALUE
     if len(output) <= _LOG_PREVIEW_LIMIT:
         return output
