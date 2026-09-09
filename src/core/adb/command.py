@@ -211,7 +211,6 @@ class AdbCommands(Enum):
             "ARROW",
         ],
     )
-    SEND_LOCATION = AdbCommand()
 
 
 def _redacted_log_value(value: str | None) -> str | None:

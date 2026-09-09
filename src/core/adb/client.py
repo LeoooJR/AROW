@@ -154,14 +154,14 @@ class AdbClient:
         return ADBCommandParser.SEND_NOTIFICATION.parse(result.output or "")
 
     def enable_location_services(self) -> None:
-        pass
+        raise NotImplementedError("Enabling location services is not implemented")
 
     def disable_location_services(self) -> None:
-        pass
+        raise NotImplementedError("Disabling location services is not implemented")
 
     def set_mock_location(self, location: Location) -> None:
         """Define a fake GPS location."""
-        pass
+        raise NotImplementedError("Setting a mock location is not implemented")
 
     def get_ro_serialno(self, phone: Phone) -> str:
         """

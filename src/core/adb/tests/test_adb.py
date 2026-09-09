@@ -30,6 +30,7 @@ from core.adb.command import (
 from core.adb.exceptions import AdbServerException
 from core.adb.server import AdbServer
 from core.devices.phone import Phone, PhoneRepository
+from core.geo.location import Location
 
 pytestmark = [pytest.mark.adb, pytest.mark.adb_server]
 
@@ -291,6 +292,28 @@ class TestAdbClientDeviceStatus:
         assert status.command == "get-state"
         assert "device" in status.description.casefold()
         assert "server" not in status.name.casefold()
+
+
+class TestAdbClientUnsupportedLocationOperations:
+    """Unimplemented location operations must fail explicitly."""
+
+    def test_enable_location_services_raises(self, adb_binary: AdbBinary) -> None:
+        client = AdbClient(adb_binary)
+
+        with pytest.raises(NotImplementedError, match="not implemented"):
+            client.enable_location_services()
+
+    def test_disable_location_services_raises(self, adb_binary: AdbBinary) -> None:
+        client = AdbClient(adb_binary)
+
+        with pytest.raises(NotImplementedError, match="not implemented"):
+            client.disable_location_services()
+
+    def test_set_mock_location_raises(self, adb_binary: AdbBinary) -> None:
+        client = AdbClient(adb_binary)
+
+        with pytest.raises(NotImplementedError, match="not implemented"):
+            client.set_mock_location(Location(lat=48.8566, lon=2.3522))
 
 
 class TestAdbBinaryDefaults:
