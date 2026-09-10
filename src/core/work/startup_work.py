@@ -74,6 +74,15 @@ def _validate_frozen_adb_binary_version(
     raise RuntimeError("Bundled ADB binary version does not match frozen metadata")
 
 
+def _initialize_adb_server(adb_server: AdbServer) -> None:
+    """Run the explicit ADB startup sequence on a freshly constructed server."""
+    adb_server.start()
+    for device in adb_server.get_known_devices():
+        adb_server.paired_devices.add(device)
+    adb_server.refresh_mdns_availability()
+    adb_server.refresh_network_availability()
+
+
 def _start_adb_server(adb_binary_path: Path) -> AdbServer:
     """
     Instantiate an ADB server bound to the shipped binary (blocking I/O on process start).
@@ -93,6 +102,7 @@ def _start_adb_server(adb_binary_path: Path) -> AdbServer:
             expected=AdbBinary(path=adb_binary_path), actual=actual_binary
         )
         adb_server: AdbServer = AdbServer(binary=adb_binary)
+        _initialize_adb_server(adb_server)
         logger.info(
             "ADB server started",
             adb_path=str(adb_binary.path),
@@ -208,6 +218,7 @@ class StartupCoreRuntimeWork(CoreRuntimeWork[StartupOutcome]):
                 state=adb_state,
                 binary=adb_binary,
             )
+            _initialize_adb_server(adb_server)
             adb_client = MockAdbClient(
                 state=adb_state,
                 binary=adb_binary,

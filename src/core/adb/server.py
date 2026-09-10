@@ -24,7 +24,7 @@ from logger import logger
 
 
 class AdbServer:
-    """ADB Server."""
+    """Side-effect-free ADB daemon facade with explicit lifecycle operations."""
 
     def __init__(self, binary: AdbBinary) -> None:
         self._executor = self._create_executor(binary)
@@ -34,9 +34,6 @@ class AdbServer:
         self._paired_devices: PhoneRepository = PhoneRepository()
         self._mdns_available: bool = False
         self._network_available: bool = False
-        self.start()
-        self.refresh_mdns_availability()
-        self.refresh_network_availability()
 
     @property
     def binary(self) -> AdbBinary:
@@ -155,14 +152,11 @@ class AdbServer:
         return self._network_available
 
     def start(self) -> None:
-        """Start the adb server."""
+        """Start the ADB daemon without performing discovery or capability probes."""
         command = AdbCommands.START_SERVER
         result = self._execute(command.invoke())
         if result.status != AdbCommandResultStatus.SUCCESS:
             raise AdbServerException(f"Failed to start adb server: {result}")
-        # Get known devices
-        for device in self.get_known_devices():
-            self._paired_devices.add(device)
 
     def stop(self) -> None:
         """Stop the adb server."""

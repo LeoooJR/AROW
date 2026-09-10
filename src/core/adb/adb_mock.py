@@ -14,11 +14,9 @@ from core.adb.binary import AdbBinary
 from core.adb.client import AdbClient
 from core.adb.command import (
     AdbCommandInvocation,
-    AdbCommandResultStatus,
     AdbCommands,
     AdbCommandSpec,
 )
-from core.adb.exceptions import AdbServerException
 from core.adb.execution import (
     AdbCommandExecutor,
     AdbTransportFailure,
@@ -503,15 +501,6 @@ class MockAdbServer(AdbServer):
             binary,
             transport=MockAdbTransport(self._state),
         )
-
-    def start(self) -> None:
-        command = AdbCommands.START_SERVER
-        result = self._execute(command.invoke())
-        if result.status != AdbCommandResultStatus.SUCCESS:
-            raise AdbServerException(f"Failed to start adb server: {result}")
-        self._paired_devices.clear()
-        for device in self.get_known_devices():
-            self._paired_devices.add(device)
 
     def refresh_network_availability(self) -> bool:
         """Keep mock workflows independent from host-specific network state."""

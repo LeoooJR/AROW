@@ -228,6 +228,7 @@ def test_authenticate_work_allows_nonmatching_paired_endpoint(
 def test_mock_pair_then_enrich() -> None:
     state = MockAdbState(seed=12345, initial_devices=1)
     server = MockAdbServer(state=state)
+    server.start()
     client = MockAdbClient(state=state)
     outcome = AuthenticateDeviceWork(
         adb_server=server,
@@ -245,6 +246,7 @@ def test_mock_pair_then_enrich() -> None:
 def test_mock_authenticate_retries_protocol_fault_then_enriches_success() -> None:
     state = MockAdbState(seed=222, initial_devices=0)
     server = RestartCountingMockAdbServer(state=state)
+    server.start()
     client = ProtocolFaultOnceMockAdbClient(state=state)
     restart_calls_after_init = server.restart_calls
 
@@ -265,6 +267,7 @@ def test_mock_authenticate_retries_protocol_fault_then_enriches_success() -> Non
 def test_mock_authenticate_non_protocol_failure_raises() -> None:
     state = MockAdbState(seed=333, initial_devices=0)
     server = RestartCountingMockAdbServer(state=state)
+    server.start()
     client = AlwaysFailingMockAdbClient(state=state)
     restart_calls_after_init = server.restart_calls
 

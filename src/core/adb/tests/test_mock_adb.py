@@ -28,7 +28,19 @@ pytestmark = [pytest.mark.mock_adb]
 
 def test_mock_server_reports_mdns_available() -> None:
     server = MockAdbServer(state=MockAdbState(seed=808, initial_devices=1))
+
+    server.refresh_mdns_availability()
+
     assert server.mdns_available is True
+
+
+def test_mock_server_construction_has_no_lifecycle_side_effects() -> None:
+    server = MockAdbServer(state=MockAdbState(seed=806, initial_devices=2))
+
+    assert server.history == {}
+    assert list(server.paired_devices) == []
+    assert server.mdns_available is False
+    assert server.network_available is False
 
 
 def test_mock_runtime_defaults_use_centralized_binary_path() -> None:
@@ -115,12 +127,15 @@ def test_model_entrypoint_mock_startup_ignores_unsupported_real_adb_platform(
     assert outcome.adb_server._executor is not outcome.adb_client._executor
 
 
-def test_mock_server_restart_repopulates_devices() -> None:
+def test_mock_server_restart_preserves_devices_without_rediscovery() -> None:
     state = MockAdbState(seed=7, initial_devices=2)
     server = MockAdbServer(state=state)
-    assert len(server.paired_devices) == 2
+    phone = server.get_known_devices()[0]
+    server.paired_devices.add(phone)
+
     server.restart()
-    assert len(server.paired_devices) == 2
+
+    assert list(server.paired_devices) == [phone]
 
 
 def test_mock_facades_own_executors_and_keep_histories_independent() -> None:
@@ -147,7 +162,7 @@ def test_mock_notification_succeeds_through_public_client_api() -> None:
     state = MockAdbState(seed=811, initial_devices=1)
     server = MockAdbServer(state=state)
     client = MockAdbClient(state=state)
-    phone = next(iter(server.paired_devices))
+    phone = server.get_known_devices()[0]
 
     assert client.send_notification(phone, "Private title", "Private message") is True
 

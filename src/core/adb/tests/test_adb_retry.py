@@ -5,7 +5,6 @@ Unit tests for Tenacity-backed ADB subprocess retries (no real adb device requir
 from __future__ import annotations
 
 import subprocess
-from collections import OrderedDict
 from pathlib import Path
 
 import pytest
@@ -22,14 +21,13 @@ from core.adb.command import (
     AdbRetryPolicy,
 )
 from core.adb.exceptions import AdbClientException, AdbServerException
-from core.adb.execution import AdbCommandExecutor
 from core.adb.retry import (
     _AdbRetryProfile,
     _is_retryable_adb_exception,
     retry_profile_for,
 )
 from core.adb.server import AdbServer
-from core.devices.phone import Phone, PhoneRepository
+from core.devices.phone import Phone
 
 
 def _fast_profile(command: AdbCommandSpec[object]) -> _AdbRetryProfile:
@@ -63,16 +61,12 @@ def adb_client(monkeypatch: pytest.MonkeyPatch) -> AdbClient:
 
 @pytest.fixture
 def adb_server(monkeypatch: pytest.MonkeyPatch) -> AdbServer:
-    """AdbServer built without __init__ side effects and fast retry profile."""
+    """Side-effect-free AdbServer with a fast retry profile."""
     monkeypatch.setattr(
         "core.adb.retry.retry_profile_for",
         _fast_profile,
     )
-    server = object.__new__(AdbServer)
-    server._executor = AdbCommandExecutor(AdbBinary(path=Path("/mock/adb")))
-    server._history = OrderedDict()
-    server.paired_devices = PhoneRepository()
-    return server
+    return AdbServer(AdbBinary(path=Path("/mock/adb")))
 
 
 def _completed_process(

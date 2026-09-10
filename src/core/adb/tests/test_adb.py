@@ -31,9 +31,8 @@ from core.adb.command import (
     _log_safe_output_preview,
 )
 from core.adb.exceptions import AdbServerException
-from core.adb.execution import AdbCommandExecutor
 from core.adb.server import AdbServer
-from core.devices.phone import Phone, PhoneRepository
+from core.devices.phone import Phone
 from core.geo.location import Location
 
 pytestmark = [pytest.mark.adb, pytest.mark.adb_server]
@@ -103,14 +102,8 @@ def invalid_adb_binary() -> AdbBinary:
 
 @pytest.fixture
 def server(adb_binary: AdbBinary) -> AdbServer:
-    """Build an AdbServer instance without triggering __init__ side effects."""
-    server = object.__new__(AdbServer)
-    server._executor = AdbCommandExecutor(adb_binary)
-    server._history = OrderedDict()
-    server.paired_devices = PhoneRepository()
-    server._mdns_available = False
-    server._network_available = False
-    return server
+    """Build a side-effect-free AdbServer instance."""
+    return AdbServer(adb_binary)
 
 
 def _completed_process(
@@ -125,10 +118,10 @@ def _completed_process(
 class TestAdbServerStartSuccess:
     """ADB start-server success cases."""
 
-    def test_server_init_calls_start_then_refreshes_mdns(
+    def test_server_init_has_no_external_side_effects(
         self, adb_binary: AdbBinary, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """AdbServer.__init__ starts gently before refreshing advisory mDNS state."""
+        """AdbServer construction only establishes in-memory state."""
         calls: list[str] = []
 
         def fake_start(self: AdbServer) -> None:
@@ -156,20 +149,20 @@ class TestAdbServerStartSuccess:
             fake_refresh_network_availability,
         )
         server = AdbServer(adb_binary)
-        assert server.binary == adb_binary
-        assert calls == [
-            "start",
-            "refresh_mdns_availability",
-            "refresh_network_availability",
-        ]
-        assert server.mdns_available is True
-        assert server.network_available is True
 
-    def test_server_start_adds_known_devices(
+        assert server.binary == adb_binary
+        assert calls == []
+        assert server.history == OrderedDict()
+        assert list(server.paired_devices) == []
+        assert server.mdns_available is False
+        assert server.network_available is False
+
+    def test_server_start_only_starts_daemon(
         self, server: AdbServer, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """start() records the command result and stores known devices."""
+        """start() records only the daemon lifecycle command."""
         phone = Phone(id="abc123", name="device:Pixel", state="device")
+        server.paired_devices.add(phone)
 
         def fake_execute(
             invocation: AdbCommandInvocation[object],
@@ -184,11 +177,48 @@ class TestAdbServerStartSuccess:
             return result
 
         monkeypatch.setattr(server, "_execute", fake_execute)
-        monkeypatch.setattr(server, "get_known_devices", lambda: [phone])
+        monkeypatch.setattr(
+            server,
+            "get_known_devices",
+            lambda: pytest.fail("start must not discover devices"),
+        )
         server.start()
+
         assert server.paired_devices.get("abc123") is phone
+        assert server.get_last_command() is AdbCommands.START_SERVER
         last_result = server.get_last_command_result()
         assert last_result.status == AdbCommandResultStatus.SUCCESS
+
+    def test_server_restart_preserves_paired_devices(
+        self, server: AdbServer, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """restart() performs daemon lifecycle commands without device discovery."""
+        phone = Phone(id="abc123", name="device:Pixel", state="device")
+        server.paired_devices.add(phone)
+        calls: list[AdbCommandSpec[object]] = []
+
+        def fake_execute(
+            invocation: AdbCommandInvocation[object],
+        ) -> AdbCommandResult:
+            calls.append(invocation.spec)
+            return AdbCommandResult(
+                status=AdbCommandResultStatus.SUCCESS,
+                output="",
+                error="",
+                return_code=0,
+            )
+
+        monkeypatch.setattr(server, "_execute", fake_execute)
+        monkeypatch.setattr(
+            server,
+            "get_known_devices",
+            lambda: pytest.fail("restart must not discover devices"),
+        )
+
+        server.restart()
+
+        assert calls == [AdbCommands.KILL_SERVER, AdbCommands.START_SERVER]
+        assert server.paired_devices.get("abc123") is phone
 
     def test_refresh_mdns_availability_sets_property_on_success(
         self, server: AdbServer, monkeypatch: pytest.MonkeyPatch
@@ -534,21 +564,19 @@ class TestAdbServerStartError:
         self, invalid_adb_binary: AdbBinary
     ) -> None:
         """Starting the server with a non-existent binary raises AdbServerException."""
+        server = AdbServer(invalid_adb_binary)
+
         with pytest.raises(
             AdbServerException,
             match="Failed to run ADB binary /nonexistent/path/to/adb",
         ):
-            AdbServer(invalid_adb_binary)
+            server.start()
 
     def test_execute_start_server_fails_when_binary_missing(
         self, invalid_adb_binary: AdbBinary
     ) -> None:
         """Execute start-server with invalid binary raises AdbServerException."""
-        # Build server without calling restart (avoid __init__ restart)
-        server = object.__new__(AdbServer)
-        server._executor = AdbCommandExecutor(invalid_adb_binary)
-        server._history = OrderedDict()
-        server.paired_devices = PhoneRepository()
+        server = AdbServer(invalid_adb_binary)
         with pytest.raises(
             AdbServerException, match="Failed to run ADB binary|Failed to execute"
         ):
@@ -565,10 +593,7 @@ class TestAdbServerKillError:
         self, invalid_adb_binary: AdbBinary
     ) -> None:
         """Execute kill-server with invalid binary raises AdbServerException."""
-        server = object.__new__(AdbServer)
-        server._executor = AdbCommandExecutor(invalid_adb_binary)
-        server._history = OrderedDict()
-        server.paired_devices = PhoneRepository()
+        server = AdbServer(invalid_adb_binary)
         with pytest.raises(
             AdbServerException, match="Failed to run ADB binary|Failed to execute"
         ):
