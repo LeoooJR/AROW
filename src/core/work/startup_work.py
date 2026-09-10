@@ -204,8 +204,14 @@ class StartupCoreRuntimeWork(CoreRuntimeWork[StartupOutcome]):
             seed = mock_adb_seed_from_env()
             adb_state = MockAdbState(seed=seed)
             adb_binary = AdbBinary(path=self._adb_binary_path)
-            adb_server = MockAdbServer(state=adb_state, binary=adb_binary)
-            adb_client = MockAdbClient(state=adb_state, binary=adb_binary)
+            adb_server = MockAdbServer(
+                state=adb_state,
+                binary=adb_binary,
+            )
+            adb_client = MockAdbClient(
+                state=adb_state,
+                binary=adb_binary,
+            )
             logger.info(
                 "Mock ADB runtime initialized",
                 adb_path=str(adb_binary.path),

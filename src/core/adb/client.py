@@ -1,9 +1,6 @@
 from __future__ import annotations
 
 import datetime
-
-# ADB is an external binary; execution is centralized below with list argv and no shell.
-import subprocess  # nosec B404
 from collections import OrderedDict
 from dataclasses import replace
 
@@ -15,20 +12,12 @@ from core.adb.command import (
     AdbCommandResultStatus,
     AdbCommands,
     AdbCommandSpec,
-    _log_safe_argv,
-    _log_safe_command_line,
-    _log_safe_output_preview,
     _redacted_log_value,
 )
 from core.adb.exceptions import AdbClientException
+from core.adb.execution import AdbCommandExecutor
 from core.adb.parser import ShellEnrichmentProperties, parse_device_state_from_listing
-from core.adb.retry import (
-    adb_status_from_process,
-    adb_status_from_timeout,
-    execute_with_adb_retry,
-    raise_client_for_result,
-    timeout_seconds_for,
-)
+from core.adb.retry import raise_client_for_result
 from core.devices.phone import Phone
 from core.geo.location import Location
 from logger import logger
@@ -37,11 +26,20 @@ from logger import logger
 class AdbClient:
     """Client to execute adb commands."""
 
-    def __init__(self, binary: AdbBinary):
-        self.binary = binary
+    def __init__(self, binary: AdbBinary) -> None:
+        self._executor = self._create_executor(binary)
         self._history: OrderedDict[
             datetime.datetime, tuple[AdbCommandSpec[object], AdbCommandResult]
         ] = OrderedDict()
+
+    @property
+    def binary(self) -> AdbBinary:
+        """Return the ADB binary used by this client."""
+        return self._executor.binary
+
+    def _create_executor(self, binary: AdbBinary) -> AdbCommandExecutor:
+        """Create the command executor owned by this client."""
+        return AdbCommandExecutor(binary)
 
     @property
     def history(
@@ -313,21 +311,11 @@ class AdbClient:
         Execute a command with Tenacity-backed retries on transient subprocess failures.
         """
         command = invocation.spec
-        phone_id = phone.descriptor.id if phone else None
-
-        def _attempt(timeout_seconds: float) -> AdbCommandResult:
-            return self._run_once(
-                invocation,
-                phone=phone,
-                timeout_seconds=timeout_seconds,
-            )
-
         try:
-            result = execute_with_adb_retry(
-                command,
+            result = self._executor.execute(
+                invocation,
                 scope="client",
-                phone_id=phone_id,
-                attempt=_attempt,
+                phone=phone,
             )
         except AdbClientException as exc:
             if phone is None:
@@ -347,92 +335,15 @@ class AdbClient:
         self.add_to_history(command, result_with_diagnostic)
         return result_with_diagnostic
 
-    def _run_once(
-        self,
-        invocation: AdbCommandInvocation[object],
-        *,
-        phone: Phone | None,
-        timeout_seconds: float,
-    ) -> AdbCommandResult:
-        """Run one bounded ADB subprocess attempt without applying retry policy."""
-        command = invocation.spec
-        phone_id = phone.descriptor.id if phone else None
-        argv = invocation.argv(self.binary.path, device_id=phone_id)
-        logger.debug(
-            "ADB client command started",
-            adb_path=str(self.binary.path),
-            command=command.argv[0],
-            phone_id=_redacted_log_value(phone_id),
-            argv=_log_safe_argv(invocation, self.binary.path, device_id=phone_id),
-            command_line=_log_safe_command_line(
-                invocation, self.binary.path, device_id=phone_id
-            ),
-            timeout_s=timeout_seconds,
-        )
-        try:
-            # ADB execution uses list argv, no shell, and a bounded timeout.
-            completed = subprocess.run(  # nosec B603
-                argv,
-                capture_output=True,
-                text=True,
-                timeout=timeout_seconds,
-            )
-        except subprocess.TimeoutExpired as exc:
-            error = f"timed out after {timeout_seconds}s"
-            logger.debug(
-                "ADB client command timed out",
-                adb_path=str(self.binary.path),
-                command=command.argv[0],
-                phone_id=_redacted_log_value(phone_id),
-                error=error,
-            )
-            return AdbCommandResult(
-                status=adb_status_from_timeout(),
-                phone=phone,
-                time=datetime.datetime.now(),
-                output=exc.output or "",
-                error=error,
-                return_code=1,
-            )
-        except subprocess.CalledProcessError as exc:
-            raise AdbClientException(
-                f"Failed to execute command: {command.argv}"
-            ) from exc
-        except OSError as exc:
-            raise AdbClientException(
-                f"Failed to run ADB binary {self.binary.path}"
-            ) from exc
-        logger.debug(
-            "ADB client command completed",
-            adb_path=str(self.binary.path),
-            command=command.argv[0],
-            return_code=completed.returncode,
-            stdout=_log_safe_output_preview(completed.stdout.strip(), command),
-            stderr=_log_safe_output_preview(completed.stderr.strip(), command),
-        )
-        return AdbCommandResult(
-            status=adb_status_from_process(
-                return_code=completed.returncode,
-                output=completed.stdout or "",
-                error=completed.stderr or "",
-            ),
-            phone=phone,
-            time=datetime.datetime.now(),
-            output=completed.stdout or "",
-            error=completed.stderr or "",
-            return_code=completed.returncode,
-        )
-
     def _diagnose_phone_reference(
         self, phone: Phone, failed_command: AdbCommandSpec[object]
     ) -> str:
         """Check once whether a failed command's target remains listed by ADB."""
         devices_command = AdbCommands.GET_DEVICES
         try:
-            result = self._run_once(
+            result = self._executor.execute_once(
                 devices_command.invoke(),
-                phone=None,
-                timeout_seconds=timeout_seconds_for(devices_command),
+                scope="client",
             )
         except AdbClientException:
             logger.warning(

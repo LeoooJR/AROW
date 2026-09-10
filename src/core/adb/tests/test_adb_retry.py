@@ -22,6 +22,7 @@ from core.adb.command import (
     AdbRetryPolicy,
 )
 from core.adb.exceptions import AdbClientException, AdbServerException
+from core.adb.execution import AdbCommandExecutor
 from core.adb.retry import (
     _AdbRetryProfile,
     _is_retryable_adb_exception,
@@ -68,7 +69,7 @@ def adb_server(monkeypatch: pytest.MonkeyPatch) -> AdbServer:
         _fast_profile,
     )
     server = object.__new__(AdbServer)
-    server.binary = AdbBinary(path=Path("/mock/adb"))
+    server._executor = AdbCommandExecutor(AdbBinary(path=Path("/mock/adb")))
     server._history = OrderedDict()
     server.paired_devices = PhoneRepository()
     return server

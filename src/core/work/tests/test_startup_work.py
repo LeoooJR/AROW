@@ -71,6 +71,14 @@ def test_ensure_adb_binary_executable_passes_for_executable_file(
     startup_work._ensure_adb_binary_executable(adb_path)
 
 
+def test_create_adb_client_owns_its_executor(tmp_path: Path) -> None:
+    binary_path = tmp_path / "adb"
+
+    client = startup_work._create_adb_client(binary_path)
+
+    assert client._executor.binary.path == binary_path
+
+
 def test_ensure_adb_binary_executable_raises_for_non_executable_file(
     tmp_path: Path,
 ) -> None:
@@ -181,7 +189,11 @@ def test_startup_reuses_server_paired_devices_after_start(
     assert server.get_known_devices_calls == 1
 
     monkeypatch.setattr(startup_work, "_start_adb_server", lambda _path: server)
-    monkeypatch.setattr(startup_work, "_create_adb_client", lambda _path: client)
+    monkeypatch.setattr(
+        startup_work,
+        "_create_adb_client",
+        lambda _path: client,
+    )
 
     outcome = _startup_work(application_paths, use_mock_adb=False).run()
 
@@ -303,7 +315,9 @@ def test_startup_apply_restores_last_active_device_after_adb_id_rebind(
     rebound_client = MockAdbClient(state=rebound_state)
     monkeypatch.setattr(startup_work, "_start_adb_server", lambda _path: rebound_server)
     monkeypatch.setattr(
-        startup_work, "_create_adb_client", lambda _path: rebound_client
+        startup_work,
+        "_create_adb_client",
+        lambda _path: rebound_client,
     )
     monkeypatch.setattr(
         startup_work,

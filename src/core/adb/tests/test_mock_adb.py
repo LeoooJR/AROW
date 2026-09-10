@@ -11,7 +11,13 @@ import pytest
 
 from application_paths import APPLICATION_PATHS, ApplicationPaths
 from core import ADB_BINARY_BUILD_NUMBER, ADB_BINARY_BUILD_VERSION, ADB_BINARY_VERSION
-from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
+from core.adb.adb_mock import (
+    MockAdbClient,
+    MockAdbServer,
+    MockAdbState,
+    MockAdbTransport,
+)
+from core.adb.binary import AdbBinary
 from core.adb.command import AdbCommands, AdbCommandSpec, AdbRetryPolicy
 from core.adb.exceptions import AdbClientException
 from core.entrypoint import ModelEntrypoint
@@ -106,6 +112,7 @@ def test_model_entrypoint_mock_startup_ignores_unsupported_real_adb_platform(
     assert isinstance(outcome.adb_client, MockAdbClient)
     assert outcome.adb_server.binary.path == paths.mock_adb_binary
     assert outcome.adb_client.binary.path == paths.mock_adb_binary
+    assert outcome.adb_server._executor is not outcome.adb_client._executor
 
 
 def test_mock_server_restart_repopulates_devices() -> None:
@@ -114,6 +121,26 @@ def test_mock_server_restart_repopulates_devices() -> None:
     assert len(server.paired_devices) == 2
     server.restart()
     assert len(server.paired_devices) == 2
+
+
+def test_mock_facades_own_executors_and_keep_histories_independent() -> None:
+    state = MockAdbState(seed=813, initial_devices=1)
+    binary = AdbBinary(path=APPLICATION_PATHS.mock_adb_binary)
+    server = MockAdbServer(state=state, binary=binary)
+    client = MockAdbClient(state=state, binary=binary)
+    server_history_size = len(server.history)
+
+    client.devices()
+
+    assert server._executor is not client._executor
+    server_transport = server._executor.transport
+    client_transport = client._executor.transport
+    assert isinstance(server_transport, MockAdbTransport)
+    assert isinstance(client_transport, MockAdbTransport)
+    assert server_transport.state is state
+    assert client_transport.state is state
+    assert len(server.history) == server_history_size
+    assert list(client.history.values())[-1][0] is AdbCommands.GET_DEVICES
 
 
 def test_mock_notification_succeeds_through_public_client_api() -> None:

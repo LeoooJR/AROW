@@ -31,6 +31,7 @@ from core.adb.command import (
     _log_safe_output_preview,
 )
 from core.adb.exceptions import AdbServerException
+from core.adb.execution import AdbCommandExecutor
 from core.adb.server import AdbServer
 from core.devices.phone import Phone, PhoneRepository
 from core.geo.location import Location
@@ -104,7 +105,7 @@ def invalid_adb_binary() -> AdbBinary:
 def server(adb_binary: AdbBinary) -> AdbServer:
     """Build an AdbServer instance without triggering __init__ side effects."""
     server = object.__new__(AdbServer)
-    server.binary = adb_binary
+    server._executor = AdbCommandExecutor(adb_binary)
     server._history = OrderedDict()
     server.paired_devices = PhoneRepository()
     server._mdns_available = False
@@ -545,7 +546,7 @@ class TestAdbServerStartError:
         """Execute start-server with invalid binary raises AdbServerException."""
         # Build server without calling restart (avoid __init__ restart)
         server = object.__new__(AdbServer)
-        server.binary = invalid_adb_binary
+        server._executor = AdbCommandExecutor(invalid_adb_binary)
         server._history = OrderedDict()
         server.paired_devices = PhoneRepository()
         with pytest.raises(
@@ -565,7 +566,7 @@ class TestAdbServerKillError:
     ) -> None:
         """Execute kill-server with invalid binary raises AdbServerException."""
         server = object.__new__(AdbServer)
-        server.binary = invalid_adb_binary
+        server._executor = AdbCommandExecutor(invalid_adb_binary)
         server._history = OrderedDict()
         server.paired_devices = PhoneRepository()
         with pytest.raises(
