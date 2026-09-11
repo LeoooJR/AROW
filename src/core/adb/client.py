@@ -1,37 +1,25 @@
 from __future__ import annotations
 
-import datetime
-
-# ADB is an external binary; execution is centralized below with list argv and no shell.
-import subprocess  # nosec B404
-from collections import OrderedDict
 from dataclasses import replace
 
 from core.adb.binary import AdbBinary
 from core.adb.command import (
-    ADB_HISTORY_MAX_ENTRIES,
-    AdbCommand,
+    AdbCommandInvocation,
     AdbCommandResult,
     AdbCommandResultStatus,
     AdbCommands,
-    _log_safe_argv,
-    _log_safe_command_line,
-    _log_safe_output_preview,
+    AdbCommandSpec,
     _redacted_log_value,
 )
 from core.adb.exceptions import AdbClientException
-from core.adb.parser import (
-    ADBCommandParser,
-    ShellEnrichmentProperties,
-    parse_device_state_from_listing,
+from core.adb.execution import AdbCommandExecutor
+from core.adb.history import (
+    AdbCommandHistory,
+    AdbCommandHistoryEntries,
+    AdbCommandHistoryManager,
 )
-from core.adb.retry import (
-    adb_status_from_process,
-    adb_status_from_timeout,
-    execute_with_adb_retry,
-    raise_client_for_result,
-    timeout_seconds_for,
-)
+from core.adb.parser import ShellEnrichmentProperties, parse_device_state_from_listing
+from core.adb.retry import raise_client_for_result
 from core.devices.phone import Phone
 from core.geo.location import Location
 from logger import logger
@@ -40,63 +28,60 @@ from logger import logger
 class AdbClient:
     """Client to execute adb commands."""
 
-    def __init__(self, binary: AdbBinary):
-        self.binary = binary
-        self._history: OrderedDict[
-            datetime.datetime, tuple[AdbCommand, AdbCommandResult]
-        ] = OrderedDict()
+    def __init__(self, binary: AdbBinary) -> None:
+        self._executor = self._create_executor(binary)
+        self._history_manager = AdbCommandHistoryManager()
 
     @property
-    def history(
-        self,
-    ) -> OrderedDict[datetime.datetime, tuple[AdbCommand, AdbCommandResult]]:
+    def binary(self) -> AdbBinary:
+        """Return the ADB binary used by this client."""
+        return self._executor.binary
+
+    def _create_executor(self, binary: AdbBinary) -> AdbCommandExecutor:
+        """Create the command executor owned by this client."""
+        return AdbCommandExecutor(binary)
+
+    @property
+    def history(self) -> AdbCommandHistory:
         """Get the history of the adb client."""
-        return self._history
+        return self._history_manager.history
 
     @history.setter
     def history(
         self,
-        history: OrderedDict[datetime.datetime, tuple[AdbCommand, AdbCommandResult]],
+        history: AdbCommandHistoryEntries,
     ) -> None:
         """Set the history of the adb client."""
-        self._history = history
+        self._history_manager.replace(history)
 
     @history.deleter
     def history(self) -> None:
         """Delete the history of the adb client."""
-        self._history.clear()
+        self._history_manager.clear()
 
-    def add_to_history(self, command: AdbCommand, result: AdbCommandResult) -> None:
+    def add_to_history(
+        self, command: AdbCommandSpec[object], result: AdbCommandResult
+    ) -> None:
         """Add to the history of the adb client."""
-        self._history[datetime.datetime.now()] = (command, result)
-        self._prune_history()
+        self._history_manager.add(command, result)
 
-    def _prune_history(self) -> None:
-        """Keep newest client history entries by dropping oldest entries first."""
-        while len(self._history) > ADB_HISTORY_MAX_ENTRIES:
-            self._history.popitem(last=False)
-
-    def remove_from_history(self, command: AdbCommand) -> None:
+    def remove_from_history(self, command: AdbCommandSpec[object]) -> None:
         """Remove from the history of the adb client."""
-        self._history = OrderedDict(
-            (time, entry)
-            for time, entry in self._history.items()
-            if entry[0] != command
-        )
+        self._history_manager.remove(command)
 
     def status(self, phone: Phone) -> str:
         """
         Read the ADB connection state of a specific device via ``adb -s <id> get-state``.
         """
-        command = AdbCommands.STATUS.value
+        command = AdbCommands.STATUS
         try:
-            result = self._execute(command, phone)
+            result = self._execute(command.invoke(), phone)
             raise_client_for_result(command, result)
         except AdbClientException as exc:
             raise AdbClientException(
                 f"Failed to get device state for {phone.descriptor.id}: {exc}"
             ) from exc
-        state = (result.output or "").strip()
+        state = command.parse(result.output or "")
         if not state:
             raise AdbClientException(
                 f"Empty device state from get-state for {phone.descriptor.id}"
@@ -107,14 +92,14 @@ class AdbClient:
         """
         Pair with a device and return a ``Phone`` parsed from adb output (``guid=`` id).
         """
-        command = AdbCommands.PAIR.value
+        command = AdbCommands.PAIR
         try:
-            result = self._execute(command, None, [f"{ip}:{port}", association_code])
+            result = self._execute(command.invoke(f"{ip}:{port}", association_code))
         except AdbClientException:
             raise
         raise_client_for_result(command, result)
         combined = f"{result.output or ''}\n{result.error or ''}".strip()
-        phone = ADBCommandParser.PAIR.parse(combined)
+        phone = command.parse(combined)
         if phone is None:
             snippet = combined if len(combined) <= 500 else combined[:500] + "…"
             raise AdbClientException(
@@ -125,13 +110,13 @@ class AdbClient:
 
     def devices(self) -> list[Phone]:
         """Get the devices."""
-        command = AdbCommands.GET_DEVICES.value
+        command = AdbCommands.GET_DEVICES
         try:
-            result = self._execute(command, None)
+            result = self._execute(command.invoke())
         except AdbClientException:
             raise
         raise_client_for_result(command, result)
-        return ADBCommandParser.GET_DEVICES.parse(result.output or "")
+        return command.parse(result.output or "")
 
     def send_notification(self, phone: Phone, title: str, message: str) -> bool:
         """
@@ -145,23 +130,26 @@ class AdbClient:
         Returns:
             bool: True if the notification was sent successfully, False otherwise
         """
-        command = AdbCommands.SEND_NOTIFICATION.value
+        command = AdbCommands.SEND_NOTIFICATION
         try:
-            result = self._execute(command, phone, ["-t", title, "-m", message])
+            result = self._execute(
+                command.invoke("-t", title, "-m", message),
+                phone,
+            )
         except AdbClientException:
             raise
         raise_client_for_result(command, result)
-        return ADBCommandParser.SEND_NOTIFICATION.parse(result.output or "")
+        return command.parse(result.output or "")
 
     def enable_location_services(self) -> None:
-        pass
+        raise NotImplementedError("Enabling location services is not implemented")
 
     def disable_location_services(self) -> None:
-        pass
+        raise NotImplementedError("Disabling location services is not implemented")
 
     def set_mock_location(self, location: Location) -> None:
         """Define a fake GPS location."""
-        pass
+        raise NotImplementedError("Setting a mock location is not implemented")
 
     def get_ro_serialno(self, phone: Phone) -> str:
         """
@@ -169,9 +157,9 @@ class AdbClient:
 
         Returns stripped stdout or empty string on failure.
         """
-        command = AdbCommands.GET_SERIAL_NO.value
+        command = AdbCommands.GET_SERIAL_NO
         try:
-            result = self._execute(command, phone)
+            result = self._execute(command.invoke(), phone)
             raise_client_for_result(command, result)
         except AdbClientException as exc:
             logger.debug(
@@ -180,7 +168,7 @@ class AdbClient:
                 error=str(exc),
             )
             return ""
-        parsed = ADBCommandParser.GET_SERIAL_NO.parse(result.output or "")
+        parsed = command.parse(result.output or "")
         if not parsed:
             return ""
         out = parsed.strip()
@@ -197,9 +185,9 @@ class AdbClient:
         """
         ``adb -s <id> shell getprop device_name``. Returns stripped value or ``""`` on failure.
         """
-        command = AdbCommands.GET_DEVICE_NAME.value
+        command = AdbCommands.GET_DEVICE_NAME
         try:
-            result = self._execute(command, phone)
+            result = self._execute(command.invoke(), phone)
             raise_client_for_result(command, result)
         except AdbClientException as exc:
             logger.debug(
@@ -208,16 +196,16 @@ class AdbClient:
                 error=str(exc),
             )
             return ""
-        parsed = ADBCommandParser.GET_DEVICE_NAME.parse(result.output or "")
+        parsed = command.parse(result.output or "")
         return (parsed or "").strip()
 
     def get_android_release(self, phone: Phone) -> str:
         """
         ``ro.build.version.release`` — Android version string (e.g. ``"15"``).
         """
-        command = AdbCommands.GET_ANDROID_VERSION.value
+        command = AdbCommands.GET_ANDROID_VERSION
         try:
-            result = self._execute(command, phone)
+            result = self._execute(command.invoke(), phone)
             raise_client_for_result(command, result)
         except AdbClientException as exc:
             logger.debug(
@@ -226,14 +214,14 @@ class AdbClient:
                 error=str(exc),
             )
             return ""
-        parsed = ADBCommandParser.GET_ANDROID_VERSION.parse(result.output or "")
+        parsed = command.parse(result.output or "")
         return (parsed or "").strip()
 
     def get_product_manufacturer(self, phone: Phone) -> str:
         """``ro.product.manufacturer``."""
-        command = AdbCommands.GET_MANUFACTURER.value
+        command = AdbCommands.GET_MANUFACTURER
         try:
-            result = self._execute(command, phone)
+            result = self._execute(command.invoke(), phone)
             raise_client_for_result(command, result)
         except AdbClientException as exc:
             logger.debug(
@@ -242,14 +230,14 @@ class AdbClient:
                 error=str(exc),
             )
             return ""
-        parsed = ADBCommandParser.GET_MANUFACTURER.parse(result.output or "")
+        parsed = command.parse(result.output or "")
         return (parsed or "").strip()
 
     def get_product_model(self, phone: Phone) -> str:
         """``ro.product.model`` (commercial model string)."""
-        command = AdbCommands.GET_PRODUCT_MODEL.value
+        command = AdbCommands.GET_PRODUCT_MODEL
         try:
-            result = self._execute(command, phone)
+            result = self._execute(command.invoke(), phone)
             raise_client_for_result(command, result)
         except AdbClientException as exc:
             logger.debug(
@@ -258,14 +246,14 @@ class AdbClient:
                 error=str(exc),
             )
             return ""
-        parsed = ADBCommandParser.GET_PRODUCT_MODEL.parse(result.output or "")
+        parsed = command.parse(result.output or "")
         return (parsed or "").strip()
 
     def get_android_sdk_api_level(self, phone: Phone) -> int | None:
         """``ro.build.version.sdk`` as integer API level, or ``None`` if unreadable."""
-        command = AdbCommands.GET_SDK_VERSION.value
+        command = AdbCommands.GET_SDK_VERSION
         try:
-            result = self._execute(command, phone)
+            result = self._execute(command.invoke(), phone)
             raise_client_for_result(command, result)
         except AdbClientException as exc:
             logger.debug(
@@ -274,7 +262,7 @@ class AdbClient:
                 error=str(exc),
             )
             return None
-        return ADBCommandParser.GET_SDK_VERSION.parse(result.output or "")
+        return command.parse(result.output or "")
 
     def get_shell_enrichment_properties(
         self, phone: Phone
@@ -285,9 +273,9 @@ class AdbClient:
         Returns empty-string/``None`` values when the command fails so refresh paths can
         preserve the existing best-effort enrichment behavior.
         """
-        command = AdbCommands.GET_SHELL_ENRICHMENT_PROPERTIES.value
+        command = AdbCommands.GET_SHELL_ENRICHMENT_PROPERTIES
         try:
-            result = self._execute(command, phone)
+            result = self._execute(command.invoke(), phone)
             raise_client_for_result(command, result)
         except AdbClientException as exc:
             logger.warning(
@@ -295,37 +283,23 @@ class AdbClient:
                 device_id=phone.descriptor.id,
                 error=str(exc),
             )
-            return ADBCommandParser.GET_SHELL_ENRICHMENT_PROPERTIES.parse("")
-        return ADBCommandParser.GET_SHELL_ENRICHMENT_PROPERTIES.parse(
-            result.output or ""
-        )
+            return command.parse("")
+        return command.parse(result.output or "")
 
     def _execute(
         self,
-        command: AdbCommand,
+        invocation: AdbCommandInvocation[object],
         phone: Phone | None = None,
-        positional_arguments: list[str] | None = None,
     ) -> AdbCommandResult:
         """
         Execute a command with Tenacity-backed retries on transient subprocess failures.
         """
-        positional_arguments = positional_arguments or []
-        phone_id = phone.descriptor.id if phone else None
-
-        def _attempt(timeout_seconds: float) -> AdbCommandResult:
-            return self._run_once(
-                command,
-                phone=phone,
-                positional_arguments=positional_arguments,
-                timeout_seconds=timeout_seconds,
-            )
-
+        command = invocation.spec
         try:
-            result = execute_with_adb_retry(
-                command,
+            result = self._executor.execute(
+                invocation,
                 scope="client",
-                phone_id=phone_id,
-                attempt=_attempt,
+                phone=phone,
             )
         except AdbClientException as exc:
             if phone is None:
@@ -345,102 +319,20 @@ class AdbClient:
         self.add_to_history(command, result_with_diagnostic)
         return result_with_diagnostic
 
-    def _run_once(
-        self,
-        command: AdbCommand,
-        *,
-        phone: Phone | None,
-        positional_arguments: list[str],
-        timeout_seconds: float,
-    ) -> AdbCommandResult:
-        """Run one bounded ADB subprocess attempt without applying retry policy."""
-        argv: list[str] = [str(self.binary.path)]
-        if phone is not None:
-            argv.extend(["-s", phone.descriptor.id])
-        argv.extend([command.command, *command.args, *positional_arguments])
-        phone_id = phone.descriptor.id if phone else None
-        logger.debug(
-            "ADB client command started",
-            adb_path=str(self.binary.path),
-            command=command.command,
-            phone_id=_redacted_log_value(phone_id),
-            argv=_log_safe_argv(command, argv),
-            command_line=_log_safe_command_line(command, argv),
-            timeout_s=timeout_seconds,
-        )
-        try:
-            # ADB execution uses list argv, no shell, and a bounded timeout.
-            completed = subprocess.run(  # nosec B603
-                argv,
-                capture_output=True,
-                text=True,
-                timeout=timeout_seconds,
-            )
-        except subprocess.TimeoutExpired as exc:
-            error = f"timed out after {timeout_seconds}s"
-            logger.debug(
-                "ADB client command timed out",
-                adb_path=str(self.binary.path),
-                command=command.command,
-                phone_id=_redacted_log_value(phone_id),
-                error=error,
-            )
-            return AdbCommandResult(
-                status=adb_status_from_timeout(),
-                phone=phone,
-                time=datetime.datetime.now(),
-                output=exc.output or "",
-                error=error,
-                return_code=1,
-            )
-        except subprocess.CalledProcessError as exc:
-            raise AdbClientException(
-                f"Failed to execute command: {command.command} {command.args}"
-            ) from exc
-        except OSError as exc:
-            raise AdbClientException(
-                f"Failed to run ADB binary {self.binary.path}"
-            ) from exc
-        logger.debug(
-            "ADB client command completed",
-            adb_path=str(self.binary.path),
-            command=command.command,
-            return_code=completed.returncode,
-            stdout=_log_safe_output_preview(completed.stdout.strip(), command),
-            stderr=_log_safe_output_preview(completed.stderr.strip(), command),
-        )
-        return AdbCommandResult(
-            status=adb_status_from_process(
-                return_code=completed.returncode,
-                output=completed.stdout or "",
-                error=completed.stderr or "",
-            ),
-            phone=phone,
-            time=datetime.datetime.now(),
-            output=completed.stdout or "",
-            error=completed.stderr or "",
-            return_code=completed.returncode,
-        )
-
     def _diagnose_phone_reference(
-        self, phone: Phone, failed_command: AdbCommand
+        self, phone: Phone, failed_command: AdbCommandSpec[object]
     ) -> str:
         """Check once whether a failed command's target remains listed by ADB."""
-        devices_command = AdbCommands.GET_DEVICES.value
+        devices_command = AdbCommands.GET_DEVICES
         try:
-            result = self._run_once(
-                devices_command,
-                phone=None,
-                positional_arguments=[],
-                timeout_seconds=timeout_seconds_for(
-                    devices_command,
-                    scope="client",
-                ),
+            result = self._executor.execute_once(
+                devices_command.invoke(),
+                scope="client",
             )
         except AdbClientException:
             logger.warning(
                 "ADB client failure device reference could not be checked",
-                command=failed_command.command,
+                command=failed_command.argv[0],
                 phone_id=_redacted_log_value(phone.descriptor.id),
                 device_reference="unknown",
                 probe_status="EXCEPTION",
@@ -454,7 +346,7 @@ class AdbClient:
         if result.status != AdbCommandResultStatus.SUCCESS:
             logger.warning(
                 "ADB client failure device reference could not be checked",
-                command=failed_command.command,
+                command=failed_command.argv[0],
                 phone_id=_redacted_log_value(phone.descriptor.id),
                 device_reference="unknown",
                 probe_status=result.status.name,
@@ -471,7 +363,7 @@ class AdbClient:
         if state is None:
             logger.warning(
                 "ADB client failure target device is no longer listed",
-                command=failed_command.command,
+                command=failed_command.argv[0],
                 phone_id=_redacted_log_value(phone.descriptor.id),
                 device_reference="missing",
             )
@@ -479,7 +371,7 @@ class AdbClient:
 
         logger.warning(
             "ADB client failure target device remains listed",
-            command=failed_command.command,
+            command=failed_command.argv[0],
             phone_id=_redacted_log_value(phone.descriptor.id),
             device_reference="present",
             device_state=state,

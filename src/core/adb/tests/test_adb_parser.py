@@ -8,11 +8,7 @@ import pytest
 
 from core import ADB_BINARY_BUILD_NUMBER, ADB_BINARY_BUILD_VERSION, ADB_BINARY_VERSION
 from core.adb.command import AdbCommands
-from core.adb.parser import (
-    ADB_COMMAND_PARSERS,
-    ADBCommandParser,
-    parse_device_state_from_listing,
-)
+from core.adb.parser import parse_device_state_from_listing
 from core.devices.phone import DEFAULT_PHONE_DISPLAY_NAME, Phone
 
 pytestmark = [pytest.mark.adb_parser]
@@ -61,7 +57,7 @@ Running on Darwin 25.5.0 (arm64)
 
 
 def test_get_devices_parser_returns_phone() -> None:
-    phones = ADBCommandParser.GET_DEVICES.parse(OUTPUT_DEVICES)
+    phones = AdbCommands.GET_DEVICES.parse(OUTPUT_DEVICES)
     assert len(phones) == 1
     p = phones[0]
     assert isinstance(p, Phone)
@@ -78,7 +74,7 @@ def test_parse_devices_line_success() -> None:
     blob = """List of devices attached
 abc123 device product:model model:pixel device:Pixel transport_id:1
 """
-    phones = ADBCommandParser.GET_DEVICES.parse(blob)
+    phones = AdbCommands.GET_DEVICES.parse(blob)
     assert len(phones) == 1
     p = phones[0]
     assert isinstance(p, Phone)
@@ -97,7 +93,7 @@ def test_parse_devices_preserves_direct_tcp_endpoint() -> None:
     blob = """List of devices attached
 192.168.1.20:5555 device product:model model:pixel device:Pixel transport_id:1
 """
-    phones = ADBCommandParser.GET_DEVICES.parse(blob)
+    phones = AdbCommands.GET_DEVICES.parse(blob)
 
     assert len(phones) == 1
     phone = phones[0]
@@ -112,7 +108,7 @@ def test_parse_devices_emulator_line() -> None:
     blob = """List of devices attached
 emulator-5554 offline product:sdk model:sdk_gphone device:emulator transport_id:9
 """
-    phones = ADBCommandParser.GET_DEVICES.parse(blob)
+    phones = AdbCommands.GET_DEVICES.parse(blob)
     assert len(phones) == 1
     p = phones[0]
     assert isinstance(p, Phone)
@@ -131,7 +127,7 @@ def test_parse_devices_skips_short_or_malformed_lines() -> None:
 id name os
 emulator-5554 offline product:sdk model:sdk_gphone device:emulator transport_id:9
 """
-    phones = ADBCommandParser.GET_DEVICES.parse(blob)
+    phones = AdbCommands.GET_DEVICES.parse(blob)
     assert len(phones) == 1
     p = phones[0]
     assert isinstance(p, Phone)
@@ -163,7 +159,7 @@ another-device device product:x model:y device:z transport_id:1
 
 
 def test_battery_parser_keys_and_concatenated_log() -> None:
-    d = ADBCommandParser.GET_BATTERY_INFOS.parse(OUTPUT_BATTERY)
+    d = AdbCommands.GET_BATTERY_INFOS.parse(OUTPUT_BATTERY)
     assert d["level"] == 54
     assert d["scale"] == 100
     assert d["ac_powered"] is False
@@ -172,36 +168,36 @@ def test_battery_parser_keys_and_concatenated_log() -> None:
 
 
 def test_window_summary_from_dumpsys_window() -> None:
-    summary = ADBCommandParser.DUMPSYS_WINDOW.parse(WINDOW_SNIPPET)
+    summary = AdbCommands.DUMPSYS_WINDOW.parse(WINDOW_SNIPPET)
     assert summary["m_awake"] is False
     assert summary["m_screen_on_fully"] is False
     assert summary["screen_state"] == "SCREEN_STATE_OFF"
     assert summary["display_size"] == "1080x2412"
-    assert summary["m_current_focus"] is not None
-    assert "NotificationShade" in summary["m_current_focus"]
-    assert summary["m_focused_app"] is not None
-    assert "com.android.settings" in summary["m_focused_app"]
+    current_focus = summary["m_current_focus"]
+    focused_app = summary["m_focused_app"]
+    assert isinstance(current_focus, str)
+    assert "NotificationShade" in current_focus
+    assert isinstance(focused_app, str)
+    assert "com.android.settings" in focused_app
 
 
 def test_scalar_parsers_match_capture_file() -> None:
-    assert ADBCommandParser.GET_ANDROID_VERSION.parse("15\n") == "15"
-    assert ADBCommandParser.GET_MANUFACTURER.parse("HONOR\n") == "HONOR"
-    assert ADBCommandParser.GET_PRODUCT_MODEL.parse("ALT-NX1") == "ALT-NX1"
-    assert ADBCommandParser.GET_SDK_VERSION.parse("35") == 35
-    assert ADBCommandParser.GET_LOCATION_MODE.parse("3") == 3
-    assert ADBCommandParser.GET_DEVICE_NAME.parse("") == ""
-    assert (
-        ADBCommandParser.GET_SERIAL_NO.parse("AYLVBB5220900344\n") == "AYLVBB5220900344"
-    )
+    assert AdbCommands.GET_ANDROID_VERSION.parse("15\n") == "15"
+    assert AdbCommands.GET_MANUFACTURER.parse("HONOR\n") == "HONOR"
+    assert AdbCommands.GET_PRODUCT_MODEL.parse("ALT-NX1") == "ALT-NX1"
+    assert AdbCommands.GET_SDK_VERSION.parse("35") == 35
+    assert AdbCommands.GET_LOCATION_MODE.parse("3") == 3
+    assert AdbCommands.GET_DEVICE_NAME.parse("") == ""
+    assert AdbCommands.GET_SERIAL_NO.parse("AYLVBB5220900344\n") == "AYLVBB5220900344"
 
 
 def test_optional_int_empty() -> None:
-    assert ADBCommandParser.GET_SDK_VERSION.parse("") is None
-    assert ADBCommandParser.GET_SDK_VERSION.parse("   \n") is None
+    assert AdbCommands.GET_SDK_VERSION.parse("") is None
+    assert AdbCommands.GET_SDK_VERSION.parse("   \n") is None
 
 
 def test_shell_enrichment_properties_parser() -> None:
-    parsed = ADBCommandParser.GET_SHELL_ENRICHMENT_PROPERTIES.parse(
+    parsed = AdbCommands.GET_SHELL_ENRICHMENT_PROPERTIES.parse(
         "\n".join(
             [
                 "manufacturer=Google",
@@ -226,17 +222,17 @@ def test_shell_enrichment_properties_parser() -> None:
 
 def test_send_notification_post_confirmation() -> None:
     assert (
-        ADBCommandParser.SEND_NOTIFICATION.parse(
+        AdbCommands.SEND_NOTIFICATION.parse(
             "posting:\n  Notification(channel=*** shortcut=null"
         )
         is True
     )
-    assert ADBCommandParser.SEND_NOTIFICATION.parse("") is False
+    assert AdbCommands.SEND_NOTIFICATION.parse("") is False
 
 
 def test_mdns_check_success_marker() -> None:
     assert (
-        ADBCommandParser.MDNS_CHECK.parse(
+        AdbCommands.MDNS_CHECK.parse(
             "mdns daemon version [Openscreen discovery 0.0.0]\n"
         )
         is True
@@ -245,11 +241,11 @@ def test_mdns_check_success_marker() -> None:
 
 @pytest.mark.parametrize("output", ["", "mdns unavailable\n", "daemon not running\n"])
 def test_mdns_check_unknown_or_failure_output(output: str) -> None:
-    assert ADBCommandParser.MDNS_CHECK.parse(output) is False
+    assert AdbCommands.MDNS_CHECK.parse(output) is False
 
 
 def test_binary_version_parser_extracts_adb_metadata() -> None:
-    parsed = ADBCommandParser.GET_BINARY_VERSION.parse(OUTPUT_ADB_VERSION)
+    parsed = AdbCommands.GET_BINARY_VERSION.parse(OUTPUT_ADB_VERSION)
     assert parsed.version == ADB_BINARY_VERSION
     assert parsed.build_version == ADB_BINARY_BUILD_VERSION
     assert parsed.build_number == ADB_BINARY_BUILD_NUMBER
@@ -257,7 +253,7 @@ def test_binary_version_parser_extracts_adb_metadata() -> None:
 
 
 def test_binary_version_parser_keeps_malformed_build_number_empty() -> None:
-    parsed = ADBCommandParser.GET_BINARY_VERSION.parse(
+    parsed = AdbCommands.GET_BINARY_VERSION.parse(
         "Android Debug Bridge version 1.0.41\n"
         "Version 36.0.0-not-a-number\n"
         "Installed as /mock/adb\n"
@@ -274,7 +270,7 @@ def test_parse_pair_success_builds_phone() -> None:
     out = (
         "Successfully paired to 10.0.0.42:37125 " "[guid=adb-X9ZZ99000012345678-aBc1dE]"
     )
-    phone = ADBCommandParser.PAIR.parse(out)
+    phone = AdbCommands.PAIR.parse(out)
     assert phone is not None
     assert phone.descriptor.id == "adb-X9ZZ99000012345678-aBc1dE"
     assert phone.descriptor.name == f"{DEFAULT_PHONE_DISPLAY_NAME} (8-aBc1dE)"
@@ -293,18 +289,16 @@ def test_parse_pair_success_builds_phone() -> None:
     ],
 )
 def test_parse_pair_case_insensitive_fixed_phrase(line: str) -> None:
-    phone = ADBCommandParser.PAIR.parse(line)
+    phone = AdbCommands.PAIR.parse(line)
     assert phone is not None
     assert phone.descriptor.id == "adb-AA11bb22CC"
     assert phone.descriptor.port == 40000
 
 
 def test_parse_pair_port_boundaries() -> None:
-    low = ADBCommandParser.PAIR.parse(
-        "Successfully paired to 10.0.0.1:1 [guid=adb-low]"
-    )
+    low = AdbCommands.PAIR.parse("Successfully paired to 10.0.0.1:1 [guid=adb-low]")
     assert low is not None and low.descriptor.port == 1
-    high = ADBCommandParser.PAIR.parse(
+    high = AdbCommands.PAIR.parse(
         "Successfully paired to 10.0.0.1:65535 [guid=adb-high]"
     )
     assert high is not None and high.descriptor.port == 65535
@@ -316,7 +310,7 @@ def test_parse_pair_picks_first_matching_line() -> None:
         "Successfully paired to 10.1.1.1:11111 [guid=adb-first]\n"
         "Successfully paired to 10.2.2.2:22222 [guid=adb-second]\n"
     )
-    phone = ADBCommandParser.PAIR.parse(blob)
+    phone = AdbCommands.PAIR.parse(blob)
     assert phone is not None
     assert phone.descriptor.id == "adb-first"
     assert phone.descriptor.ip == "10.1.1.1"
@@ -331,7 +325,7 @@ def test_parse_pair_finds_line_in_mixed_blob() -> None:
         "[guid=adb-QQ77aa000099887766-ZzYy9x]\n"
         "OK\n"
     )
-    phone = ADBCommandParser.PAIR.parse(blob)
+    phone = AdbCommands.PAIR.parse(blob)
     assert phone is not None
     assert phone.descriptor.id == "adb-QQ77aa000099887766-ZzYy9x"
     assert phone.descriptor.ip == "172.16.254.9"
@@ -343,7 +337,7 @@ def test_parse_pair_merged_stdout_stderr_shape() -> None:
     stdout = "adb: protocol message\n"
     stderr = "Successfully paired to 203.0.113.7:49152 [guid=adb-mergeStdStreams01]\n"
     combined = f"{stdout}\n{stderr}".strip()
-    phone = ADBCommandParser.PAIR.parse(combined)
+    phone = AdbCommands.PAIR.parse(combined)
     assert phone is not None
     assert phone.descriptor.id == "adb-mergeStdStreams01"
     assert phone.descriptor.ip == "203.0.113.7"
@@ -368,27 +362,4 @@ def test_parse_pair_merged_stdout_stderr_shape() -> None:
     ],
 )
 def test_parse_pair_invalid_returns_none(invalid: str) -> None:
-    assert ADBCommandParser.PAIR.parse(invalid) is None
-
-
-def test_adb_command_parsers_registry() -> None:
-    expected = {
-        AdbCommands.GET_DEVICES,
-        AdbCommands.GET_ANDROID_VERSION,
-        AdbCommands.GET_MANUFACTURER,
-        AdbCommands.GET_DEVICE_NAME,
-        AdbCommands.GET_PRODUCT_MODEL,
-        AdbCommands.GET_SDK_VERSION,
-        AdbCommands.GET_LOCATION_MODE,
-        AdbCommands.GET_SERIAL_NO,
-        AdbCommands.GET_SHELL_ENRICHMENT_PROPERTIES,
-        AdbCommands.GET_BATTERY_INFOS,
-        AdbCommands.DUMPSYS_WINDOW,
-        AdbCommands.SEND_NOTIFICATION,
-        AdbCommands.MDNS_CHECK,
-        AdbCommands.GET_BINARY_VERSION,
-    }
-    assert set(ADB_COMMAND_PARSERS.keys()) == expected
-    for cmd, parser in ADB_COMMAND_PARSERS.items():
-        assert isinstance(cmd, AdbCommands)
-        assert isinstance(parser, ADBCommandParser)
+    assert AdbCommands.PAIR.parse(invalid) is None

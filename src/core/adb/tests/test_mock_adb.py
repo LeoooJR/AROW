@@ -11,9 +11,15 @@ import pytest
 
 from application_paths import APPLICATION_PATHS, ApplicationPaths
 from core import ADB_BINARY_BUILD_NUMBER, ADB_BINARY_BUILD_VERSION, ADB_BINARY_VERSION
-from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
-from core.adb.command import AdbCommands
-from core.adb.parser import ADBCommandParser
+from core.adb.adb_mock import (
+    MockAdbClient,
+    MockAdbServer,
+    MockAdbState,
+    MockAdbTransport,
+)
+from core.adb.binary import AdbBinary
+from core.adb.command import AdbCommands, AdbCommandSpec, AdbRetryPolicy
+from core.adb.exceptions import AdbClientException
 from core.entrypoint import ModelEntrypoint
 from core.signals import CoreSignal, CoreSignals
 
@@ -22,7 +28,19 @@ pytestmark = [pytest.mark.mock_adb]
 
 def test_mock_server_reports_mdns_available() -> None:
     server = MockAdbServer(state=MockAdbState(seed=808, initial_devices=1))
+
+    server.refresh_mdns_availability()
+
     assert server.mdns_available is True
+
+
+def test_mock_server_construction_has_no_lifecycle_side_effects() -> None:
+    server = MockAdbServer(state=MockAdbState(seed=806, initial_devices=2))
+
+    assert server.history == {}
+    assert list(server.paired_devices) == []
+    assert server.mdns_available is False
+    assert server.network_available is False
 
 
 def test_mock_runtime_defaults_use_centralized_binary_path() -> None:
@@ -34,15 +52,15 @@ def test_mock_runtime_defaults_use_centralized_binary_path() -> None:
 
 def test_mock_server_mdns_check_output_matches_parser() -> None:
     server = MockAdbServer(state=MockAdbState(seed=809, initial_devices=1))
-    result = server._execute(AdbCommands.MDNS_CHECK.value)
+    result = server._execute(AdbCommands.MDNS_CHECK.invoke())
 
-    assert ADBCommandParser.MDNS_CHECK.parse(result.output) is True
+    assert AdbCommands.MDNS_CHECK.parse(result.output) is True
 
 
 def test_mock_server_binary_version_output_matches_parser() -> None:
     server = MockAdbServer(state=MockAdbState(seed=810, initial_devices=1))
-    result = server._execute(AdbCommands.GET_BINARY_VERSION.value)
-    parsed = ADBCommandParser.GET_BINARY_VERSION.parse(result.output)
+    result = server._execute(AdbCommands.GET_BINARY_VERSION.invoke())
+    parsed = AdbCommands.GET_BINARY_VERSION.parse(result.output)
 
     assert parsed.version == ADB_BINARY_VERSION
     assert parsed.build_version == ADB_BINARY_BUILD_VERSION
@@ -106,11 +124,58 @@ def test_model_entrypoint_mock_startup_ignores_unsupported_real_adb_platform(
     assert isinstance(outcome.adb_client, MockAdbClient)
     assert outcome.adb_server.binary.path == paths.mock_adb_binary
     assert outcome.adb_client.binary.path == paths.mock_adb_binary
+    assert outcome.adb_server._executor is not outcome.adb_client._executor
 
 
-def test_mock_server_restart_repopulates_devices() -> None:
+def test_mock_server_restart_preserves_devices_without_rediscovery() -> None:
     state = MockAdbState(seed=7, initial_devices=2)
     server = MockAdbServer(state=state)
-    assert len(server.paired_devices) == 2
+    phone = server.get_known_devices()[0]
+    server.paired_devices.add(phone)
+
     server.restart()
-    assert len(server.paired_devices) == 2
+
+    assert list(server.paired_devices) == [phone]
+
+
+def test_mock_facades_own_executors_and_keep_histories_independent() -> None:
+    state = MockAdbState(seed=813, initial_devices=1)
+    binary = AdbBinary(path=APPLICATION_PATHS.mock_adb_binary)
+    server = MockAdbServer(state=state, binary=binary)
+    client = MockAdbClient(state=state, binary=binary)
+    server_history_size = len(server.history)
+
+    client.devices()
+
+    assert server._executor is not client._executor
+    server_transport = server._executor.transport
+    client_transport = client._executor.transport
+    assert isinstance(server_transport, MockAdbTransport)
+    assert isinstance(client_transport, MockAdbTransport)
+    assert server_transport.state is state
+    assert client_transport.state is state
+    assert len(server.history) == server_history_size
+    assert list(client.history.values())[-1][0] is AdbCommands.GET_DEVICES
+
+
+def test_mock_notification_succeeds_through_public_client_api() -> None:
+    state = MockAdbState(seed=811, initial_devices=1)
+    server = MockAdbServer(state=state)
+    client = MockAdbClient(state=state)
+    phone = server.get_known_devices()[0]
+
+    assert client.send_notification(phone, "Private title", "Private message") is True
+
+
+def test_mock_rejects_unregistered_spec_with_known_argv() -> None:
+    client = MockAdbClient(state=MockAdbState(seed=812, initial_devices=1))
+    lookalike = AdbCommandSpec(
+        name="UNREGISTERED_DEVICES_LOOKALIKE",
+        description="Not the canonical devices specification",
+        argv=AdbCommands.GET_DEVICES.argv,
+        parser=AdbCommands.GET_DEVICES.parser,
+        retry_policy=AdbRetryPolicy.DAEMON,
+    )
+
+    with pytest.raises(AdbClientException, match="Unsupported mock ADB client"):
+        client._execute(lookalike.invoke())

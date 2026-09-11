@@ -78,6 +78,7 @@ def test_refresh_known_devices_work_enriches_mock_adb_devices() -> None:
     """Mock ADB lets refresh exercise list parsing plus real shell getter enrichment."""
     state = MockAdbState(seed=101, initial_devices=2)
     server = MockAdbServer(state=state)
+    server.start()
     client = MockAdbClient(state=state)
 
     outcome = RefreshKnownDevicesWork(server, client).run()

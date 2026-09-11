@@ -10,7 +10,7 @@ from application_paths import ApplicationPaths
 from core import ADB_BINARY_BUILD_NUMBER, ADB_BINARY_BUILD_VERSION, ADB_BINARY_VERSION
 from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
 from core.adb.binary import AdbBinary
-from core.devices.phone import Phone, serialize_phone_collection
+from core.devices.phone import Phone, PhoneRepository, serialize_phone_collection
 from core.entrypoint import ModelEntrypoint
 from core.signals import (
     AdbServerStartedPayload,
@@ -71,6 +71,14 @@ def test_ensure_adb_binary_executable_passes_for_executable_file(
     startup_work._ensure_adb_binary_executable(adb_path)
 
 
+def test_create_adb_client_owns_its_executor(tmp_path: Path) -> None:
+    binary_path = tmp_path / "adb"
+
+    client = startup_work._create_adb_client(binary_path)
+
+    assert client._executor.binary.path == binary_path
+
+
 def test_ensure_adb_binary_executable_raises_for_non_executable_file(
     tmp_path: Path,
 ) -> None:
@@ -98,7 +106,22 @@ def test_start_adb_server_checks_binary_before_constructing_server(
         def __init__(self, binary: AdbBinary) -> None:
             calls.append("construct")
             self.binary = binary
-            self.paired_devices: list[Phone] = []
+            self.paired_devices = PhoneRepository()
+
+        def start(self) -> None:
+            calls.append("start")
+
+        def get_known_devices(self) -> list[Phone]:
+            calls.append("get_known_devices")
+            return [Phone(id="device-1", state="device")]
+
+        def refresh_mdns_availability(self) -> bool:
+            calls.append("refresh_mdns_availability")
+            return True
+
+        def refresh_network_availability(self) -> bool:
+            calls.append("refresh_network_availability")
+            return True
 
         @classmethod
         def get_binary_version(cls, binary: AdbBinary) -> AdbBinary:
@@ -120,7 +143,16 @@ def test_start_adb_server_checks_binary_before_constructing_server(
     server = startup_work._start_adb_server(adb_path)
 
     assert isinstance(server, FakeAdbServer)
-    assert calls == ["ensure", "version", "construct"]
+    assert calls == [
+        "ensure",
+        "version",
+        "construct",
+        "start",
+        "get_known_devices",
+        "refresh_mdns_availability",
+        "refresh_network_availability",
+    ]
+    assert [phone.id for phone in server.paired_devices] == ["device-1"]
 
 
 def test_start_adb_server_rejects_binary_version_mismatch(
@@ -178,10 +210,15 @@ def test_startup_reuses_server_paired_devices_after_start(
     state = MockAdbState(seed=909, initial_devices=2)
     server = KnownDevicesCountingMockAdbServer(state=state)
     client = MockAdbClient(state=state)
+    startup_work._initialize_adb_server(server)
     assert server.get_known_devices_calls == 1
 
     monkeypatch.setattr(startup_work, "_start_adb_server", lambda _path: server)
-    monkeypatch.setattr(startup_work, "_create_adb_client", lambda _path: client)
+    monkeypatch.setattr(
+        startup_work,
+        "_create_adb_client",
+        lambda _path: client,
+    )
 
     outcome = _startup_work(application_paths, use_mock_adb=False).run()
 
@@ -303,7 +340,9 @@ def test_startup_apply_restores_last_active_device_after_adb_id_rebind(
     rebound_client = MockAdbClient(state=rebound_state)
     monkeypatch.setattr(startup_work, "_start_adb_server", lambda _path: rebound_server)
     monkeypatch.setattr(
-        startup_work, "_create_adb_client", lambda _path: rebound_client
+        startup_work,
+        "_create_adb_client",
+        lambda _path: rebound_client,
     )
     monkeypatch.setattr(
         startup_work,

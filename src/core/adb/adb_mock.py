@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import datetime
 import os
 import random
 from dataclasses import dataclass
-from typing import Final
+from pathlib import Path
+from typing import Callable, Final
 
 from faker import Faker
 from faker.providers import DynamicProvider
@@ -13,19 +13,18 @@ from application_paths import APPLICATION_PATHS
 from core.adb.binary import AdbBinary
 from core.adb.client import AdbClient
 from core.adb.command import (
-    AdbCommand,
-    AdbCommandResult,
-    AdbCommandResultStatus,
+    AdbCommandInvocation,
     AdbCommands,
-    _log_safe_argv,
-    _log_safe_command_line,
-    _log_safe_output_preview,
-    _redacted_log_value,
+    AdbCommandSpec,
 )
-from core.adb.exceptions import AdbClientException, AdbServerException
+from core.adb.execution import (
+    AdbCommandExecutor,
+    AdbTransportFailure,
+    AdbTransportResult,
+    AdbTransportScope,
+)
 from core.adb.server import AdbServer
 from core.devices.phone import Phone
-from logger import logger
 
 AROW_MOCK_ADB_SEED_ENV_VAR: Final[str] = "AROW_MOCK_ADB_SEED"
 
@@ -174,7 +173,7 @@ class MockAdbState:
         )
 
     def devices_l_blob(self) -> str:
-        """Stderr/stdout-shaped ``adb devices -l`` list for :class:`ADBCommandParser.GET_DEVICES`."""
+        """Return parser-compatible ``adb devices -l`` output."""
         lines = ["List of devices attached"]
         for did in self._ordered_ids:
             p = self._profiles[did]
@@ -262,10 +261,208 @@ def _mock_shell_enrichment_blob(profile: MockAdbDeviceProfile) -> str:
     )
 
 
+class MockAdbTransport:
+    """Faker-backed transport that never invokes the local ADB binary."""
+
+    log_label = "Mock ADB"
+
+    def __init__(self, state: MockAdbState) -> None:
+        self._state = state
+
+    @property
+    def state(self) -> MockAdbState:
+        """Return the synthetic device state owned by this transport."""
+        return self._state
+
+    def run(
+        self,
+        invocation: AdbCommandInvocation[object],
+        *,
+        binary_path: Path,
+        scope: AdbTransportScope,
+        phone: Phone | None,
+        timeout_seconds: float,
+    ) -> AdbTransportResult:
+        del timeout_seconds
+        command = invocation.spec
+        handlers = (
+            self._client_handlers()
+            if scope == "client"
+            else self._server_handlers(binary_path)
+        )
+        handler = handlers.get(command)
+        if handler is None:
+            raise AdbTransportFailure(
+                f"Unsupported mock ADB {scope} command specification: {command.name}"
+            )
+        out = handler(invocation, phone)
+        return AdbTransportResult(output=out)
+
+    def _client_handlers(
+        self,
+    ) -> dict[
+        AdbCommandSpec[object],
+        Callable[[AdbCommandInvocation[object], Phone | None], str],
+    ]:
+        return {
+            AdbCommands.PAIR: self._handle_pair,
+            AdbCommands.GET_DEVICES: self._handle_get_devices,
+            AdbCommands.STATUS: self._handle_status,
+            AdbCommands.GET_SERIAL_NO: self._handle_get_serial_no,
+            AdbCommands.GET_DEVICE_NAME: self._handle_get_device_name,
+            AdbCommands.GET_ANDROID_VERSION: self._handle_get_android_version,
+            AdbCommands.GET_MANUFACTURER: self._handle_get_manufacturer,
+            AdbCommands.GET_PRODUCT_MODEL: self._handle_get_product_model,
+            AdbCommands.GET_SDK_VERSION: self._handle_get_sdk_version,
+            AdbCommands.GET_LOCATION_MODE: self._handle_get_location_mode,
+            AdbCommands.GET_BATTERY_INFOS: self._handle_get_battery_infos,
+            AdbCommands.DUMPSYS_WINDOW: self._handle_dumpsys_window,
+            AdbCommands.GET_SHELL_ENRICHMENT_PROPERTIES: self._handle_enrichment,
+            AdbCommands.SEND_NOTIFICATION: self._handle_send_notification,
+        }
+
+    def _server_handlers(self, binary_path: Path) -> dict[
+        AdbCommandSpec[object],
+        Callable[[AdbCommandInvocation[object], Phone | None], str],
+    ]:
+        def _empty(
+            invocation: AdbCommandInvocation[object], phone: Phone | None
+        ) -> str:
+            del invocation, phone
+            return ""
+
+        def _mdns(invocation: AdbCommandInvocation[object], phone: Phone | None) -> str:
+            del invocation, phone
+            return "mdns daemon version [Openscreen discovery 0.0.0]\n"
+
+        def _version(
+            invocation: AdbCommandInvocation[object], phone: Phone | None
+        ) -> str:
+            del invocation, phone
+            return (
+                "Android Debug Bridge version 1.0.41\n"
+                "Version 36.0.0-13206524\n"
+                f"Installed as {binary_path}\n"
+                "Running on MockOS 0.0.0 (mock)\n"
+            )
+
+        return {
+            AdbCommands.START_SERVER: _empty,
+            AdbCommands.KILL_SERVER: _empty,
+            AdbCommands.GET_DEVICES: self._handle_get_devices,
+            AdbCommands.MDNS_CHECK: _mdns,
+            AdbCommands.GET_BINARY_VERSION: _version,
+        }
+
+    def _profile_for_phone(self, phone: Phone | None) -> MockAdbDeviceProfile:
+        if phone is None:
+            raise AdbTransportFailure("Mock ADB shell command requires a target device")
+        return self._state.ensure_profile_for_id(phone.descriptor.id)
+
+    def _handle_pair(
+        self, invocation: AdbCommandInvocation[object], phone: Phone | None
+    ) -> str:
+        del phone
+        if not invocation.dynamic_args:
+            raise AdbTransportFailure("Mock ADB pair command requires an endpoint")
+        hostport = invocation.dynamic_args[0]
+        if ":" not in hostport:
+            raise AdbTransportFailure(f"Malformed pair endpoint: {hostport!r}")
+        new_id = self._state.register_new_paired_device()
+        return f"Successfully paired to {hostport} [guid={new_id}]\n"
+
+    def _handle_get_devices(
+        self, invocation: AdbCommandInvocation[object], phone: Phone | None
+    ) -> str:
+        del invocation, phone
+        return self._state.devices_l_blob()
+
+    def _handle_status(
+        self, invocation: AdbCommandInvocation[object], phone: Phone | None
+    ) -> str:
+        del invocation
+        if phone is None:
+            raise AdbTransportFailure(
+                "Mock ADB status command requires a target device"
+            )
+        return f"{(phone.descriptor.state or 'device').strip()}\n"
+
+    def _handle_get_serial_no(
+        self, invocation: AdbCommandInvocation[object], phone: Phone | None
+    ) -> str:
+        del invocation
+        return f"{self._profile_for_phone(phone).ro_serialno}\n"
+
+    def _handle_get_device_name(
+        self, invocation: AdbCommandInvocation[object], phone: Phone | None
+    ) -> str:
+        del invocation
+        device_name = self._profile_for_phone(phone).device_name
+        return f"{device_name}\n" if device_name else ""
+
+    def _handle_get_android_version(
+        self, invocation: AdbCommandInvocation[object], phone: Phone | None
+    ) -> str:
+        del invocation
+        return f"{self._profile_for_phone(phone).android_release}\n"
+
+    def _handle_get_manufacturer(
+        self, invocation: AdbCommandInvocation[object], phone: Phone | None
+    ) -> str:
+        del invocation
+        return f"{self._profile_for_phone(phone).manufacturer}\n"
+
+    def _handle_get_product_model(
+        self, invocation: AdbCommandInvocation[object], phone: Phone | None
+    ) -> str:
+        del invocation
+        return f"{self._profile_for_phone(phone).model.replace('_', ' ')}\n"
+
+    def _handle_get_sdk_version(
+        self, invocation: AdbCommandInvocation[object], phone: Phone | None
+    ) -> str:
+        del invocation
+        return f"{self._profile_for_phone(phone).sdk}\n"
+
+    def _handle_get_location_mode(
+        self, invocation: AdbCommandInvocation[object], phone: Phone | None
+    ) -> str:
+        del invocation
+        self._profile_for_phone(phone)
+        return f"{self._state._faker.random_int(min=0, max=3)}\n"
+
+    def _handle_get_battery_infos(
+        self, invocation: AdbCommandInvocation[object], phone: Phone | None
+    ) -> str:
+        del invocation
+        self._profile_for_phone(phone)
+        return _mock_battery_blob(self._state._faker)
+
+    def _handle_dumpsys_window(
+        self, invocation: AdbCommandInvocation[object], phone: Phone | None
+    ) -> str:
+        del invocation
+        return _mock_window_blob(self._profile_for_phone(phone))
+
+    def _handle_enrichment(
+        self, invocation: AdbCommandInvocation[object], phone: Phone | None
+    ) -> str:
+        del invocation
+        return _mock_shell_enrichment_blob(self._profile_for_phone(phone))
+
+    def _handle_send_notification(
+        self, invocation: AdbCommandInvocation[object], phone: Phone | None
+    ) -> str:
+        self._profile_for_phone(phone)
+        if len(invocation.dynamic_args) != 4:
+            raise AdbTransportFailure(
+                "Mock ADB notification command requires tag, title, id, and message"
+            )
+        return "posting:\n"
+
+
 class MockAdbClient(AdbClient):
-    """
-    ADB client that never spawns adb: emits faker-shaped stdout/stderr compatible with parsers.
-    """
+    """ADB client backed by a deterministic in-memory transport."""
 
     def __init__(
         self,
@@ -273,110 +470,16 @@ class MockAdbClient(AdbClient):
         state: MockAdbState,
         binary: AdbBinary | None = None,
     ) -> None:
-        super().__init__(binary or AdbBinary(path=APPLICATION_PATHS.mock_adb_binary))
         self._state = state
+        command_binary = binary or AdbBinary(path=APPLICATION_PATHS.mock_adb_binary)
+        super().__init__(command_binary)
 
-    def _fake_shell_stdout(
-        self,
-        *,
-        phone: Phone | None,
-        args: list[str],
-    ) -> str:
-        if phone is None:
-            if (
-                len(args) >= 3
-                and args[0] == "cmd"
-                and args[1] == "notification"
-                and args[2] == "post"
-            ):
-                return "posting:\n"
-            return ""
-        fake = self._faker
-        profile = self._state.ensure_profile_for_id(phone.descriptor.id)
-        tup = tuple(args)
-        if tup == ("getprop", "ro.serialno"):
-            return f"{profile.ro_serialno}\n"
-        elif tup == ("getprop", "device_name"):
-            return f"{profile.device_name}\n" if profile.device_name else ""
-        elif tup == ("getprop", "ro.build.version.release"):
-            return f"{profile.android_release}\n"
-        elif tup == ("getprop", "ro.product.manufacturer"):
-            return f"{profile.manufacturer}\n"
-        elif tup == ("getprop", "ro.product.model"):
-            return f"{profile.model.replace('_', ' ')}\n"
-        elif tup == ("getprop", "ro.build.version.sdk"):
-            return f"{profile.sdk}\n"
-        elif tup == ("settings", "get", "secure", "location_mode"):
-            return str(fake.random_int(min=0, max=3)) + "\n"
-        elif tup == ("dumpsys", "battery"):
-            return _mock_battery_blob(fake)
-        elif tup == ("dumpsys", "window"):
-            return _mock_window_blob(profile)
-        elif len(args) >= 3 and args[0] == "sh" and args[1] == "-c":
-            script = args[2]
-            if "manufacturer=" in script and "ro_serialno=" in script:
-                return _mock_shell_enrichment_blob(profile)
-            return ""
-        else:
-            return ""
-
-    @property
-    def _faker(self) -> Faker:
-        return self._state._faker
-
-    def _execute(
-        self,
-        command: AdbCommand,
-        phone: Phone | None = None,
-        positional_arguments: list[str] | None = None,
-    ) -> AdbCommandResult:
-        positional_arguments = positional_arguments or []
-        argv: list[str] = [str(self.binary.path)]
-        if phone is not None:
-            argv.extend(["-s", phone.descriptor.id])
-        argv.extend([command.command, *command.args, *positional_arguments])
-        logger.debug(
-            "Mock ADB client command started",
-            adb_path=str(self.binary.path),
-            command=command.command,
-            phone_id=_redacted_log_value(phone.descriptor.id if phone else None),
-            argv=_log_safe_argv(command, argv),
-            command_line=_log_safe_command_line(command, argv),
+    def _create_executor(self, binary: AdbBinary) -> AdbCommandExecutor:
+        """Create a client executor backed by this facade's mock state."""
+        return AdbCommandExecutor(
+            binary,
+            transport=MockAdbTransport(self._state),
         )
-        out = ""
-        if command.command == "pair":
-            hostport = (
-                positional_arguments[0] if positional_arguments else "127.0.0.1:5555"
-            )
-            if ":" not in hostport:
-                raise AdbClientException(f"Malformed pair endpoint: {hostport!r}")
-            new_id = self._state.register_new_paired_device()
-            out = f"Successfully paired to {hostport} [guid={new_id}]\n"
-        elif command.command == "devices" and command.args == ["-l"]:
-            out = self._state.devices_l_blob()
-        elif command.command == "shell":
-            out = self._fake_shell_stdout(phone=phone, args=list(command.args))
-        elif command.command == "get-state" and phone is not None:
-            device_state = (phone.descriptor.state or "device").strip()
-            out = f"{device_state}\n"
-        else:
-            out = ""
-
-        logger.debug(
-            "Mock ADB client command completed",
-            command=command.command,
-            stdout_preview=_log_safe_output_preview(out.strip(), command),
-        )
-        cmd_result = AdbCommandResult(
-            status=AdbCommandResultStatus.SUCCESS,
-            phone=phone,
-            time=datetime.datetime.now(),
-            output=out,
-            error="",
-            return_code=0,
-        )
-        self.add_to_history(command, cmd_result)
-        return cmd_result
 
 
 class MockAdbServer(AdbServer):
@@ -388,51 +491,18 @@ class MockAdbServer(AdbServer):
         state: MockAdbState,
         binary: AdbBinary | None = None,
     ) -> None:
-        self._mock_state = state
-        super().__init__(binary or AdbBinary(path=APPLICATION_PATHS.mock_adb_binary))
+        self._state = state
+        command_binary = binary or AdbBinary(path=APPLICATION_PATHS.mock_adb_binary)
+        super().__init__(command_binary)
 
-    def start(self) -> None:
-        command = AdbCommands.START_SERVER.value
-        result = self._execute(command)
-        if result.status != AdbCommandResultStatus.SUCCESS:
-            raise AdbServerException(f"Failed to start adb server: {result}")
-        self._paired_devices.clear()
-        for device in self.get_known_devices():
-            self._paired_devices.add(device)
+    def _create_executor(self, binary: AdbBinary) -> AdbCommandExecutor:
+        """Create a server executor backed by this facade's mock state."""
+        return AdbCommandExecutor(
+            binary,
+            transport=MockAdbTransport(self._state),
+        )
 
     def refresh_network_availability(self) -> bool:
         """Keep mock workflows independent from host-specific network state."""
         self._network_available = True
         return self._network_available
-
-    def _execute(self, command: AdbCommand) -> AdbCommandResult:
-        argv: list[str] = [str(self.binary.path), command.command, *command.args]
-        logger.debug(
-            "Mock ADB server command started",
-            adb_path=str(self.binary.path),
-            command=command.command,
-            argv=_log_safe_argv(command, argv),
-            command_line=_log_safe_command_line(command, argv),
-        )
-        out = ""
-        if command.command == "devices" and command.args == ["-l"]:
-            out = self._mock_state.devices_l_blob()
-        elif command.command == "mdns" and command.args == ["check"]:
-            out = "mdns daemon version [Openscreen discovery 0.0.0]\n"
-        elif command.command == "--version":
-            out = (
-                "Android Debug Bridge version 1.0.41\n"
-                "Version 36.0.0-13206524\n"
-                f"Installed as {self.binary.path}\n"
-                "Running on MockOS 0.0.0 (mock)\n"
-            )
-        cmd_result = AdbCommandResult(
-            status=AdbCommandResultStatus.SUCCESS,
-            phone=None,
-            time=datetime.datetime.now(),
-            output=out,
-            error="",
-            return_code=0,
-        )
-        self.add_to_history(command, cmd_result)
-        return cmd_result
