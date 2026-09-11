@@ -19,7 +19,6 @@ from core import ADB_BINARY_BUILD_NUMBER, ADB_BINARY_BUILD_VERSION, ADB_BINARY_V
 from core.adb.binary import AdbBinary
 from core.adb.client import AdbClient
 from core.adb.command import (
-    ADB_HISTORY_MAX_ENTRIES,
     AdbCommandInvocation,
     AdbCommandResult,
     AdbCommandResultStatus,
@@ -31,6 +30,7 @@ from core.adb.command import (
     _log_safe_output_preview,
 )
 from core.adb.exceptions import AdbServerException
+from core.adb.history import ADB_HISTORY_MAX_ENTRIES
 from core.adb.server import AdbServer
 from core.devices.phone import Phone
 from core.geo.location import Location

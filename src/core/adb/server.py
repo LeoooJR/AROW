@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 import datetime
-from collections import OrderedDict
 
 from core.adb.binary import AdbBinary
 from core.adb.command import (
-    ADB_HISTORY_MAX_ENTRIES,
     AdbCommandInvocation,
     AdbCommandResult,
     AdbCommandResultStatus,
@@ -15,6 +13,11 @@ from core.adb.command import (
 )
 from core.adb.exceptions import AdbClientException, AdbServerException
 from core.adb.execution import AdbCommandExecutor
+from core.adb.history import (
+    AdbCommandHistory,
+    AdbCommandHistoryEntries,
+    AdbCommandHistoryManager,
+)
 from core.adb.retry import (
     raise_server_for_result,
 )
@@ -28,9 +31,7 @@ class AdbServer:
 
     def __init__(self, binary: AdbBinary) -> None:
         self._executor = self._create_executor(binary)
-        self._history: OrderedDict[
-            datetime.datetime, tuple[AdbCommandSpec[object], AdbCommandResult]
-        ] = OrderedDict()
+        self._history_manager = AdbCommandHistoryManager()
         self._paired_devices: PhoneRepository = PhoneRepository()
         self._mdns_available: bool = False
         self._network_available: bool = False
@@ -45,66 +46,50 @@ class AdbServer:
         return AdbCommandExecutor(binary)
 
     @property
-    def history(
-        self,
-    ) -> OrderedDict[
-        datetime.datetime, tuple[AdbCommandSpec[object], AdbCommandResult]
-    ]:
+    def history(self) -> AdbCommandHistory:
         """Get the history of the adb server."""
-        return self._history
+        return self._history_manager.history
 
     @history.setter
     def history(
         self,
-        history: OrderedDict[
-            datetime.datetime, tuple[AdbCommandSpec[object], AdbCommandResult]
-        ],
+        history: AdbCommandHistoryEntries,
     ) -> None:
         """Set the history of the adb server."""
-        self._history = history
+        self._history_manager.replace(history)
 
     @history.deleter
     def history(self) -> None:
         """Delete the history of the adb server."""
-        self._history.clear()
+        self._history_manager.clear()
 
     def add_to_history(
         self, command: AdbCommandSpec[object], result: AdbCommandResult
     ) -> None:
         """Add to the history of the adb server."""
-        self._history[datetime.datetime.now()] = (command, result)
-        self._prune_history()
-
-    def _prune_history(self) -> None:
-        """Keep newest server history entries by dropping oldest entries first."""
-        while len(self._history) > ADB_HISTORY_MAX_ENTRIES:
-            self._history.popitem(last=False)
+        self._history_manager.add(command, result)
 
     def remove_from_history(self, command: AdbCommandSpec[object]) -> None:
         """Remove from the history of the adb server."""
-        self._history = OrderedDict(
-            (time, entry)
-            for time, entry in self._history.items()
-            if entry[0] != command
-        )
+        self._history_manager.remove(command)
 
     def get_last_command_time(self) -> datetime.datetime:
         """Get the time of the last command."""
-        return next(reversed(self.history))
+        return self._history_manager.latest_time()
 
     def get_last_from_history(
         self,
     ) -> tuple[AdbCommandSpec[object], AdbCommandResult]:
         """Get the last command and result."""
-        return self.history[self.get_last_command_time()]
+        return self._history_manager.latest_entry()
 
     def get_last_command(self) -> AdbCommandSpec[object]:
         """Get the last command."""
-        return self.get_last_from_history()[0]
+        return self._history_manager.latest_command()
 
     def get_last_command_result(self) -> AdbCommandResult:
         """Get the last command result."""
-        return self.get_last_from_history()[1]
+        return self._history_manager.latest_result()
 
     @property
     def paired_devices(self) -> PhoneRepository:
@@ -250,7 +235,7 @@ class AdbServer:
         Using ``adb start-server`` here would mutate daemon state during a read-only guard,
         so this method only inspects the recorded lifecycle command history.
         """
-        for command, result in reversed(self.history.values()):
+        for command, result in self._history_manager.entries_newest_first():
             if command == AdbCommands.KILL_SERVER:
                 return result.status == AdbCommandResultStatus.ERROR
             if command == AdbCommands.START_SERVER:

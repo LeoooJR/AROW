@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-import datetime
-from collections import OrderedDict
 from dataclasses import replace
 
 from core.adb.binary import AdbBinary
 from core.adb.command import (
-    ADB_HISTORY_MAX_ENTRIES,
     AdbCommandInvocation,
     AdbCommandResult,
     AdbCommandResultStatus,
@@ -16,6 +13,11 @@ from core.adb.command import (
 )
 from core.adb.exceptions import AdbClientException
 from core.adb.execution import AdbCommandExecutor
+from core.adb.history import (
+    AdbCommandHistory,
+    AdbCommandHistoryEntries,
+    AdbCommandHistoryManager,
+)
 from core.adb.parser import ShellEnrichmentProperties, parse_device_state_from_listing
 from core.adb.retry import raise_client_for_result
 from core.devices.phone import Phone
@@ -28,9 +30,7 @@ class AdbClient:
 
     def __init__(self, binary: AdbBinary) -> None:
         self._executor = self._create_executor(binary)
-        self._history: OrderedDict[
-            datetime.datetime, tuple[AdbCommandSpec[object], AdbCommandResult]
-        ] = OrderedDict()
+        self._history_manager = AdbCommandHistoryManager()
 
     @property
     def binary(self) -> AdbBinary:
@@ -42,48 +42,32 @@ class AdbClient:
         return AdbCommandExecutor(binary)
 
     @property
-    def history(
-        self,
-    ) -> OrderedDict[
-        datetime.datetime, tuple[AdbCommandSpec[object], AdbCommandResult]
-    ]:
+    def history(self) -> AdbCommandHistory:
         """Get the history of the adb client."""
-        return self._history
+        return self._history_manager.history
 
     @history.setter
     def history(
         self,
-        history: OrderedDict[
-            datetime.datetime, tuple[AdbCommandSpec[object], AdbCommandResult]
-        ],
+        history: AdbCommandHistoryEntries,
     ) -> None:
         """Set the history of the adb client."""
-        self._history = history
+        self._history_manager.replace(history)
 
     @history.deleter
     def history(self) -> None:
         """Delete the history of the adb client."""
-        self._history.clear()
+        self._history_manager.clear()
 
     def add_to_history(
         self, command: AdbCommandSpec[object], result: AdbCommandResult
     ) -> None:
         """Add to the history of the adb client."""
-        self._history[datetime.datetime.now()] = (command, result)
-        self._prune_history()
-
-    def _prune_history(self) -> None:
-        """Keep newest client history entries by dropping oldest entries first."""
-        while len(self._history) > ADB_HISTORY_MAX_ENTRIES:
-            self._history.popitem(last=False)
+        self._history_manager.add(command, result)
 
     def remove_from_history(self, command: AdbCommandSpec[object]) -> None:
         """Remove from the history of the adb client."""
-        self._history = OrderedDict(
-            (time, entry)
-            for time, entry in self._history.items()
-            if entry[0] != command
-        )
+        self._history_manager.remove(command)
 
     def status(self, phone: Phone) -> str:
         """

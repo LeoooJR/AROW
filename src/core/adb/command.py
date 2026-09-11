@@ -27,7 +27,6 @@ from core.devices.phone import Phone
 
 _REDACTED_LOG_VALUE: Final[str] = "<redacted>"
 _LOG_PREVIEW_LIMIT: Final[int] = 200
-ADB_HISTORY_MAX_ENTRIES: Final[int] = 100
 
 ParsedT_co = TypeVar("ParsedT_co", covariant=True)
 
