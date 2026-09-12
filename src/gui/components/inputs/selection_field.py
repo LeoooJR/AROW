@@ -14,6 +14,7 @@ from gui.constants.settings import Settings
 
 
 class SelectionField(QComboBox, Component):
+    """Non-editable selection field with placeholder support."""
 
     @dataclass(frozen=True)
     class Text:
@@ -65,4 +66,5 @@ class SelectionField(QComboBox, Component):
         pass
 
     def apply_theme_icons(self, theme: Theme) -> None:
+        """Apply theme-dependent icons when the field gains any."""
         pass

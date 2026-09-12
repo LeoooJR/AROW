@@ -26,6 +26,11 @@ class AuthenticationOverlay(QWidget):
         authentification_card: AuthentificationCard
 
     def __init__(self, parent: QWidget | None = None) -> None:
+        """Build the modal authentication overlay.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+        """
         super().__init__(parent)
         self.texts = AuthenticationOverlay.Text()
         self.setObjectName("authentification-overlay")
@@ -50,4 +55,5 @@ class AuthenticationOverlay(QWidget):
         self.layout().setAlignment(card, Qt.AlignmentFlag.AlignCenter)
 
     def apply_theme_icons(self, theme: Theme) -> None:
+        """Refresh authentication card icons for the active theme."""
         self.ui.authentification_card.apply_theme_icons(theme)

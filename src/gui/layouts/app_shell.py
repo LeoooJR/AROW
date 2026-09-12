@@ -45,6 +45,11 @@ class AppShell(QWidget):
         toast: Toast | None = None
 
     def __init__(self, parent: QWidget | None = None) -> None:
+        """Build the application shell around the top bar and workspace.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+        """
         super().__init__(parent)
         self.texts = AppShell.Text()
         self._toast_queue: Deque[tuple[str, str]] = deque()
@@ -68,6 +73,7 @@ class AppShell(QWidget):
         self._connect_signals()
 
     def apply_theme_icons(self, theme: Theme) -> None:
+        """Refresh shell child icons for the active theme."""
         self.ui.header.apply_theme_icons(theme)
         self.ui.workspace.apply_theme_icons(theme)
 

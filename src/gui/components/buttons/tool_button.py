@@ -22,6 +22,7 @@ from gui.constants.settings import Settings
 
 
 class ToolButton(QToolButton, Component):
+    """Compact tool button with an optional theme-aware icon."""
 
     _icon: GenericIcons | OperatingSystemIcons | ApplicationIcons | None
 
@@ -85,6 +86,7 @@ class ToolButton(QToolButton, Component):
         pass
 
     def apply_theme_icons(self, theme: Theme) -> None:
+        """Refresh the tool button icon for the active theme."""
         if self._theme_unresponsive:
             return
         if self._icon is not None:

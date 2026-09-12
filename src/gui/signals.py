@@ -108,6 +108,7 @@ class Signals(QObject):
     """
 
     def __init__(self) -> None:
+        """Initialize the categorized GUI signal groups."""
         super().__init__()
         self.UI = UISignals(self)
         self.ADB_SERVER = ADBServerSignals(self)

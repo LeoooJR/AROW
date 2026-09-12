@@ -34,6 +34,11 @@ class ShutdownOverlay(QWidget):
         shutdown_card: ShutdownCard
 
     def __init__(self, parent: QWidget | None = None) -> None:
+        """Build the modal managed-shutdown overlay.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+        """
         super().__init__(parent)
         self.texts = ShutdownOverlay.Text()
         self.setObjectName("shutdown-overlay")
@@ -79,4 +84,5 @@ class ShutdownOverlay(QWidget):
         self.ui.shutdown_card.setFocus(Qt.FocusReason.OtherFocusReason)
 
     def apply_theme_icons(self, theme: Theme) -> None:
+        """Refresh shutdown card icons for the active theme."""
         self.ui.shutdown_card.apply_theme_icons(theme)

@@ -27,6 +27,7 @@ class Icon:
     dark_mode_path: str
 
     def for_theme(self, theme: Theme) -> str:
+        """Return the icon path associated with ``theme``."""
         return self.light_mode_path if theme == "light" else self.dark_mode_path
 
 

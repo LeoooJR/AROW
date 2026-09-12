@@ -12,6 +12,13 @@ class ActivityTracker(QObject):
     def __init__(
         self, parent=None, idle_ms: int = 30_000, track_mouse_move: bool = False
     ):
+        """Create an application-wide user-activity tracker.
+
+        Args:
+            parent: Optional Qt parent object for lifetime management.
+            idle_ms: Inactivity interval before emitting ``became_idle``.
+            track_mouse_move: Whether mouse movement counts as activity.
+        """
         super().__init__(parent)
         self.idle_ms = idle_ms  # Idle timeout in milliseconds
         self.track_mouse_move = track_mouse_move  # Track mouse movement
@@ -62,6 +69,15 @@ class ActivityTracker(QObject):
         self.reset_idle_timer(msecs=next_ms)
 
     def eventFilter(self, obj, event):
+        """Observe configured input events and reset the idle timer.
+
+        Args:
+            obj: Object receiving the event.
+            event: Qt event offered to the filter.
+
+        Returns:
+            False so the event continues through normal Qt processing.
+        """
         et = event.type()
 
         if et in (

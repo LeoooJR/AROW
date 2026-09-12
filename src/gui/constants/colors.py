@@ -172,6 +172,7 @@ class Color:
     dark_mode_value: str
 
     def for_theme(self, theme: Theme) -> str:
+        """Return the color value associated with ``theme``."""
         return self.light_mode_value if theme == "light" else self.dark_mode_value
 
 

@@ -69,6 +69,7 @@ class StatusBadge(QLabel, Component):
         pass
 
     def apply_theme_icons(self, theme: Theme) -> None:
+        """Apply theme-dependent icons when the badge gains any."""
         pass
 
     def set_status(self, text: str, kind: StatusBadgeKind = "muted") -> None:

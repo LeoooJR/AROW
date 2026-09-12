@@ -156,6 +156,7 @@ class File(QWidget, Component):
             self._save_as_button.clicked.connect(self._on_save_as_button_clicked)
 
     def apply_theme_icons(self, theme: Theme) -> None:
+        """Refresh file-row icons for the active theme."""
         self._file_icon.set_path(icon_qt_path_for_theme(theme, GenericIcons.FILE))
         if hasattr(self, "_save_as_button"):
             self._save_as_button.apply_theme_icons(theme)
@@ -174,6 +175,7 @@ class File(QWidget, Component):
                 signals.ACTIVITY_LOG.ActivityLogFileUpdateRequested.emit(selected_path)
 
     def resizeEvent(self, event):
+        """Refresh elided file text after the widget is resized."""
         super().resizeEvent(event)
         self.refresh_display()
 

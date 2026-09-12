@@ -57,4 +57,5 @@ class Image(QLabel, Component):
         pass
 
     def apply_theme_icons(self, theme: Theme) -> None:
+        """Apply theme-dependent media when the image gains any."""
         pass
