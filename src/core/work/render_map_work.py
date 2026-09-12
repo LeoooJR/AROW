@@ -24,6 +24,12 @@ class RenderMapError(CoreException):
     """Map rendering failed; preserves simulation id for user-facing reporting."""
 
     def __init__(self, *, simulation_id: str, reason: str) -> None:
+        """Initialize a map-rendering failure.
+
+        Args:
+            simulation_id: Simulation whose map could not be rendered.
+            reason: Human-readable failure reason.
+        """
         self.simulation_id = simulation_id
         self.reason = reason
         super().__init__(reason)
@@ -48,6 +54,12 @@ class RenderMapWork(CoreRuntimeWork[RenderMapOutcome]):
         simulation_id: str,
         output_dir: Path,
     ) -> None:
+        """Initialize map-rendering work.
+
+        Args:
+            simulation_id: Simulation that owns the rendered map.
+            output_dir: Directory in which to write the HTML map.
+        """
         self._simulation_id = simulation_id
         self._output_dir = output_dir
 
@@ -93,6 +105,12 @@ class RenderMapWork(CoreRuntimeWork[RenderMapOutcome]):
         model_entrypoint: CoreSignalEmitter,
         outcome: RenderMapOutcome,
     ) -> None:
+        """Persist a rendered map path and emit its completion event.
+
+        Args:
+            model_entrypoint: Main-thread simulation mutation boundary.
+            outcome: Worker result containing the rendered map path.
+        """
         mutation_entrypoint = cast(SimulationMutationEntrypoint, model_entrypoint)
         simulation = mutation_entrypoint.get_simulation(outcome.simulation_id)
         if simulation is None:
@@ -125,6 +143,12 @@ class RenderMapWork(CoreRuntimeWork[RenderMapOutcome]):
     def apply_failure_main_thread(
         model_entrypoint: CoreSignalEmitter, error: BaseException
     ) -> None:
+        """Clear failed map state and emit a render failure.
+
+        Args:
+            model_entrypoint: Main-thread simulation mutation boundary.
+            error: Worker failure to translate.
+        """
         mutation_entrypoint = cast(SimulationMutationEntrypoint, model_entrypoint)
         if isinstance(error, RenderMapError):
             simulation = mutation_entrypoint.get_simulation(error.simulation_id)

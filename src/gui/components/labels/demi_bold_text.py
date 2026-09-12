@@ -14,6 +14,7 @@ from gui.constants.settings import Settings
 
 
 class DemiBoldText(QLabel, Component):
+    """Label rendered with the application's demi-bold text style."""
 
     @dataclass(frozen=True)
     class Text:
@@ -58,4 +59,5 @@ class DemiBoldText(QLabel, Component):
         pass
 
     def apply_theme_icons(self, theme: Theme) -> None:
+        """Apply theme-dependent icons when the label gains any."""
         pass

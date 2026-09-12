@@ -120,6 +120,7 @@ class RefreshKnownDevicesError(CoreException):
     """Refresh known devices work failed."""
 
     def __init__(self, reason: str) -> None:
+        """Initialize a device-refresh failure with its reason."""
         self.reason = reason
         super().__init__(reason)
 
@@ -141,6 +142,12 @@ class RefreshKnownDevicesWork(CoreRuntimeWork[RefreshKnownDevicesOutcome]):
         adb_server: AdbServer | None,
         adb_client: AdbClient | None,
     ) -> None:
+        """Initialize device-refresh work from the active ADB runtime.
+
+        Args:
+            adb_server: Active server used to list paired devices.
+            adb_client: Active client used for device enrichment.
+        """
         self._adb_server = adb_server
         self._adb_client = adb_client
 
@@ -186,6 +193,12 @@ class RefreshKnownDevicesWork(CoreRuntimeWork[RefreshKnownDevicesOutcome]):
         model_entrypoint: CoreSignalEmitter,
         outcome: RefreshKnownDevicesOutcome,
     ) -> None:
+        """Reconcile refreshed devices and emit changes on the main thread.
+
+        Args:
+            model_entrypoint: Main-thread device-reconciliation boundary.
+            outcome: Worker result containing freshly discovered phones.
+        """
         reconcile_entrypoint = cast(DeviceReconcileEntrypoint, model_entrypoint)
         adb_server = reconcile_entrypoint.adb_server
         if adb_server is None:
@@ -209,6 +222,7 @@ class RefreshKnownDevicesWork(CoreRuntimeWork[RefreshKnownDevicesOutcome]):
     def apply_failure_main_thread(
         model_entrypoint: CoreSignalEmitter, error: BaseException
     ) -> None:
+        """Emit a generic core error for a device-refresh failure."""
         RefreshKnownDevicesWork.emit_generic_error(
             model_entrypoint,
             source="RefreshKnownDevicesWork",

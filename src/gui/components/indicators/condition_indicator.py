@@ -78,6 +78,7 @@ class ConditionIndicator(QFrame, Component):
         pass
 
     def apply_theme_icons(self, theme: Theme) -> None:
+        """Apply theme-dependent icons when the indicator gains any."""
         pass
 
     def _indicator_color(self) -> str:
@@ -153,4 +154,5 @@ class ConditionIndicator(QFrame, Component):
             self._pulse_group.start()
 
     def state(self) -> IndicatorState:
+        """Return the current semantic indicator state."""
         return self._state

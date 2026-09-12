@@ -48,6 +48,13 @@ class MilestoneMetadataItem(HorizontalLayoutWrapper):
         key: str,
         value: str = "--",
     ) -> None:
+        """Build a key-value row for milestone metadata.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+            key: Metadata label shown before the value.
+            value: Initial metadata value.
+        """
         item_texts = MilestoneMetadataItem.Text(key=key, value=value)
 
         key_label = QLabel(key, parent)
@@ -184,6 +191,11 @@ class MilestoneTargetBlock(VerticalLayoutWrapper, Block):
         target_button: Button
 
     def __init__(self, parent: QWidget | None = None) -> None:
+        """Build the milestone target summary and selection action.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+        """
         block_texts = MilestoneTargetBlock.Text()
 
         title = QLabel(block_texts.title, parent)
@@ -321,6 +333,7 @@ class MilestoneTargetBlock(VerticalLayoutWrapper, Block):
         )
 
     def apply_theme_icons(self, theme: Theme) -> None:
+        """Refresh target controls for the active theme."""
         self.ui.target_button.apply_theme_icons(theme)
 
     def set_target_values(

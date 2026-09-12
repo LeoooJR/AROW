@@ -3,6 +3,7 @@ import socket
 
 
 def is_non_loopback_ipv4(value: str) -> bool:
+    """Return whether ``value`` is a valid non-loopback IPv4 address."""
     try:
         address = ipaddress.IPv4Address(value)
     except (ipaddress.AddressValueError, ValueError):
@@ -31,10 +32,12 @@ def resolve_network_identity() -> tuple[str, bool]:
 
 
 class Network:
+    """Placeholder for shared network-domain behavior."""
 
     pass
 
 
 class Wifi:
+    """Placeholder for Wi-Fi-specific network behavior."""
 
     pass

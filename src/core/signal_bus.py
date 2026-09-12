@@ -38,6 +38,13 @@ class CoreSignalSubscription:
         signal: CoreSignal[Any],
         handler: SignalHandler[Any],
     ) -> None:
+        """Initialize an active subscription handle.
+
+        Args:
+            bus: Signal bus that owns the subscription.
+            signal: Subscribed signal token.
+            handler: Callback registered for the signal.
+        """
         self._bus = bus
         self._signal = signal
         self._handler = handler
@@ -98,6 +105,7 @@ class InMemoryCoreSignalBus(CoreSignalBus):
     """
 
     def __init__(self) -> None:
+        """Initialize empty subscriber and emission registries."""
         self._subscribers: dict[CoreSignal[Any], list[SignalHandler[Any]]] = {}
         self._emissions: list[CoreSignalEmission] = []
         self._emitted_global: set[CoreSignal[Any]] = set()

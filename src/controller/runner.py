@@ -23,6 +23,8 @@ jobpreflight = Callable[[], bool]
 
 
 class CancelledError(Exception):
+    """Raised when cooperative job cancellation is observed."""
+
     pass
 
 
@@ -112,15 +114,23 @@ class CancelToken:
     __slots__ = ("_cancelled",)
 
     def __init__(self):
+        """Initialize an active cancellation token."""
         self._cancelled: bool = False
 
     def cancel(self) -> None:
+        """Mark the associated job as cancelled."""
         self._cancelled = True
 
     def is_cancelled(self) -> bool:
+        """Return whether cancellation has been requested."""
         return self._cancelled
 
     def throw_if_cancelled(self) -> None:
+        """Raise when cancellation has been requested.
+
+        Raises:
+            CancelledError: If the token has been cancelled.
+        """
         if self._cancelled:
             raise CancelledError("The job has been cancelled")
 
@@ -471,6 +481,14 @@ class AsyncRunner(QObject):
     _terminal_ready = Signal(str, object)
 
     def __init__(self, parent: Optional[QObject] = None) -> None:
+        """Initialize worker pools, runner signals, and active-job tracking.
+
+        Args:
+            parent: Optional Qt parent object.
+
+        Raises:
+            RuntimeError: If the required thread pool cannot be initialized.
+        """
         super().__init__(parent)
         self._signals: RunnerSignals = RunnerSignals(self)
         try:

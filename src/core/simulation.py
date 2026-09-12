@@ -196,6 +196,11 @@ class SimulationDiskStore:
     """Disk I/O for simulation metadata, index, and on-disk simulation directories."""
 
     def __init__(self, save_dir: Path) -> None:
+        """Initialize persistent storage in a simulation root directory.
+
+        Args:
+            save_dir: Root directory for the index and simulation folders.
+        """
         self._save_dir: Path = save_dir
         self._index_simulation_ids: list[str] = []
         self._last_active_device_id: str | None = None
@@ -455,6 +460,11 @@ class SimulationRepository(Repository[Simulation]):
     """In-memory repository for simulations; persistence delegated to SimulationDiskStore."""
 
     def __init__(self, save_dir: Path) -> None:
+        """Initialize an in-memory repository backed by disk storage.
+
+        Args:
+            save_dir: Root directory for persisted simulation state.
+        """
         super().__init__()
         self._store = SimulationDiskStore(save_dir)
         self._last_active_device_id: str | None = self._store.last_active_device_id

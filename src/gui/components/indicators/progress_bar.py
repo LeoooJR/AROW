@@ -76,6 +76,7 @@ class ProgressBar(QProgressBar, Component):
         self.valueChanged.connect(self._update_format)
 
     def apply_theme_icons(self, theme: Theme) -> None:
+        """Apply theme-dependent icons when the progress bar gains any."""
         pass
 
     @Slot(int)

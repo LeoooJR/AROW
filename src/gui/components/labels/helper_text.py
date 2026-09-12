@@ -14,6 +14,7 @@ from gui.constants.settings import Settings
 
 
 class HelperText(QLabel, Component):
+    """Label rendered with the application's secondary text style."""
 
     @dataclass(frozen=True)
     class Text:
@@ -57,4 +58,5 @@ class HelperText(QLabel, Component):
         pass
 
     def apply_theme_icons(self, theme: Theme) -> None:
+        """Apply theme-dependent icons when the label gains any."""
         pass

@@ -19,6 +19,14 @@ class Station(MapElement, Payload):
         super().__init__(id, geometry)
 
     def serialize(self, **kwargs) -> dict[str, object]:
+        """Serialize the station identifier and geometry.
+
+        Args:
+            **kwargs: Geometry serialization options.
+
+        Returns:
+            Serialized station fields.
+        """
         return {
             "id": self.id,
             "geometry": serialize_geometry(self.geometry, **kwargs),
@@ -26,6 +34,20 @@ class Station(MapElement, Payload):
 
     @classmethod
     def deserialize(cls, payload: dict[str, object], **kwargs) -> Station:
+        """Deserialize a station identifier and geometry.
+
+        Args:
+            payload: Serialized station fields.
+            **kwargs: Reserved deserialization options.
+
+        Returns:
+            Reconstructed station.
+
+        Raises:
+            KeyError: If a required field is absent.
+            TypeError: If the geometry is not a point.
+            ValueError: If the station identifier or geometry is invalid.
+        """
         station_id = payload["id"]
         if not isinstance(station_id, str):
             raise ValueError("Station payload id must be a string")

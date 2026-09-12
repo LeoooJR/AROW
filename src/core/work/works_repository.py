@@ -50,6 +50,7 @@ class CoreRuntimeWorksRepository(Repository[CoreRuntimeWorkCatalogEntry]):
     """Registers all built-in core-runtime work/outcome pairs (see :data:`CORE_RUNTIME_WORKS`)."""
 
     def __init__(self) -> None:
+        """Initialize and register every built-in core-runtime work type."""
         super().__init__()
         entries: tuple[CoreRuntimeWorkCatalogEntry, ...] = (
             CoreRuntimeWorkCatalogEntry(

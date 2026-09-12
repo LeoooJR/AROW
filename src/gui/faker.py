@@ -54,6 +54,7 @@ faker.add_provider(android_device_model_provider)
 
 
 def generate_android_device_model() -> str:
+    """Return a synthetic Android device model name."""
     return faker.android_device_model()
 
 
@@ -88,6 +89,7 @@ faker.add_provider(android_device_manufacturer_provider)
 
 
 def generate_android_device_manufacturer() -> str:
+    """Return a synthetic Android device manufacturer."""
     return faker.android_device_manufacturer()
 
 
@@ -236,47 +238,58 @@ faker.add_provider(
 
 
 def generate_host_name() -> str:
+    """Return a synthetic desktop host name."""
     return faker.name()
 
 
 def generate_private_ipv4() -> str:
+    """Return a synthetic private IPv4 address."""
     return faker.ipv4_private()
 
 
 def generate_desktop_platform_label() -> str:
+    """Return a synthetic desktop platform label."""
     return faker.desktop_platform_label()
 
 
 def generate_host_identity_summary() -> str:
+    """Return a synthetic host and platform summary."""
     return faker.host_identity_summary()
 
 
 def generate_adb_version_string() -> str:
+    """Return a synthetic ADB version string."""
     # Semver-shaped patch segment; numeric sampling fits Faker better than a fixed pool.
     return f"1.0.{faker.random_int(28, 52)}"
 
 
 def generate_adb_daemon_endpoint() -> str:
+    """Return a synthetic ADB daemon endpoint."""
     return faker.adb_daemon_endpoint()
 
 
 def generate_connected_device_count_str() -> str:
+    """Return a synthetic connected-device count label."""
     return str(faker.random_int(0, 4))
 
 
 def generate_server_state_label() -> str:
+    """Return a synthetic ADB server state label."""
     return faker.adb_server_state_label()
 
 
 def generate_adb_bridge_helper_note() -> str:
+    """Return a synthetic ADB bridge helper note."""
     return faker.adb_bridge_helper_note()
 
 
 def generate_android_release_label() -> str:
+    """Return a synthetic Android release label."""
     return faker.android_release_label()
 
 
 def generate_city_state_location() -> str:
+    """Return a synthetic city and region label."""
     # Composite geographic formatter; no discrete pool.
     return f"{faker.city()}, {faker.state_abbr()}"
 
@@ -303,35 +316,43 @@ def generate_log_labels() -> tuple[str, str, str]:
 
 
 def generate_activity_log_filename() -> str:
+    """Return a synthetic activity log filename."""
     stem = faker.slug()[:28].replace("-", "_") or "session"
     return f"{stem}_{faker.random_int(1000, 9999)}.log"
 
 
 def generate_activity_log_file_type() -> str:
+    """Return a synthetic activity log file type."""
     return faker.activity_log_file_type()
 
 
 def generate_milestone_line_label() -> str:
+    """Return a synthetic milestone railway line label."""
     return faker.milestone_line_label()
 
 
 def generate_milestone_km_label() -> str:
+    """Return a synthetic milestone kilometre label."""
     kilometer = faker.random_int(0, 999)
     meters = faker.random_int(0, 999)
     return f"{kilometer}+{meters:03d}"
 
 
 def generate_milestone_longitude() -> float:
+    """Return a synthetic milestone longitude."""
     return faker.pyfloat(left_digits=2, right_digits=10, min_value=-5, max_value=9)
 
 
 def generate_milestone_latitude() -> float:
+    """Return a synthetic milestone latitude."""
     return faker.pyfloat(left_digits=2, right_digits=10, min_value=41, max_value=51)
 
 
 def generate_milestone_type_label() -> str:
+    """Return a synthetic milestone type label."""
     return faker.milestone_type_label()
 
 
 def generate_milestone_source_label() -> str:
+    """Return a synthetic milestone source label."""
     return faker.milestone_source_label()

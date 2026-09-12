@@ -19,6 +19,7 @@ from gui.wrapper import VerticalLayoutWrapper
 
 
 class DeviceSelectionPanel(CollapsiblePanel):
+    """Collapsible panel presenting linked Android devices."""
 
     @dataclass(frozen=True)
     class Text:

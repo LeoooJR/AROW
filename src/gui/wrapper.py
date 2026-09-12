@@ -5,6 +5,7 @@ from PySide6.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QVBoxLayout, QWi
 
 
 class VerticalLayoutWrapper(QFrame):
+    """Frame wrapper that owns a configured vertical layout."""
 
     @dataclass(frozen=True)
     class Text:
@@ -71,13 +72,16 @@ class VerticalLayoutWrapper(QFrame):
         self.layout().addWidget(widget)
 
     def get_layout(self) -> QVBoxLayout:
+        """Return the owned vertical layout."""
         return self.layout()
 
     def get_widgets(self) -> list[QWidget]:
+        """Return the widgets currently held by the vertical layout."""
         return [self.layout().itemAt(i).widget() for i in range(self.layout().count())]
 
 
 class HorizontalLayoutWrapper(QFrame):
+    """Frame wrapper that owns a configured horizontal layout."""
 
     @dataclass(frozen=True)
     class Text:
@@ -144,13 +148,16 @@ class HorizontalLayoutWrapper(QFrame):
         self.layout().addWidget(widget)
 
     def get_layout(self) -> QHBoxLayout:
+        """Return the owned horizontal layout."""
         return self.layout()
 
     def get_widgets(self) -> list[QWidget]:
+        """Return the widgets currently held by the horizontal layout."""
         return [self.layout().itemAt(i).widget() for i in range(self.layout().count())]
 
 
 class GridLayoutWrapper(QFrame):
+    """Frame wrapper that owns a configured grid layout."""
 
     @dataclass(frozen=True)
     class Text:
@@ -218,9 +225,11 @@ class GridLayoutWrapper(QFrame):
         self.layout().addWidget(widget, row, column, alignment=alignment)
 
     def get_layout(self) -> QGridLayout:
+        """Return the owned grid layout."""
         return self.layout()
 
     def get_widgets(self) -> list[tuple[QWidget, int, int]]:
+        """Return widgets and their current grid coordinates."""
         return [
             (
                 self.layout().itemAt(i).widget(),

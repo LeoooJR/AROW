@@ -30,6 +30,11 @@ class AdbServer:
     """Side-effect-free ADB daemon facade with explicit lifecycle operations."""
 
     def __init__(self, binary: AdbBinary) -> None:
+        """Initialize the server facade for an ADB binary.
+
+        Args:
+            binary: ADB binary metadata used for daemon commands.
+        """
         self._executor = self._create_executor(binary)
         self._history_manager = AdbCommandHistoryManager()
         self._paired_devices: PhoneRepository = PhoneRepository()

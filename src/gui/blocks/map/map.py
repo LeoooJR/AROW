@@ -85,6 +85,15 @@ class Bridge(QObject):
         latitude: float,
         longitude: float,
     ) -> None:
+        """Normalize and forward a marker selection from JavaScript.
+
+        Args:
+            km: Kilometric position of the selected marker.
+            line_code: Railway line code associated with the marker.
+            line_troncon: Railway section identifier.
+            latitude: Marker latitude in decimal degrees.
+            longitude: Marker longitude in decimal degrees.
+        """
         normalized_line_code = str(line_code).strip()
         if normalized_line_code.isdigit():
             normalized_line_code = normalized_line_code.zfill(6)
@@ -210,6 +219,7 @@ class Canvas(QWebEngineView):
 
 
 class Legend(QFrame):
+    """Legend describing real, simulated, and kilometric map cues."""
 
     @dataclass(frozen=True)
     class Text:
@@ -327,6 +337,7 @@ class Legend(QFrame):
 
 
 class Location(QWidget):
+    """Coordinate readout with a map-recentering control."""
 
     @dataclass(frozen=True)
     class Text:
@@ -524,6 +535,7 @@ class Location(QWidget):
 
 
 class Coordinates(QFrame):
+    """Simulation state and coordinate controls displayed below the map."""
 
     @dataclass(frozen=True)
     class Text:
