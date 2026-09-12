@@ -47,6 +47,7 @@ def _lignes_geometry_is_line_or_multiline(
 
 
 class GaresDeVoyageursSchema(pg.GeoDataFrameModel):
+    """Schema for the packaged passenger-station GeoJSON dataset."""
 
     nom: Series[String] = pg.Field(
         nullable=False, unique=True, description="The official name of the station"
@@ -101,6 +102,7 @@ def normalize_dataset_code_ligne(value: object) -> str:
 
 
 class LignesParTypeSchema(pg.GeoDataFrameModel):
+    """Schema for the packaged railway-line segment GeoJSON dataset."""
 
     type_ligne: Series[String] = pg.Field(
         nullable=False, description="Line category (e.g. principale, raccordement)."

@@ -210,6 +210,27 @@ class Phone(Device[PhoneDescriptor], Payload):
         android_api_level: int | None = None,
         connectivity_type: ConnectivityType | None = None,
     ) -> None:
+        """Initialize an Android phone from ADB and enrichment metadata.
+
+        Args:
+            id: Current ADB connection identifier.
+            name: Optional fallback display name or ADB device column.
+            os: Android release string.
+            ip: Network address for a Wi-Fi connection.
+            port: Network port for a Wi-Fi connection.
+            device: Device value reported by ``adb devices -l``.
+            product: Product value reported by ADB.
+            model: Commercial model value reported by ADB.
+            state: Current ADB connection state.
+            hardware_serial: Hardware serial reported by ``ro.serialno``.
+            manufacturer: Device manufacturer reported by ADB.
+            transport_id: Transport identifier reported by ADB.
+            android_api_level: Android SDK API level.
+            connectivity_type: Explicit ``usb`` or ``wifi`` transport type.
+
+        Raises:
+            ValueError: If ``connectivity_type`` is unsupported.
+        """
         prod, mod, man = product or "", model or "", manufacturer or ""
         serial = (hardware_serial.strip() if hardware_serial else "") or ""
         device_column = (device.strip() if device else "") or ""
@@ -259,66 +280,88 @@ class Phone(Device[PhoneDescriptor], Payload):
 
     @property
     def product(self) -> str:
+        """Return the ADB product identifier."""
         return self._descriptor.product
 
     @property
     def os(self) -> str:
+        """Return the Android release string."""
         return self._descriptor.os
 
     @os.setter
     def os(self, value: str) -> None:
+        """Set a non-empty Android release string."""
         value = value.strip()
         if value:
             self._descriptor.os = value
 
     @property
     def state(self) -> str:
+        """Return the current ADB connection state."""
         return self._descriptor.state
 
     @state.setter
     def state(self, value: str) -> None:
+        """Set the current ADB connection state.
+
+        Raises:
+            TypeError: If ``value`` is not a string.
+        """
         if not isinstance(value, str):
             raise TypeError("state must be a string")
         self._descriptor.state = value
 
     @property
     def model(self) -> str:
+        """Return the commercial device model."""
         return self._descriptor.model
 
     @model.setter
     def model(self, value: str) -> None:
+        """Set a non-empty commercial device model."""
         value = value.strip()
         if value:
             self._descriptor.model = value
 
     @property
     def last_communication(self) -> datetime.datetime:
+        """Return the time of the latest device communication."""
         return self._descriptor.last_communication
 
     @last_communication.setter
     def last_communication(self, value: datetime.datetime) -> None:
+        """Set the time of the latest device communication.
+
+        Raises:
+            TypeError: If ``value`` is not a datetime.
+        """
         if not isinstance(value, datetime.datetime):
             raise TypeError("last_communication must be a datetime")
         self._descriptor.last_communication = value
 
     @property
     def transport_id(self) -> str:
+        """Return the current ADB transport identifier."""
         return self._descriptor.transport_id
 
     @property
     def connectivity_type(self) -> ConnectivityType:
+        """Return whether ADB reaches the phone over USB or Wi-Fi."""
         return self._descriptor.connectivity_type
 
     @property
     def stable_key(self) -> str:
+        """Return the stable logical phone identity."""
         return self._descriptor.stable_key
 
     @property
     def hardware_serial(self) -> str:
+        """Return the enriched hardware serial."""
         return self._descriptor.hardware_serial
 
     @hardware_serial.setter
     def hardware_serial(self, value: str) -> None:
+        """Set a valid hardware serial and refresh derived identity."""
         value = value.strip()
         if value and value.casefold() != "unknown":
             self._descriptor.hardware_serial = value
@@ -328,32 +371,47 @@ class Phone(Device[PhoneDescriptor], Payload):
 
     @property
     def manufacturer(self) -> str:
+        """Return the enriched device manufacturer."""
         return self._descriptor.manufacturer
 
     @manufacturer.setter
     def manufacturer(self, value: str) -> None:
+        """Set a non-empty device manufacturer."""
         value = value.strip()
         if value:
             self._descriptor.manufacturer = value
 
     @property
     def android_api_level(self) -> int | None:
+        """Return the enriched Android SDK API level."""
         return self._descriptor.android_api_level
 
     @android_api_level.setter
     def android_api_level(self, value: int | None) -> None:
+        """Set the Android SDK API level when available."""
         if value is not None:
             self._descriptor.android_api_level = value
 
     @property
     def shell_device_name(self) -> str:
+        """Return the enriched user-facing shell device name."""
         return self._descriptor.shell_device_name
 
     @shell_device_name.setter
     def shell_device_name(self, value: str) -> None:
+        """Set the normalized shell device name."""
         self._descriptor.shell_device_name = value.strip()
 
     def serialize(self, **kwargs: object) -> dict[str, object]:
+        """Serialize persisted phone state.
+
+        Args:
+            **kwargs: Serialization options. ``json_compatible`` converts the
+                communication timestamp to ISO 8601 text.
+
+        Returns:
+            Persistable phone state keyed by field name.
+        """
         return {
             "id": self.id,
             "name": self.name,
@@ -372,6 +430,19 @@ class Phone(Device[PhoneDescriptor], Payload):
 
     @classmethod
     def deserialize(cls, payload: dict[str, object], **kwargs: object) -> Phone:
+        """Deserialize persisted phone state.
+
+        Args:
+            payload: Persisted phone fields.
+            **kwargs: Reserved deserialization options.
+
+        Returns:
+            Reconstructed phone instance.
+
+        Raises:
+            KeyError: If the required ``id`` field is absent.
+            ValueError: If a serialized port or timestamp is invalid.
+        """
         port_raw = payload.get("port")
         port = (
             port_raw
@@ -409,6 +480,7 @@ class Phone(Device[PhoneDescriptor], Payload):
 
 
 def serialize_phone_collection(phones: Iterable[Phone]) -> list[dict[str, object]]:
+    """Serialize a phone collection while preserving datetime values."""
     return [phone.serialize(json_compatible=False) for phone in phones]
 
 
@@ -432,6 +504,12 @@ _DISCOVERED_PHONE_DESCRIPTOR_FIELDS = (
 
 
 def apply_discovered_phone_state(paired: Phone, discovered: Phone) -> None:
+    """Apply fresh discovery metadata to an existing paired phone.
+
+    Args:
+        paired: Tracked phone instance to update in place.
+        discovered: Newly discovered phone supplying current metadata.
+    """
     for field_name in _DISCOVERED_PHONE_DESCRIPTOR_FIELDS:
         setattr(
             paired.descriptor, field_name, getattr(discovered.descriptor, field_name)
@@ -444,15 +522,22 @@ class PhoneRepository(Repository[Phone]):
     """Repository that tracks the first added phone as its working device."""
 
     def __init__(self) -> None:
+        """Initialize an empty repository without a working phone."""
         super().__init__()
         self._working_device: Phone | None = None
 
     @property
     def working_device(self) -> Phone | None:
+        """Return the currently selected phone."""
         return self.__dict__.get("_working_device", None)
 
     @working_device.setter
     def working_device(self, device: Phone | None) -> None:
+        """Select a tracked phone or clear the selection.
+
+        Raises:
+            ValueError: If ``device`` is not stored in the repository.
+        """
         if device is None:
             self._working_device = None
         elif device.id in self._repository:
@@ -461,6 +546,7 @@ class PhoneRepository(Repository[Phone]):
             raise ValueError(f"Device with id {device.id} is not in the repository")
 
     def add(self, item: Phone) -> None:
+        """Add a phone and select the first successful addition."""
         try:
             super().add(item)
         except ValueError as error:
@@ -470,6 +556,7 @@ class PhoneRepository(Repository[Phone]):
             self._working_device = item
 
     def remove(self, item: Phone) -> None:
+        """Remove a phone and clear it when currently selected."""
         try:
             super().remove(item)
         except ValueError as error:
@@ -493,5 +580,6 @@ class PhoneRepository(Repository[Phone]):
         return indexed
 
     def clear(self) -> None:
+        """Remove all phones and clear the working-device selection."""
         super().clear()
         self._working_device = None

@@ -28,9 +28,11 @@ class SimulationSubController(AppSubController):
     """Subcontroller for the current simulation model state (no own AsyncRunner)."""
 
     def __init__(self, app: AppController) -> None:
+        """Initialize simulation orchestration for an application controller."""
         super().__init__(app)
 
     def connect_view_signals(self) -> None:
+        """Connect device-selection view signals to simulation lifecycle slots."""
         signals.DEVICE.DeviceSelectionConfirmed.connect(
             self._on_device_selection_confirmed
         )  # Ensuring the device is selected when the user confirms the selection
@@ -39,6 +41,7 @@ class SimulationSubController(AppSubController):
         )  # Ensuring no simulation is running before device is removed by adb subcontroller
 
     def connect_model_signals(self) -> None:
+        """Subscribe to simulation lifecycle events from the core signal bus."""
         self.model_entrypoint.signal_bus.subscribe(
             CoreSignals.SIMULATION_CREATED,
             self._on_simulation_created,

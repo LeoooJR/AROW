@@ -35,6 +35,7 @@ class MapSubController(AppSubController):
     """Subcontroller for map flows; does not own an AsyncRunner."""
 
     def __init__(self, app: AppController) -> None:
+        """Initialize map orchestration for an application controller."""
         super().__init__(app)
         self._render_jobs_by_simulation_id: dict[str, JobHandler] = (
             {}

@@ -29,6 +29,11 @@ class AdbClient:
     """Client to execute adb commands."""
 
     def __init__(self, binary: AdbBinary) -> None:
+        """Initialize the client for an ADB binary.
+
+        Args:
+            binary: ADB binary metadata used for command execution.
+        """
         self._executor = self._create_executor(binary)
         self._history_manager = AdbCommandHistoryManager()
 
@@ -142,9 +147,19 @@ class AdbClient:
         return command.parse(result.output or "")
 
     def enable_location_services(self) -> None:
+        """Enable Android location services.
+
+        Raises:
+            NotImplementedError: Always; location-service control is unavailable.
+        """
         raise NotImplementedError("Enabling location services is not implemented")
 
     def disable_location_services(self) -> None:
+        """Disable Android location services.
+
+        Raises:
+            NotImplementedError: Always; location-service control is unavailable.
+        """
         raise NotImplementedError("Disabling location services is not implemented")
 
     def set_mock_location(self, location: Location) -> None:

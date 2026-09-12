@@ -77,6 +77,12 @@ class MockAdbState:
     def __init__(
         self, *, seed: int | None = None, initial_devices: int | None = None
     ) -> None:
+        """Initialize synthetic device state.
+
+        Args:
+            seed: Optional seed for repeatable generated device data.
+            initial_devices: Initial device count, or ``None`` to generate one or two.
+        """
         if seed is not None:
             Faker.seed(seed)
             random.seed(seed)
@@ -183,6 +189,7 @@ class MockAdbState:
         return "\n".join(lines) + "\n"
 
     def ensure_profile_for_id(self, device_id: str) -> MockAdbDeviceProfile:
+        """Return the profile for a connection id, creating it when absent."""
         if device_id not in self._profiles:
             tid = self._alloc_transport_id()
             self._profiles[device_id] = self._build_profile(tid)
@@ -267,6 +274,7 @@ class MockAdbTransport:
     log_label = "Mock ADB"
 
     def __init__(self, state: MockAdbState) -> None:
+        """Initialize the transport with shared synthetic device state."""
         self._state = state
 
     @property
@@ -283,6 +291,21 @@ class MockAdbTransport:
         phone: Phone | None,
         timeout_seconds: float,
     ) -> AdbTransportResult:
+        """Execute one supported command against synthetic device state.
+
+        Args:
+            invocation: Bound ADB command invocation.
+            binary_path: Mock binary path used in version output.
+            scope: Client or server command scope.
+            phone: Optional target phone for device-scoped commands.
+            timeout_seconds: Ignored timeout supplied by the executor contract.
+
+        Returns:
+            Process-shaped synthetic command output.
+
+        Raises:
+            AdbTransportFailure: If the command or required target is unsupported.
+        """
         del timeout_seconds
         command = invocation.spec
         handlers = (
@@ -470,6 +493,12 @@ class MockAdbClient(AdbClient):
         state: MockAdbState,
         binary: AdbBinary | None = None,
     ) -> None:
+        """Initialize a client backed by shared mock state.
+
+        Args:
+            state: Synthetic device catalogue shared with the mock server.
+            binary: Optional mock binary metadata override.
+        """
         self._state = state
         command_binary = binary or AdbBinary(path=APPLICATION_PATHS.mock_adb_binary)
         super().__init__(command_binary)
@@ -491,6 +520,12 @@ class MockAdbServer(AdbServer):
         state: MockAdbState,
         binary: AdbBinary | None = None,
     ) -> None:
+        """Initialize a server facade backed by shared mock state.
+
+        Args:
+            state: Synthetic device catalogue shared with the mock client.
+            binary: Optional mock binary metadata override.
+        """
         self._state = state
         command_binary = binary or AdbBinary(path=APPLICATION_PATHS.mock_adb_binary)
         super().__init__(command_binary)

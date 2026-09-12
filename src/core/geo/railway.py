@@ -236,6 +236,14 @@ class Railway(MapElement, Payload):
         )
 
     def serialize(self, **kwargs) -> dict[str, object]:
+        """Serialize the validated railway lookup key.
+
+        Args:
+            **kwargs: Reserved serialization options.
+
+        Returns:
+            Railway identifier, line code, and segment number.
+        """
         return {
             "id": self.id,
             "code": self.code,
@@ -244,6 +252,18 @@ class Railway(MapElement, Payload):
 
     @classmethod
     def deserialize(cls, payload: dict[str, object], **kwargs) -> Railway:
+        """Deserialize and validate a railway lookup key.
+
+        Args:
+            payload: Serialized railway fields.
+            **kwargs: Reserved deserialization options.
+
+        Returns:
+            Railway resolved from the referential dataset.
+
+        Raises:
+            ValueError: If a required field has an invalid type or value.
+        """
         railway_id = payload.get("id")
         if not isinstance(railway_id, str):
             raise ValueError("Railway payload id must be a string")

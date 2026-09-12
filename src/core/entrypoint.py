@@ -96,9 +96,14 @@ def register_core_runtime_result_applier(
 
 
 class Entrypoint(ABC):
+    """Base entrypoint that owns application paths and the core signal bus."""
 
     def __init__(self, *, paths: ApplicationPaths | None = None) -> None:
+        """Initialize shared entrypoint infrastructure.
 
+        Args:
+            paths: Application paths override, or ``None`` to use the default.
+        """
         self._signal_bus: InMemoryCoreSignalBus = InMemoryCoreSignalBus()
         self._paths = paths or APPLICATION_PATHS
 
@@ -122,10 +127,12 @@ class Entrypoint(ABC):
 
     @property
     def config_dir(self) -> Path:
+        """Return the application configuration directory."""
         return self.paths.config_dir
 
     @property
     def application_dir(self) -> Path:
+        """Return the application data directory."""
         return self.paths.application_dir
 
 
@@ -143,6 +150,12 @@ class ModelEntrypoint(Entrypoint):
         use_mock_adb: bool = False,
         paths: ApplicationPaths | None = None,
     ) -> None:
+        """Initialize the model runtime and its domain services.
+
+        Args:
+            use_mock_adb: Whether startup should use the in-memory ADB backend.
+            paths: Application paths override, or ``None`` to use the default.
+        """
         super().__init__(paths=paths)
         self._host: Computer = Computer(id="host-1")
         self._adb_server: AdbServer | None = None
