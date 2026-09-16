@@ -21,6 +21,13 @@ class DatasetNotFoundError(DatasetError):
         *,
         path: Path | None = None,
     ) -> None:
+        """Initialize a missing-dataset error.
+
+        Args:
+            dataset_id: Identifier of the missing dataset.
+            message: Human-readable failure description.
+            path: Expected packaged asset path, when known.
+        """
         self.dataset_id = dataset_id
         self.path = path
         super().__init__(message)
@@ -38,6 +45,15 @@ class DatasetCorruptionError(DatasetError):
         expected_hash: str | None = None,
         actual_hash: str | None = None,
     ) -> None:
+        """Initialize an unreadable or invalid-dataset error.
+
+        Args:
+            dataset_id: Identifier of the corrupt dataset.
+            message: Human-readable failure description.
+            path: Packaged asset path, when known.
+            expected_hash: Expected SHA-256 digest, when available.
+            actual_hash: Observed SHA-256 digest, when available.
+        """
         self.dataset_id = dataset_id
         self.path = path
         self.expected_hash = expected_hash

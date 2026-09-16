@@ -78,6 +78,16 @@ class ValidateSimulationMarkerLocationWork(
         latitude: float,
         longitude: float,
     ) -> None:
+        """Initialize marker-validation work.
+
+        Args:
+            simulation_id: Simulation that owns the selected marker.
+            km: Selected integer kilometer point.
+            line_code: Selected six-digit railway code.
+            line_troncon: Selected railway segment number.
+            latitude: Selected WGS84 latitude.
+            longitude: Selected WGS84 longitude.
+        """
         self._simulation_id = simulation_id
         self._km = km
         self._line_code = line_code
@@ -129,6 +139,12 @@ class ValidateSimulationMarkerLocationWork(
         model_entrypoint: CoreSignalEmitter,
         outcome: ValidateSimulationMarkerLocationOutcome,
     ) -> None:
+        """Apply and emit a validated or rejected marker result.
+
+        Args:
+            model_entrypoint: Main-thread simulation mutation boundary.
+            outcome: Worker validation or rejection result.
+        """
         mutation_entrypoint = cast(SimulationMutationEntrypoint, model_entrypoint)
         if outcome.validated is not None:
             if (
@@ -193,6 +209,7 @@ class ValidateSimulationMarkerLocationWork(
     def apply_failure_main_thread(
         model_entrypoint: CoreSignalEmitter, error: BaseException
     ) -> None:
+        """Emit a generic core error for an unexpected validation failure."""
         ValidateSimulationMarkerLocationWork.emit_generic_error(
             model_entrypoint,
             source="ValidateSimulationMarkerLocationWork",

@@ -88,6 +88,7 @@ class DotStatusBadge(QFrame, Component):
         pass
 
     def apply_theme_icons(self, theme: Theme) -> None:
+        """Apply theme-dependent icons when the badge gains any."""
         pass
 
     def set_status(self, text: str, kind: DotStatusKind = "muted") -> None:

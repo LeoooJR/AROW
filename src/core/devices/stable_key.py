@@ -58,9 +58,11 @@ class FirstTierStableKey(StableKey):
 
     @property
     def value(self) -> str:
+        """Return the canonical Tier-1 stable-key representation."""
         return f"{_STABLE_HW_PREFIX}{self.hardware_serial}"
 
     def is_collision_resistant(self) -> bool:
+        """Return whether the hardware-serial key resists collisions."""
         return True
 
 
@@ -112,9 +114,11 @@ class SecondTierStableKey(StableKey):
 
     @property
     def value(self) -> str:
+        """Return the canonical Tier-2 stable-key representation."""
         return f"{_STABLE_FP_PREFIX}{self.digest}"
 
     def is_collision_resistant(self) -> bool:
+        """Return whether the metadata fingerprint resists collisions."""
         return False
 
 

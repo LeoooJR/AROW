@@ -69,9 +69,11 @@ class SVG(QLabel, Component):
         pass
 
     def apply_theme_icons(self, theme: Theme) -> None:
+        """Apply theme-dependent media when the SVG gains any."""
         pass
 
     def paintEvent(self, event):
+        """Render the current SVG into the widget bounds."""
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         if self.renderer is not None:

@@ -78,9 +78,11 @@ class OTPLineEdit(QLineEdit, Component):
         pass
 
     def apply_theme_icons(self, theme: Theme) -> None:
+        """Apply theme-dependent icons when the OTP cell gains any."""
         pass
 
     def keyPressEvent(self, event):
+        """Move focus backward when Backspace is pressed in an empty cell."""
         if event.key() == Qt.Key.Key_Backspace:
             cursor_pos = self.cursorPosition()
             if cursor_pos == 0 and (not QLineEdit.text(self)) and self._otp_index > 0:
@@ -207,6 +209,7 @@ class OTPInput(QWidget, Component):
         pass
 
     def apply_theme_icons(self, theme: Theme) -> None:
+        """Apply theme-dependent icons when the OTP input gains any."""
         pass
 
     def _connect_otp_text_changed(self, index: int, otp_input: QLineEdit) -> None:
@@ -226,12 +229,14 @@ class OTPInput(QWidget, Component):
             self._otp_inputs[index + 1].setFocus()
 
     def is_valid(self) -> bool:
+        """Return whether every OTP cell contains acceptable input."""
         for otp_input in self._otp_inputs:
             if not otp_input.hasAcceptableInput():
                 return False
         return True
 
     def get_invalid_index(self) -> set[int]:
+        """Return indices of cells with invalid or incomplete input."""
         invalid_indices_by_type: set[int] = set()
         invalid_indices_by_length: set[int] = set()
         for i, otp_input in enumerate(self._otp_inputs):

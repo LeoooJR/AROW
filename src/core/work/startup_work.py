@@ -129,6 +129,7 @@ class StartupCoreRuntimeError(CoreException):
     """Startup core runtime work failed."""
 
     def __init__(self, reason: str) -> None:
+        """Initialize a runtime-startup failure with its reason."""
         self.reason = reason
         super().__init__(reason)
 
@@ -170,6 +171,13 @@ class StartupCoreRuntimeWork(CoreRuntimeWork[StartupOutcome]):
         adb_binary_path: Path,
         simulations_dir: Path,
     ) -> None:
+        """Initialize core-runtime startup work.
+
+        Args:
+            use_mock_adb: Whether to construct the in-memory ADB runtime.
+            adb_binary_path: Path of the real or mock ADB binary.
+            simulations_dir: Root directory for persisted simulations.
+        """
         self._use_mock_adb: bool = use_mock_adb
         self._adb_binary_path = adb_binary_path
         self._simulations_dir = simulations_dir
@@ -293,6 +301,7 @@ class StartupCoreRuntimeWork(CoreRuntimeWork[StartupOutcome]):
     def apply_failure_main_thread(
         model_entrypoint: CoreSignalEmitter, error: BaseException
     ) -> None:
+        """Emit a generic core error for a runtime-startup failure."""
         StartupCoreRuntimeWork.emit_generic_error(
             model_entrypoint,
             source="StartupCoreRuntimeWork",

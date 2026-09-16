@@ -21,6 +21,7 @@ class AdbCommandHistory(Mapping[datetime.datetime, AdbCommandHistoryEntry]):
     __slots__ = ("_entries",)
 
     def __init__(self, entries: AdbCommandHistoryEntries | None = None) -> None:
+        """Initialize an ordered history from optional existing entries."""
         self._entries = (
             OrderedDict(entries.items()) if entries is not None else OrderedDict()
         )
@@ -65,6 +66,7 @@ class AdbCommandHistoryManager:
     """Own all mutation and query policy for one ADB command history."""
 
     def __init__(self) -> None:
+        """Initialize a manager with an empty command history."""
         self._history = AdbCommandHistory()
 
     @property

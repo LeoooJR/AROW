@@ -46,6 +46,15 @@ class ReadinessRow(HorizontalLayoutWrapper):
         status: str,
         status_kind: str = "muted",
     ) -> None:
+        """Build one operator-readiness status row.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+            label: Short readiness category label.
+            detail: Supporting readiness description.
+            status: Initial status badge text.
+            status_kind: Initial semantic badge style.
+        """
         self.texts = ReadinessRow.Text(label=label, detail=detail, status=status)
 
         label_widget = QLabel(label, parent)
@@ -151,6 +160,11 @@ class OperatorReadinessBlock(VerticalLayoutWrapper, Block):
         rows: list[ReadinessRow]
 
     def __init__(self, parent: QWidget | None = None) -> None:
+        """Build the operator-readiness summary block.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+        """
         block_texts = OperatorReadinessBlock.Text()
 
         title = QLabel(block_texts.title, parent)
@@ -221,6 +235,7 @@ class OperatorReadinessBlock(VerticalLayoutWrapper, Block):
         )
 
     def apply_theme_icons(self, theme: Theme) -> None:
+        """Apply theme-dependent icons when readiness rows gain any."""
         pass
 
     ### Slots ###

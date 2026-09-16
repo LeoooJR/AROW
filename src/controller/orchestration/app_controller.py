@@ -54,6 +54,13 @@ class AppController(Controller):
         *,
         force_exit: Callable[[int], NoReturn] = os._exit,
     ) -> None:
+        """Initialize application orchestration and start core runtime setup.
+
+        Args:
+            model_entrypoint: Core model boundary shared by subcontrollers.
+            view: Main application window.
+            force_exit: Process termination callback used after forced shutdown.
+        """
         # Subcontrollers need a fully constructed app reference; defer signal
         # wiring in Controller until children exist.
         super().__init__(model_entrypoint, view, defer_signal_connect=True)
@@ -75,14 +82,17 @@ class AppController(Controller):
 
     @property
     def simulation(self) -> SimulationSubController:
+        """Return the simulation-domain subcontroller."""
         return self._simulation
 
     @property
     def adb(self) -> AdbSubController:
+        """Return the ADB-domain subcontroller."""
         return self._adb
 
     @property
     def map(self) -> MapSubController:
+        """Return the map-domain subcontroller."""
         return self._map
 
     def _connect_view_signals(self) -> None:

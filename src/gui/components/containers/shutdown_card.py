@@ -61,6 +61,11 @@ class ShutdownCard(QFrame, Component):
         force_button: Button
 
     def __init__(self, parent: QWidget | None = None) -> None:
+        """Build the managed-shutdown status and decision card.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+        """
         super().__init__(parent)
         self.texts = ShutdownCard.Text()
         self._mode = ShutdownCardMode.CLOSING
@@ -130,6 +135,7 @@ class ShutdownCard(QFrame, Component):
 
     @property
     def mode(self) -> ShutdownCardMode:
+        """Return the shutdown state currently presented by the card."""
         return self._mode
 
     def _set_size_policy(self) -> None:
@@ -147,6 +153,7 @@ class ShutdownCard(QFrame, Component):
         self.ui.force_button.clicked.connect(self.ForceCloseRequested)
 
     def apply_theme_icons(self, theme: Theme) -> None:
+        """Refresh the shutdown status icon for the active theme."""
         self.ui.status_icon.set_path(
             icon_qt_path_for_theme(theme, GenericIcons.EXCLAMATION)
         )

@@ -319,6 +319,13 @@ class CoreSignalDependencyError(RuntimeError):
         missing: tuple[CoreSignal[Any], ...],
         scope: str | None = None,
     ) -> None:
+        """Initialize an error describing unmet signal dependencies.
+
+        Args:
+            signal: Signal whose emission was rejected.
+            missing: Prior signals that could satisfy the dependency.
+            scope: Optional entity scope that must match prior emissions.
+        """
         self.signal = signal
         self.missing = missing
         self.scope = scope

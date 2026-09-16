@@ -17,14 +17,17 @@ class AppSubController(ABC):
     """Subcontroller slice: shared access to app model entrypoint/view and signal wiring hooks."""
 
     def __init__(self, app: AppController) -> None:
+        """Initialize a domain subcontroller owned by the application controller."""
         self._app = app
 
     @property
     def model_entrypoint(self) -> ModelEntrypoint:
+        """Return the shared model entrypoint."""
         return self._app.model_entrypoint
 
     @property
     def view(self) -> MainWindow:
+        """Return the shared main window."""
         return self._app.view
 
     def declare_cron_jobs(self) -> tuple[CronJob, ...]:

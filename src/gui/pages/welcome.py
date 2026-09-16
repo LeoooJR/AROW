@@ -18,6 +18,7 @@ from gui.wrapper import HorizontalLayoutWrapper, VerticalLayoutWrapper
 
 
 class WelcomePage(QFrame):
+    """Welcome workspace for readiness, connection, and recent sessions."""
 
     @dataclass(frozen=True)
     class Text:
@@ -102,6 +103,7 @@ class WelcomePage(QFrame):
         self._finalize_ui_hooks()
 
     def apply_theme_icons(self, theme: Theme) -> None:
+        """Refresh visible welcome-card icons for the active theme."""
         self.ui.briefing_card.apply_theme_icons(theme)
         if self.ui.connection_card.isVisible():
             self.ui.connection_card.apply_theme_icons(theme)
@@ -139,6 +141,7 @@ class WelcomePage(QFrame):
         self.ui.content_wrapper.setMaximumWidth(target_width)
 
     def resizeEvent(self, event) -> None:
+        """Recalculate expanded welcome content width after a resize."""
         super().resizeEvent(event)
         if getattr(self, "_expanded_workspace_mode", False):
             self._apply_expanded_workspace_width()

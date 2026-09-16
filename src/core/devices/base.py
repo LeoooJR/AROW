@@ -49,39 +49,68 @@ class Device(ABC, Generic[D]):
         *,
         descriptor: D,
     ) -> None:
+        """Initialize a device from its typed descriptor.
+
+        Args:
+            id: Device identifier retained for constructor compatibility.
+            name: Display name retained for constructor compatibility.
+            os: Operating system retained for constructor compatibility.
+            ip: IP address retained for constructor compatibility.
+            port: Network port retained for constructor compatibility.
+            descriptor: Typed descriptor that owns the device state.
+        """
         self._descriptor = descriptor
 
     @property
     def descriptor(self) -> D:
+        """Return the typed descriptor that owns the device state."""
         return self._descriptor
 
     @descriptor.setter
     def descriptor(self, value: D) -> None:
+        """Replace the device descriptor.
+
+        Args:
+            value: Descriptor to bind to the device.
+
+        Raises:
+            TypeError: If ``value`` is not a device descriptor.
+        """
         if not isinstance(value, DeviceDescriptor):
             raise TypeError("descriptor must be an instance of DeviceDescriptor")
         self._descriptor = value
 
     @property
     def id(self) -> str:
+        """Return the device identifier."""
         return self._descriptor.id
 
     @property
     def name(self) -> str:
+        """Return the user-facing device name."""
         return self._descriptor.name
 
     @property
     def os(self) -> str:
+        """Return the device operating-system name or version."""
         return self._descriptor.os
 
     @property
     def ip(self) -> str:
+        """Return the device IP address."""
         return self._descriptor.ip
 
     @property
     def port(self) -> Optional[int]:
+        """Return the device network port, if available."""
         return self._descriptor.port
 
     def update_state(self, **kwargs: Any) -> None:
+        """Update descriptor fields from keyword arguments.
+
+        Args:
+            **kwargs: Descriptor field names and their new values.
+        """
         for key, value in kwargs.items():
             setattr(self._descriptor, key, value)
 

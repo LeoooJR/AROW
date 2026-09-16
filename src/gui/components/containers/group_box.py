@@ -65,4 +65,5 @@ class GroupBox(QGroupBox, Component):
         pass
 
     def apply_theme_icons(self, theme: Theme) -> None:
+        """Apply theme-dependent icons when the component gains any."""
         pass

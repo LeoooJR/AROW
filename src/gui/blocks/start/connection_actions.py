@@ -38,6 +38,11 @@ class ConnectionActionsBlock(VerticalLayoutWrapper, Block):
         body_wrapper: VerticalLayoutWrapper
 
     def __init__(self, parent: QWidget | None = None) -> None:
+        """Build wireless and USB Android connection actions.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+        """
         block_texts = ConnectionActionsBlock.Text()
 
         title = QLabel(block_texts.title, parent)
@@ -140,6 +145,7 @@ class ConnectionActionsBlock(VerticalLayoutWrapper, Block):
         return self.ui.usb_button
 
     def apply_theme_icons(self, theme: Theme) -> None:
+        """Refresh connection action icons for the active theme."""
         self.ui.wifi_button.apply_theme_icons(theme)
         self.ui.usb_button.apply_theme_icons(theme)
 

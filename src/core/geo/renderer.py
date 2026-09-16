@@ -29,6 +29,7 @@ _MILESTONE_GEOJSON_COLUMNS: Final[Tuple[str, ...]] = (
 
 
 class MapRenderer:
+    """Render AROW railway datasets as an interactive Folium map."""
 
     DEFAULT_LATITUDE: Final[float] = 46.232193
 
@@ -39,7 +40,7 @@ class MapRenderer:
     ZOOM_START: Final[int] = 6
 
     def __init__(self):
-
+        """Initialize the map, load packaged datasets, and create map layers."""
         # Canvas renderer reduces DOM load for many CircleMarkers (milestones).
         self.map = folium.Map(
             tiles="OpenStreetMap",

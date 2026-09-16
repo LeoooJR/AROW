@@ -78,6 +78,7 @@ class MapPage(QFrame):
         pass
 
     def apply_theme_icons(self, theme: Theme) -> None:
+        """Refresh map block icons for the active theme."""
         self.ui.map_block.apply_theme_icons(theme)
 
     def _set_size_policy(self) -> None:

@@ -43,6 +43,11 @@ class LogPanel(CollapsiblePanel):
         activity_log_block: ActivityLogBlock
 
     def __init__(self, parent=None):
+        """Build the collapsible activity-log panel.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+        """
         self.texts = LogPanel.Text()
         self.ui: LogPanel.UI
         self._activity_log_block: ActivityLogBlock
@@ -93,17 +98,25 @@ class LogPanel(CollapsiblePanel):
         self._activity_log_block.apply_theme_icons(theme)
 
     def resizeEvent(self, event) -> None:
+        """Refresh the activity-log layout after the panel is resized."""
         super().resizeEvent(event)
         self.refresh_layout()
 
     @Slot()
     def refresh_layout(self, *, deferred: bool = True) -> None:
+        """Refresh responsive activity-log layout state.
+
+        Args:
+            deferred: Whether to defer geometry-dependent work to the event loop.
+        """
         self.ui.activity_log_block.refresh_layout(deferred=deferred)
 
     def logs_list(self) -> List:
+        """Return the activity log list widget."""
         return self.ui.activity_log_block.logs_list
 
     def file_display_widget(self) -> File:
+        """Return the activity log file summary widget."""
         return self.ui.activity_log_block.file_display_widget
 
 

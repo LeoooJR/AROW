@@ -8,7 +8,9 @@ class Identifiable(Protocol):
     """Objects stored in a repository must expose a stable string id."""
 
     @property
-    def id(self) -> str: ...
+    def id(self) -> str:
+        """Return the stable identifier used as the repository key."""
+        ...
 
 
 RepositoryObject = TypeVar("RepositoryObject", bound=Identifiable)
@@ -18,6 +20,7 @@ class Repository(ABC, Generic[RepositoryObject]):
     """Repository for the collection."""
 
     def __init__(self) -> None:
+        """Initialize an empty repository keyed by object identifier."""
         self._repository: dict[str, RepositoryObject] = dict()
 
     def get(self, id: str) -> RepositoryObject | None:

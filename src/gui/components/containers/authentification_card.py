@@ -313,6 +313,7 @@ class AuthentificationCard(QFrame, Component):
         self.ui.close_button.clicked.connect(self._on_close_button_clicked)
 
     def apply_theme_icons(self, theme: Theme) -> None:
+        """Refresh card icons for the active theme."""
         self.ui.close_button.apply_theme_icons(theme)
         self.ui.icon.set_path(icon_qt_path_for_theme(theme, GenericIcons.DEVICE))
 

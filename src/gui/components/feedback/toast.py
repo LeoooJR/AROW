@@ -25,6 +25,7 @@ from gui.constants.settings import Settings
 
 
 class Toast(QWidget, Component):
+    """Transient top-level notification with severity styling."""
 
     @dataclass(frozen=True)
     class Text:
@@ -183,6 +184,7 @@ class Toast(QWidget, Component):
         pass
 
     def apply_theme_icons(self, theme: Theme) -> None:
+        """Apply theme-dependent icons when the toast gains any."""
         pass
 
     def _move_to_bottom_right(self):

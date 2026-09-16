@@ -37,6 +37,14 @@ class DeviceAuthentificationError(CoreException):
         association_code: str,
         reason: str,
     ) -> None:
+        """Initialize a device-pairing failure.
+
+        Args:
+            ip: Requested device IPv4 address.
+            port: Requested pairing port.
+            association_code: Requested pairing code.
+            reason: Human-readable failure reason.
+        """
         self.ip = ip
         self.port = port
         self.association_code = association_code
@@ -96,6 +104,15 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
         port: int,
         association_code: str,
     ) -> None:
+        """Initialize a device-pairing work item.
+
+        Args:
+            adb_server: Active server used for preflight and retry.
+            adb_client: Active client used to pair the device.
+            ip: Device IPv4 address.
+            port: Device pairing port.
+            association_code: Six-digit wireless pairing code.
+        """
         self.adb_server: AdbServer | None = adb_server
         self.adb_client: AdbClient | None = adb_client
         self.ip: str = ip
@@ -236,6 +253,12 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
     def apply_failure_main_thread(
         model_entrypoint: CoreSignalEmitter, error: BaseException
     ) -> None:
+        """Emit a typed pairing failure or a generic core error.
+
+        Args:
+            model_entrypoint: Main-thread signal-emission boundary.
+            error: Worker failure to translate.
+        """
         if isinstance(error, DeviceAuthentificationError):
             logger.warning(
                 "Device pairing failed",

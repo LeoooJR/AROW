@@ -126,6 +126,7 @@ class PlaceHolder(QFrame, Component):
         pass
 
     def apply_theme_icons(self, theme: Theme) -> None:
+        """Refresh the placeholder icon for the active theme."""
         if self._icon is not None:
             self.ui.svg.set_path(icon_qt_path_for_theme(theme, self._icon))
 

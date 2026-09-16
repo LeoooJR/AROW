@@ -70,6 +70,7 @@ class HostInstallIdentityError(CoreException):
     """Host install identity work failed."""
 
     def __init__(self, reason: str) -> None:
+        """Initialize a host-install identity failure with its reason."""
         self.reason = reason
         super().__init__(reason)
 
@@ -87,6 +88,11 @@ class HostInstallIdentityWork(CoreRuntimeWork[HostInstallIdentityOutcome]):
     """
 
     def __init__(self, *, install_identity_file: Path) -> None:
+        """Initialize work for an install-identity file.
+
+        Args:
+            install_identity_file: Path read or created by the worker.
+        """
         self._install_identity_file = install_identity_file
 
     @preflight()
@@ -119,6 +125,12 @@ class HostInstallIdentityWork(CoreRuntimeWork[HostInstallIdentityOutcome]):
     def apply_main_thread(
         model_entrypoint: CoreSignalEmitter, outcome: HostInstallIdentityOutcome
     ) -> None:
+        """Apply a persisted install identity to the host model.
+
+        Args:
+            model_entrypoint: Main-thread host-identity boundary.
+            outcome: Worker result containing the normalized install token.
+        """
         host_entrypoint = cast(HostIdentityEntrypoint, model_entrypoint)
         token = (outcome.install_token or "").strip()
         if not token:
@@ -136,6 +148,7 @@ class HostInstallIdentityWork(CoreRuntimeWork[HostInstallIdentityOutcome]):
     def apply_failure_main_thread(
         model_entrypoint: CoreSignalEmitter, error: BaseException
     ) -> None:
+        """Emit a generic core error for an install-identity failure."""
         HostInstallIdentityWork.emit_generic_error(
             model_entrypoint,
             source="HostInstallIdentityWork",

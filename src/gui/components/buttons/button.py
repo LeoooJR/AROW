@@ -22,6 +22,7 @@ from gui.constants.settings import Settings
 
 
 class Button(QPushButton, Component):
+    """Styled primary action button with optional theme-aware icon."""
 
     _icon: GenericIcons | OperatingSystemIcons | ApplicationIcons | None
 
@@ -83,6 +84,7 @@ class Button(QPushButton, Component):
         pass
 
     def apply_theme_icons(self, theme: Theme) -> None:
+        """Refresh the button icon for the active theme."""
         if self._theme_unresponsive:
             return
         if self._icon is not None:

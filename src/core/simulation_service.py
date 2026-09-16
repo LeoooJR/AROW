@@ -32,6 +32,12 @@ class SimulationService:
     """Own simulation CRUD, location setters, and related core signal emission."""
 
     def __init__(self, entrypoint: ModelEntrypoint, *, save_dir: Path) -> None:
+        """Initialize simulation operations for a model entrypoint.
+
+        Args:
+            entrypoint: Model entrypoint used for state and signal access.
+            save_dir: Root directory for persisted simulations.
+        """
         self._entrypoint = entrypoint
         self._simulations = SimulationRepository(save_dir)
 

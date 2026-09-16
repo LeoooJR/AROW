@@ -13,6 +13,7 @@ from gui.constants.colors import Theme
 
 
 class FileOpenDialog(QFileDialog, Component):
+    """Read-only file picker configured for supported table files."""
 
     @dataclass(frozen=True)
     class Text:
@@ -59,10 +60,12 @@ class FileOpenDialog(QFileDialog, Component):
         pass
 
     def apply_theme_icons(self, theme: Theme) -> None:
+        """Apply theme-dependent icons when the dialog gains any."""
         pass
 
 
 class FileSaveDialog(QFileDialog, Component):
+    """File picker configured to save activity logs."""
 
     @dataclass(frozen=True)
     class Text:
@@ -109,4 +112,5 @@ class FileSaveDialog(QFileDialog, Component):
         pass
 
     def apply_theme_icons(self, theme: Theme) -> None:
+        """Apply theme-dependent icons when the dialog gains any."""
         pass

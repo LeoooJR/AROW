@@ -16,6 +16,7 @@ class CloseCoreRuntimeError(CoreException):
     """Close core runtime work failed."""
 
     def __init__(self, reason: str) -> None:
+        """Initialize a runtime-close failure with its reason."""
         self.reason = reason
         super().__init__(reason)
 
@@ -33,6 +34,7 @@ class CloseCoreRuntimeWork(CoreRuntimeWork[CloseOutcome]):
     """
 
     def __init__(self, adb_server: AdbServer) -> None:
+        """Initialize close work for the active ADB server."""
         self._adb_server = adb_server
 
     @preflight(
@@ -92,6 +94,7 @@ class CloseCoreRuntimeWork(CoreRuntimeWork[CloseOutcome]):
     def apply_failure_main_thread(
         model_entrypoint: CoreSignalEmitter, error: BaseException
     ) -> None:
+        """Emit a generic core error for a runtime-close failure."""
         CloseCoreRuntimeWork.emit_generic_error(
             model_entrypoint,
             source="CloseCoreRuntimeWork",

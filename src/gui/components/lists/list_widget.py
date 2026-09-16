@@ -22,6 +22,7 @@ from gui.constants.settings import Settings
 
 
 class List(QListWidget, Component):
+    """Styled list widget with bulk item insertion support."""
 
     @dataclass(frozen=True)
     class Text:
@@ -92,6 +93,7 @@ class List(QListWidget, Component):
         pass
 
     def apply_theme_icons(self, theme: Theme) -> None:
+        """Apply theme-dependent icons when the list gains any."""
         pass
 
     def add_items(self, items: list[QListWidgetItem | str]):

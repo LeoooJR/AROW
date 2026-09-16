@@ -77,6 +77,22 @@ class SubprocessAdbTransport:
         phone: Phone | None,
         timeout_seconds: float,
     ) -> AdbTransportResult:
+        """Execute one ADB subprocess attempt.
+
+        Args:
+            invocation: Bound command invocation to execute.
+            binary_path: Filesystem path of the ADB binary.
+            scope: Client or server scope, unused by this transport.
+            phone: Optional target phone for device-scoped commands.
+            timeout_seconds: Maximum subprocess duration in seconds.
+
+        Returns:
+            Captured subprocess output and return code.
+
+        Raises:
+            subprocess.TimeoutExpired: If the command exceeds its timeout.
+            OSError: If the subprocess cannot be started.
+        """
         del scope
         argv = invocation.argv(
             binary_path,
@@ -104,6 +120,12 @@ class AdbCommandExecutor:
         *,
         transport: AdbTransport | None = None,
     ) -> None:
+        """Initialize an executor for a binary and transport.
+
+        Args:
+            binary: ADB binary metadata used for command execution.
+            transport: Command transport, or ``None`` for subprocess execution.
+        """
         self._binary = binary
         self._transport = transport or SubprocessAdbTransport()
 

@@ -36,6 +36,11 @@ class CronManager:
     """Declare recurring jobs and activate their Qt timers in one commit."""
 
     def __init__(self, submit: CronSubmitter) -> None:
+        """Initialize a scheduler around an asynchronous job submitter.
+
+        Args:
+            submit: Callback that submits each recurring job.
+        """
         self._submit = submit
         self._declarations: dict[str, CronJob] = {}
         self._timers: dict[str, QTimer] = {}

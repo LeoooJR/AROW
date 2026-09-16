@@ -25,6 +25,11 @@ class PageRouter(QTabWidget):
     route_changed = Signal(object)
 
     def __init__(self, parent: QWidget | None = None) -> None:
+        """Create a stacked page router.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+        """
         super().__init__(parent)
         self._route_indexes: dict[PageRoute, int] = {}
         self._index_routes: dict[int, PageRoute] = {}

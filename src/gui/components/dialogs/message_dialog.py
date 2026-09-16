@@ -22,6 +22,7 @@ def _message_dialog_icon_pixmap(qt_path: str) -> QPixmap:
 
 
 class WarningDialog(QMessageBox, Component):
+    """Theme-aware warning dialog with confirmation actions."""
 
     @dataclass(frozen=True)
     class Text:
@@ -96,6 +97,7 @@ class WarningDialog(QMessageBox, Component):
         pass
 
     def apply_theme_icons(self, theme: Theme) -> None:
+        """Refresh the custom warning icon for the active theme."""
         if self._icon is not None:
             self.setIconPixmap(
                 _message_dialog_icon_pixmap(icon_qt_path_for_theme(theme, self._icon))
@@ -103,6 +105,7 @@ class WarningDialog(QMessageBox, Component):
 
 
 class QuestionDialog(QMessageBox, Component):
+    """Theme-aware question dialog with confirmation actions."""
 
     @dataclass(frozen=True)
     class Text:
@@ -177,6 +180,7 @@ class QuestionDialog(QMessageBox, Component):
         pass
 
     def apply_theme_icons(self, theme: Theme) -> None:
+        """Refresh the custom question icon for the active theme."""
         if self._icon is not None:
             self.setIconPixmap(
                 _message_dialog_icon_pixmap(icon_qt_path_for_theme(theme, self._icon))

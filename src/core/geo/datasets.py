@@ -117,6 +117,7 @@ def _preprocess_referentiel_pk_gps(df: pd.DataFrame) -> geopandas.GeoDataFrame:
 
 @dataclass(frozen=True)
 class DatasetDefinition:
+    """Immutable metadata and validation rules for one packaged dataset."""
 
     id: str
     name: str
@@ -137,10 +138,12 @@ class DatasetDefinition:
 
     @property
     def full_path(self) -> Path:
+        """Return the resolved path of the packaged dataset asset."""
         return APPLICATION_PATHS.geo_dataset_file(".".join([self.name, self.format]))
 
 
 class DatasetRepository:
+    """Static catalogue of packaged geospatial dataset definitions."""
 
     BASE_URL = APPLICATION_PATHS.geo_datasets_dir
 
@@ -182,12 +185,12 @@ class DatasetRepository:
 
     @classmethod
     def get_all_dataset_definitions(cls) -> list[DatasetDefinition]:
-
+        """Return every registered dataset definition."""
         return list(cls.DATASET_DEFINITIONS.values())
 
     @classmethod
     def get_dataset_definition(cls, id: str) -> DatasetDefinition | None:
-
+        """Return a registered dataset definition by identifier."""
         return cls.DATASET_DEFINITIONS.get(id, None)
 
 

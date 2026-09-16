@@ -50,6 +50,11 @@ class WorkspaceLayout(QWidget):
         right_panels_wrapper: VerticalLayoutWrapper
 
     def __init__(self, parent: QWidget | None = None) -> None:
+        """Build the routed workspace and its collapsible side panels.
+
+        Args:
+            parent: Optional Qt parent widget for lifetime and hierarchy.
+        """
         super().__init__(parent)
         self.texts = WorkspaceLayout.Text()
         self._left_panels_visible = True
@@ -172,6 +177,7 @@ class WorkspaceLayout(QWidget):
             self.ui.router.navigate(PageRoute.MAP)
 
     def set_left_panels_visibility(self, visible: bool) -> None:
+        """Animate the left panel group to the requested visibility."""
         self._left_panels_visible = visible
         animate_widget_visibility(
             self.ui.left_panels_wrapper,
@@ -186,6 +192,7 @@ class WorkspaceLayout(QWidget):
         self._refresh_log_panel_layout_later()
 
     def set_right_panels_visibility(self, visible: bool) -> None:
+        """Animate the right panel group to the requested visibility."""
         self._right_panels_visible = visible
         animate_widget_visibility(
             self.ui.right_panels_wrapper,
@@ -233,6 +240,7 @@ class WorkspaceLayout(QWidget):
         self.ui.welcome_page.set_expanded_workspace_mode(enabled)
 
     def apply_theme_icons(self, theme: Theme) -> None:
+        """Refresh workspace child icons for the active theme."""
         self.ui.router.apply_theme_icons(theme)
         for page in (self.ui.map_page, self.ui.device_page):
             page.apply_theme_icons(theme)
