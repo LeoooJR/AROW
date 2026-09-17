@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
+from core.devices.computer import Computer
 from core.devices.phone import Phone
 from core.entrypoint import ModelEntrypoint
 from core.work.authentificate_device_work import (
@@ -120,7 +121,7 @@ class TestModelEntrypoint:
         model_entrypoint = ModelEntrypoint()
         model_entrypoint._adb_server = MockAdbServer(state=state)
         model_entrypoint._adb_client = MockAdbClient(state=state)
-        model_entrypoint.host.descriptor.network_available = False
+        model_entrypoint._host = Computer(id="host-1", ip="127.0.0.1")
         expected_phone = Phone(id="paired", state="device")
         expected_outcome = AuthentificateDeviceOutcome(success_phone=expected_phone)
         mock_work_cls.return_value.run.return_value = expected_outcome

@@ -4,12 +4,14 @@ from __future__ import annotations
 
 from abc import ABC
 from dataclasses import dataclass, field
-from typing import Any, Generic, Optional, TypeVar
+from typing import Generic, Optional, TypeVar
 
 
-@dataclass(match_args=True)
+@dataclass(frozen=True, match_args=True)
 class DeviceDescriptor:
     """Metadata common to every device."""
+
+    __hash__ = None  # type: ignore[assignment]
 
     id: str = field(metadata={"description": "The id of the device"}, default="")
     name: str = field(
@@ -37,24 +39,10 @@ class Device(ABC, Generic[D]):
 
     _descriptor: D
 
-    def __init__(
-        self,
-        id: str,
-        name: str,
-        os: str,
-        ip: str,
-        port: Optional[int],
-        *,
-        descriptor: D,
-    ) -> None:
-        """Initialize a device from its typed descriptor.
+    def __init__(self, *, descriptor: D) -> None:
+        """Initialize a device from its typed descriptor snapshot.
 
         Args:
-            id: Device identifier retained for constructor compatibility.
-            name: Display name retained for constructor compatibility.
-            os: Operating system retained for constructor compatibility.
-            ip: IP address retained for constructor compatibility.
-            port: Network port retained for constructor compatibility.
             descriptor: Typed descriptor that owns the device state.
         """
         self._descriptor = descriptor
@@ -63,20 +51,6 @@ class Device(ABC, Generic[D]):
     def descriptor(self) -> D:
         """Return the typed descriptor that owns the device state."""
         return self._descriptor
-
-    @descriptor.setter
-    def descriptor(self, value: D) -> None:
-        """Replace the device descriptor.
-
-        Args:
-            value: Descriptor to bind to the device.
-
-        Raises:
-            TypeError: If ``value`` is not a device descriptor.
-        """
-        if not isinstance(value, DeviceDescriptor):
-            raise TypeError("descriptor must be an instance of DeviceDescriptor")
-        self._descriptor = value
 
     @property
     def id(self) -> str:
@@ -102,15 +76,6 @@ class Device(ABC, Generic[D]):
     def port(self) -> Optional[int]:
         """Return the device network port, if available."""
         return self._descriptor.port
-
-    def update_state(self, **kwargs: Any) -> None:
-        """Update descriptor fields from keyword arguments.
-
-        Args:
-            **kwargs: Descriptor field names and their new values.
-        """
-        for key, value in kwargs.items():
-            setattr(self._descriptor, key, value)
 
     def __str__(self) -> str:
         return f"{self._descriptor.name} - {self._descriptor.os} - {self._descriptor.ip}:{self._descriptor.port}"

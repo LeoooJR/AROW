@@ -4,6 +4,8 @@ Tests for core device model modules.
 
 from __future__ import annotations
 
+from dataclasses import FrozenInstanceError, replace
+
 import pytest
 
 from core.devices.base import DeviceDescriptor
@@ -41,14 +43,18 @@ class TestDeviceDescriptor:
         assert state.ip == "192.168.1.1"
         assert state.port == 5555
 
-    def test_device_descriptor_is_unhashable_before_and_after_update(self) -> None:
-        """Mutable descriptors must never advertise a stable hash."""
+    def test_device_descriptor_is_immutable_and_unhashable(self) -> None:
+        """Descriptor snapshots are immutable without becoming identity keys."""
         descriptor = DeviceDescriptor(id="device-1")
 
         with pytest.raises(TypeError):
             hash(descriptor)
+        with pytest.raises(FrozenInstanceError):
+            descriptor.name = "Updated device"  # type: ignore[misc]
 
-        descriptor.name = "Updated device"
+        updated = replace(descriptor, name="Updated device")
 
         with pytest.raises(TypeError):
-            hash(descriptor)
+            hash(updated)
+        assert updated.name == "Updated device"
+        assert descriptor.name == ""

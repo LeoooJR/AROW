@@ -333,7 +333,7 @@ def test_startup_apply_restores_last_active_device_after_adb_id_rebind(
         state="device",
         hardware_serial=phone.hardware_serial,
     )
-    rebound_phone.descriptor.os = phone.os
+    rebound_phone.os = phone.os
     rebound_state = MockAdbState(seed=222, initial_devices=0)
     rebound_server = MockAdbServer(state=rebound_state)
     rebound_server.paired_devices.add(rebound_phone)

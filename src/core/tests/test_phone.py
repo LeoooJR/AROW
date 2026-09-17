@@ -5,10 +5,11 @@ Tests for core device model modules.
 from __future__ import annotations
 
 import datetime
-from dataclasses import FrozenInstanceError
+from dataclasses import FrozenInstanceError, replace
 
 import pytest
 
+from core.devices.computer import ComputerDescriptor
 from core.devices.phone import (
     DEFAULT_PHONE_DISPLAY_NAME,
     Phone,
@@ -30,11 +31,13 @@ pytestmark = [pytest.mark.devices]
 class TestPhone:
     """Tests for the Phone device class."""
 
-    def test_phone_descriptor_setter(self) -> None:
-        """Assigning `phone.descriptor = ...` updates the nested PhoneDescriptor status field."""
+    def test_phone_descriptor_is_read_only_and_type_safe(self) -> None:
         phone = Phone(id="id", name="Pixel", state="online")
-        phone.state = "offline"
-        assert phone.descriptor.state == "offline"
+
+        with pytest.raises(AttributeError):
+            phone.descriptor = ComputerDescriptor()  # type: ignore[misc,assignment]
+        with pytest.raises(FrozenInstanceError):
+            phone.descriptor.state = "offline"  # type: ignore[misc]
 
     def test_phone_str_repr(self) -> None:
         """Phone __str__ and __repr__ are defined and non-empty."""
@@ -42,6 +45,26 @@ class TestPhone:
         assert "n" in str(phone)
         assert "Phone" in repr(phone)
         assert "x" in repr(phone)
+
+    def test_phone_descriptor_str_uses_human_friendly_labels(self) -> None:
+        phone = Phone(
+            id="192.168.1.20:5555",
+            os="15",
+            model="Pixel 8",
+            state="device",
+            android_api_level=35,
+        )
+
+        assert str(phone.descriptor) == (
+            "Pixel 8 | Android 15 (API 35) | "
+            "Wi-Fi: 192.168.1.20:5555 | State: device"
+        )
+
+    def test_phone_descriptor_repr_quotes_string_values(self) -> None:
+        descriptor = Phone(id="device-1", model="Pixel 8").descriptor
+
+        assert "id='device-1'" in repr(descriptor)
+        assert "model='Pixel 8'" in repr(descriptor)
 
     @pytest.mark.parametrize(
         ("kwargs", "expected"),
@@ -92,13 +115,10 @@ class TestPhone:
         payload.pop("connectivity_type")
         assert Phone.deserialize(payload).connectivity_type == "wifi"
 
-    def test_phone_update_state(self) -> None:
-        """Phone.update_state updates only given fields."""
-        phone = Phone(id="a", name="b", os="c", ip="d", port=1, state="e")
-        phone.update_state(name="updated", port=9999)
-        assert phone.descriptor.name == "updated"
-        assert phone.descriptor.port == 9999
-        assert phone.descriptor.id == "a"
+    def test_phone_has_no_generic_update_state_escape_hatch(self) -> None:
+        phone = Phone(id="a")
+
+        assert not hasattr(phone, "update_state")
 
     def test_phone_is_not_equal_to_unrelated_types(self) -> None:
         phone = Phone(id="connection", model="OceanPhone")
@@ -234,26 +254,55 @@ class TestPhone:
         assert phone.manufacturer == "FabCo"
         assert phone.model == "OceanPhone"
 
-    def test_descriptor_identity_assignment_synchronizes_stable_key(self) -> None:
-        phone = Phone(id="device-1", product="ocean", model="OceanPhone")
-        assert phone.stable_key == ""
+    def test_apply_shell_enrichment_updates_one_snapshot_atomically(self) -> None:
+        phone = Phone(id="device-1", product="ocean", model="List model", os="14")
+        original = phone.descriptor
 
-        phone.descriptor.manufacturer = "FabCo"
-        assert phone.stable_key.startswith("fp:v1:")
+        phone.apply_shell_enrichment(
+            manufacturer=" FabCo ",
+            model="OceanPhone",
+            shell_device_name=" Field handset ",
+            os="15",
+            android_api_level=35,
+            hardware_serial=" SERIAL-1 ",
+        )
 
-        phone.descriptor.hardware_serial = "SERIAL-1"
+        assert phone.descriptor is not original
+        assert phone.manufacturer == "FabCo"
+        assert phone.model == "OceanPhone"
+        assert phone.shell_device_name == "Field handset"
+        assert phone.name == "Field handset"
+        assert phone.os == "15"
+        assert phone.android_api_level == 35
+        assert phone.hardware_serial == "SERIAL-1"
         assert phone.stable_key == "hw:v1:SERIAL-1"
 
-    def test_descriptor_non_identity_assignment_preserves_stable_key(self) -> None:
-        phone = Phone(id="device-1", product="ocean", model="OceanPhone")
-        phone.descriptor.manufacturer = "FabCo"
-        stable_key = phone.stable_key
+    def test_apply_shell_enrichment_preserves_non_empty_values_on_blanks(self) -> None:
+        phone = Phone(
+            id="device-1",
+            manufacturer="FabCo",
+            model="OceanPhone",
+            os="14",
+            hardware_serial="SERIAL-1",
+            android_api_level=34,
+        )
 
-        phone.descriptor.os = "15"
-        phone.descriptor.shell_device_name = "Living Room Phone"
-        phone.descriptor.android_api_level = 35
+        phone.apply_shell_enrichment(
+            manufacturer=" ",
+            model="",
+            shell_device_name=" ",
+            os="",
+            android_api_level=None,
+            hardware_serial="unknown",
+        )
 
-        assert phone.stable_key == stable_key
+        assert phone.manufacturer == "FabCo"
+        assert phone.model == "OceanPhone"
+        assert phone.shell_device_name == ""
+        assert phone.os == "14"
+        assert phone.android_api_level == 34
+        assert phone.hardware_serial == "SERIAL-1"
+        assert phone.stable_key == "hw:v1:SERIAL-1"
 
     def test_descriptor_constructor_preserves_keyless_discovery_state(self) -> None:
         descriptor = PhoneDescriptor(
@@ -264,50 +313,33 @@ class TestPhone:
 
         assert descriptor.stable_key == ""
 
-    def test_direct_persisted_stable_key_assignment_is_preserved(self) -> None:
-        phone = Phone(id="device-1", product="ocean", model="OceanPhone")
+    def test_deserialize_preserves_persisted_stable_key(self) -> None:
         persisted_key = "hw:v1:PERSISTED-SERIAL"
 
-        phone.descriptor.stable_key = persisted_key
+        phone = Phone.deserialize(
+            {
+                "id": "device-1",
+                "name": "OceanPhone",
+                "stable_key": persisted_key,
+            }
+        )
 
         assert phone.stable_key == persisted_key
 
-    def test_descriptor_display_inputs_follow_name_precedence(self) -> None:
-        phone = Phone(id="device-1", device="adb-token")
-        assert phone.name == "adb-token"
-
-        phone.descriptor.product = "ocean"
-        assert phone.name == "ocean"
-
-        phone.descriptor.model = "OceanPhone"
-        assert phone.name == "OceanPhone"
-
-        phone.descriptor.manufacturer = "FabCo"
-        assert phone.name == "FabCo OceanPhone"
-
-        phone.descriptor.shell_device_name = "Living Room Phone"
-        assert phone.name == "Living Room Phone"
-
-    def test_descriptor_id_rebinding_refreshes_connection_name(self) -> None:
-        phone = Phone(id="adb-X9ZZ99000012345678-aBc1dE")
-        assert phone.name == f"{DEFAULT_PHONE_DISPLAY_NAME} (8-aBc1dE)"
-
-        phone.descriptor.id = "emulator-5554"
-
-        assert phone.name == "emulator-5554"
-
-    def test_direct_name_assignment_is_preserved_until_display_input_changes(
+    def test_apply_discovery_replaces_snapshot_and_refreshes_connection_name(
         self,
     ) -> None:
-        phone = Phone(id="device-1", device="adb-token")
-        phone.descriptor.name = "Persisted label"
-        phone.descriptor.os = "15"
+        phone = Phone(id="adb-X9ZZ99000012345678-aBc1dE")
+        assert phone.name == f"{DEFAULT_PHONE_DISPLAY_NAME} (8-aBc1dE)"
+        original = phone.descriptor
+        discovered = Phone(id="emulator-5554", state="device", model="Pixel")
 
-        assert phone.name == "Persisted label"
+        phone.apply_discovery(discovered)
 
-        phone.descriptor.device = "fresh-adb-token"
-
-        assert phone.name == "fresh-adb-token"
+        assert phone.descriptor is discovered.descriptor
+        assert phone.descriptor is not original
+        assert phone.id == "emulator-5554"
+        assert phone.name == "Pixel"
 
 
 class TestComputePhoneStableKey:
@@ -438,14 +470,17 @@ class TestPhoneDescriptorEquality:
         with pytest.raises(TypeError):
             hash(d1)
 
-        d2.id = "adb-2"
-        d2.last_communication = fixed_last + datetime.timedelta(seconds=1)
-        assert d1 == d2
-
-        d2.state = "offline"
-        assert d2 == d1
+        transient_update = replace(
+            d2,
+            id="adb-2",
+            state="offline",
+            last_communication=fixed_last + datetime.timedelta(seconds=1),
+        )
+        assert d1 == transient_update
+        with pytest.raises(FrozenInstanceError):
+            d2.state = "offline"  # type: ignore[misc]
         with pytest.raises(TypeError):
-            hash(d2)
+            hash(transient_update)
 
         sk_fingerprint = compute_phone_stable_key(
             hardware_serial=None,

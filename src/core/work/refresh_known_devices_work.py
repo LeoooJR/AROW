@@ -90,13 +90,15 @@ def enrich_phones_with_ro_serialno(adb_client: AdbClient, phones: list[Phone]) -
 def _enrich_phone_with_shell_properties(adb_client: AdbClient, phone: Phone) -> None:
     """Apply the batch ADB shell enrichment payload to one targetable phone."""
     props = adb_client.get_shell_enrichment_properties(phone)
-    phone.manufacturer = str(props.get("manufacturer") or "")
-    phone.model = str(props.get("model") or "")
-    phone.shell_device_name = str(props.get("device_name") or "")
-    phone.os = str(props.get("android_release") or "")
     sdk_value = props.get("sdk")
-    phone.android_api_level = sdk_value if isinstance(sdk_value, int) else None
-    phone.hardware_serial = str(props.get("ro_serialno") or "")
+    phone.apply_shell_enrichment(
+        manufacturer=str(props.get("manufacturer") or ""),
+        model=str(props.get("model") or ""),
+        shell_device_name=str(props.get("device_name") or ""),
+        os=str(props.get("android_release") or ""),
+        android_api_level=sdk_value if isinstance(sdk_value, int) else None,
+        hardware_serial=str(props.get("ro_serialno") or ""),
+    )
 
 
 def enrich_phones_with_adb_shell_properties(

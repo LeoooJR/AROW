@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import datetime
 import platform
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Optional
 
 from loguru import logger
@@ -22,9 +22,11 @@ def compute_computer_stable_key(install_token: str) -> str:
     return f"{_STABLE_PC_INSTALL_PREFIX}{token.casefold()}" if token else ""
 
 
-@dataclass(match_args=True)
+@dataclass(frozen=True, match_args=True)
 class ComputerDescriptor(DeviceDescriptor):
     """Metadata about the host computer."""
+
+    __hash__ = None
 
     state: Optional[str] = field(
         metadata={"description": "The state of the computer"},
@@ -96,14 +98,7 @@ class Computer(Device[ComputerDescriptor]):
             stable_key="",
             network_available=network_available,
         )
-        super().__init__(
-            id=id,
-            name=resolved_name,
-            os=resolved_os.lower(),
-            ip=resolved_ip,
-            port=port,
-            descriptor=descriptor,
-        )
+        super().__init__(descriptor=descriptor)
 
     @property
     def stable_key(self) -> str:
@@ -118,7 +113,7 @@ class Computer(Device[ComputerDescriptor]):
     @state.setter
     def state(self, value: str | None) -> None:
         """Set the current host state."""
-        self._descriptor.state = value
+        self._descriptor = replace(self._descriptor, state=value)
 
     @property
     def last_communication(self) -> datetime.datetime | None:
@@ -128,17 +123,24 @@ class Computer(Device[ComputerDescriptor]):
     @last_communication.setter
     def last_communication(self, value: datetime.datetime | None) -> None:
         """Set the time of the latest host communication."""
-        self._descriptor.last_communication = value
+        self._descriptor = replace(self._descriptor, last_communication=value)
 
     @property
     def network_available(self) -> bool:
         """Return whether the host has a usable network identity."""
         return self._descriptor.network_available
 
+    def set_stable_key(self, stable_key: str) -> None:
+        """Replace the persisted install-scoped host identity."""
+        self._descriptor = replace(self._descriptor, stable_key=stable_key)
+
     def refresh_network_identity(self) -> None:
         """Refresh the host IP address and network availability flag."""
-        self._descriptor.ip, self._descriptor.network_available = (
-            self._resolve_network_identity()
+        ip, network_available = self._resolve_network_identity()
+        self._descriptor = replace(
+            self._descriptor,
+            ip=ip,
+            network_available=network_available,
         )
 
     def _resolve_network_identity(self) -> tuple[str, bool]:

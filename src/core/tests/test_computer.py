@@ -5,6 +5,7 @@ Tests for core device model modules.
 from __future__ import annotations
 
 import datetime
+from dataclasses import FrozenInstanceError, replace
 
 import pytest
 
@@ -116,6 +117,15 @@ class TestComputer:
         assert computer.state == "online"
         assert computer.last_communication is now
 
+    def test_computer_set_stable_key_replaces_descriptor_snapshot(self) -> None:
+        computer = Computer(id="host-1", ip="127.0.0.1")
+        original = computer.descriptor
+
+        computer.set_stable_key("pc:v1:install:token")
+
+        assert computer.descriptor is not original
+        assert computer.stable_key == "pc:v1:install:token"
+
     def test_computer_uses_object_identity(self) -> None:
         first = Computer(id="host-1", name="Workstation", os="macOS", ip="10.0.0.1")
         second = Computer(id="host-1", name="Workstation", os="macOS", ip="10.0.0.1")
@@ -129,7 +139,7 @@ class TestComputer:
         with pytest.raises(TypeError):
             hash(computer)
 
-        computer.descriptor.name = "Updated workstation"
+        computer.state = "online"
 
         with pytest.raises(TypeError):
             hash(computer)
@@ -183,9 +193,11 @@ class TestComputerDescriptorEquality:
         with pytest.raises(TypeError):
             hash(d1)
 
-        d1.name = "updated"
+        with pytest.raises(FrozenInstanceError):
+            d1.name = "updated"  # type: ignore[misc]
+        updated = replace(d1, name="updated")
         with pytest.raises(TypeError):
-            hash(d1)
+            hash(updated)
 
         d3 = ComputerDescriptor(
             id="host-1",

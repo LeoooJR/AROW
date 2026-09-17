@@ -43,7 +43,6 @@ def test_reconcile_result_is_immutable() -> None:
 def test_reconcile_identical_phone_is_a_noop() -> None:
     paired = Phone(id="device-1", state="device", model="Pixel")
     discovered = Phone(id="device-1", state="device", model="Pixel")
-    discovered.descriptor.last_communication = paired.descriptor.last_communication
     repository = _repository(paired)
 
     result = ReconciliationEngine().reconcile(repository, [discovered])

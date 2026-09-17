@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import datetime
 import ipaddress
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Iterable, Literal, cast
 
 from loguru import logger
@@ -24,6 +24,12 @@ ConnectivityType = Literal["usb", "wifi"]
 
 
 def _connection_id_is_wifi(connection_id: str) -> bool:
+    """Return whether an ADB connection ID represents a Wi-Fi connection.
+
+    Examples:
+        ``192.168.1.20:5555`` and ``phone._adb-tls-connect._tcp`` return
+        ``True``. ``emulator-5554`` and ``USB123456`` return ``False``.
+    """
     normalized = connection_id.strip()
     if normalized.casefold().endswith("._adb-tls-connect._tcp"):
         return True
@@ -55,6 +61,12 @@ def _resolve_connectivity_type(
 
 
 def _adb_connection_id_is_human_readable(connection_id: str) -> bool:
+    """Return whether a connection ID is suitable for a display name.
+
+    Examples:
+        ``emulator-5554`` and ``USB123456`` return ``True``.
+        ``phone._adb-tls-connect._tcp`` and long opaque IDs return ``False``.
+    """
     cid = connection_id.strip()
     if not cid:
         return False
@@ -65,9 +77,67 @@ def _adb_connection_id_is_human_readable(connection_id: str) -> bool:
     return len(cid) <= 24
 
 
-@dataclass(match_args=True)
+def _derive_phone_display_name(
+    *,
+    connection_id: str,
+    shell_device_name: str,
+    manufacturer: str,
+    model: str,
+    product: str,
+    device: str,
+) -> str:
+    """Derive the best user-facing name from available phone metadata."""
+    shell = shell_device_name.strip()
+    manufacturer = manufacturer.strip()
+    model = model.strip()
+    product = product.strip()
+    device = device.strip()
+    connection_id = connection_id.strip()
+
+    if shell:
+        return shell
+    if manufacturer and model:
+        return f"{manufacturer} {model}"
+    if model:
+        return model
+    if product:
+        return product
+    if device:
+        return device
+    if connection_id and _adb_connection_id_is_human_readable(connection_id):
+        return connection_id
+    if len(connection_id) > _PHONE_DISPLAY_ID_TAIL_LEN:
+        return (
+            f"{DEFAULT_PHONE_DISPLAY_NAME} "
+            f"({connection_id[-_PHONE_DISPLAY_ID_TAIL_LEN:]})"
+        )
+    return connection_id or DEFAULT_PHONE_DISPLAY_NAME
+
+
+def _derive_stable_key_value(
+    *,
+    hardware_serial: str,
+    product: str,
+    model: str,
+    manufacturer: str,
+    fingerprint_when_no_serial: bool = False,
+) -> str:
+    """Return the serialized stable key derived from phone identity inputs."""
+    stable_key = compute_phone_stable_key(
+        hardware_serial=hardware_serial or None,
+        product=product,
+        model=model,
+        manufacturer=manufacturer.strip() or None,
+        fingerprint_when_no_serial=fingerprint_when_no_serial,
+    )
+    return stable_key.value if stable_key is not None else ""
+
+
+@dataclass(frozen=True, match_args=True)
 class PhoneDescriptor(DeviceDescriptor):
     """Metadata about an Android phone."""
+
+    __hash__ = None
 
     id: str = field(
         metadata={"description": "The id of the device"},
@@ -115,78 +185,38 @@ class PhoneDescriptor(DeviceDescriptor):
         metadata={"description": "Friendly getprop device name"},
         default="",
     )
-    _stable_key_sync_enabled: bool = field(
-        init=False,
-        default=False,
-        repr=False,
-        compare=False,
-    )
-
-    _STABLE_KEY_INPUT_FIELDS = frozenset(
-        {"hardware_serial", "manufacturer", "product", "model"}
-    )
-    _DISPLAY_NAME_INPUT_FIELDS = frozenset(
-        {"id", "product", "model", "device", "manufacturer", "shell_device_name"}
-    )
 
     def __post_init__(self) -> None:
-        """Enable synchronization after construction preserves ADB-list key timing."""
-        object.__setattr__(self, "_stable_key_sync_enabled", True)
-        self._sync_display_name()
-
-    def __setattr__(self, name: str, value: object) -> None:
-        """Synchronize derived stable-key and display-name fields after input changes."""
-        object.__setattr__(self, name, value)
-        if not self.__dict__.get("_stable_key_sync_enabled", False):
-            return
-        if name in self._STABLE_KEY_INPUT_FIELDS:
-            stable_key = compute_phone_stable_key(
-                hardware_serial=self.hardware_serial or None,
-                product=self.product,
+        """Derive the display name once when constructing the snapshot."""
+        object.__setattr__(
+            self,
+            "name",
+            _derive_phone_display_name(
+                connection_id=self.id,
+                shell_device_name=self.shell_device_name,
+                manufacturer=self.manufacturer,
                 model=self.model,
-                manufacturer=self.manufacturer or None,
-                fingerprint_when_no_serial=True,
-            )
-            object.__setattr__(
-                self,
-                "stable_key",
-                stable_key.value if stable_key is not None else "",
-            )
-        if name in self._DISPLAY_NAME_INPUT_FIELDS:
-            self._sync_display_name()
-
-    def _sync_display_name(self) -> None:
-        """Derive the user-facing label from enriched and ADB-list metadata."""
-        shell, manufacturer, model, product, device = (
-            (self.shell_device_name or "").strip(),
-            (self.manufacturer or "").strip(),
-            (self.model or "").strip(),
-            (self.product or "").strip(),
-            (self.device or "").strip(),
+                product=self.product,
+                device=self.device,
+            ),
         )
-        if shell:
-            name = shell
-        elif manufacturer and model:
-            name = f"{manufacturer} {model}"
-        elif model:
-            name = model
-        elif product:
-            name = product
-        elif device:
-            name = device
-        elif self.id and _adb_connection_id_is_human_readable(self.id):
-            name = self.id
-        elif self.id and len(self.id) > _PHONE_DISPLAY_ID_TAIL_LEN:
-            name = f"{DEFAULT_PHONE_DISPLAY_NAME} ({self.id[-_PHONE_DISPLAY_ID_TAIL_LEN:]})"
-        else:
-            name = DEFAULT_PHONE_DISPLAY_NAME if not self.id else self.id
-        object.__setattr__(self, "name", name)
 
     def __str__(self) -> str:
-        return f"{self.id} - {self.name} - {self.os} - {self.ip}:{self.port} - {self.product} - {self.model} - {self.transport_id} - {self.connectivity_type} - {self.state} - {self.hardware_serial} - {self.stable_key} - {self.manufacturer} - {self.android_api_level} - {self.last_communication}"
+        """Return a concise, human-readable summary of the phone state."""
+        details = [self.name]
+        if self.os:
+            android = f"Android {self.os}"
+            if self.android_api_level is not None:
+                android += f" (API {self.android_api_level})"
+            details.append(android)
+        elif self.android_api_level is not None:
+            details.append(f"Android API {self.android_api_level}")
 
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(id={self.id}, name={self.name}, os={self.os}, ip={self.ip}, port={self.port}, product={self.product}, model={self.model}, transport_id={self.transport_id}, connectivity_type={self.connectivity_type!r}, state={self.state}, hardware_serial={self.hardware_serial!r}, stable_key={self.stable_key!r}, manufacturer={self.manufacturer!r}, android_api_level={self.android_api_level!r}, shell_device_name={self.shell_device_name!r}, last_communication={self.last_communication})"
+        connection_type = "Wi-Fi" if self.connectivity_type == "wifi" else "USB"
+        details.append(f"{connection_type}: {self.id or 'unknown'}")
+        if self.state:
+            details.append(f"State: {self.state}")
+        return " | ".join(details)
 
 
 class Phone(Device[PhoneDescriptor], Payload):
@@ -235,11 +265,11 @@ class Phone(Device[PhoneDescriptor], Payload):
         device_column = (device.strip() if device else "") or ""
         if not device_column and name:
             device_column = name.strip()
-        stable_key = compute_phone_stable_key(
-            hardware_serial=serial or None,
+        stable_key = _derive_stable_key_value(
+            hardware_serial=serial,
             product=prod,
             model=mod,
-            manufacturer=man.strip() or None,
+            manufacturer=man,
         )
         descriptor = PhoneDescriptor(
             id=id,
@@ -260,14 +290,12 @@ class Phone(Device[PhoneDescriptor], Payload):
             state=state or "",
             last_communication=datetime.datetime.now(),
             hardware_serial=serial,
-            stable_key=stable_key.value if stable_key is not None else "",
+            stable_key=stable_key,
             manufacturer=man,
             android_api_level=android_api_level,
             shell_device_name="",
         )
-        super().__init__(
-            id=id, name="", os=os or "", ip=ip or "", port=port, descriptor=descriptor
-        )
+        super().__init__(descriptor=descriptor)
 
     @property
     def product(self) -> str:
@@ -284,7 +312,7 @@ class Phone(Device[PhoneDescriptor], Payload):
         """Set a non-empty Android release string."""
         value = value.strip()
         if value:
-            self._descriptor.os = value
+            self._descriptor = replace(self._descriptor, os=value)
 
     @property
     def state(self) -> str:
@@ -300,7 +328,7 @@ class Phone(Device[PhoneDescriptor], Payload):
         """
         if not isinstance(value, str):
             raise TypeError("state must be a string")
-        self._descriptor.state = value
+        self._descriptor = replace(self._descriptor, state=value)
 
     @property
     def model(self) -> str:
@@ -312,7 +340,18 @@ class Phone(Device[PhoneDescriptor], Payload):
         """Set a non-empty commercial device model."""
         value = value.strip()
         if value:
-            self._descriptor.model = value
+            stable_key = _derive_stable_key_value(
+                hardware_serial=self.hardware_serial,
+                product=self.product,
+                model=value,
+                manufacturer=self.manufacturer,
+                fingerprint_when_no_serial=True,
+            )
+            self._descriptor = replace(
+                self._descriptor,
+                model=value,
+                stable_key=stable_key,
+            )
 
     @property
     def last_communication(self) -> datetime.datetime:
@@ -328,7 +367,7 @@ class Phone(Device[PhoneDescriptor], Payload):
         """
         if not isinstance(value, datetime.datetime):
             raise TypeError("last_communication must be a datetime")
-        self._descriptor.last_communication = value
+        self._descriptor = replace(self._descriptor, last_communication=value)
 
     @property
     def transport_id(self) -> str:
@@ -355,10 +394,23 @@ class Phone(Device[PhoneDescriptor], Payload):
         """Set a valid hardware serial and refresh derived identity."""
         value = value.strip()
         if value and value.casefold() != "unknown":
-            self._descriptor.hardware_serial = value
+            hardware_serial = value
         elif not self._descriptor.hardware_serial:
-            # Assigning the known-empty input lets descriptor-level sync derive Tier 2.
-            self._descriptor.hardware_serial = ""
+            hardware_serial = ""
+        else:
+            return
+        stable_key = _derive_stable_key_value(
+            hardware_serial=hardware_serial,
+            product=self.product,
+            model=self.model,
+            manufacturer=self.manufacturer,
+            fingerprint_when_no_serial=True,
+        )
+        self._descriptor = replace(
+            self._descriptor,
+            hardware_serial=hardware_serial,
+            stable_key=stable_key,
+        )
 
     @property
     def manufacturer(self) -> str:
@@ -370,7 +422,18 @@ class Phone(Device[PhoneDescriptor], Payload):
         """Set a non-empty device manufacturer."""
         value = value.strip()
         if value:
-            self._descriptor.manufacturer = value
+            stable_key = _derive_stable_key_value(
+                hardware_serial=self.hardware_serial,
+                product=self.product,
+                model=self.model,
+                manufacturer=value,
+                fingerprint_when_no_serial=True,
+            )
+            self._descriptor = replace(
+                self._descriptor,
+                manufacturer=value,
+                stable_key=stable_key,
+            )
 
     @property
     def android_api_level(self) -> int | None:
@@ -381,7 +444,7 @@ class Phone(Device[PhoneDescriptor], Payload):
     def android_api_level(self, value: int | None) -> None:
         """Set the Android SDK API level when available."""
         if value is not None:
-            self._descriptor.android_api_level = value
+            self._descriptor = replace(self._descriptor, android_api_level=value)
 
     @property
     def shell_device_name(self) -> str:
@@ -391,7 +454,70 @@ class Phone(Device[PhoneDescriptor], Payload):
     @shell_device_name.setter
     def shell_device_name(self, value: str) -> None:
         """Set the normalized shell device name."""
-        self._descriptor.shell_device_name = value.strip()
+        self._descriptor = replace(self._descriptor, shell_device_name=value.strip())
+
+    def apply_shell_enrichment(
+        self,
+        *,
+        manufacturer: str,
+        model: str,
+        shell_device_name: str,
+        os: str,
+        android_api_level: int | None,
+        hardware_serial: str,
+    ) -> None:
+        """Atomically apply normalized metadata from one ADB shell observation."""
+        current = self._descriptor
+        normalized_manufacturer = manufacturer.strip() or current.manufacturer
+        normalized_model = model.strip() or current.model
+        normalized_os = os.strip() or current.os
+        normalized_serial = hardware_serial.strip()
+        if not normalized_serial or normalized_serial.casefold() == "unknown":
+            normalized_serial = current.hardware_serial
+        stable_key = _derive_stable_key_value(
+            hardware_serial=normalized_serial,
+            product=current.product,
+            model=normalized_model,
+            manufacturer=normalized_manufacturer,
+            fingerprint_when_no_serial=True,
+        )
+        self._descriptor = replace(
+            current,
+            manufacturer=normalized_manufacturer,
+            model=normalized_model,
+            shell_device_name=shell_device_name.strip(),
+            os=normalized_os,
+            android_api_level=(
+                android_api_level
+                if android_api_level is not None
+                else current.android_api_level
+            ),
+            hardware_serial=normalized_serial,
+            stable_key=stable_key,
+        )
+
+    def apply_discovery(self, discovered: Phone) -> None:
+        """Replace this phone's state from one complete discovery observation."""
+        self._descriptor = discovered.descriptor
+
+    def _restore_persisted_state(
+        self,
+        *,
+        stable_key: str | None,
+        last_communication: datetime.datetime | None,
+    ) -> None:
+        """Restore fields persisted independently from live ADB discovery metadata."""
+        self._descriptor = replace(
+            self._descriptor,
+            stable_key=(
+                stable_key if stable_key is not None else self._descriptor.stable_key
+            ),
+            last_communication=(
+                last_communication
+                if last_communication is not None
+                else self._descriptor.last_communication
+            ),
+        )
 
     def serialize(self, **kwargs: object) -> dict[str, object]:
         """Serialize persisted phone state.
@@ -463,50 +589,20 @@ class Phone(Device[PhoneDescriptor], Payload):
                 else None
             ),
         )
-        if payload.get("stable_key") is not None:
-            phone.descriptor.stable_key = str(payload["stable_key"])
-        if last_communication is not None:
-            phone.descriptor.last_communication = last_communication
+        phone._restore_persisted_state(
+            stable_key=(
+                str(payload["stable_key"])
+                if payload.get("stable_key") is not None
+                else None
+            ),
+            last_communication=last_communication,
+        )
         return phone
 
 
 def serialize_phone_collection(phones: Iterable[Phone]) -> list[dict[str, object]]:
     """Serialize a phone collection while preserving datetime values."""
     return [phone.serialize(json_compatible=False) for phone in phones]
-
-
-_DISCOVERED_PHONE_DESCRIPTOR_FIELDS = (
-    "name",
-    "os",
-    "ip",
-    "port",
-    "product",
-    "model",
-    "device",
-    "transport_id",
-    "connectivity_type",
-    "state",
-    "hardware_serial",
-    "stable_key",
-    "manufacturer",
-    "android_api_level",
-    "shell_device_name",
-)
-
-
-def apply_discovered_phone_state(paired: Phone, discovered: Phone) -> None:
-    """Apply fresh discovery metadata to an existing paired phone.
-
-    Args:
-        paired: Tracked phone instance to update in place.
-        discovered: Newly discovered phone supplying current metadata.
-    """
-    for field_name in _DISCOVERED_PHONE_DESCRIPTOR_FIELDS:
-        setattr(
-            paired.descriptor, field_name, getattr(discovered.descriptor, field_name)
-        )
-    paired.descriptor.id = discovered.id
-    paired.descriptor.last_communication = discovered.descriptor.last_communication
 
 
 class PhoneRepository(Repository[Phone]):

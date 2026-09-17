@@ -210,7 +210,7 @@ class ModelEntrypoint(Entrypoint):
 
     def set_host_identity(self, stable_key: str) -> None:
         """Apply persisted install identity to the host descriptor and emit."""
-        self._host.descriptor.stable_key = stable_key
+        self._host.set_stable_key(stable_key)
         self.emit_core_signal(
             CoreSignals.HOST_COMPUTER_IDENTITY_UPDATED,
             HostComputerIdentityPayload(stable_key=stable_key),

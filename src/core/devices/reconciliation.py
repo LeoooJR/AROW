@@ -6,11 +6,7 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Mapping
 
-from core.devices.phone import (
-    Phone,
-    PhoneRepository,
-    apply_discovered_phone_state,
-)
+from core.devices.phone import Phone, PhoneRepository
 from core.devices.stable_key import FirstTierStableKey, StableKey
 from logger import logger
 
@@ -167,7 +163,7 @@ class ReconciliationEngine:
             # descriptor and add the same object back under its new key afterward.
             state.paired_devices.remove(paired)
 
-        apply_discovered_phone_state(paired, discovered)
+        paired.apply_discovery(discovered)
 
         if connection_id_changed:
             state.paired_devices.add(paired)
