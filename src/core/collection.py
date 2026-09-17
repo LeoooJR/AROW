@@ -52,8 +52,13 @@ class Repository(ABC, Generic[RepositoryObject]):
 
     def remove(self, item: RepositoryObject) -> None:
         """Remove an item from the repository."""
-        if item.id not in self._repository:
+        stored_item = self._repository.get(item.id)
+        if stored_item is None:
             raise ValueError(f"Item with id {item.id} does not exist")
+        if stored_item is not item:
+            raise ValueError(
+                f"Item with id {item.id} is not the stored repository instance"
+            )
         self._repository.pop(item.id)
         logger.debug(
             "Repository item removed",
@@ -80,5 +85,5 @@ class Repository(ABC, Generic[RepositoryObject]):
         return iter(self._repository.values())
 
     def __contains__(self, item: RepositoryObject) -> bool:
-        """Check if an item is in the repository."""
-        return item.id in self._repository
+        """Return whether ``item`` is the exact instance stored for its id."""
+        return self._repository.get(item.id) is item

@@ -627,7 +627,7 @@ class PhoneRepository(Repository[Phone]):
         """
         if device is None:
             self._working_device = None
-        elif device.id in self._repository:
+        elif device in self:
             self._working_device = device
         else:
             raise ValueError(f"Device with id {device.id} is not in the repository")
@@ -649,7 +649,7 @@ class PhoneRepository(Repository[Phone]):
         except ValueError as error:
             logger.error("Phone could not be removed from repository", error=str(error))
             return
-        if self._working_device == item:
+        if self._working_device is item:
             self._working_device = None
 
     def index_by_stable_identity(self) -> dict[FirstTierStableKey, Phone]:

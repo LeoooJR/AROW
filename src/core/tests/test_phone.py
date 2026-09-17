@@ -511,6 +511,26 @@ class TestPhoneDescriptorEquality:
 class TestPhoneRepository:
     """Phone repository indexes used by device-domain workflows."""
 
+    def test_selection_and_removal_require_the_stored_phone_instance(self) -> None:
+        stored = Phone(id="device-1", model="Pixel")
+        same_id_clone = Phone(id="device-1", model="Pixel Pro")
+        repository = PhoneRepository()
+        repository.add(stored)
+        repository.working_device = None
+
+        repository.working_device = stored
+        with pytest.raises(ValueError, match="not in the repository"):
+            repository.working_device = same_id_clone
+        repository.remove(same_id_clone)
+
+        assert repository.get("device-1") is stored
+        assert repository.working_device is stored
+
+        repository.remove(stored)
+
+        assert repository.get("device-1") is None
+        assert repository.working_device is None
+
     def test_index_by_stable_identity_keeps_first_tier_one_phone(
         self,
     ) -> None:

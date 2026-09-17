@@ -474,6 +474,24 @@ def test_remove_updates_index(tmp_path: Path) -> None:
     }
 
 
+def test_remove_rejects_same_id_clone_without_deleting_persisted_state(
+    tmp_path: Path,
+) -> None:
+    repository = SimulationRepository(tmp_path / "simulations")
+    stored = Simulation(id="sim-1")
+    repository.add(stored)
+    simulation_dir = repository.simulation_dir(stored.id)
+
+    with pytest.raises(ValueError, match="not the stored repository instance"):
+        repository.remove(Simulation(id="sim-1"))
+
+    assert repository.get("sim-1") is stored
+    assert simulation_dir.is_dir()
+    assert repository.simulation_metadata_file("sim-1").is_file()
+    index_payload = json.loads(repository.index_file.read_text(encoding="utf-8"))
+    assert index_payload["simulations"] == ["sim-1"]
+
+
 @pytest.mark.parametrize(
     ("filename", "relative_path"),
     [

@@ -162,7 +162,13 @@ class ComputerRepository(Repository[Computer]):
 
     @working_device.setter
     def working_device(self, device: Computer) -> None:
-        """Set the currently selected host computer."""
+        """Select a host computer owned by this repository.
+
+        Raises:
+            ValueError: If ``device`` is not the stored instance for its id.
+        """
+        if device not in self:
+            raise ValueError(f"Device with id {device.id} is not in the repository")
         self._working_device = device
 
     def add(self, item: Computer) -> None:
@@ -184,5 +190,5 @@ class ComputerRepository(Repository[Computer]):
                 "Computer could not be removed from repository", error=str(error)
             )
             return
-        if self._working_device == item:
+        if self._working_device is item:
             self._working_device = None

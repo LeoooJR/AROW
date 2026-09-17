@@ -13,6 +13,7 @@ import core.devices.computer as computer_devices
 from core.devices.computer import (
     Computer,
     ComputerDescriptor,
+    ComputerRepository,
     compute_computer_stable_key,
 )
 
@@ -148,6 +149,29 @@ class TestComputer:
         computer = Computer(id="host-1", ip="127.0.0.1")
 
         assert computer != object()
+
+
+class TestComputerRepository:
+    """Computer repository ownership and selection behavior."""
+
+    def test_selection_and_removal_require_the_stored_computer_instance(self) -> None:
+        stored = Computer(id="host-1", name="Stored", ip="127.0.0.1")
+        same_id_clone = Computer(id="host-1", name="Clone", ip="127.0.0.1")
+        repository = ComputerRepository()
+        repository.add(stored)
+
+        repository.working_device = stored
+        with pytest.raises(ValueError, match="not in the repository"):
+            repository.working_device = same_id_clone
+        repository.remove(same_id_clone)
+
+        assert repository.get("host-1") is stored
+        assert repository.working_device is stored
+
+        repository.remove(stored)
+
+        assert repository.get("host-1") is None
+        assert repository.working_device is None
 
 
 class TestComputeComputerStableKey:

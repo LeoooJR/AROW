@@ -84,6 +84,7 @@ def test_reconcile_rebinds_collision_resistant_stable_identity() -> None:
     assert result.device_id_rebindings == {"192.168.0.10:5555": "192.168.0.10:37849"}
     assert repository.get("192.168.0.10:5555") is None
     assert repository.get("192.168.0.10:37849") is paired
+    assert repository.working_device is paired
 
 
 def test_reconcile_reports_removed_phone_ids_in_repository_order() -> None:
