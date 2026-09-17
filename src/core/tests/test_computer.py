@@ -116,28 +116,27 @@ class TestComputer:
         assert computer.state == "online"
         assert computer.last_communication is now
 
-    def test_computer_equality_and_hash_delegate_to_descriptor(self) -> None:
+    def test_computer_uses_object_identity(self) -> None:
         first = Computer(id="host-1", name="Workstation", os="macOS", ip="10.0.0.1")
         second = Computer(id="host-1", name="Workstation", os="macOS", ip="10.0.0.1")
 
-        assert first == second
-        assert hash(first) == hash(second)
+        assert first == first
+        assert first != second
 
-        second.state = "online"
-        assert first == second
-        assert hash(first) == hash(second)
+    def test_computer_is_unhashable_before_and_after_update(self) -> None:
+        computer = Computer(id="host-1", name="Workstation", os="macOS", ip="10.0.0.1")
 
-        third = Computer(id="host-1", name="Workstation 2", os="macOS", ip="10.0.0.1")
+        with pytest.raises(TypeError):
+            hash(computer)
 
-        assert first != third
-        assert hash(first) != hash(third)
+        computer.descriptor.name = "Updated workstation"
 
-    def test_computer_equality_returns_not_implemented_for_unrelated_types(
-        self,
-    ) -> None:
+        with pytest.raises(TypeError):
+            hash(computer)
+
+    def test_computer_is_not_equal_to_unrelated_types(self) -> None:
         computer = Computer(id="host-1", ip="127.0.0.1")
 
-        assert computer.__eq__(object()) is NotImplemented
         assert computer != object()
 
 
@@ -154,10 +153,10 @@ class TestComputeComputerStableKey:
         assert compute_computer_stable_key(u) == expected
 
 
-class TestComputerDescriptorHash:
-    """ComputerDescriptor equality and hashing include ``stable_key`` (parity with PhoneDescriptor tests)."""
+class TestComputerDescriptorEquality:
+    """ComputerDescriptor supports state comparison without mutable hashing."""
 
-    def test_stable_key_participates_in_hash_and_eq(self) -> None:
+    def test_stable_key_participates_in_equality(self) -> None:
         token_a = compute_computer_stable_key("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
         token_b = compute_computer_stable_key("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
         d1 = ComputerDescriptor(
@@ -180,7 +179,13 @@ class TestComputerDescriptorHash:
             last_communication=None,
             stable_key=token_b,
         )
-        assert d1 == d2 and hash(d1) == hash(d2)
+        assert d1 == d2
+        with pytest.raises(TypeError):
+            hash(d1)
+
+        d1.name = "updated"
+        with pytest.raises(TypeError):
+            hash(d1)
 
         d3 = ComputerDescriptor(
             id="host-1",

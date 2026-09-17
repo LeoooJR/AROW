@@ -170,7 +170,7 @@ def test_reconcile_noop_when_discovery_matches_paired(tmp_path: Path) -> None:
     server.paired_devices.add(paired)
     discovered = Phone(id="device-1", state="device", model="Pixel")
 
-    assert paired == discovered
+    assert paired.descriptor == discovered.descriptor
     result = model_entrypoint.reconcile_paired_devices([discovered])
 
     assert result.changed is False

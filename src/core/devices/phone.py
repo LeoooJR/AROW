@@ -11,7 +11,11 @@ from loguru import logger
 
 from core.collection import Repository
 from core.devices.base import Device, DeviceDescriptor
-from core.devices.stable_key import compute_phone_stable_key
+from core.devices.stable_key import (
+    FirstTierStableKey,
+    StableKey,
+    compute_phone_stable_key,
+)
 from core.payload import Payload
 
 DEFAULT_PHONE_DISPLAY_NAME = "Android device"
@@ -61,7 +65,7 @@ def _adb_connection_id_is_human_readable(connection_id: str) -> bool:
     return len(cid) <= 24
 
 
-@dataclass(unsafe_hash=True, match_args=True)
+@dataclass(match_args=True)
 class PhoneDescriptor(DeviceDescriptor):
     """Metadata about an Android phone."""
 
@@ -69,7 +73,6 @@ class PhoneDescriptor(DeviceDescriptor):
         metadata={"description": "The id of the device"},
         default="",
         compare=False,
-        hash=False,
     )
     product: str = field(
         metadata={"description": "The product of the phone"}, default=""
@@ -85,25 +88,22 @@ class PhoneDescriptor(DeviceDescriptor):
         metadata={"description": "Whether ADB reaches the phone over USB or Wi-Fi"},
         default="usb",
         compare=False,
-        hash=False,
     )
     state: str = field(
         metadata={"description": "The state of the phone"},
         default="",
         compare=False,
-        hash=False,
     )
     last_communication: datetime.datetime = field(
         metadata={"description": "The last communication time of the phone"},
         default_factory=datetime.datetime.now,
         compare=False,
-        hash=False,
     )
     hardware_serial: str = field(
         metadata={"description": "ro.serialno after enrichment"}, default=""
     )
     stable_key: str = field(
-        metadata={"description": "Stable logical phone identity"}, default="", hash=True
+        metadata={"description": "Stable logical phone identity"}, default=""
     )
     manufacturer: str = field(
         metadata={"description": "Hardware manufacturer"}, default=""
@@ -120,7 +120,6 @@ class PhoneDescriptor(DeviceDescriptor):
         default=False,
         repr=False,
         compare=False,
-        hash=False,
     )
 
     _STABLE_KEY_INPUT_FIELDS = frozenset(
@@ -269,14 +268,6 @@ class Phone(Device[PhoneDescriptor], Payload):
         super().__init__(
             id=id, name="", os=os or "", ip=ip or "", port=port, descriptor=descriptor
         )
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, Phone):
-            return NotImplemented
-        return self.descriptor == other.descriptor
-
-    def __hash__(self) -> int:
-        return hash(self.descriptor)
 
     @property
     def product(self) -> str:
@@ -565,18 +556,20 @@ class PhoneRepository(Repository[Phone]):
         if self._working_device == item:
             self._working_device = None
 
-    def index_by_stable_key(self) -> dict[str, Phone]:
-        """Return the first phone stored for each non-empty stable identity.
+    def index_by_stable_identity(self) -> dict[FirstTierStableKey, Phone]:
+        """Return the first phone stored for each Tier-1 stable identity.
 
-        Keeping the first phone makes duplicate stable identities deterministic. The
-        reconciliation engine decides separately whether a key is collision-resistant
-        enough to use for matching.
+        Tier-2 fingerprints are deliberately excluded because they can collide across
+        similar handsets and are unsafe for connection-ID rebinding.
         """
-        indexed: dict[str, Phone] = {}
+        indexed: dict[FirstTierStableKey, Phone] = {}
         for phone in self:
-            stable_key = (phone.stable_key or "").strip()
-            if stable_key and stable_key not in indexed:
-                indexed[stable_key] = phone
+            stable_identity = StableKey.from_value(phone.stable_key)
+            if (
+                isinstance(stable_identity, FirstTierStableKey)
+                and stable_identity not in indexed
+            ):
+                indexed[stable_identity] = phone
         return indexed
 
     def clear(self) -> None:

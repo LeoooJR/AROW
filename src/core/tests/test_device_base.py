@@ -40,3 +40,15 @@ class TestDeviceDescriptor:
         assert state.os == "Android"
         assert state.ip == "192.168.1.1"
         assert state.port == 5555
+
+    def test_device_descriptor_is_unhashable_before_and_after_update(self) -> None:
+        """Mutable descriptors must never advertise a stable hash."""
+        descriptor = DeviceDescriptor(id="device-1")
+
+        with pytest.raises(TypeError):
+            hash(descriptor)
+
+        descriptor.name = "Updated device"
+
+        with pytest.raises(TypeError):
+            hash(descriptor)

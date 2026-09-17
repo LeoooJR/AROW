@@ -22,7 +22,7 @@ def compute_computer_stable_key(install_token: str) -> str:
     return f"{_STABLE_PC_INSTALL_PREFIX}{token.casefold()}" if token else ""
 
 
-@dataclass(unsafe_hash=True, match_args=True)
+@dataclass(match_args=True)
 class ComputerDescriptor(DeviceDescriptor):
     """Metadata about the host computer."""
 
@@ -30,18 +30,15 @@ class ComputerDescriptor(DeviceDescriptor):
         metadata={"description": "The state of the computer"},
         default=None,
         compare=False,
-        hash=False,
     )
     last_communication: Optional[datetime.datetime] = field(
         metadata={"description": "The last communication time of the computer"},
         default=None,
         compare=False,
-        hash=False,
     )
     stable_key: str = field(
         metadata={"description": "Stable install-scoped host identity"},
         default="",
-        hash=True,
     )
     network_available: bool = field(
         metadata={
@@ -49,7 +46,6 @@ class ComputerDescriptor(DeviceDescriptor):
         },
         default=False,
         compare=False,
-        hash=False,
     )
 
     def __str__(self) -> str:
@@ -138,14 +134,6 @@ class Computer(Device[ComputerDescriptor]):
     def network_available(self) -> bool:
         """Return whether the host has a usable network identity."""
         return self._descriptor.network_available
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, Computer):
-            return NotImplemented
-        return self.descriptor == other.descriptor
-
-    def __hash__(self) -> int:
-        return hash(self.descriptor)
 
     def refresh_network_identity(self) -> None:
         """Refresh the host IP address and network availability flag."""

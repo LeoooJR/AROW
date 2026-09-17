@@ -11,7 +11,7 @@ from core.devices.phone import (
     PhoneRepository,
     apply_discovered_phone_state,
 )
-from core.devices.stable_key import StableKey
+from core.devices.stable_key import FirstTierStableKey, StableKey
 from logger import logger
 
 
@@ -39,7 +39,7 @@ class _ReconciliationState:
     """
 
     paired_devices: PhoneRepository
-    paired_by_stable_key: dict[str, Phone]
+    paired_by_stable_identity: dict[FirstTierStableKey, Phone]
     matched_paired_object_ids: set[int] = field(default_factory=set)
     device_id_rebindings: dict[str, str] = field(default_factory=dict)
     changed: bool = False
@@ -66,7 +66,7 @@ class ReconciliationEngine:
         state = _ReconciliationState(
             paired_devices=paired_devices,
             # Capture stable identities before any connection-ID mutation occurs.
-            paired_by_stable_key=paired_devices.index_by_stable_key(),
+            paired_by_stable_identity=paired_devices.index_by_stable_identity(),
         )
 
         for discovered in deduplicated_phones:
@@ -126,13 +126,12 @@ class ReconciliationEngine:
         if paired is not None:
             return paired
 
-        stable_key = (discovered.stable_key or "").strip()
-        parsed_key = StableKey.from_value(stable_key)
+        stable_identity = StableKey.from_value(discovered.stable_key)
         # Fingerprint identities can collide across similar handsets, so they must never
         # cause a connection-ID rebind.
-        if parsed_key is None or not parsed_key.is_collision_resistant():
+        if not isinstance(stable_identity, FirstTierStableKey):
             return None
-        return state.paired_by_stable_key.get(stable_key)
+        return state.paired_by_stable_identity.get(stable_identity)
 
     @staticmethod
     def _phones_are_unchanged(paired: Phone, discovered: Phone) -> bool:
@@ -141,7 +140,7 @@ class ReconciliationEngine:
             paired.id == discovered.id
             and paired.state == discovered.state
             and paired.connectivity_type == discovered.connectivity_type
-            and paired == discovered
+            and paired.descriptor == discovered.descriptor
         )
 
     @staticmethod

@@ -7,13 +7,11 @@ from dataclasses import dataclass, field
 from typing import Any, Generic, Optional, TypeVar
 
 
-@dataclass(unsafe_hash=True, match_args=True)
+@dataclass(match_args=True)
 class DeviceDescriptor:
     """Metadata common to every device."""
 
-    id: str = field(
-        metadata={"description": "The id of the device"}, default="", hash=True
-    )
+    id: str = field(metadata={"description": "The id of the device"}, default="")
     name: str = field(
         metadata={
             "description": "The name of the device. This value is displayed to the user and should be human readable."
@@ -120,8 +118,10 @@ class Device(ABC, Generic[D]):
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(id={self._descriptor.id}, name={self._descriptor.name}, os={self._descriptor.os}, ip={self._descriptor.ip}, port={self._descriptor.port})"
 
-    def __hash__(self) -> int:
-        return hash(self._descriptor)
+    def __eq__(self, other: object) -> bool:
+        """Compare devices by instance identity.
 
-    def __eq__(self, other: Any) -> bool:
-        return isinstance(other, Device) and self._descriptor == other._descriptor
+        Mutable device aggregates are deliberately unhashable. Logical identity belongs
+        to immutable stable-key values rather than to the aggregate itself.
+        """
+        return self is other

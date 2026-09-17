@@ -5,6 +5,7 @@ Tests for core device model modules.
 from __future__ import annotations
 
 import datetime
+from dataclasses import FrozenInstanceError
 
 import pytest
 
@@ -59,12 +60,23 @@ class TestPhone:
 
         assert phone.connectivity_type == expected
 
-    def test_phone_connectivity_type_is_transient_identity_metadata(self) -> None:
+    def test_distinct_phones_use_object_identity(self) -> None:
         usb = Phone(id="device-1", model="Pixel", connectivity_type="usb")
-        wifi = Phone(id="device-1", model="Pixel", connectivity_type="wifi")
+        same_metadata = Phone(id="device-1", model="Pixel", connectivity_type="usb")
 
-        assert usb == wifi
-        assert hash(usb) == hash(wifi)
+        assert usb == usb
+        assert usb != same_metadata
+
+    def test_phone_is_unhashable_before_and_after_update(self) -> None:
+        phone = Phone(id="device-1", model="Pixel")
+
+        with pytest.raises(TypeError):
+            hash(phone)
+
+        phone.model = "Pixel Pro"
+
+        with pytest.raises(TypeError):
+            hash(phone)
 
     def test_phone_connectivity_type_round_trips_and_old_payload_infers(self) -> None:
         phone = Phone(
@@ -88,27 +100,9 @@ class TestPhone:
         assert phone.descriptor.port == 9999
         assert phone.descriptor.id == "a"
 
-    def test_phone_equality_ignores_connection_id_and_last_communication(
-        self,
-    ) -> None:
-        paired = Phone(id="old-connection", model="OceanPhone", state="device")
-        discovered = Phone(id="new-connection", model="OceanPhone", state="device")
-        discovered.last_communication = datetime.datetime(2025, 6, 15, 10, 30, 0)
-
-        assert paired == discovered
-        assert hash(paired) == hash(discovered)
-
-    def test_phone_equality_ignores_state(self) -> None:
-        paired = Phone(id="connection-a", model="OceanPhone", state="device")
-        discovered = Phone(id="connection-b", model="OceanPhone", state="offline")
-
-        assert paired == discovered
-        assert hash(paired) == hash(discovered)
-
-    def test_phone_equality_returns_not_implemented_for_unrelated_types(self) -> None:
+    def test_phone_is_not_equal_to_unrelated_types(self) -> None:
         phone = Phone(id="connection", model="OceanPhone")
 
-        assert phone.__eq__(object()) is NotImplemented
         assert phone != object()
 
     def test_phone_hardware_serial_derives_stable_key_tier_one(self) -> None:
@@ -325,6 +319,16 @@ class TestComputePhoneStableKey:
         assert key.value == "hw:v1:SN1"
         assert key.is_collision_resistant() is True
 
+    def test_tier_one_keys_are_immutable_hashable_identity_values(self) -> None:
+        first = FirstTierStableKey("SERIAL-1")
+        second = FirstTierStableKey("SERIAL-1")
+
+        assert first == second
+        assert hash(first) == hash(second)
+        assert {first: "phone"}[second] == "phone"
+        with pytest.raises(FrozenInstanceError):
+            first.hardware_serial = "SERIAL-2"  # type: ignore[misc]
+
     def test_unknown_serial_falls_through(self) -> None:
         """unknown (any case) is not treated as Tier-1."""
 
@@ -387,10 +391,10 @@ class TestComputePhoneStableKey:
             assert parsed.is_collision_resistant() is expected_collision_resistance
 
 
-class TestPhoneDescriptorHash:
-    """PhoneDescriptor equality and hashing reflect full dataclass state including ``stable_key``."""
+class TestPhoneDescriptorEquality:
+    """PhoneDescriptor supports state comparison without mutable hashing."""
 
-    def test_stable_key_participates_in_hash_and_eq(self) -> None:
+    def test_stable_key_participates_in_equality(self) -> None:
         fixed_last = datetime.datetime(2025, 6, 15, 10, 30, 0)
         sk_tier_one = compute_phone_stable_key(
             hardware_serial="SN123",
@@ -430,15 +434,18 @@ class TestPhoneDescriptorHash:
             stable_key=sk_tier_one.value,
             manufacturer="",
         )
-        assert d1 == d2 and hash(d1) == hash(d2)
+        assert d1 == d2
+        with pytest.raises(TypeError):
+            hash(d1)
 
         d2.id = "adb-2"
         d2.last_communication = fixed_last + datetime.timedelta(seconds=1)
-        assert d1 == d2 and hash(d1) == hash(d2)
+        assert d1 == d2
 
         d2.state = "offline"
         assert d2 == d1
-        assert hash(d2) == hash(d1)
+        with pytest.raises(TypeError):
+            hash(d2)
 
         sk_fingerprint = compute_phone_stable_key(
             hardware_serial=None,
@@ -469,17 +476,20 @@ class TestPhoneDescriptorHash:
 class TestPhoneRepository:
     """Phone repository indexes used by device-domain workflows."""
 
-    def test_index_by_stable_key_keeps_first_phone_and_skips_blank_keys(
+    def test_index_by_stable_identity_keeps_first_tier_one_phone(
         self,
     ) -> None:
         first = Phone(id="device-1", hardware_serial="SERIAL-1")
         duplicate = Phone(id="device-2", hardware_serial="SERIAL-1")
         without_stable_key = Phone(id="device-3")
+        fingerprint = Phone(id="device-4", model="Pixel")
+        fingerprint.manufacturer = "Google"
         repository = PhoneRepository()
-        for phone in (first, duplicate, without_stable_key):
+        for phone in (first, duplicate, without_stable_key, fingerprint):
             repository.add(phone)
 
-        indexed = repository.index_by_stable_key()
+        indexed = repository.index_by_stable_identity()
 
-        assert indexed == {"hw:v1:SERIAL-1": first}
-        assert indexed["hw:v1:SERIAL-1"] is first
+        stable_identity = FirstTierStableKey("SERIAL-1")
+        assert indexed == {stable_identity: first}
+        assert indexed[stable_identity] is first
