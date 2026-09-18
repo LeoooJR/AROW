@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import datetime
 import platform
 from dataclasses import dataclass, field, replace
 from typing import Optional
@@ -33,11 +32,6 @@ class ComputerDescriptor(DeviceDescriptor):
         default=None,
         compare=False,
     )
-    last_communication: Optional[datetime.datetime] = field(
-        metadata={"description": "The last communication time of the computer"},
-        default=None,
-        compare=False,
-    )
     stable_key: str = field(
         metadata={"description": "Stable install-scoped host identity"},
         default="",
@@ -51,10 +45,10 @@ class ComputerDescriptor(DeviceDescriptor):
     )
 
     def __str__(self) -> str:
-        return f"{self.id} - {self.name} - {self.os} - {self.ip}:{self.port} - {self.state} - {self.stable_key} - {self.network_available} - {self.last_communication}"
+        return f"{self.id} - {self.name} - {self.os} - {self.ip}:{self.port} - {self.state} - {self.stable_key} - {self.network_available}"
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(id={self.id}, name={self.name}, os={self.os}, ip={self.ip}, port={self.port}, state={self.state}, stable_key={self.stable_key!r}, network_available={self.network_available!r}, last_communication={self.last_communication})"
+        return f"{self.__class__.__name__}(id={self.id}, name={self.name}, os={self.os}, ip={self.ip}, port={self.port}, state={self.state}, stable_key={self.stable_key!r}, network_available={self.network_available!r})"
 
 
 class Computer(Device[ComputerDescriptor]):
@@ -68,7 +62,6 @@ class Computer(Device[ComputerDescriptor]):
         ip: str | None = None,
         port: int | None = None,
         state: str | None = None,
-        last_communication: datetime.datetime | None = None,
     ) -> None:
         """Initialize the host computer and resolve missing local metadata.
 
@@ -79,7 +72,6 @@ class Computer(Device[ComputerDescriptor]):
             ip: Host IP address, or ``None`` to resolve the network identity.
             port: Optional host communication port.
             state: Optional host connection state.
-            last_communication: Time of the latest host communication.
         """
         resolved_name, resolved_os = name or platform.node(), os or platform.system()
         resolved_ip, network_available = (
@@ -94,7 +86,6 @@ class Computer(Device[ComputerDescriptor]):
             ip=resolved_ip,
             port=port,
             state=state,
-            last_communication=last_communication,
             stable_key="",
             network_available=network_available,
         )
@@ -114,16 +105,6 @@ class Computer(Device[ComputerDescriptor]):
     def state(self, value: str | None) -> None:
         """Set the current host state."""
         self._descriptor = replace(self._descriptor, state=value)
-
-    @property
-    def last_communication(self) -> datetime.datetime | None:
-        """Return the time of the latest host communication."""
-        return self._descriptor.last_communication
-
-    @last_communication.setter
-    def last_communication(self, value: datetime.datetime | None) -> None:
-        """Set the time of the latest host communication."""
-        self._descriptor = replace(self._descriptor, last_communication=value)
 
     @property
     def network_available(self) -> bool:

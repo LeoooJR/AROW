@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime
 from dataclasses import FrozenInstanceError
 
 import pytest
@@ -43,6 +44,7 @@ def test_reconcile_result_is_immutable() -> None:
 def test_reconcile_identical_phone_is_a_noop() -> None:
     paired = Phone(id="device-1", state="device", model="Pixel")
     discovered = Phone(id="device-1", state="device", model="Pixel")
+    discovered.last_connection = paired.last_connection
     repository = _repository(paired)
 
     result = ReconciliationEngine().reconcile(repository, [discovered])
@@ -51,6 +53,50 @@ def test_reconcile_identical_phone_is_a_noop() -> None:
     assert result.device_id_rebindings == {}
     assert result.removed_device_ids == ()
     assert repository.get("device-1") is paired
+
+
+def test_reconcile_active_phone_advances_last_connection_in_place() -> None:
+    earlier = datetime.datetime(2025, 6, 15, 10, 30)
+    later = datetime.datetime(2025, 6, 15, 10, 31)
+    paired = Phone(id="device-1", state="device", model="Pixel")
+    paired.last_connection = earlier
+    discovered = Phone(id="device-1", state="device", model="Pixel")
+    discovered.last_connection = later
+    repository = _repository(paired)
+
+    result = ReconciliationEngine().reconcile(repository, [discovered])
+
+    assert result.changed is True
+    assert repository.get("device-1") is paired
+    assert paired.last_connection == later
+
+
+def test_reconcile_inactive_phone_preserves_last_connection() -> None:
+    connected_at = datetime.datetime(2025, 6, 15, 10, 30)
+    paired = Phone(id="device-1", state="device", model="Pixel")
+    paired.last_connection = connected_at
+    discovered = Phone(id="device-1", state="offline", model="Pixel")
+    repository = _repository(paired)
+
+    result = ReconciliationEngine().reconcile(repository, [discovered])
+
+    assert result.changed is True
+    assert paired.state == "offline"
+    assert paired.last_connection == connected_at
+
+
+def test_reconcile_repeated_inactive_observation_is_a_noop() -> None:
+    connected_at = datetime.datetime(2025, 6, 15, 10, 30)
+    paired = Phone(id="device-1", state="offline", model="Pixel")
+    paired.last_connection = connected_at
+    discovered = Phone(id="device-1", state="offline", model="Pixel")
+    repository = _repository(paired)
+
+    result = ReconciliationEngine().reconcile(repository, [discovered])
+
+    assert result.changed is False
+    assert repository.get("device-1") is paired
+    assert paired.last_connection == connected_at
 
 
 def test_reconcile_updates_existing_phone_in_place() -> None:

@@ -31,10 +31,10 @@ DeviceKind = Literal["mobile"]
 DeviceBadge = Literal["none", "active", "trusted", "new"]
 
 # Relative labels switch to absolute date/time after this many days.
-_LAST_COMMUNICATION_RELATIVE_MAX_DAYS = 7
+_LAST_CONNECTION_RELATIVE_MAX_DAYS = 7
 
 
-def format_last_communication_short(
+def format_last_connection_short(
     value: dt.datetime | None,
     *,
     now: dt.datetime | None = None,
@@ -44,7 +44,7 @@ def format_last_communication_short(
     Naive datetimes are treated as local wall time, consistent with ``Phone`` construction.
 
     Args:
-        value: Last communication instant, or ``None`` if unknown.
+        value: Last ADB connection instant, or ``None`` if unknown.
         now: Reference "current" time for tests; default ``datetime.now()`` (naive local).
     """
     if value is None:
@@ -67,7 +67,7 @@ def format_last_communication_short(
             return "1 hour ago"
         return f"{hours} hours ago"
     days = secs // 86400
-    if days < _LAST_COMMUNICATION_RELATIVE_MAX_DAYS:
+    if days < _LAST_CONNECTION_RELATIVE_MAX_DAYS:
         if days == 1:
             return "1 day ago"
         return f"{days} days ago"
@@ -123,7 +123,7 @@ class _DeviceItemRowWidget(QWidget):
 class DeviceItem(QListWidgetItem):
     """
     Rich list entry: lead icon, title + badges, subtitle (OS / location),
-    last-communication label, and a menu affordance. The visual row is a QWidget
+    last-connection label, and a menu affordance. The visual row is a QWidget
     attached via setItemWidget after the item is added to a QListWidget.
     """
 
@@ -172,7 +172,7 @@ class DeviceItem(QListWidgetItem):
         badge: DeviceBadge = "none",
         operating_system: str = "",
         location: str = "",
-        last_communication: str | dt.datetime | None = "",
+        last_connection: str | dt.datetime | None = "",
         alert_highlight: bool = False,
     ):
         """Create a styled device entry for embedding in a ``QListWidget``.
@@ -186,7 +186,7 @@ class DeviceItem(QListWidgetItem):
             badge: Visual trust/activity badge variant.
             operating_system: OS line shown in the subtitle stack.
             location: Location line shown in the subtitle stack.
-            last_communication: Right-side recency when extended: plain string (fixed
+            last_connection: Right-side recency when extended: plain string (fixed
                 label), datetime (live relative/absolute formatting), or None (Never).
             alert_highlight: When True, apply attention styling to the row.
         """
@@ -217,9 +217,9 @@ class DeviceItem(QListWidgetItem):
         self._badge: DeviceBadge = badge
         self._operating_system: str = operating_system
         self._location: str = location
-        self._last_communication_is_static: bool = isinstance(last_communication, str)
-        self._last_communication_live_at: dt.datetime | None = (
-            last_communication if isinstance(last_communication, dt.datetime) else None
+        self._last_connection_is_static: bool = isinstance(last_connection, str)
+        self._last_connection_live_at: dt.datetime | None = (
+            last_connection if isinstance(last_connection, dt.datetime) else None
         )
 
         # Device item UI properties
@@ -298,7 +298,7 @@ class DeviceItem(QListWidgetItem):
         subtitle_host.setObjectName("device-item-subtitle-host")
         subtitle_host.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
 
-        ### Last communication time label ###
+        ### Last connection time label ###
 
         time_label = QLabel(row)
         time_label.setObjectName("device-item-time")
@@ -308,14 +308,14 @@ class DeviceItem(QListWidgetItem):
         DeviceItem._configure_wrapped_line_label(
             time_label, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop
         )
-        # Set the last communication time label text based on the last communication property (dynamic or static)
-        if self._last_communication_is_static:
-            time_label.setText(last_communication)
+        # Format live connection times while preserving static showcase labels.
+        if self._last_connection_is_static:
+            time_label.setText(last_connection)
         else:
             time_label.setText(
-                format_last_communication_short(self._last_communication_live_at)
+                format_last_connection_short(self._last_connection_live_at)
             )
-        time_label.hide()  # Hide the last communication time by default (shown in extended mode)
+        time_label.hide()  # Shown only when the device row is extended.
 
         ### Trash button ###
 
@@ -565,12 +565,12 @@ class DeviceItem(QListWidgetItem):
         )
 
     @property
-    def last_communication(self) -> str | dt.datetime | None:
-        """Return the stored live last-communication instant, if any."""
-        return self._last_communication_live_at
+    def last_connection(self) -> str | dt.datetime | None:
+        """Return the stored live last-connection instant, if any."""
+        return self._last_connection_live_at
 
-    @last_communication.setter
-    def last_communication(
+    @last_connection.setter
+    def last_connection(
         self,
         value: str | dt.datetime | None,
         *,
@@ -578,23 +578,21 @@ class DeviceItem(QListWidgetItem):
     ) -> None:
         """Set the right-side time label: static string or live datetime/None."""
         if isinstance(value, str):
-            self._last_communication_is_static = True
-            self._last_communication_live_at = None
+            self._last_connection_is_static = True
+            self._last_connection_live_at = None
             self.ui.time_label.setText(value)
         else:
-            self._last_communication_is_static = False
-            self._last_communication_live_at = value
-            self.ui.time_label.setText(format_last_communication_short(value, now=now))
+            self._last_connection_is_static = False
+            self._last_connection_live_at = value
+            self.ui.time_label.setText(format_last_connection_short(value, now=now))
         self._sync_size_hint()
 
-    def refresh_last_communication_label(
-        self, *, now: dt.datetime | None = None
-    ) -> None:
+    def refresh_last_connection_label(self, *, now: dt.datetime | None = None) -> None:
         """Recompute label from stored live instant (no-op for static/placeholder rows)."""
-        if self._last_communication_is_static:
+        if self._last_connection_is_static:
             return
         self.ui.time_label.setText(
-            format_last_communication_short(self._last_communication_live_at, now=now)
+            format_last_connection_short(self._last_connection_live_at, now=now)
         )
         self._sync_size_hint()
 
@@ -735,14 +733,14 @@ class DeviceItem(QListWidgetItem):
     def refresh_badge(self, *, now: dt.datetime | None = None) -> None:
         """Promote a ``new`` badge to ``trusted`` after the configured elapsed time.
 
-        Uses the stored live last-communication instant, not the rendered time label.
+        Uses the stored live last-connection instant, not the rendered time label.
         Static rows and rows without a timestamp are left unchanged.
         """
         if self._badge != "new":
             return
-        if self._last_communication_is_static:
+        if self._last_connection_is_static:
             return
-        at = self._last_communication_live_at
+        at = self._last_connection_live_at
         if at is None:
             return
         current = now if now is not None else dt.datetime.now()
@@ -781,7 +779,7 @@ class DeviceItem(QListWidgetItem):
         badge: DeviceBadge = "none",
         operating_system: str = "",
         location: str = "",
-        last_communication: str | dt.datetime | None = "",
+        last_connection: str | dt.datetime | None = "",
         alert_highlight: bool = False,
     ) -> "DeviceItem":
         """Add a device item to the list widget and sync the size hint."""
@@ -794,7 +792,7 @@ class DeviceItem(QListWidgetItem):
             badge=badge,
             operating_system=operating_system,
             location=location,
-            last_communication=last_communication,
+            last_connection=last_connection,
             alert_highlight=alert_highlight,
         )
         list_widget.addItem(item)
@@ -950,18 +948,18 @@ class DeviceItem(QListWidgetItem):
     ### Extend / shorten core logic ###
 
     def extend(self) -> None:
-        """Extend the device item to show the last communication time."""
+        """Extend the device item to show the last connection time."""
         if self._is_extended:
             return
         self._is_extended = True
         self._set_compact_badge_layout()
         self._apply_text_display_mode()
-        self.ui.time_label.show()  # Show the last communication time
+        self.ui.time_label.show()  # Show the last connection time
         self.ui.trash_button.show()
         self._sync_size_hint()
 
     def shorten(self) -> None:
-        """Shorten the device item to hide the last communication time"""
+        """Shorten the device item to hide the last connection time."""
         if not self._is_extended:
             self._set_compact_badge_layout()  # In shortened mode, the badge is below the device name
             self.ui.time_label.hide()
@@ -972,7 +970,7 @@ class DeviceItem(QListWidgetItem):
         self._is_extended = False
         self._set_compact_badge_layout()  # In shortened mode, the badge is below the device name
         self._apply_text_display_mode()
-        self.ui.time_label.hide()  # Hide the last communication time
+        self.ui.time_label.hide()  # Hide the last connection time
         self.ui.trash_button.hide()
         self._sync_size_hint()
 

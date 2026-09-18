@@ -4,7 +4,6 @@ Tests for core device model modules.
 
 from __future__ import annotations
 
-import datetime
 from dataclasses import FrozenInstanceError, replace
 
 import pytest
@@ -27,14 +26,12 @@ class TestComputer:
 
     def test_computer_creation(self) -> None:
         """Computer can be created with explicit values without relying on host lookup."""
-        now = datetime.datetime.now()
         computer = Computer(
             id="host-1",
             name="Workstation",
             os="macOS",
             ip="192.168.1.10",
             state="online",
-            last_communication=now,
         )
         assert computer.descriptor.id == "host-1"
         assert computer.descriptor.name == "Workstation"
@@ -42,7 +39,6 @@ class TestComputer:
         assert computer.descriptor.ip == "192.168.1.10"
         assert computer.descriptor.port is None
         assert computer.descriptor.state == "online"
-        assert computer.descriptor.last_communication is now
         assert computer.descriptor.stable_key == ""
         assert computer.stable_key == ""
         assert computer.network_available is True
@@ -109,14 +105,11 @@ class TestComputer:
         assert computer.network_available is True
 
     def test_computer_properties_update_descriptor_state(self) -> None:
-        computer = Computer(id="host-1", state=None, last_communication=None)
-        now = datetime.datetime(2025, 6, 15, 10, 30, 0)
+        computer = Computer(id="host-1", state=None)
 
         computer.state = "online"
-        computer.last_communication = now
 
         assert computer.state == "online"
-        assert computer.last_communication is now
 
     def test_computer_set_stable_key_replaces_descriptor_snapshot(self) -> None:
         computer = Computer(id="host-1", ip="127.0.0.1")
@@ -200,7 +193,6 @@ class TestComputerDescriptorEquality:
             ip="127.0.0.1",
             port=None,
             state=None,
-            last_communication=None,
             stable_key=token_a,
         )
         d2 = ComputerDescriptor(
@@ -210,7 +202,6 @@ class TestComputerDescriptorEquality:
             ip="127.0.0.1",
             port=None,
             state=None,
-            last_communication=None,
             stable_key=token_b,
         )
         assert d1 == d2
@@ -230,7 +221,6 @@ class TestComputerDescriptorEquality:
             ip="127.0.0.1",
             port=None,
             state=None,
-            last_communication=None,
             stable_key=compute_computer_stable_key(
                 "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
             ),

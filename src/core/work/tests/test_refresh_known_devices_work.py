@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -191,9 +192,41 @@ def test_refresh_known_devices_apply_skips_emit_when_devices_unchanged() -> None
         (signal, payload)
     )
 
-    outcome = RefreshKnownDevicesOutcome(
-        devices=[Phone(id="device-1", state="device", model="Pixel")]
-    )
+    unchanged = Phone(id="device-1", state="device", model="Pixel")
+    unchanged.last_connection = phone.last_connection
+    outcome = RefreshKnownDevicesOutcome(devices=[unchanged])
     RefreshKnownDevicesWork.apply_main_thread(model_entrypoint, outcome)
 
     assert emitted == []
+
+
+def test_refresh_known_devices_apply_emits_timestamp_only_active_update() -> None:
+    state = MockAdbState(seed=205, initial_devices=0)
+    server = MockAdbServer(state=state)
+    client = MockAdbClient(state=state)
+    model_entrypoint = ModelEntrypoint()
+    model_entrypoint.adb_server = server
+    model_entrypoint.adb_client = client
+    paired = Phone(id="device-1", state="device", model="Pixel")
+    paired.last_connection = datetime.datetime(2025, 6, 15, 10, 30)
+    discovered = Phone(id="device-1", state="device", model="Pixel")
+    discovered.last_connection = datetime.datetime(2025, 6, 15, 10, 31)
+    server.paired_devices.add(paired)
+    emitted: list[tuple[CoreSignal[Any], object]] = []
+    model_entrypoint.emit_core_signal = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
+        (signal, payload)
+    )
+
+    RefreshKnownDevicesWork.apply_main_thread(
+        model_entrypoint,
+        RefreshKnownDevicesOutcome(devices=[discovered]),
+    )
+
+    assert server.paired_devices.get("device-1") is paired
+    assert paired.last_connection == datetime.datetime(2025, 6, 15, 10, 31)
+    assert emitted == [
+        (
+            CoreSignals.DEVICES_UPDATED,
+            DevicesUpdatedPayload(devices=serialize_phone_collection([paired])),
+        )
+    ]

@@ -326,6 +326,52 @@ class TestPhone:
 
         assert phone.stable_key == persisted_key
 
+    def test_last_connection_tracks_only_active_adb_observations(self) -> None:
+        active = Phone(id="device-1", state="device")
+        offline = Phone(id="device-2", state="offline")
+        unauthorized = Phone(id="device-3", state="unauthorized")
+
+        assert isinstance(active.last_connection, datetime.datetime)
+        assert offline.last_connection is None
+        assert unauthorized.last_connection is None
+
+    def test_last_connection_setter_replaces_snapshot_and_validates_value(self) -> None:
+        phone = Phone(id="device-1", state="offline")
+        original = phone.descriptor
+        connected_at = datetime.datetime(2025, 6, 15, 10, 30)
+
+        phone.last_connection = connected_at
+
+        assert phone.descriptor is not original
+        assert phone.last_connection is connected_at
+        phone.last_connection = None
+        assert phone.last_connection is None
+        with pytest.raises(TypeError, match="last_connection"):
+            phone.last_connection = "recently"  # type: ignore[assignment]
+
+    def test_deserialize_ignores_legacy_communication_timestamp(self) -> None:
+        restored = Phone.deserialize(
+            {
+                "id": "device-1",
+                "state": "device",
+                "last_communication": "2025-06-15T10:30:00",
+            }
+        )
+
+        assert restored.last_connection is None
+
+    def test_last_connection_serialization_round_trip(self) -> None:
+        connected_at = datetime.datetime(2025, 6, 15, 10, 30)
+        phone = Phone(id="device-1", state="device")
+        phone.last_connection = connected_at
+
+        payload = phone.serialize(json_compatible=True)
+        restored = Phone.deserialize(payload)
+
+        assert payload["last_connection"] == "2025-06-15T10:30:00"
+        assert "last_communication" not in payload
+        assert restored.last_connection == connected_at
+
     def test_apply_discovery_replaces_snapshot_and_refreshes_connection_name(
         self,
     ) -> None:
@@ -340,6 +386,20 @@ class TestPhone:
         assert phone.descriptor is not original
         assert phone.id == "emulator-5554"
         assert phone.name == "Pixel"
+
+    def test_apply_discovery_preserves_last_connection_when_phone_is_inactive(
+        self,
+    ) -> None:
+        connected_at = datetime.datetime(2025, 6, 15, 10, 30)
+        phone = Phone(id="device-1", state="device", model="Old")
+        phone.last_connection = connected_at
+        discovered = Phone(id="device-1", state="offline", model="New")
+
+        phone.apply_discovery(discovered)
+
+        assert phone.state == "offline"
+        assert phone.model == "New"
+        assert phone.last_connection == connected_at
 
 
 class TestComputePhoneStableKey:
@@ -446,7 +506,7 @@ class TestPhoneDescriptorEquality:
             model="mod",
             transport_id="1",
             state="device",
-            last_communication=fixed_last,
+            last_connection=fixed_last,
             hardware_serial="SN123",
             stable_key=sk_tier_one.value,
             manufacturer="",
@@ -461,7 +521,7 @@ class TestPhoneDescriptorEquality:
             model="mod",
             transport_id="1",
             state="device",
-            last_communication=fixed_last,
+            last_connection=fixed_last,
             hardware_serial="SN123",
             stable_key=sk_tier_one.value,
             manufacturer="",
@@ -474,7 +534,7 @@ class TestPhoneDescriptorEquality:
             d2,
             id="adb-2",
             state="offline",
-            last_communication=fixed_last + datetime.timedelta(seconds=1),
+            last_connection=fixed_last + datetime.timedelta(seconds=1),
         )
         assert d1 == transient_update
         with pytest.raises(FrozenInstanceError):
@@ -500,7 +560,7 @@ class TestPhoneDescriptorEquality:
             model="mod",
             transport_id="1",
             state="device",
-            last_communication=fixed_last,
+            last_connection=fixed_last,
             hardware_serial="",
             stable_key=sk_fingerprint.value,
             manufacturer="Fab",

@@ -131,12 +131,18 @@ class ReconciliationEngine:
 
     @staticmethod
     def _phones_are_unchanged(paired: Phone, discovered: Phone) -> bool:
-        """Preserve the complete equality check used by the entrypoint flow."""
+        """Compare discovery state after applying connection-time preservation."""
+        effective_last_connection = (
+            discovered.last_connection
+            if discovered.last_connection is not None
+            else paired.last_connection
+        )
         return (
             paired.id == discovered.id
             and paired.state == discovered.state
             and paired.connectivity_type == discovered.connectivity_type
             and paired.descriptor == discovered.descriptor
+            and paired.last_connection == effective_last_connection
         )
 
     @staticmethod

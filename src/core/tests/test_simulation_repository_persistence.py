@@ -145,7 +145,7 @@ def test_phone_from_payload_rebuilds_persisted_fields() -> None:
     assert restored.port == phone.port
     assert restored.state == phone.state
     assert restored.stable_key == phone.stable_key
-    assert restored.last_communication == phone.last_communication
+    assert restored.last_connection == phone.last_connection
 
 
 def test_simulation_from_payload_rebuilds_fields(tmp_path: Path) -> None:
@@ -176,7 +176,24 @@ def test_simulation_from_payload_rebuilds_fields(tmp_path: Path) -> None:
     assert restored.map_file == map_file
     assert restored.log_file == log_file
     assert restored.active is True
-    assert restored.device.last_communication == device.last_communication
+    assert restored.device.last_connection == device.last_connection
+
+
+def test_simulation_deserialize_ignores_legacy_device_timestamp(tmp_path: Path) -> None:
+    device = Phone(id="device-1", name="Pixel", state="device")
+    simulation = Simulation(id="sim-1", device=device)
+    simulation_dir = tmp_path / "sim-1"
+    payload = simulation.serialize(simulation_dir, json_compatible=True)
+    device_payload = payload["device"]
+    assert isinstance(device_payload, dict)
+    device_payload.pop("last_connection")
+    device_payload["last_communication"] = "2025-06-15T10:30:00"
+
+    restored = Simulation.deserialize(payload, simulation_dir)
+
+    assert restored.device is not None
+    assert restored.device.id == "device-1"
+    assert restored.device.last_connection is None
 
 
 def test_simulation_payload_round_trips_external_artifact_paths(

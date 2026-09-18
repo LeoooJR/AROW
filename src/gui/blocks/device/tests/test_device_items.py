@@ -14,7 +14,7 @@ from PySide6.QtWidgets import QLabel
 from gui.blocks.device import (
     DeviceItem,
     DeviceSelectionBlock,
-    format_last_communication_short,
+    format_last_connection_short,
 )
 from gui.components import StatusBadge
 
@@ -85,7 +85,7 @@ def test_device_item_trusted_badge_keeps_icon_and_uses_status_badge_text(qtbot) 
 
 
 def test_device_item_actions_show_only_in_extended_mode(qtbot) -> None:
-    item = DeviceItem(None, text="Zenfone 11", last_communication="Active now")
+    item = DeviceItem(None, text="Zenfone 11", last_connection="Active now")
     qtbot.addWidget(item.row_widget)
     qtbot.wait(0)
 
@@ -141,7 +141,7 @@ def test_device_item_extended_size_hint_stays_within_viewport(qtbot) -> None:
         operating_system="Android 15 Beta 4",
         location="North Charleston, South Carolina",
         badge="trusted",
-        last_communication=_NOW - dt.timedelta(days=12, hours=3, minutes=5),
+        last_connection=_NOW - dt.timedelta(days=12, hours=3, minutes=5),
     )
     item.extend()
     qtbot.wait(0)
@@ -183,7 +183,7 @@ def test_device_item_extended_text_uses_single_line_elision(qtbot) -> None:
         operating_system="Android 15 Beta 4",
         location="North Charleston, South Carolina",
         badge="trusted",
-        last_communication=_NOW - dt.timedelta(days=12, hours=3, minutes=5),
+        last_connection=_NOW - dt.timedelta(days=12, hours=3, minutes=5),
     )
     item.extend()
     qtbot.wait(0)
@@ -208,48 +208,48 @@ def test_device_item_extended_text_uses_single_line_elision(qtbot) -> None:
         (_NOW - dt.timedelta(days=6), "6 days ago"),
     ],
 )
-def test_format_last_communication_short_relative(
+def test_format_last_connection_short_relative(
     at: dt.datetime | None, expected_substring: str
 ) -> None:
-    out = format_last_communication_short(at, now=_NOW)
+    out = format_last_connection_short(at, now=_NOW)
     assert expected_substring in out
 
 
-def test_format_last_communication_short_absolute_after_one_week() -> None:
+def test_format_last_connection_short_absolute_after_one_week() -> None:
     at = _NOW - dt.timedelta(days=10)
-    out = format_last_communication_short(at, now=_NOW)
+    out = format_last_connection_short(at, now=_NOW)
     assert "2026" in out
     assert "Apr" in out or "May" in out
 
 
 def test_format_future_timestamp_is_just_now() -> None:
     at = _NOW + dt.timedelta(hours=1)
-    assert format_last_communication_short(at, now=_NOW) == "Just now"
+    assert format_last_connection_short(at, now=_NOW) == "Just now"
 
 
 def test_device_item_static_row_not_refreshed(qtbot) -> None:
-    item = DeviceItem(None, text="Phone", last_communication="Active now")
+    item = DeviceItem(None, text="Phone", last_connection="Active now")
     qtbot.addWidget(item.row_widget)
     qtbot.wait(0)
     assert item.ui.time_label.text() == "Active now"
-    item.refresh_last_communication_label(now=_NOW)
+    item.refresh_last_connection_label(now=_NOW)
     assert item.ui.time_label.text() == "Active now"
 
 
 def test_device_item_live_row_updates_with_now(qtbot) -> None:
     past = _NOW - dt.timedelta(hours=2)
-    item = DeviceItem(None, text="Phone", last_communication=past)
+    item = DeviceItem(None, text="Phone", last_connection=past)
     qtbot.addWidget(item.row_widget)
     qtbot.wait(0)
-    item.refresh_last_communication_label(now=_NOW)
+    item.refresh_last_connection_label(now=_NOW)
     assert item.ui.time_label.text() == "2 hours ago"
-    item.refresh_last_communication_label(now=_NOW + dt.timedelta(hours=2))
+    item.refresh_last_connection_label(now=_NOW + dt.timedelta(hours=2))
     assert item.ui.time_label.text() == "4 hours ago"
 
 
 def test_device_item_refresh_badge_keeps_new_before_five_minutes(qtbot) -> None:
     at = _NOW - dt.timedelta(minutes=4, seconds=59)
-    item = DeviceItem(None, text="Phone", badge="new", last_communication=at)
+    item = DeviceItem(None, text="Phone", badge="new", last_connection=at)
     qtbot.addWidget(item.row_widget)
     qtbot.wait(0)
 
@@ -260,7 +260,7 @@ def test_device_item_refresh_badge_keeps_new_before_five_minutes(qtbot) -> None:
 
 def test_device_item_refresh_badge_becomes_trusted_at_five_minutes(qtbot) -> None:
     at = _NOW - dt.timedelta(minutes=5)
-    item = DeviceItem(None, text="Phone", badge="new", last_communication=at)
+    item = DeviceItem(None, text="Phone", badge="new", last_connection=at)
     qtbot.addWidget(item.row_widget)
     qtbot.wait(0)
 
@@ -269,12 +269,12 @@ def test_device_item_refresh_badge_becomes_trusted_at_five_minutes(qtbot) -> Non
     assert item.badge == "trusted"
 
 
-def test_device_item_refresh_badge_skips_static_last_communication(qtbot) -> None:
+def test_device_item_refresh_badge_skips_static_last_connection(qtbot) -> None:
     item = DeviceItem(
         None,
         text="Phone",
         badge="new",
-        last_communication="Active now",
+        last_connection="Active now",
     )
     qtbot.addWidget(item.row_widget)
     qtbot.wait(0)

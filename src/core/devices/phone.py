@@ -164,9 +164,9 @@ class PhoneDescriptor(DeviceDescriptor):
         default="",
         compare=False,
     )
-    last_communication: datetime.datetime = field(
-        metadata={"description": "The last communication time of the phone"},
-        default_factory=datetime.datetime.now,
+    last_connection: datetime.datetime | None = field(
+        metadata={"description": "The latest active ADB connection time"},
+        default=None,
         compare=False,
     )
     hardware_serial: str = field(
@@ -288,7 +288,11 @@ class Phone(Device[PhoneDescriptor], Payload):
                 connectivity_type=connectivity_type,
             ),
             state=state or "",
-            last_communication=datetime.datetime.now(),
+            last_connection=(
+                datetime.datetime.now()
+                if (state or "").strip().casefold() == "device"
+                else None
+            ),
             hardware_serial=serial,
             stable_key=stable_key,
             manufacturer=man,
@@ -354,20 +358,20 @@ class Phone(Device[PhoneDescriptor], Payload):
             )
 
     @property
-    def last_communication(self) -> datetime.datetime:
-        """Return the time of the latest device communication."""
-        return self._descriptor.last_communication
+    def last_connection(self) -> datetime.datetime | None:
+        """Return the latest time ADB reported this phone as active."""
+        return self._descriptor.last_connection
 
-    @last_communication.setter
-    def last_communication(self, value: datetime.datetime) -> None:
-        """Set the time of the latest device communication.
+    @last_connection.setter
+    def last_connection(self, value: datetime.datetime | None) -> None:
+        """Set the latest active ADB connection time.
 
         Raises:
-            TypeError: If ``value`` is not a datetime.
+            TypeError: If ``value`` is neither a datetime nor ``None``.
         """
-        if not isinstance(value, datetime.datetime):
-            raise TypeError("last_communication must be a datetime")
-        self._descriptor = replace(self._descriptor, last_communication=value)
+        if value is not None and not isinstance(value, datetime.datetime):
+            raise TypeError("last_connection must be a datetime or None")
+        self._descriptor = replace(self._descriptor, last_connection=value)
 
     @property
     def transport_id(self) -> str:
@@ -498,13 +502,19 @@ class Phone(Device[PhoneDescriptor], Payload):
 
     def apply_discovery(self, discovered: Phone) -> None:
         """Replace this phone's state from one complete discovery observation."""
-        self._descriptor = discovered.descriptor
+        if discovered.last_connection is not None:
+            self._descriptor = discovered.descriptor
+            return
+        self._descriptor = replace(
+            discovered.descriptor,
+            last_connection=self.last_connection,
+        )
 
     def _restore_persisted_state(
         self,
         *,
         stable_key: str | None,
-        last_communication: datetime.datetime | None,
+        last_connection: datetime.datetime | None,
     ) -> None:
         """Restore fields persisted independently from live ADB discovery metadata."""
         self._descriptor = replace(
@@ -512,11 +522,7 @@ class Phone(Device[PhoneDescriptor], Payload):
             stable_key=(
                 stable_key if stable_key is not None else self._descriptor.stable_key
             ),
-            last_communication=(
-                last_communication
-                if last_communication is not None
-                else self._descriptor.last_communication
-            ),
+            last_connection=last_connection,
         )
 
     def serialize(self, **kwargs: object) -> dict[str, object]:
@@ -524,7 +530,7 @@ class Phone(Device[PhoneDescriptor], Payload):
 
         Args:
             **kwargs: Serialization options. ``json_compatible`` converts the
-                communication timestamp to ISO 8601 text.
+                connection timestamp to ISO 8601 text.
 
         Returns:
             Persistable phone state keyed by field name.
@@ -538,10 +544,11 @@ class Phone(Device[PhoneDescriptor], Payload):
             "state": self.state,
             "connectivity_type": self.connectivity_type,
             "stable_key": self.stable_key,
-            "last_communication": (
-                self.last_communication.isoformat()
+            "last_connection": (
+                self.last_connection.isoformat()
                 if kwargs.get("json_compatible", False)
-                else self.last_communication
+                and self.last_connection is not None
+                else self.last_connection
             ),
         }
 
@@ -570,8 +577,8 @@ class Phone(Device[PhoneDescriptor], Payload):
                 else None
             )
         )
-        value = payload.get("last_communication")
-        last_communication = (
+        value = payload.get("last_connection")
+        last_connection = (
             datetime.datetime.fromisoformat(value)
             if isinstance(value, str) and value.strip()
             else value if isinstance(value, datetime.datetime) else None
@@ -595,7 +602,7 @@ class Phone(Device[PhoneDescriptor], Payload):
                 if payload.get("stable_key") is not None
                 else None
             ),
-            last_communication=last_communication,
+            last_connection=last_connection,
         )
         return phone
 

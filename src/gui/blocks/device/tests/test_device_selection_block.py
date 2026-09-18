@@ -29,7 +29,7 @@ def _device_payload(device_id: str, name: str, minutes_ago: int = 0) -> dict:
         "id": device_id,
         "name": name,
         "os": "15",
-        "last_communication": _NOW - dt.timedelta(minutes=minutes_ago),
+        "last_connection": _NOW - dt.timedelta(minutes=minutes_ago),
     }
 
 
@@ -91,12 +91,12 @@ def test_device_selection_block_extend_signal_expands_all_rows(qtbot) -> None:
     DeviceItem.add_to_list(
         block.available_device_list,
         text="Pixel 9",
-        last_communication="Active now",
+        last_connection="Active now",
     )
     DeviceItem.add_to_list(
         block.available_device_list,
         text="Zenfone 11",
-        last_communication="30 min ago",
+        last_connection="30 min ago",
     )
     qtbot.wait(0)
 
@@ -119,12 +119,12 @@ def test_device_selection_block_shorten_signal_collapses_all_rows(qtbot) -> None
     DeviceItem.add_to_list(
         block.available_device_list,
         text="Pixel 9",
-        last_communication="Active now",
+        last_connection="Active now",
     )
     DeviceItem.add_to_list(
         block.available_device_list,
         text="Zenfone 11",
-        last_communication="30 min ago",
+        last_connection="30 min ago",
     )
     qtbot.wait(0)
 
@@ -153,7 +153,7 @@ def test_device_selection_block_extends_new_authenticated_device(qtbot) -> None:
             "id": "new-phone",
             "name": "Pixel 9",
             "os": "15",
-            "last_communication": _NOW,
+            "last_connection": _NOW,
         }
     )
     qtbot.wait(0)
@@ -161,6 +161,20 @@ def test_device_selection_block_extends_new_authenticated_device(qtbot) -> None:
     item = _device_rows(block)[0]
     assert item.ui.time_label.isHidden() is False
     assert item.trash_button.isHidden() is False
+
+
+def test_device_selection_block_missing_connection_time_displays_never(qtbot) -> None:
+    block = DeviceSelectionBlock()
+    qtbot.addWidget(block)
+    block.show()
+
+    block._on_devices_updated([{"id": "offline-phone", "name": "Pixel 9", "os": "15"}])
+    block.extend()
+    qtbot.wait(0)
+
+    item = _device_rows(block)[0]
+    assert item.last_connection is None
+    assert item.ui.time_label.text() == "Never"
 
 
 def test_device_selection_block_extends_refreshed_devices(qtbot) -> None:
@@ -241,7 +255,7 @@ def test_device_selection_block_map_tab_skips_highlight_when_device_selected(
         badge="new",
         operating_system="Android",
         location="N/A",
-        last_communication="Active now",
+        last_connection="Active now",
     )
     block.available_device_list.setCurrentItem(item)
     signals.DEVICE.DeviceSelectionSucceeded.emit("sim-1", "device-1", "Phone")
@@ -291,7 +305,7 @@ def test_device_selection_block_timer_tick_refreshes_badges(qtbot) -> None:
         block.available_device_list,
         text="Phone",
         badge="new",
-        last_communication=at,
+        last_connection=at,
     )
     qtbot.wait(0)
 
