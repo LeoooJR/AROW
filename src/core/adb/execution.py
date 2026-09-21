@@ -27,7 +27,7 @@ from core.adb.retry import (
     execute_with_adb_retry,
     timeout_seconds_for,
 )
-from core.devices.phone import Phone
+from core.devices.phone import AdbConnection
 from logger import logger
 
 AdbTransportScope = Literal["client", "server"]
@@ -57,7 +57,7 @@ class AdbTransport(Protocol):
         *,
         binary_path: Path,
         scope: AdbTransportScope,
-        phone: Phone | None,
+        connection: AdbConnection | None,
         timeout_seconds: float,
     ) -> AdbTransportResult:
         """Perform one attempt and return process-shaped output."""
@@ -74,7 +74,7 @@ class SubprocessAdbTransport:
         *,
         binary_path: Path,
         scope: AdbTransportScope,
-        phone: Phone | None,
+        connection: AdbConnection | None,
         timeout_seconds: float,
     ) -> AdbTransportResult:
         """Execute one ADB subprocess attempt.
@@ -83,7 +83,7 @@ class SubprocessAdbTransport:
             invocation: Bound command invocation to execute.
             binary_path: Filesystem path of the ADB binary.
             scope: Client or server scope, unused by this transport.
-            phone: Optional target phone for device-scoped commands.
+            connection: Optional target connection for device-scoped commands.
             timeout_seconds: Maximum subprocess duration in seconds.
 
         Returns:
@@ -96,7 +96,7 @@ class SubprocessAdbTransport:
         del scope
         argv = invocation.argv(
             binary_path,
-            device_id=phone.descriptor.id if phone is not None else None,
+            device_id=connection.id if connection is not None else None,
         )
         completed = subprocess.run(  # nosec B603
             argv,
@@ -144,7 +144,7 @@ class AdbCommandExecutor:
         invocation: AdbCommandInvocation[object],
         *,
         scope: AdbTransportScope,
-        phone: Phone | None = None,
+        connection: AdbConnection | None = None,
     ) -> AdbCommandResult:
         """Execute an invocation using its declared retry policy."""
 
@@ -152,14 +152,14 @@ class AdbCommandExecutor:
             return self._execute_once(
                 invocation,
                 scope=scope,
-                phone=phone,
+                connection=connection,
                 timeout_seconds=timeout_seconds,
             )
 
         return execute_with_adb_retry(
             invocation.spec,
             scope=scope,
-            phone_id=phone.descriptor.id if phone is not None else None,
+            phone_id=connection.id if connection is not None else None,
             attempt=_attempt,
         )
 
@@ -168,13 +168,13 @@ class AdbCommandExecutor:
         invocation: AdbCommandInvocation[object],
         *,
         scope: AdbTransportScope,
-        phone: Phone | None = None,
+        connection: AdbConnection | None = None,
     ) -> AdbCommandResult:
         """Execute exactly one invocation attempt without applying retries."""
         return self._execute_once(
             invocation,
             scope=scope,
-            phone=phone,
+            connection=connection,
             timeout_seconds=timeout_seconds_for(invocation.spec),
         )
 
@@ -183,11 +183,11 @@ class AdbCommandExecutor:
         invocation: AdbCommandInvocation[object],
         *,
         scope: AdbTransportScope,
-        phone: Phone | None,
+        connection: AdbConnection | None,
         timeout_seconds: float,
     ) -> AdbCommandResult:
         command = invocation.spec
-        phone_id = phone.descriptor.id if phone is not None else None
+        phone_id = connection.id if connection is not None else None
         event_prefix = f"{self._transport.log_label} {scope} command"
         logger.debug(
             f"{event_prefix} started",
@@ -211,7 +211,7 @@ class AdbCommandExecutor:
                 invocation,
                 binary_path=self._binary.path,
                 scope=scope,
-                phone=phone,
+                connection=connection,
                 timeout_seconds=timeout_seconds,
             )
         except subprocess.TimeoutExpired as exc:
@@ -225,7 +225,7 @@ class AdbCommandExecutor:
             )
             return AdbCommandResult(
                 status=adb_status_from_timeout(),
-                phone=phone,
+                connection=connection,
                 time=datetime.datetime.now(),
                 output=exc.output or "",
                 error=error,
@@ -259,7 +259,7 @@ class AdbCommandExecutor:
                 output=completed.output,
                 error=completed.error,
             ),
-            phone=phone,
+            connection=connection,
             time=datetime.datetime.now(),
             output=completed.output,
             error=completed.error,

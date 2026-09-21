@@ -458,10 +458,10 @@ class MainWindow(QMainWindow):
         )
 
     def forward_devices_updated(
-        self, devices: list[dict], device_id_rebindings: dict[str, str] | None = None
+        self, devices: list[dict], phone_id_rebindings: dict[str, str] | None = None
     ) -> None:
         """Handle the devices updated."""
-        rebindings = device_id_rebindings or {}
+        rebindings = phone_id_rebindings or {}
         signals.DEVICE.DevicesUpdated.emit(devices, rebindings)
 
     def forward_simulation_deleted(self, simulation_id: str) -> None:

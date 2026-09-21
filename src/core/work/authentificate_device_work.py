@@ -238,7 +238,7 @@ class AuthenticateDeviceWork(CoreRuntimeWork[AuthentificateDeviceOutcome]):
         registration_entrypoint = cast(DeviceRegistrationEntrypoint, model_entrypoint)
         logger.info(
             "Device paired",
-            device_id=outcome.success_phone.id,
+            device_id=outcome.success_phone.identity.value,
             device_name=outcome.success_phone.name,
         )
         registration_entrypoint.register_paired_device(outcome.success_phone)

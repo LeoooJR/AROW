@@ -6,8 +6,8 @@ import pytest
 
 from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
 from core.devices.computer import Computer
-from core.devices.phone import Phone
 from core.entrypoint import ModelEntrypoint
+from core.tests.phone_test_factory import make_phone
 from core.work.authentificate_device_work import (
     AuthentificateDeviceOutcome,
     DeviceAuthentificationError,
@@ -64,12 +64,14 @@ class TestModelEntrypoint:
         port = 5555
         code = "123456"
         server.paired_devices.add(
-            Phone(id="existing-handset", ip=duplicate_ip, port=port)
+            make_phone(id="existing-handset", ip=duplicate_ip, port=port)
         )
         model_entrypoint = ModelEntrypoint()
         model_entrypoint._adb_server = server
         model_entrypoint._adb_client = client
-        expected_outcome = AuthentificateDeviceOutcome(success_phone=Phone(id="unused"))
+        expected_outcome = AuthentificateDeviceOutcome(
+            success_phone=make_phone(id="unused")
+        )
         mock_work_cls.return_value.run.return_value = expected_outcome
 
         outcome = model_entrypoint.authentificate_device(duplicate_ip, port, code)
@@ -94,8 +96,10 @@ class TestModelEntrypoint:
         requested_ip = "10.0.0.9"
         port = 37777
         code = "000000"
-        server.paired_devices.add(Phone(id="other-handset", ip="10.0.0.8", port=port))
-        expected_phone = Phone(id="new-pair", ip=requested_ip, port=port)
+        server.paired_devices.add(
+            make_phone(id="other-handset", ip="10.0.0.8", port=port)
+        )
+        expected_phone = make_phone(id="new-pair", ip=requested_ip, port=port)
         expected_outcome = AuthentificateDeviceOutcome(success_phone=expected_phone)
         mock_work_cls.return_value.run.return_value = expected_outcome
 
@@ -122,7 +126,7 @@ class TestModelEntrypoint:
         model_entrypoint._adb_server = MockAdbServer(state=state)
         model_entrypoint._adb_client = MockAdbClient(state=state)
         model_entrypoint._host = Computer(id="host-1", ip="127.0.0.1")
-        expected_phone = Phone(id="paired", state="device")
+        expected_phone = make_phone(id="paired", state="device")
         expected_outcome = AuthentificateDeviceOutcome(success_phone=expected_phone)
         mock_work_cls.return_value.run.return_value = expected_outcome
 

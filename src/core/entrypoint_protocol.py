@@ -77,7 +77,7 @@ class DeviceReconcileResultProtocol(Protocol):
         """True when paired devices were added, removed, or rebound."""
 
     @property
-    def device_id_rebindings(self) -> Mapping[str, str]:
+    def phone_id_rebindings(self) -> Mapping[str, str]:
         """Old device id to new id when ADB serials were rebound."""
 
 

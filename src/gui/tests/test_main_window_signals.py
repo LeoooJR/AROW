@@ -11,7 +11,9 @@ from gui.windows import MainWindow
 def test_forward_devices_updated_emits_rebindings_without_info_log(
     qtbot, log_records
 ) -> None:
-    devices = [{"id": "device-1", "name": "Pixel 9"}]
+    devices = [
+        {"id": "device-1", "name": "Pixel 9", "os": "Android 15", "connections": []}
+    ]
     rebindings = {"old-device-1": "device-1"}
 
     with qtbot.waitSignal(signals.DEVICE.DevicesUpdated) as blocker:
@@ -29,7 +31,9 @@ def test_forward_devices_updated_emits_rebindings_without_info_log(
 
 
 def test_forward_devices_updated_defaults_rebindings_to_empty_dict(qtbot) -> None:
-    devices = [{"id": "device-1", "name": "Pixel 9"}]
+    devices = [
+        {"id": "device-1", "name": "Pixel 9", "os": "Android 15", "connections": []}
+    ]
 
     with qtbot.waitSignal(signals.DEVICE.DevicesUpdated) as blocker:
         MainWindow.forward_devices_updated(cast(MainWindow, object()), devices)

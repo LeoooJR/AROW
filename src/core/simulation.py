@@ -360,8 +360,17 @@ class SimulationDiskStore:
                 )
                 self._delete_persisted_simulation_dir(simulation_id)
                 continue
-            persisted_device_id = simulation.device.id
+            persisted_device_id = simulation.device.identity.value
             paired_device = devices.get(persisted_device_id)
+            if paired_device is None:
+                paired_device = next(
+                    (
+                        devices.get_by_connection_id(connection.id)
+                        for connection in simulation.device.connections
+                        if devices.get_by_connection_id(connection.id) is not None
+                    ),
+                    None,
+                )
             if paired_device is None:
                 stable_identity = StableKey.from_value(simulation.device.stable_key)
                 if isinstance(stable_identity, FirstTierStableKey):
@@ -374,17 +383,22 @@ class SimulationDiskStore:
                 )
                 self._delete_persisted_simulation_dir(simulation_id)
                 continue
+            persisted_connection_ids = {
+                connection.id for connection in simulation.device.connections
+            }
             simulation.device = paired_device
-            if (
-                self._last_active_device_id == persisted_device_id
-            ):  # Simulation is linked to last active device
+            if self._last_active_device_id in {
+                persisted_device_id,
+                *persisted_connection_ids,
+            }:
                 self._last_active_device_id = (
-                    paired_device.id
+                    paired_device.identity.value
                 )  # Update the last active device id
             loaded.append(simulation)
         if (
             self._last_active_device_id is not None
             and devices.get(self._last_active_device_id) is None
+            and devices.get_by_connection_id(self._last_active_device_id) is None
         ):
             logger.info(
                 "Last active device cleared because it is not paired",

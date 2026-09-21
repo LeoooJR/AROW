@@ -114,17 +114,25 @@ Restore is not a blind JSON load. `SimulationDiskStore.load_for_devices(...)` ap
 
 ### Normal restore
 
-If `simulation.device.id` is still present in the paired device repository, the restored simulation is rebound to that existing in-memory `Phone` instance.
+If the persisted physical phone identity is still present in the paired-device
+repository, the restored simulation is rebound to that existing in-memory
+`Phone` instance.
 
 This preserves object identity across the model: the simulation points at the same `Phone` object the rest of the runtime uses.
 
-### Rebind on ADB id change
+### Rebind legacy endpoint identities
 
-Wireless reconnects can change a device's ADB connection id. When that happens, AROW may still restore the simulation by matching the persisted device's `stable_key`.
+Current phone payloads store a physical identity and a nested `connections`
+array. Schema-v1 payloads written before this split are still accepted: their
+flat ADB endpoint becomes one `AdbConnection`, and restore may resolve that old
+endpoint id through the repository's secondary connection index.
 
-This only happens when `phone_stable_key_is_collision_resistant(stable_key)` returns true. Tier-2 fingerprints are intentionally not trusted for destructive rebinding.
+If neither physical identity nor connection id resolves the phone, restore may
+fall back to a Tier-1 stable key. Tier-2 fingerprints remain intentionally
+excluded from identity rebinding.
 
-If a persisted simulation is rebound this way, `last_active_device_id` is updated to the new paired device id before `index.json` is rewritten.
+If a persisted simulation is rebound this way, `last_active_device_id` is
+rewritten to the canonical physical phone identity.
 
 ### Delete stale or invalid state
 
@@ -148,7 +156,8 @@ If `last_active_device_id` no longer points to a currently paired device after r
 Important consequences:
 
 - Newly discovered devices are added to the paired-device repository.
-- Existing devices are updated in place when they match by ADB id or collision-resistant stable key.
+- Existing physical phones are updated in place when their identity, an owned
+  ADB connection, or a Tier-1 stable key matches.
 - Simulations keep pointing at the same `Phone` object when the device is updated in place.
 - Devices missing from the refreshed discovery list are removed.
 - Any simulation bound to a removed device is deleted best-effort.

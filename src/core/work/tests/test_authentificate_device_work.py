@@ -9,7 +9,7 @@ import pytest
 from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
 from core.adb.binary import AdbBinary
 from core.adb.exceptions import AdbClientException
-from core.devices.phone import Phone
+from core.devices.phone import AdbConnection, Phone
 from core.entrypoint import ModelEntrypoint
 from core.signals import (
     CoreSignal,
@@ -18,6 +18,7 @@ from core.signals import (
     DeviceAuthentificationSucceededPayload,
     ErrorRaisedPayload,
 )
+from core.tests.phone_test_factory import make_phone
 from core.work.authentificate_device_work import (
     AuthenticateDeviceWork,
     AuthentificateDeviceOutcome,
@@ -40,10 +41,10 @@ class FakeAdbClient:
 
     def pair(self, ip: str, port: int, association_code: str) -> Phone:
         self.pair_calls.append(PairCall(ip, port, association_code))
-        return Phone(id="mock-phone", state="device")
+        return make_phone(id="mock-phone", state="device")
 
     def get_shell_enrichment_properties(
-        self, phone: Phone
+        self, connection: AdbConnection
     ) -> dict[str, str | int | None]:
         return {
             "manufacturer": "Google",
@@ -172,14 +173,16 @@ def test_authenticate_work_valid_input_pairs_and_returns_success() -> None:
         association_code="123456",
     ).run()
 
-    assert outcome.success_phone.descriptor.id == "mock-phone"
+    assert outcome.success_phone.connections[0].id == "mock-phone"
     assert client.pair_calls == [PairCall("192.168.1.10", 37777, "123456")]
     assert server.restart_calls == 0
 
 
 def test_authenticate_work_exact_paired_endpoint_fails_before_pair() -> None:
     server = FakeAdbServer()
-    server.paired_devices.append(Phone(id="existing", ip="192.168.1.10", port=37777))
+    server.paired_devices.append(
+        make_phone(id="existing", ip="192.168.1.10", port=37777)
+    )
     client = FakeAdbClient()
 
     with pytest.raises(DeviceAuthentificationError) as exc_info:
@@ -210,7 +213,9 @@ def test_authenticate_work_allows_nonmatching_paired_endpoint(
     ip: str, port: int
 ) -> None:
     server = FakeAdbServer()
-    server.paired_devices.append(Phone(id="existing", ip="192.168.1.10", port=37777))
+    server.paired_devices.append(
+        make_phone(id="existing", ip="192.168.1.10", port=37777)
+    )
     client = FakeAdbClient()
 
     outcome = AuthenticateDeviceWork(
@@ -221,7 +226,7 @@ def test_authenticate_work_allows_nonmatching_paired_endpoint(
         association_code="123456",
     ).run()
 
-    assert outcome.success_phone.id == "mock-phone"
+    assert outcome.success_phone.connections[0].id == "mock-phone"
     assert client.pair_calls == [PairCall(ip, port, "123456")]
 
 
@@ -238,7 +243,7 @@ def test_mock_pair_then_enrich() -> None:
         association_code="000000",
     ).run()
     p = outcome.success_phone
-    assert p.descriptor.state == "device"
+    assert p.connections[0].state == "device"
     assert p.descriptor.manufacturer.strip()
     assert p.descriptor.hardware_serial.strip()
 
@@ -347,7 +352,7 @@ def test_authenticate_apply_success_adds_phone_and_emits_signal(log_records) -> 
     server = MockAdbServer(state=state)
     model_entrypoint = ModelEntrypoint()
     model_entrypoint.adb_server = server
-    phone = Phone(id="paired-phone", state="device")
+    phone = make_phone(id="paired-phone", state="device")
     emitted: list[tuple[CoreSignal[Any], object]] = []
     model_entrypoint.emit_core_signal = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
         (signal, payload)

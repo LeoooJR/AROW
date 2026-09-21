@@ -119,7 +119,7 @@ class AdbServer:
             logger.error(
                 "ADB working device could not be set",
                 error=str(e),
-                device_id=device.id,
+                device_id=device.identity.value,
             )
             raise e
 

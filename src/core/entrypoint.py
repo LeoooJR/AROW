@@ -336,15 +336,14 @@ class ModelEntrypoint(Entrypoint):
         """
         Reconcile paired devices with a freshly discovered handset list.
 
-        Existing ``Phone`` instances are updated in place when they match by ADB
-        connection id or non-empty ``stable_key`` (wireless/USB reconnect).
+        Existing physical ``Phone`` instances are updated in place when their
+        identity, an owned ADB connection, or a Tier-1 stable key matches.
         Handsets absent from ``phones`` are removed and any linked simulation is
         dropped best-effort.
 
         Returns:
-            Result carrying whether the paired repository or simulations changed
-            and any safe old ADB id -> new ADB id rebindings detected during
-            collision-resistant identity reconciliation.
+            Result carrying whether the paired repository changed and any
+            provisional physical id -> Tier-1 id promotions.
         """
         if self._adb_server is None:
             raise AttributeError(
@@ -354,8 +353,13 @@ class ModelEntrypoint(Entrypoint):
             self._adb_server.paired_devices,
             phones,
         )
-        for device_id in result.removed_device_ids:
-            self.delete_simulation_for_device(device_id)
+        for old_phone_id, new_phone_id in result.phone_id_rebindings.items():
+            self._simulation_service.rebind_phone_identity(
+                old_phone_id,
+                new_phone_id,
+            )
+        for phone_id in result.removed_phone_ids:
+            self.delete_simulation_for_device(phone_id)
         return result
 
     def create_simulation(self, device_id: str) -> None:

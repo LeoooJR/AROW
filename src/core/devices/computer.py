@@ -27,6 +27,14 @@ class ComputerDescriptor(DeviceDescriptor):
 
     __hash__ = None
 
+    id: str = field(metadata={"description": "The id of the computer"}, default="")
+    ip: str = field(
+        metadata={"description": "The IP address of the computer"}, default=""
+    )
+    port: int | None = field(
+        metadata={"description": "The computer communication port"}, default=None
+    )
+
     state: Optional[str] = field(
         metadata={"description": "The state of the computer"},
         default=None,
@@ -53,6 +61,21 @@ class ComputerDescriptor(DeviceDescriptor):
 
 class Computer(Device[ComputerDescriptor]):
     """Host computer device."""
+
+    @property
+    def id(self) -> str:
+        """Return the host identifier."""
+        return self._descriptor.id
+
+    @property
+    def ip(self) -> str:
+        """Return the host IP address."""
+        return self._descriptor.ip
+
+    @property
+    def port(self) -> int | None:
+        """Return the host communication port."""
+        return self._descriptor.port
 
     def __init__(
         self,

@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from core.adb.adb_mock import MockAdbClient, MockAdbServer, MockAdbState
-from core.devices.phone import Phone, serialize_phone_collection
+from core.devices.phone import AdbConnection, Phone, serialize_phone_collection
 from core.entrypoint import ModelEntrypoint
 from core.signals import (
     CoreSignal,
@@ -26,6 +26,25 @@ from core.work.refresh_known_devices_work import (
 pytestmark = [pytest.mark.devices]
 
 
+def _phone(
+    connection_id: str,
+    *,
+    state: str = "device",
+    model: str = "",
+    hardware_serial: str = "",
+    observed_at: datetime.datetime | None = None,
+) -> Phone:
+    return Phone(
+        AdbConnection.observed(
+            connection_id,
+            state=state,
+            observed_at=observed_at,
+        ),
+        model=model,
+        hardware_serial=hardware_serial,
+    )
+
+
 def test_enrich_phones_with_adb_shell_properties_empty_skips_adb_methods() -> None:
     """No phones implies no getters on the client (fast path)."""
     client = MagicMock()
@@ -36,7 +55,7 @@ def test_enrich_phones_with_adb_shell_properties_empty_skips_adb_methods() -> No
 def test_enrich_phones_with_adb_shell_properties_skips_non_targetable_phone() -> None:
     """Only devices in executable ADB state receive shell enrichment."""
     client = MagicMock()
-    phone = Phone(id="offline-phone", state="offline")
+    phone = _phone("offline-phone", state="offline")
 
     enrich_phones_with_adb_shell_properties(client, [phone])
 
@@ -54,11 +73,13 @@ def test_enrich_phones_with_adb_shell_properties_uses_batch_getter() -> None:
         "sdk": 35,
         "ro_serialno": "SER123",
     }
-    phone = Phone(id="target-phone", state="device")
+    phone = _phone("target-phone")
 
     enrich_phones_with_adb_shell_properties(client, [phone])
 
-    client.get_shell_enrichment_properties.assert_called_once_with(phone)
+    client.get_shell_enrichment_properties.assert_called_once_with(
+        phone.target_connection
+    )
     client.get_product_manufacturer.assert_not_called()
     client.get_product_model.assert_not_called()
     client.get_device_name_prop.assert_not_called()
@@ -103,8 +124,8 @@ def test_refresh_known_devices_apply_replaces_devices_and_emits_update() -> None
     model_entrypoint = ModelEntrypoint()
     model_entrypoint.adb_server = server
     model_entrypoint.adb_client = client
-    stale_phone = Phone(id="stale-device", state="device")
-    refreshed_phone = Phone(id="fresh-device", state="device")
+    stale_phone = _phone("stale-device")
+    refreshed_phone = _phone("fresh-device")
     server.paired_devices.add(stale_phone)
     emitted: list[tuple[CoreSignal[Any], object]] = []
 
@@ -116,14 +137,14 @@ def test_refresh_known_devices_apply_replaces_devices_and_emits_update() -> None
     outcome = RefreshKnownDevicesOutcome(devices=[refreshed_phone])
     RefreshKnownDevicesWork.apply_main_thread(model_entrypoint, outcome)
 
-    assert server.paired_devices.get("stale-device") is None
-    assert server.paired_devices.get("fresh-device") is refreshed_phone
+    assert server.paired_devices.get(stale_phone.id) is None
+    assert server.paired_devices.get(refreshed_phone.id) is refreshed_phone
     assert emitted == [
         (
             CoreSignals.SIMULATION_DELETE_SKIPPED,
             SimulationDeleteSkippedPayload(
-                device_id="stale-device",
-                reason="Simulation for device with id stale-device not found",
+                device_id=stale_phone.id,
+                reason=f"Simulation for device with id {stale_phone.id} not found",
             ),
         ),
         (
@@ -135,23 +156,23 @@ def test_refresh_known_devices_apply_replaces_devices_and_emits_update() -> None
     ]
 
 
-def test_refresh_known_devices_apply_emits_safe_device_id_rebindings() -> None:
-    """ADB id changes matched by Tier-1 serial are forwarded to the UI payload."""
+def test_refresh_known_devices_apply_rebinds_connection_without_phone_id_change() -> (
+    None
+):
+    """A Tier-1 match replaces the endpoint without replacing physical identity."""
     state = MockAdbState(seed=204, initial_devices=0)
     server = MockAdbServer(state=state)
     client = MockAdbClient(state=state)
     model_entrypoint = ModelEntrypoint()
     model_entrypoint.adb_server = server
     model_entrypoint.adb_client = client
-    paired_phone = Phone(
-        id="192.168.0.10:5555",
-        state="device",
+    paired_phone = _phone(
+        "192.168.0.10:5555",
         hardware_serial="SER-REFRESH",
         model="Pixel",
     )
-    refreshed_phone = Phone(
-        id="192.168.0.10:37849",
-        state="device",
+    refreshed_phone = _phone(
+        "192.168.0.10:37849",
         hardware_serial="SER-REFRESH",
         model="Pixel",
     )
@@ -164,14 +185,17 @@ def test_refresh_known_devices_apply_emits_safe_device_id_rebindings() -> None:
     outcome = RefreshKnownDevicesOutcome(devices=[refreshed_phone])
     RefreshKnownDevicesWork.apply_main_thread(model_entrypoint, outcome)
 
-    assert server.paired_devices.get("192.168.0.10:5555") is None
-    assert server.paired_devices.get("192.168.0.10:37849") is paired_phone
+    assert server.paired_devices.get(paired_phone.id) is paired_phone
+    assert server.paired_devices.get_by_connection_id("192.168.0.10:5555") is None
+    assert (
+        server.paired_devices.get_by_connection_id("192.168.0.10:37849") is paired_phone
+    )
     assert emitted == [
         (
             CoreSignals.DEVICES_UPDATED,
             DevicesUpdatedPayload(
                 devices=serialize_phone_collection([paired_phone]),
-                device_id_rebindings={"192.168.0.10:5555": "192.168.0.10:37849"},
+                phone_id_rebindings={},
             ),
         )
     ]
@@ -185,15 +209,14 @@ def test_refresh_known_devices_apply_skips_emit_when_devices_unchanged() -> None
     model_entrypoint = ModelEntrypoint()
     model_entrypoint.adb_server = server
     model_entrypoint.adb_client = client
-    phone = Phone(id="device-1", state="device", model="Pixel")
+    phone = _phone("device-1", model="Pixel")
     server.paired_devices.add(phone)
     emitted: list[tuple[CoreSignal[Any], object]] = []
     model_entrypoint.emit_core_signal = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
         (signal, payload)
     )
 
-    unchanged = Phone(id="device-1", state="device", model="Pixel")
-    unchanged.last_connection = phone.last_connection
+    unchanged = Phone(phone.connections[0], model="Pixel")
     outcome = RefreshKnownDevicesOutcome(devices=[unchanged])
     RefreshKnownDevicesWork.apply_main_thread(model_entrypoint, outcome)
 
@@ -207,10 +230,16 @@ def test_refresh_known_devices_apply_emits_timestamp_only_active_update() -> Non
     model_entrypoint = ModelEntrypoint()
     model_entrypoint.adb_server = server
     model_entrypoint.adb_client = client
-    paired = Phone(id="device-1", state="device", model="Pixel")
-    paired.last_connection = datetime.datetime(2025, 6, 15, 10, 30)
-    discovered = Phone(id="device-1", state="device", model="Pixel")
-    discovered.last_connection = datetime.datetime(2025, 6, 15, 10, 31)
+    paired = _phone(
+        "device-1",
+        model="Pixel",
+        observed_at=datetime.datetime(2025, 6, 15, 10, 30),
+    )
+    discovered = _phone(
+        "device-1",
+        model="Pixel",
+        observed_at=datetime.datetime(2025, 6, 15, 10, 31),
+    )
     server.paired_devices.add(paired)
     emitted: list[tuple[CoreSignal[Any], object]] = []
     model_entrypoint.emit_core_signal = lambda signal, payload: emitted.append(  # type: ignore[method-assign]
@@ -222,8 +251,10 @@ def test_refresh_known_devices_apply_emits_timestamp_only_active_update() -> Non
         RefreshKnownDevicesOutcome(devices=[discovered]),
     )
 
-    assert server.paired_devices.get("device-1") is paired
-    assert paired.last_connection == datetime.datetime(2025, 6, 15, 10, 31)
+    assert server.paired_devices.get(paired.id) is paired
+    assert paired.connections[0].last_connection == datetime.datetime(
+        2025, 6, 15, 10, 31
+    )
     assert emitted == [
         (
             CoreSignals.DEVICES_UPDATED,

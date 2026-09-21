@@ -33,6 +33,21 @@ from gui.wrapper import GridLayoutWrapper, HorizontalLayoutWrapper
 from logger import logger
 
 
+def _latest_phone_connection(payload: dict) -> dt.datetime | None:
+    """Return the most recent timestamp across a phone's current connections."""
+    connections = payload.get("connections")
+    if not isinstance(connections, list):
+        return None
+    timestamps: list[dt.datetime] = []
+    for connection in connections:
+        if not isinstance(connection, dict):
+            continue
+        timestamp = connection.get("last_connection")
+        if isinstance(timestamp, dt.datetime):
+            timestamps.append(timestamp)
+    return max(timestamps) if timestamps else None
+
+
 class DeviceSelectionBlock(QFrame, Block):
     """Available-device list block used by the device selection panel."""
 
@@ -350,7 +365,7 @@ class DeviceSelectionBlock(QFrame, Block):
     @Slot(dict)
     def _on_authentification_succeeded(self, device: dict) -> None:
         """Add a newly authenticated device and mark it as the active selection."""
-        last_connection = device.get("last_connection")
+        last_connection = _latest_phone_connection(device)
         item = self._device_item_type.add_to_list(
             self.ui.available_device_list,
             id=device["id"],
@@ -422,18 +437,18 @@ class DeviceSelectionBlock(QFrame, Block):
     def _on_devices_updated(
         self,
         devices: list[dict],
-        device_id_rebindings: dict[str, str] | None = None,
+        phone_id_rebindings: dict[str, str] | None = None,
     ) -> None:
         """Replace the available-device list from controller-provided device data."""
         previous_active_device_id = self._active_device_id
         if previous_active_device_id is not None:
-            previous_active_device_id = (device_id_rebindings or {}).get(
+            previous_active_device_id = (phone_id_rebindings or {}).get(
                 previous_active_device_id,
                 previous_active_device_id,
             )
         self.ui.available_device_list.clear()
         for device in devices:
-            last_connection = device.get("last_connection")
+            last_connection = _latest_phone_connection(device)
             self._device_item_type.add_to_list(
                 self.ui.available_device_list,
                 id=device["id"],

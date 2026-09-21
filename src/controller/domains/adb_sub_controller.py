@@ -192,7 +192,7 @@ class AdbSubController(AppSubController):
     def _on_devices_updated(self, payload: DevicesUpdatedPayload) -> None:
         self.view.forward_devices_updated(
             payload.devices,
-            dict(payload.device_id_rebindings),
+            dict(payload.phone_id_rebindings),
         )
 
     def _on_device_authentification_succeeded(

@@ -27,7 +27,7 @@ from core.adb.retry import (
     retry_profile_for,
 )
 from core.adb.server import AdbServer
-from core.devices.phone import Phone
+from core.devices.phone import AdbConnection
 
 
 def _fast_profile(command: AdbCommandSpec[object]) -> _AdbRetryProfile:
@@ -135,7 +135,7 @@ class TestAdbClientExecuteRetry:
 
         result = adb_client._execute(
             AdbCommands.GET_PRODUCT_MODEL.invoke(),
-            Phone(id="abc123", state="device"),
+            AdbConnection.observed("abc123", state="device"),
         )
 
         assert result.status == AdbCommandResultStatus.SUCCESS
@@ -197,7 +197,7 @@ class TestAdbClientExecuteRetry:
 
         result = adb_client._execute(
             AdbCommands.GET_PRODUCT_MODEL.invoke(),
-            Phone(id="abc123", state="device"),
+            AdbConnection.observed("abc123", state="device"),
         )
 
         assert result.status == AdbCommandResultStatus.TRANSIENT_ERROR
@@ -242,7 +242,7 @@ class TestAdbClientExecuteRetry:
 
         result = adb_client._execute(
             AdbCommands.SEND_NOTIFICATION.invoke("-t", "Title", "-m", "Message"),
-            Phone(id="abc123", state="device"),
+            AdbConnection.observed("abc123", state="device"),
         )
 
         assert result.status == AdbCommandResultStatus.ERROR
@@ -280,7 +280,7 @@ class TestAdbClientExecuteRetry:
             AdbClientException,
             match="target device remains listed by ADB with state 'unauthorized'",
         ):
-            adb_client.status(Phone(id="abc123", state="device"))
+            adb_client.status(AdbConnection.observed("abc123", state="device"))
 
     def test_targeted_failure_reports_device_is_no_longer_listed(
         self, adb_client: AdbClient, monkeypatch: pytest.MonkeyPatch
@@ -311,7 +311,7 @@ class TestAdbClientExecuteRetry:
 
         result = adb_client._execute(
             AdbCommands.GET_PRODUCT_MODEL.invoke(),
-            Phone(id="abc123", state="device"),
+            AdbConnection.observed("abc123", state="device"),
         )
 
         assert "target device is no longer listed by ADB" in result.error
@@ -345,7 +345,7 @@ class TestAdbClientExecuteRetry:
 
         result = adb_client._execute(
             AdbCommands.GET_PRODUCT_MODEL.invoke(),
-            Phone(id="abc123", state="device"),
+            AdbConnection.observed("abc123", state="device"),
         )
 
         assert len(calls) == 2
@@ -417,7 +417,7 @@ class TestAdbClientExecuteRetry:
         with pytest.raises(AdbClientException) as exc_info:
             adb_client._execute(
                 AdbCommands.GET_PRODUCT_MODEL.invoke(),
-                Phone(id="abc123", state="device"),
+                AdbConnection.observed("abc123", state="device"),
             )
 
         assert calls["count"] == 2
@@ -452,7 +452,7 @@ class TestAdbClientExecuteRetry:
     ) -> None:
         def fake_execute(
             invocation: AdbCommandInvocation[object],
-            phone: Phone | None = None,
+            connection: AdbConnection | None = None,
         ) -> AdbCommandResult:
             return AdbCommandResult(
                 status=AdbCommandResultStatus.ERROR,
@@ -469,7 +469,7 @@ class TestAdbClientExecuteRetry:
         self, adb_client: AdbClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         def fake_execute(
-            invocation: AdbCommandInvocation[object], phone: Phone
+            invocation: AdbCommandInvocation[object], connection: AdbConnection
         ) -> AdbCommandResult:
             return AdbCommandResult(
                 status=AdbCommandResultStatus.TRANSIENT_ERROR,
@@ -479,7 +479,12 @@ class TestAdbClientExecuteRetry:
             )
 
         monkeypatch.setattr(adb_client, "_execute", fake_execute)
-        assert adb_client.get_product_model(Phone(id="abc123", state="device")) == ""
+        assert (
+            adb_client.get_product_model(
+                AdbConnection.observed("abc123", state="device")
+            )
+            == ""
+        )
 
 
 class TestAdbServerExecuteRetry:

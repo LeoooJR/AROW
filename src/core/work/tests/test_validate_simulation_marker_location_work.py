@@ -24,6 +24,7 @@ from core.tests.geo_fixtures import (
     SAMPLE_LINE_TRONCON,
     SAMPLE_LONGITUDE,
 )
+from core.tests.phone_test_factory import make_phone
 from core.tests.signal_test_helpers import seed_adb_startup_for_entrypoint
 from core.work.validate_simulation_marker_location_work import (
     ValidateSimulationMarkerLocationOutcome,
@@ -37,7 +38,7 @@ def _make_model(tmp_path: Path) -> tuple[ModelEntrypoint, str]:
     state = MockAdbState(seed=601, initial_devices=0)
     server = MockAdbServer(state=state)
     client = MockAdbClient(state=state)
-    device = Phone(id="device-1", state="device", model="Pixel")
+    device = make_phone(id="device-1", state="device", model="Pixel")
     server.paired_devices.add(device)
     model_entrypoint = ModelEntrypoint(
         paths=ApplicationPaths(tmp_path, tmp_path / "config", tmp_path / "src", "linux")

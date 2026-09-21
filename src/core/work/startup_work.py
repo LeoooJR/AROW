@@ -240,7 +240,22 @@ class StartupCoreRuntimeWork(CoreRuntimeWork[StartupOutcome]):
             adb_server = _start_adb_server(self._adb_binary_path)
             adb_client = _create_adb_client(self._adb_binary_path)
         devices = list(adb_server.paired_devices)
+        previous_repository_keys = {
+            id(phone): (
+                phone.identity.value,
+                tuple(connection.id for connection in phone.connections),
+            )
+            for phone in devices
+        }
         enrich_phones_with_adb_shell_properties(adb_client, devices)
+        for phone in devices:
+            old_identity, old_connection_ids = previous_repository_keys[id(phone)]
+            if old_identity != phone.identity.value:
+                adb_server.paired_devices.reindex(
+                    phone,
+                    old_identity=old_identity,
+                    old_connection_ids=old_connection_ids,
+                )
         persisted_state: PersistedSimulationState = SimulationDiskStore(
             self._simulations_dir
         ).load_for_devices(adb_server.paired_devices)
@@ -287,7 +302,10 @@ class StartupCoreRuntimeWork(CoreRuntimeWork[StartupOutcome]):
                 if result.adb_server is not None
                 else None
             )
-            if paired_device is not None and paired_device.state == "device":
+            if (
+                paired_device is not None
+                and paired_device.target_connection is not None
+            ):
                 try:
                     startup_entrypoint.create_simulation(result.last_active_device_id)
                 except (AttributeError, ValueError) as error:

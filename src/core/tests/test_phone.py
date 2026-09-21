@@ -1,610 +1,226 @@
-"""
-Tests for core device model modules.
-"""
+"""Tests for physical phones, ADB connections, identities, and repositories."""
 
 from __future__ import annotations
 
 import datetime
-from dataclasses import FrozenInstanceError, replace
+from dataclasses import FrozenInstanceError
 
 import pytest
 
-from core.devices.computer import ComputerDescriptor
 from core.devices.phone import (
-    DEFAULT_PHONE_DISPLAY_NAME,
+    AdbConnection,
     Phone,
     PhoneDescriptor,
+    PhoneIdentity,
     PhoneRepository,
-)
-from core.devices.stable_key import (
-    FirstTierStableKey,
-    SecondTierStableKey,
-    StableKey,
-    compute_phone_stable_key,
 )
 
 pytestmark = [pytest.mark.devices]
 
-# --- Phone ---
+
+def _connection(
+    id: str,
+    *,
+    state: str = "device",
+    kind: str = "usb",
+    at: datetime.datetime | None = None,
+) -> AdbConnection:
+    return AdbConnection.observed(
+        id,
+        state=state,
+        connectivity_type=kind,  # type: ignore[arg-type]
+        observed_at=at,
+    )
+
+
+class TestAdbConnection:
+    def test_active_observation_records_timestamp(self) -> None:
+        at = datetime.datetime(2025, 6, 15, 10, 30)
+        active = _connection("usb-1", at=at)
+        offline = _connection("wifi-1", state="offline", at=at)
+
+        assert active.is_active is True
+        assert active.last_connection == at
+        assert offline.is_active is False
+        assert offline.last_connection is None
+
+    def test_connection_is_immutable_structural_and_unhashable(self) -> None:
+        first = _connection("usb-1")
+        second = AdbConnection.deserialize(first.serialize())
+
+        assert first == second
+        with pytest.raises(FrozenInstanceError):
+            first.state = "offline"  # type: ignore[misc]
+        with pytest.raises(TypeError):
+            hash(first)
+
+    def test_connection_json_timestamp_round_trip(self) -> None:
+        at = datetime.datetime(2025, 6, 15, 10, 30)
+        payload = _connection("usb-1", at=at).serialize(json_compatible=True)
+
+        assert payload["last_connection"] == "2025-06-15T10:30:00"
+        assert AdbConnection.deserialize(payload).last_connection == at
+
+
+class TestPhoneIdentity:
+    def test_tier_one_identity_is_hashable(self) -> None:
+        first = PhoneIdentity.from_stable_key("hw:v1:SERIAL-1")
+        second = PhoneIdentity.from_stable_key("hw:v1:SERIAL-1")
+
+        assert first is not None and first == second
+        assert hash(first) == hash(second)
+
+    def test_tier_two_identity_is_rejected(self) -> None:
+        assert PhoneIdentity.from_stable_key("fp:v1:" + "a" * 64) is None
+        assert PhoneIdentity.provisional().is_provisional is True
 
 
 class TestPhone:
-    """Tests for the Phone device class."""
+    def test_phone_owns_connections_without_endpoint_forwarding(self) -> None:
+        phone = Phone(_connection("usb-1"), model="Pixel")
 
-    def test_phone_descriptor_is_read_only_and_type_safe(self) -> None:
-        phone = Phone(id="id", name="Pixel", state="online")
+        assert phone.connections[0].id == "usb-1"
+        assert phone.target_connection is phone.connections[0]
+        assert not hasattr(phone, "state")
+        assert not hasattr(phone, "ip")
+        assert not hasattr(phone, "last_connection")
 
-        with pytest.raises(AttributeError):
-            phone.descriptor = ComputerDescriptor()  # type: ignore[misc,assignment]
-        with pytest.raises(FrozenInstanceError):
-            phone.descriptor.state = "offline"  # type: ignore[misc]
+    def test_phone_prefers_sticky_connection_then_usb_fallback(self) -> None:
+        phone = Phone(_connection("usb-1"))
+        phone.add_connection(_connection("wifi-1", kind="wifi"))
+        phone.select_connection("wifi-1")
 
-    def test_phone_str_repr(self) -> None:
-        """Phone __str__ and __repr__ are defined and non-empty."""
-        phone = Phone(id="x", name="n", os="o", ip="i", port=1, state="s")
-        assert "n" in str(phone)
-        assert "Phone" in repr(phone)
-        assert "x" in repr(phone)
+        assert phone.target_connection is not None
+        assert phone.target_connection.id == "wifi-1"
 
-    def test_phone_descriptor_str_uses_human_friendly_labels(self) -> None:
-        phone = Phone(
-            id="192.168.1.20:5555",
-            os="15",
-            model="Pixel 8",
-            state="device",
-            android_api_level=35,
-        )
+        discovered = Phone(_connection("usb-1"), identity=phone.identity)
+        discovered.add_connection(_connection("wifi-1", state="offline", kind="wifi"))
+        phone.apply_discovery(discovered)
 
-        assert str(phone.descriptor) == (
-            "Pixel 8 | Android 15 (API 35) | "
-            "Wi-Fi: 192.168.1.20:5555 | State: device"
-        )
+        assert phone.target_connection is not None
+        assert phone.target_connection.id == "usb-1"
 
-    def test_phone_descriptor_repr_quotes_string_values(self) -> None:
-        descriptor = Phone(id="device-1", model="Pixel 8").descriptor
+    def test_phone_has_no_target_when_every_connection_is_inactive(self) -> None:
+        phone = Phone(_connection("usb-1", state="offline"))
 
-        assert "id='device-1'" in repr(descriptor)
-        assert "model='Pixel 8'" in repr(descriptor)
+        assert phone.target_connection is None
+        with pytest.raises(ValueError, match="not active"):
+            phone.select_connection("usb-1")
 
-    @pytest.mark.parametrize(
-        ("kwargs", "expected"),
-        [
-            ({"id": "serial-123"}, "usb"),
-            ({"id": "emulator-5554"}, "usb"),
-            ({"id": "192.168.1.20:5555"}, "wifi"),
-            ({"id": "adb-serial._adb-tls-connect._tcp"}, "wifi"),
-            ({"id": "adb-guid", "ip": "192.168.1.20", "port": 37777}, "wifi"),
-        ],
-    )
-    def test_phone_infers_connectivity_type(
-        self, kwargs: dict[str, object], expected: str
-    ) -> None:
-        phone = Phone(**kwargs)  # type: ignore[arg-type]
-
-        assert phone.connectivity_type == expected
-
-    def test_distinct_phones_use_object_identity(self) -> None:
-        usb = Phone(id="device-1", model="Pixel", connectivity_type="usb")
-        same_metadata = Phone(id="device-1", model="Pixel", connectivity_type="usb")
-
-        assert usb == usb
-        assert usb != same_metadata
-
-    def test_phone_is_unhashable_before_and_after_update(self) -> None:
-        phone = Phone(id="device-1", model="Pixel")
-
-        with pytest.raises(TypeError):
-            hash(phone)
-
-        phone.model = "Pixel Pro"
-
-        with pytest.raises(TypeError):
-            hash(phone)
-
-    def test_phone_connectivity_type_round_trips_and_old_payload_infers(self) -> None:
-        phone = Phone(
-            id="adb-guid",
-            ip="192.168.1.20",
-            port=37777,
-            connectivity_type="wifi",
-        )
-        payload = phone.serialize()
-
-        assert payload["connectivity_type"] == "wifi"
-        assert Phone.deserialize(payload).connectivity_type == "wifi"
-        payload.pop("connectivity_type")
-        assert Phone.deserialize(payload).connectivity_type == "wifi"
-
-    def test_phone_has_no_generic_update_state_escape_hatch(self) -> None:
-        phone = Phone(id="a")
-
-        assert not hasattr(phone, "update_state")
-
-    def test_phone_is_not_equal_to_unrelated_types(self) -> None:
-        phone = Phone(id="connection", model="OceanPhone")
-
-        assert phone != object()
-
-    def test_phone_hardware_serial_derives_stable_key_tier_one(self) -> None:
-        """Explicit hardware_serial produces hw:v1: Tier-1 stable_key."""
-        phone = Phone(
-            id="x",
-            name="n",
-            product="prod",
-            model="mod",
-            hardware_serial="  SN999  ",
-            manufacturer="",
-        )
-        assert phone.hardware_serial == "SN999"
-        assert phone.stable_key == "hw:v1:SN999"
-
-    def test_hardware_serial_setter_updates_stable_key(self) -> None:
-        phone = Phone(
-            id="dev",
-            name="Pixel",
-            product="prod",
-            model="mod",
-            state="device",
-        )
-        phone.hardware_serial = "ABC123DEVICE\n"
-        assert phone.hardware_serial == "ABC123DEVICE"
-        assert phone.stable_key == "hw:v1:ABC123DEVICE"
-
-    def test_manufacturer_and_model_setters_update_tier_two_stable_key(
-        self,
-    ) -> None:
-        """Without serial, manufacturer + model enrichment produces fp:v1: stable_key."""
-        phone = Phone(
-            id="dev", name="Pixel", product="ocean", model="m1", state="device"
-        )
-        assert phone.stable_key == ""
-        phone.manufacturer = "FabCo"
-        phone.model = "OceanView"
-        assert phone.descriptor.manufacturer == "FabCo"
-        assert phone.descriptor.model == "OceanView"
-        assert phone.stable_key.startswith("fp:v1:")
-
-    def test_model_setter_leaves_tier_one_key_unchanged(self) -> None:
-        """After Tier-1 serial, model enrichment does not change hw stable_key."""
-        phone = Phone(
-            id="dev", name="Pixel", product="ocean", model="m1", state="device"
-        )
-        phone.hardware_serial = "SERIALX"
-        key = phone.stable_key
-        phone.model = "OceanView"
-        assert phone.descriptor.model == "OceanView"
-        assert phone.stable_key == key == "hw:v1:SERIALX"
-
-    def test_os_setter_applies_android_release(self) -> None:
-        phone = Phone(id="x", name="n", os="", state="device")
-        phone.os = " 15 \n"
-        assert phone.descriptor.os == "15"
-
-    def test_shell_device_name_setter_clears_override_and_recomputes_display(
-        self,
-    ) -> None:
-        """Blank ``device_name`` clears shell override; label falls back to list token / model."""
-        phone = Phone(
-            id="x",
-            name="keep-token",
-            model="ModX",
-            state="device",
-        )
-        phone.shell_device_name = "  "
-        assert phone.descriptor.shell_device_name == ""
-        # Model beats legacy name-as-list-token for display.
-        assert phone.descriptor.name == "ModX"
-
-    def test_display_name_model_only_before_manufacturer(self) -> None:
-        phone = Phone(
-            id="dev1",
-            product="ocean",
-            model="OceanPhone",
-            device="Handset1",
-            state="device",
-        )
-        assert phone.descriptor.name == "OceanPhone"
-
-    def test_display_name_manufacturer_and_model_after_enrichment(self) -> None:
-        phone = Phone(
-            id="dev1",
-            model="OceanPhone",
-            device="Handset1",
-            state="device",
-        )
-        phone.manufacturer = "FabCo"
-        assert phone.descriptor.name == "FabCo OceanPhone"
-
-    def test_display_name_getprop_overrides_manufacturer_model(self) -> None:
-        phone = Phone(id="d", model="X", manufacturer="Fab", state="device")
-        assert "Fab" in phone.descriptor.name
-        phone.shell_device_name = "Living Room Phone"
-        assert phone.descriptor.name == "Living Room Phone"
-        assert phone.descriptor.shell_device_name == "Living Room Phone"
-
-    def test_sync_phone_display_name_long_id_suffix(self) -> None:
-        pid = "adb-X9ZZ99000012345678-aBc1dE"
-        phone = Phone(id=pid, state="device")
-        assert phone.descriptor.name == f"{DEFAULT_PHONE_DISPLAY_NAME} (8-aBc1dE)"
-
-    def test_sync_phone_display_name_emulator_id(self) -> None:
-        phone = Phone(id="emulator-5554", state="offline")
-        assert phone.descriptor.name == "emulator-5554"
-
-    def test_android_api_level_setter(self) -> None:
-        phone = Phone(id="x", name="n", state="device")
-        phone.android_api_level = 35
-        assert phone.descriptor.android_api_level == 35
-        phone.android_api_level = None
-        assert phone.descriptor.android_api_level == 35
-
-    def test_identity_and_os_setters_ignore_blank_values(self) -> None:
-        phone = Phone(
-            id="x",
-            os="14",
-            manufacturer="FabCo",
-            model="OceanPhone",
-        )
-
-        phone.os = "  "
-        phone.manufacturer = "  "
-        phone.model = "  "
-
-        assert phone.os == "14"
-        assert phone.manufacturer == "FabCo"
-        assert phone.model == "OceanPhone"
-
-    def test_apply_shell_enrichment_updates_one_snapshot_atomically(self) -> None:
-        phone = Phone(id="device-1", product="ocean", model="List model", os="14")
-        original = phone.descriptor
+    def test_tier_one_enrichment_promotes_provisional_identity(self) -> None:
+        phone = Phone(_connection("usb-1"))
+        assert phone.identity.is_provisional
 
         phone.apply_shell_enrichment(
-            manufacturer=" FabCo ",
-            model="OceanPhone",
-            shell_device_name=" Field handset ",
+            manufacturer="Google",
+            model="Pixel",
+            shell_device_name="Field phone",
             os="15",
             android_api_level=35,
-            hardware_serial=" SERIAL-1 ",
-        )
-
-        assert phone.descriptor is not original
-        assert phone.manufacturer == "FabCo"
-        assert phone.model == "OceanPhone"
-        assert phone.shell_device_name == "Field handset"
-        assert phone.name == "Field handset"
-        assert phone.os == "15"
-        assert phone.android_api_level == 35
-        assert phone.hardware_serial == "SERIAL-1"
-        assert phone.stable_key == "hw:v1:SERIAL-1"
-
-    def test_apply_shell_enrichment_preserves_non_empty_values_on_blanks(self) -> None:
-        phone = Phone(
-            id="device-1",
-            manufacturer="FabCo",
-            model="OceanPhone",
-            os="14",
             hardware_serial="SERIAL-1",
-            android_api_level=34,
         )
 
-        phone.apply_shell_enrichment(
-            manufacturer=" ",
-            model="",
-            shell_device_name=" ",
-            os="",
-            android_api_level=None,
-            hardware_serial="unknown",
-        )
-
-        assert phone.manufacturer == "FabCo"
-        assert phone.model == "OceanPhone"
-        assert phone.shell_device_name == ""
-        assert phone.os == "14"
-        assert phone.android_api_level == 34
-        assert phone.hardware_serial == "SERIAL-1"
+        assert phone.identity == PhoneIdentity("hw:v1:SERIAL-1")
         assert phone.stable_key == "hw:v1:SERIAL-1"
+        assert phone.name == "Field phone"
 
-    def test_descriptor_constructor_preserves_keyless_discovery_state(self) -> None:
-        descriptor = PhoneDescriptor(
-            product="ocean",
-            model="OceanPhone",
-            manufacturer="FabCo",
+    def test_apply_discovery_preserves_inactive_connection_recency(self) -> None:
+        at = datetime.datetime(2025, 6, 15, 10, 30)
+        phone = Phone(_connection("usb-1", at=at))
+        discovered = Phone(
+            _connection("usb-1", state="offline"), identity=phone.identity
         )
 
-        assert descriptor.stable_key == ""
+        phone.apply_discovery(discovered)
 
-    def test_deserialize_preserves_persisted_stable_key(self) -> None:
-        persisted_key = "hw:v1:PERSISTED-SERIAL"
+        assert phone.connections[0].state == "offline"
+        assert phone.connections[0].last_connection == at
 
-        phone = Phone.deserialize(
-            {
-                "id": "device-1",
-                "name": "OceanPhone",
-                "stable_key": persisted_key,
-            }
+    def test_nested_serialization_round_trip(self) -> None:
+        phone = Phone(
+            _connection("usb-1"),
+            hardware_serial="SERIAL-1",
+            model="Pixel",
         )
-
-        assert phone.stable_key == persisted_key
-
-    def test_last_connection_tracks_only_active_adb_observations(self) -> None:
-        active = Phone(id="device-1", state="device")
-        offline = Phone(id="device-2", state="offline")
-        unauthorized = Phone(id="device-3", state="unauthorized")
-
-        assert isinstance(active.last_connection, datetime.datetime)
-        assert offline.last_connection is None
-        assert unauthorized.last_connection is None
-
-    def test_last_connection_setter_replaces_snapshot_and_validates_value(self) -> None:
-        phone = Phone(id="device-1", state="offline")
-        original = phone.descriptor
-        connected_at = datetime.datetime(2025, 6, 15, 10, 30)
-
-        phone.last_connection = connected_at
-
-        assert phone.descriptor is not original
-        assert phone.last_connection is connected_at
-        phone.last_connection = None
-        assert phone.last_connection is None
-        with pytest.raises(TypeError, match="last_connection"):
-            phone.last_connection = "recently"  # type: ignore[assignment]
-
-    def test_deserialize_ignores_legacy_communication_timestamp(self) -> None:
-        restored = Phone.deserialize(
-            {
-                "id": "device-1",
-                "state": "device",
-                "last_communication": "2025-06-15T10:30:00",
-            }
-        )
-
-        assert restored.last_connection is None
-
-    def test_last_connection_serialization_round_trip(self) -> None:
-        connected_at = datetime.datetime(2025, 6, 15, 10, 30)
-        phone = Phone(id="device-1", state="device")
-        phone.last_connection = connected_at
+        phone.add_connection(_connection("wifi-1", kind="wifi"))
 
         payload = phone.serialize(json_compatible=True)
         restored = Phone.deserialize(payload)
 
-        assert payload["last_connection"] == "2025-06-15T10:30:00"
-        assert "last_communication" not in payload
-        assert restored.last_connection == connected_at
+        assert payload["id"] == "hw:v1:SERIAL-1"
+        assert len(payload["connections"]) == 2  # type: ignore[arg-type]
+        assert restored.identity == phone.identity
+        assert restored.connections == phone.connections
 
-    def test_apply_discovery_replaces_snapshot_and_refreshes_connection_name(
-        self,
-    ) -> None:
-        phone = Phone(id="adb-X9ZZ99000012345678-aBc1dE")
-        assert phone.name == f"{DEFAULT_PHONE_DISPLAY_NAME} (8-aBc1dE)"
-        original = phone.descriptor
-        discovered = Phone(id="emulator-5554", state="device", model="Pixel")
-
-        phone.apply_discovery(discovered)
-
-        assert phone.descriptor is discovered.descriptor
-        assert phone.descriptor is not original
-        assert phone.id == "emulator-5554"
-        assert phone.name == "Pixel"
-
-    def test_apply_discovery_preserves_last_connection_when_phone_is_inactive(
-        self,
-    ) -> None:
-        connected_at = datetime.datetime(2025, 6, 15, 10, 30)
-        phone = Phone(id="device-1", state="device", model="Old")
-        phone.last_connection = connected_at
-        discovered = Phone(id="device-1", state="offline", model="New")
-
-        phone.apply_discovery(discovered)
-
-        assert phone.state == "offline"
-        assert phone.model == "New"
-        assert phone.last_connection == connected_at
-
-
-class TestComputePhoneStableKey:
-    """Tests for stable key derivation."""
-
-    def test_tier_one_known_serial(self) -> None:
-        key = compute_phone_stable_key(hardware_serial=" SN1 ", product="x", model="y")
-        assert isinstance(key, FirstTierStableKey)
-        assert key.value == "hw:v1:SN1"
-        assert key.is_collision_resistant() is True
-
-    def test_tier_one_keys_are_immutable_hashable_identity_values(self) -> None:
-        first = FirstTierStableKey("SERIAL-1")
-        second = FirstTierStableKey("SERIAL-1")
-
-        assert first == second
-        assert hash(first) == hash(second)
-        assert {first: "phone"}[second] == "phone"
-        with pytest.raises(FrozenInstanceError):
-            first.hardware_serial = "SERIAL-2"  # type: ignore[misc]
-
-    def test_unknown_serial_falls_through(self) -> None:
-        """unknown (any case) is not treated as Tier-1."""
-
-        fp = compute_phone_stable_key(
-            hardware_serial="unknown",
-            product="prod",
-            model="mod",
-            fingerprint_when_no_serial=True,
+    def test_legacy_flat_payload_becomes_one_connection(self) -> None:
+        restored = Phone.deserialize(
+            {
+                "id": "legacy-endpoint",
+                "name": "Pixel",
+                "state": "offline",
+                "connectivity_type": "usb",
+                "last_connection": "2025-06-15T10:30:00",
+            }
         )
-        assert isinstance(fp, SecondTierStableKey)
-        assert fp.value.startswith("fp:v1:")
-        assert fp.is_collision_resistant() is False
-        fp2 = compute_phone_stable_key(
-            hardware_serial="unknown",
-            product="prod",
-            model="mod",
-            fingerprint_when_no_serial=False,
-        )
-        assert fp2 is None
 
-    def test_fingerprint_stable_for_same_inputs(self) -> None:
-        a = compute_phone_stable_key(
-            hardware_serial=None,
-            product=" Prod ",
-            model=" Mod ",
-            manufacturer="Fab",
-            fingerprint_when_no_serial=True,
+        assert restored.identity.is_provisional
+        assert restored.connections[0].id == "legacy-endpoint"
+        assert restored.connections[0].last_connection == datetime.datetime(
+            2025, 6, 15, 10, 30
         )
-        b = compute_phone_stable_key(
-            hardware_serial="",
-            product=" Prod ",
-            model=" Mod ",
-            manufacturer="Fab ",
-            fingerprint_when_no_serial=True,
-        )
-        assert isinstance(a, SecondTierStableKey)
-        assert a == b and a.value.startswith("fp:v1:")
 
-    @pytest.mark.parametrize(
-        ("stable_key", "expected_type", "expected_collision_resistance"),
-        [
-            ("hw:v1:SER-123", FirstTierStableKey, True),
-            ("fp:v1:" + "a" * 64, SecondTierStableKey, False),
-            ("pc:v1:install:host-token", None, None),
-            ("", None, None),
-            ("fp:v1:not-a-digest", None, None),
-        ],
-    )
-    def test_parse_persisted_stable_key(
-        self,
-        stable_key: str,
-        expected_type: type[StableKey] | None,
-        expected_collision_resistance: bool | None,
-    ) -> None:
-        parsed = StableKey.from_value(stable_key)
-        if expected_type is None:
-            assert parsed is None
-        else:
-            assert isinstance(parsed, expected_type)
-            assert parsed.is_collision_resistant() is expected_collision_resistance
+    def test_phone_and_descriptor_are_unhashable(self) -> None:
+        phone = Phone(_connection("usb-1"))
+        descriptor = PhoneDescriptor(name="Pixel")
 
-
-class TestPhoneDescriptorEquality:
-    """PhoneDescriptor supports state comparison without mutable hashing."""
-
-    def test_stable_key_participates_in_equality(self) -> None:
-        fixed_last = datetime.datetime(2025, 6, 15, 10, 30, 0)
-        sk_tier_one = compute_phone_stable_key(
-            hardware_serial="SN123",
-            product="prod",
-            model="mod",
-            fingerprint_when_no_serial=False,
-        )
-        assert isinstance(sk_tier_one, FirstTierStableKey)
-
-        d1 = PhoneDescriptor(
-            id="adb-1",
-            name="n",
-            os="Android",
-            ip="10.0.0.1",
-            port=5555,
-            product="prod",
-            model="mod",
-            transport_id="1",
-            state="device",
-            last_connection=fixed_last,
-            hardware_serial="SN123",
-            stable_key=sk_tier_one.value,
-            manufacturer="",
-        )
-        d2 = PhoneDescriptor(
-            id="adb-1",
-            name="n",
-            os="Android",
-            ip="10.0.0.1",
-            port=5555,
-            product="prod",
-            model="mod",
-            transport_id="1",
-            state="device",
-            last_connection=fixed_last,
-            hardware_serial="SN123",
-            stable_key=sk_tier_one.value,
-            manufacturer="",
-        )
-        assert d1 == d2
+        assert phone == phone
+        assert phone != Phone(_connection("usb-1"))
         with pytest.raises(TypeError):
-            hash(d1)
-
-        transient_update = replace(
-            d2,
-            id="adb-2",
-            state="offline",
-            last_connection=fixed_last + datetime.timedelta(seconds=1),
-        )
-        assert d1 == transient_update
-        with pytest.raises(FrozenInstanceError):
-            d2.state = "offline"  # type: ignore[misc]
+            hash(phone)
         with pytest.raises(TypeError):
-            hash(transient_update)
-
-        sk_fingerprint = compute_phone_stable_key(
-            hardware_serial=None,
-            product="prod",
-            model="mod",
-            manufacturer="Fab",
-            fingerprint_when_no_serial=True,
-        )
-        assert isinstance(sk_fingerprint, SecondTierStableKey)
-        d3 = PhoneDescriptor(
-            id="adb-1",
-            name="n",
-            os="Android",
-            ip="10.0.0.1",
-            port=5555,
-            product="prod",
-            model="mod",
-            transport_id="1",
-            state="device",
-            last_connection=fixed_last,
-            hardware_serial="",
-            stable_key=sk_fingerprint.value,
-            manufacturer="Fab",
-        )
-        assert d3 != d1
+            hash(descriptor)
 
 
 class TestPhoneRepository:
-    """Phone repository indexes used by device-domain workflows."""
+    def test_indexes_physical_identity_and_connections(self) -> None:
+        phone = Phone(_connection("usb-1"), hardware_serial="SERIAL-1")
+        phone.add_connection(_connection("wifi-1", kind="wifi"))
+        repository = PhoneRepository()
 
-    def test_selection_and_removal_require_the_stored_phone_instance(self) -> None:
-        stored = Phone(id="device-1", model="Pixel")
-        same_id_clone = Phone(id="device-1", model="Pixel Pro")
+        repository.add(phone)
+
+        assert repository.get("hw:v1:SERIAL-1") is phone
+        assert repository.get_by_connection_id("usb-1") is phone
+        assert repository.get_by_connection_id("wifi-1") is phone
+
+    def test_reindex_preserves_working_instance(self) -> None:
+        phone = Phone(_connection("usb-1"))
+        repository = PhoneRepository()
+        repository.add(phone)
+        old_identity = phone.identity.value
+
+        phone.hardware_serial = "SERIAL-1"
+        repository.reindex(
+            phone,
+            old_identity=old_identity,
+            old_connection_ids=("usb-1",),
+        )
+
+        assert repository.get(old_identity) is None
+        assert repository.get("hw:v1:SERIAL-1") is phone
+        assert repository.working_device is phone
+
+    def test_selection_and_removal_require_exact_instance(self) -> None:
+        identity = PhoneIdentity("hw:v1:SERIAL-1")
+        stored = Phone(_connection("usb-1"), identity=identity)
+        clone = Phone(_connection("usb-2"), identity=identity)
         repository = PhoneRepository()
         repository.add(stored)
-        repository.working_device = None
 
-        repository.working_device = stored
-        with pytest.raises(ValueError, match="not in the repository"):
-            repository.working_device = same_id_clone
-        repository.remove(same_id_clone)
+        with pytest.raises(ValueError):
+            repository.working_device = clone
+        repository.remove(clone)
 
-        assert repository.get("device-1") is stored
-        assert repository.working_device is stored
-
+        assert repository.get(identity.value) is stored
         repository.remove(stored)
-
-        assert repository.get("device-1") is None
-        assert repository.working_device is None
-
-    def test_index_by_stable_identity_keeps_first_tier_one_phone(
-        self,
-    ) -> None:
-        first = Phone(id="device-1", hardware_serial="SERIAL-1")
-        duplicate = Phone(id="device-2", hardware_serial="SERIAL-1")
-        without_stable_key = Phone(id="device-3")
-        fingerprint = Phone(id="device-4", model="Pixel")
-        fingerprint.manufacturer = "Google"
-        repository = PhoneRepository()
-        for phone in (first, duplicate, without_stable_key, fingerprint):
-            repository.add(phone)
-
-        indexed = repository.index_by_stable_identity()
-
-        stable_identity = FirstTierStableKey("SERIAL-1")
-        assert indexed == {stable_identity: first}
-        assert indexed[stable_identity] is first
+        assert repository.get(identity.value) is None

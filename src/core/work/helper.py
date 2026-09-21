@@ -62,13 +62,15 @@ def _device_endpoint_status(work: object, server: object) -> bool | None:
         return None
     ip, port = endpoint
     for device in devices:
-        device_port = getattr(device, "port", None)
-        if (
-            getattr(device, "ip", None) == ip
-            and _valid_device_port(device_port)
-            and device_port == port
-        ):
-            return True
+        connections = getattr(device, "connections", ())
+        for connection in connections:
+            device_port = getattr(connection, "port", None)
+            if (
+                getattr(connection, "ip", None) == ip
+                and _valid_device_port(device_port)
+                and device_port == port
+            ):
+                return True
     return False
 
 

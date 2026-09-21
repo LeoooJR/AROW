@@ -18,7 +18,7 @@ from core.adb.execution import (
     AdbTransportScope,
 )
 from core.adb.server import AdbServer
-from core.devices.phone import Phone
+from core.devices.phone import AdbConnection
 
 
 class ScriptedTransport:
@@ -33,7 +33,7 @@ class ScriptedTransport:
                 AdbCommandInvocation[object],
                 Path,
                 AdbTransportScope,
-                Phone | None,
+                AdbConnection | None,
                 float,
             ]
         ] = []
@@ -44,10 +44,10 @@ class ScriptedTransport:
         *,
         binary_path: Path,
         scope: AdbTransportScope,
-        phone: Phone | None,
+        connection: AdbConnection | None,
         timeout_seconds: float,
     ) -> AdbTransportResult:
-        self.calls.append((invocation, binary_path, scope, phone, timeout_seconds))
+        self.calls.append((invocation, binary_path, scope, connection, timeout_seconds))
         outcome = self._outcomes.pop(0)
         if isinstance(outcome, BaseException):
             raise outcome
@@ -60,15 +60,15 @@ def test_execute_once_delegates_complete_context_and_builds_result() -> None:
     )
     binary = AdbBinary(path=Path("/mock/adb"))
     executor = AdbCommandExecutor(binary=binary, transport=transport)
-    phone = Phone(id="device-123", state="device")
+    connection = AdbConnection.observed("device-123", state="device")
     invocation = AdbCommands.STATUS.invoke()
 
-    result = executor.execute_once(invocation, scope="client", phone=phone)
+    result = executor.execute_once(invocation, scope="client", connection=connection)
 
     assert result.status is AdbCommandResultStatus.SUCCESS
     assert result.output == "device\n"
-    assert result.phone is phone
-    assert transport.calls == [(invocation, binary.path, "client", phone, 10.0)]
+    assert result.connection is connection
+    assert transport.calls == [(invocation, binary.path, "client", connection, 10.0)]
 
 
 def test_facade_constructors_do_not_accept_an_executor() -> None:
