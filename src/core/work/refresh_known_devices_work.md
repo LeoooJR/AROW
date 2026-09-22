@@ -32,11 +32,11 @@ sequenceDiagram
             Runner->>Entrypoint: apply_result(outcome) on main thread
             Entrypoint->>Work: apply_main_thread(entrypoint, outcome)
             Work->>Entrypoint: reconcile_paired_devices(devices)
-            alt repository changed
+            alt repository or active connection timestamp changed
                 Work->>Bus: emit DEVICES_UPDATED
                 Bus-->>Controller: devices and ID rebindings
                 Controller-->>View: forward devices update
-            else no effective change
+            else unchanged inactive or exact snapshot
                 Work->>Work: return without emitting
             end
         else listing or preflight fails

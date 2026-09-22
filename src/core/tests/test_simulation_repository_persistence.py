@@ -8,7 +8,6 @@ from pathlib import Path
 import pytest
 
 from core.devices.phone import Phone, PhoneRepository
-from core.devices.stable_key import compute_phone_stable_key
 from core.geo.location import Location
 from core.simulation import (
     INDEX_FILENAME,
@@ -18,6 +17,7 @@ from core.simulation import (
     SimulationDiskStore,
     SimulationRepository,
 )
+from core.tests.phone_test_factory import make_phone
 
 
 def test_init_writes_empty_index(tmp_path: Path) -> None:
@@ -119,7 +119,7 @@ def test_add_updates_index_and_writes_metadata(tmp_path: Path) -> None:
 
 def test_add_only_survives_reload_without_write_all(tmp_path: Path) -> None:
     repository = SimulationRepository(tmp_path / "simulations")
-    paired_phone = Phone(id="device-1", name="Pixel", state="device")
+    paired_phone = make_phone(id="device-1", name="Pixel", state="device")
     simulation = Simulation(id="sim-1", device=paired_phone, active=False)
     repository.add(simulation)
 
@@ -135,22 +135,21 @@ def test_add_only_survives_reload_without_write_all(tmp_path: Path) -> None:
 
 
 def test_phone_from_payload_rebuilds_persisted_fields() -> None:
-    phone = Phone(id="device-1", name="Pixel", state="device", ip="10.0.0.5", port=5555)
+    phone = make_phone(
+        id="device-1", name="Pixel", state="device", ip="10.0.0.5", port=5555
+    )
     payload = phone.serialize(json_compatible=False)
     restored = Phone.deserialize(payload)
 
     assert restored.id == phone.id
     assert restored.name == phone.name
     assert restored.os == phone.os
-    assert restored.ip == phone.ip
-    assert restored.port == phone.port
-    assert restored.state == phone.state
+    assert restored.connections == phone.connections
     assert restored.stable_key == phone.stable_key
-    assert restored.last_communication == phone.last_communication
 
 
 def test_simulation_from_payload_rebuilds_fields(tmp_path: Path) -> None:
-    device = Phone(id="device-1", name="Pixel", state="device")
+    device = make_phone(id="device-1", name="Pixel", state="device")
     simulation_dir = tmp_path / "sim-1"
     map_file = simulation_dir / "map" / "sim-1.html"
     log_file = simulation_dir / "sim-1.log"
@@ -177,7 +176,27 @@ def test_simulation_from_payload_rebuilds_fields(tmp_path: Path) -> None:
     assert restored.map_file == map_file
     assert restored.log_file == log_file
     assert restored.active is True
-    assert restored.device.last_communication == device.last_communication
+    assert restored.device.connections == device.connections
+
+
+def test_simulation_deserialize_ignores_legacy_device_timestamp(tmp_path: Path) -> None:
+    device = make_phone(id="device-1", name="Pixel", state="device")
+    simulation = Simulation(id="sim-1", device=device)
+    simulation_dir = tmp_path / "sim-1"
+    payload = simulation.serialize(simulation_dir, json_compatible=True)
+    device_payload = payload["device"]
+    assert isinstance(device_payload, dict)
+    device_payload.pop("connections")
+    device_payload.pop("preferred_connection_id")
+    device_payload["id"] = "device-1"
+    device_payload["state"] = "offline"
+    device_payload["last_communication"] = "2025-06-15T10:30:00"
+
+    restored = Simulation.deserialize(payload, simulation_dir)
+
+    assert restored.device is not None
+    assert restored.device.connections[0].id == "device-1"
+    assert restored.device.connections[0].last_connection is None
 
 
 def test_simulation_payload_round_trips_external_artifact_paths(
@@ -207,7 +226,7 @@ def test_simulation_payload_round_trips_external_artifact_paths(
 
 def test_disk_store_load_for_devices_binds_paired_phone(tmp_path: Path) -> None:
     repository = SimulationRepository(tmp_path / "simulations")
-    paired_phone = Phone(id="device-1", name="Pixel", state="device")
+    paired_phone = make_phone(id="device-1", name="Pixel", state="device")
     simulation = Simulation(id="sim-1", device=paired_phone, active=False)
     repository.add(simulation)
     repository.write_all()
@@ -225,7 +244,7 @@ def test_disk_store_load_for_devices_binds_paired_phone(tmp_path: Path) -> None:
 
 def test_load_all_for_devices_binds_existing_phone_instance(tmp_path: Path) -> None:
     repository = SimulationRepository(tmp_path / "simulations")
-    paired_phone = Phone(id="device-1", name="Pixel", state="device")
+    paired_phone = make_phone(id="device-1", name="Pixel", state="device")
     simulation = Simulation(
         id="sim-1",
         device=paired_phone,
@@ -248,7 +267,7 @@ def test_load_all_for_devices_rebinds_simulation_by_stable_key_when_adb_id_chang
     tmp_path: Path,
 ) -> None:
     repository = SimulationRepository(tmp_path / "simulations")
-    persisted_phone = Phone(
+    persisted_phone = make_phone(
         id="device-old",
         name="Pixel",
         state="device",
@@ -259,7 +278,7 @@ def test_load_all_for_devices_rebinds_simulation_by_stable_key_when_adb_id_chang
     repository.last_active_device_id = persisted_phone.id
     repository.write_all()
 
-    rebound_phone = Phone(
+    rebound_phone = make_phone(
         id="device-new",
         name="Pixel",
         state="device",
@@ -273,9 +292,9 @@ def test_load_all_for_devices_rebinds_simulation_by_stable_key_when_adb_id_chang
 
     assert len(loaded) == 1
     assert loaded[0].device is rebound_phone
-    assert loaded_repository.last_active_device_id == "device-new"
+    assert loaded_repository.last_active_device_id == rebound_phone.id
     index_payload = json.loads(loaded_repository.index_file.read_text(encoding="utf-8"))
-    assert index_payload["last_active_device_id"] == "device-new"
+    assert index_payload["last_active_device_id"] == rebound_phone.id
     assert loaded_repository.simulation_dir("sim-1").exists()
 
 
@@ -283,7 +302,7 @@ def test_load_all_for_devices_does_not_rebind_by_collision_prone_stable_key(
     tmp_path: Path,
 ) -> None:
     repository = SimulationRepository(tmp_path / "simulations")
-    persisted_phone = Phone(
+    persisted_phone = make_phone(
         id="device-old",
         name="Pixel",
         state="device",
@@ -291,21 +310,14 @@ def test_load_all_for_devices_does_not_rebind_by_collision_prone_stable_key(
         model="Pixel 8",
         manufacturer="Google",
     )
-    stable_key = compute_phone_stable_key(
-        hardware_serial=None,
-        product=persisted_phone.product,
-        model=persisted_phone.model,
-        manufacturer=persisted_phone.manufacturer,
-        fingerprint_when_no_serial=True,
-    )
-    assert stable_key is not None
-    persisted_phone.descriptor.stable_key = stable_key.value
+    persisted_phone.hardware_serial = ""
+    assert persisted_phone.stable_key.startswith("fp:v1:")
     simulation = Simulation(id="sim-1", device=persisted_phone, active=True)
     repository.add(simulation)
     repository.last_active_device_id = persisted_phone.id
     repository.write_all()
 
-    rebound_phone = Phone(
+    rebound_phone = make_phone(
         id="device-new",
         name="Pixel",
         state="device",
@@ -313,7 +325,8 @@ def test_load_all_for_devices_does_not_rebind_by_collision_prone_stable_key(
         model="Pixel 8",
         manufacturer="Google",
     )
-    rebound_phone.descriptor.stable_key = persisted_phone.stable_key
+    rebound_phone.hardware_serial = ""
+    assert rebound_phone.stable_key == persisted_phone.stable_key
     paired_devices = PhoneRepository()
     paired_devices.add(rebound_phone)
 
@@ -330,7 +343,7 @@ def test_load_all_for_devices_does_not_rebind_by_collision_prone_stable_key(
 
 def test_load_all_for_devices_deletes_stale_simulation(tmp_path: Path) -> None:
     repository = SimulationRepository(tmp_path / "simulations")
-    stale_device = Phone(id="missing-device", name="Ghost", state="device")
+    stale_device = make_phone(id="missing-device", name="Ghost", state="device")
     simulation = Simulation(id="sim-stale", device=stale_device)
     repository.add(simulation)
     repository.write_all()
@@ -349,7 +362,7 @@ def test_load_all_for_devices_deletes_invalid_persisted_simulation(
 ) -> None:
     save_dir = tmp_path / "simulations"
     repository = SimulationRepository(save_dir)
-    paired_phone = Phone(id="device-1", name="Pixel", state="device")
+    paired_phone = make_phone(id="device-1", name="Pixel", state="device")
     simulation = Simulation(id="sim-1", device=paired_phone)
     repository.add(simulation)
     repository.write_all()
@@ -375,7 +388,7 @@ def test_load_all_for_devices_deletes_simulation_with_missing_location_payload(
 ) -> None:
     save_dir = tmp_path / "simulations"
     repository = SimulationRepository(save_dir)
-    paired_phone = Phone(id="device-1", name="Pixel", state="device")
+    paired_phone = make_phone(id="device-1", name="Pixel", state="device")
     simulation = Simulation(id="sim-1", device=paired_phone)
     repository.add(simulation)
     repository.write_all()
@@ -401,7 +414,7 @@ def test_load_all_for_devices_deletes_simulation_without_persisted_device(
 ) -> None:
     save_dir = tmp_path / "simulations"
     repository = SimulationRepository(save_dir)
-    paired_phone = Phone(id="device-1", name="Pixel", state="device")
+    paired_phone = make_phone(id="device-1", name="Pixel", state="device")
     simulation = Simulation(id="sim-1", device=paired_phone)
     repository.add(simulation)
     repository.write_all()
@@ -424,7 +437,7 @@ def test_load_all_for_devices_deletes_simulation_without_persisted_device(
 
 def test_write_all_writes_simulation_json_and_index_last(tmp_path: Path) -> None:
     repository = SimulationRepository(tmp_path / "simulations")
-    device = Phone(id="device-1", name="Pixel", state="device")
+    device = make_phone(id="device-1", name="Pixel", state="device")
     simulation_one = Simulation(
         id="sim-1",
         device=device,
@@ -479,6 +492,24 @@ def test_remove_updates_index(tmp_path: Path) -> None:
         "simulations": [],
         "last_active_device_id": None,
     }
+
+
+def test_remove_rejects_same_id_clone_without_deleting_persisted_state(
+    tmp_path: Path,
+) -> None:
+    repository = SimulationRepository(tmp_path / "simulations")
+    stored = Simulation(id="sim-1")
+    repository.add(stored)
+    simulation_dir = repository.simulation_dir(stored.id)
+
+    with pytest.raises(ValueError, match="not the stored repository instance"):
+        repository.remove(Simulation(id="sim-1"))
+
+    assert repository.get("sim-1") is stored
+    assert simulation_dir.is_dir()
+    assert repository.simulation_metadata_file("sim-1").is_file()
+    index_payload = json.loads(repository.index_file.read_text(encoding="utf-8"))
+    assert index_payload["simulations"] == ["sim-1"]
 
 
 @pytest.mark.parametrize(

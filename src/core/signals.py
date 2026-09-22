@@ -68,7 +68,7 @@ class DevicesUpdatedPayload:
     """Payload emitted when the known/connected devices list changes."""
 
     devices: list[dict[str, object]]
-    device_id_rebindings: Mapping[str, str] = field(default_factory=dict)
+    phone_id_rebindings: Mapping[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)

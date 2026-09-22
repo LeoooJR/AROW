@@ -11,7 +11,10 @@ from core.devices.phone import (
     Phone,
     serialize_phone_collection,
 )
-from core.devices.reconciliation import DeviceReconcileResult, ReconciliationEngine
+from core.devices.reconciliation import (
+    PhoneReconciliationReport,
+    ReconciliationEngine,
+)
 from core.signal_bus import InMemoryCoreSignalBus
 from core.signals import (
     ActivityLogFileUpdatedPayload,
@@ -210,7 +213,7 @@ class ModelEntrypoint(Entrypoint):
 
     def set_host_identity(self, stable_key: str) -> None:
         """Apply persisted install identity to the host descriptor and emit."""
-        self._host.descriptor.stable_key = stable_key
+        self._host.set_stable_key(stable_key)
         self.emit_core_signal(
             CoreSignals.HOST_COMPUTER_IDENTITY_UPDATED,
             HostComputerIdentityPayload(stable_key=stable_key),
@@ -332,19 +335,19 @@ class ModelEntrypoint(Entrypoint):
             return []
         return resolved.get_known_devices()
 
-    def reconcile_paired_devices(self, phones: list[Phone]) -> DeviceReconcileResult:
+    def reconcile_paired_devices(
+        self, phones: list[Phone]
+    ) -> PhoneReconciliationReport:
         """
         Reconcile paired devices with a freshly discovered handset list.
 
-        Existing ``Phone`` instances are updated in place when they match by ADB
-        connection id or non-empty ``stable_key`` (wireless/USB reconnect).
+        Existing physical ``Phone`` instances are updated in place when their
+        identity, an owned ADB connection, or a Tier-1 stable key matches.
         Handsets absent from ``phones`` are removed and any linked simulation is
         dropped best-effort.
 
         Returns:
-            Result carrying whether the paired repository or simulations changed
-            and any safe old ADB id -> new ADB id rebindings detected during
-            collision-resistant identity reconciliation.
+            Ordered domain events describing repository-visible changes.
         """
         if self._adb_server is None:
             raise AttributeError(
@@ -354,8 +357,13 @@ class ModelEntrypoint(Entrypoint):
             self._adb_server.paired_devices,
             phones,
         )
-        for device_id in result.removed_device_ids:
-            self.delete_simulation_for_device(device_id)
+        for change in result.identity_changes:
+            self._simulation_service.rebind_phone_identity(
+                change.previous_phone_id,
+                change.current_phone_id,
+            )
+        for removal in result.removals:
+            self.delete_simulation_for_device(removal.phone_id)
         return result
 
     def create_simulation(self, device_id: str) -> None:

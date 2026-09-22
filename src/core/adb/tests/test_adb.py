@@ -32,7 +32,7 @@ from core.adb.command import (
 from core.adb.exceptions import AdbServerException
 from core.adb.history import ADB_HISTORY_MAX_ENTRIES
 from core.adb.server import AdbServer
-from core.devices.phone import Phone
+from core.devices.phone import AdbConnection, Phone
 from core.geo.location import Location
 
 pytestmark = [pytest.mark.adb, pytest.mark.adb_server]
@@ -161,7 +161,9 @@ class TestAdbServerStartSuccess:
         self, server: AdbServer, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """start() records only the daemon lifecycle command."""
-        phone = Phone(id="abc123", name="device:Pixel", state="device")
+        phone = Phone(
+            AdbConnection.observed("abc123", state="device"), name="device:Pixel"
+        )
         server.paired_devices.add(phone)
 
         def fake_execute(
@@ -184,7 +186,7 @@ class TestAdbServerStartSuccess:
         )
         server.start()
 
-        assert server.paired_devices.get("abc123") is phone
+        assert server.paired_devices.get(phone.id) is phone
         assert server.get_last_command() is AdbCommands.START_SERVER
         last_result = server.get_last_command_result()
         assert last_result.status == AdbCommandResultStatus.SUCCESS
@@ -193,7 +195,9 @@ class TestAdbServerStartSuccess:
         self, server: AdbServer, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """restart() performs daemon lifecycle commands without device discovery."""
-        phone = Phone(id="abc123", name="device:Pixel", state="device")
+        phone = Phone(
+            AdbConnection.observed("abc123", state="device"), name="device:Pixel"
+        )
         server.paired_devices.add(phone)
         calls: list[AdbCommandSpec[object]] = []
 
@@ -218,7 +222,7 @@ class TestAdbServerStartSuccess:
         server.restart()
 
         assert calls == [AdbCommands.KILL_SERVER, AdbCommands.START_SERVER]
-        assert server.paired_devices.get("abc123") is phone
+        assert server.paired_devices.get(phone.id) is phone
 
     def test_refresh_mdns_availability_sets_property_on_success(
         self, server: AdbServer, monkeypatch: pytest.MonkeyPatch
@@ -356,24 +360,25 @@ class TestAdbClientDeviceStatus:
         from core.adb.client import AdbClient
 
         client = AdbClient(adb_binary)
-        phone = Phone(id="abc123", state="device")
+        phone = Phone(AdbConnection.observed("abc123", state="device"))
+        connection = phone.connections[0]
 
         def fake_execute(
             invocation: AdbCommandInvocation[object],
-            target_phone: Phone | None = None,
+            target_connection: AdbConnection | None = None,
         ) -> AdbCommandResult:
-            assert target_phone is phone
+            assert target_connection is connection
             assert invocation.spec is AdbCommands.STATUS
             return AdbCommandResult(
                 status=AdbCommandResultStatus.SUCCESS,
                 output="device\n",
                 error="",
                 return_code=0,
-                phone=target_phone,
+                connection=target_connection,
             )
 
         monkeypatch.setattr(client, "_execute", fake_execute)
-        assert client.status(phone) == "device"
+        assert client.status(connection) == "device"
 
     def test_status_command_describes_device_state_not_server(self) -> None:
         status = AdbCommands.STATUS
@@ -625,7 +630,7 @@ class TestAdbServerExecuteResult:
         result = server._execute(AdbCommands.START_SERVER.invoke())
         assert result.status == AdbCommandResultStatus.SUCCESS
         assert result.return_code == 0
-        assert result.phone is None
+        assert result.connection is None
         assert result.time is not None
         assert "daemon started successfully" in result.output
 
@@ -670,7 +675,7 @@ class TestAdbServerExecuteResult:
 
         monkeypatch.setattr(server, "_execute", fake_execute)
         devices = server.get_known_devices()
-        assert [device.descriptor.id for device in devices] == ["abc123"]
+        assert [device.connections[0].id for device in devices] == ["abc123"]
 
     def test_remove_from_history_removes_matching_commands(
         self, server: AdbServer
@@ -809,14 +814,15 @@ class TestAdbClientSendNotification:
     ) -> None:
         """Notification title/message are passed as argv values, not shell-quoted."""
         client = AdbClient(adb_binary)
-        phone = Phone(id="abc123", name="Pixel", state="device")
-        calls: list[tuple[AdbCommandInvocation[object], Phone | None]] = []
+        phone = Phone(AdbConnection.observed("abc123", state="device"), name="Pixel")
+        connection = phone.connections[0]
+        calls: list[tuple[AdbCommandInvocation[object], AdbConnection | None]] = []
 
         def fake_execute(
             invocation: AdbCommandInvocation[object],
-            phone_arg: Phone | None = None,
+            connection_arg: AdbConnection | None = None,
         ) -> AdbCommandResult:
-            calls.append((invocation, phone_arg))
+            calls.append((invocation, connection_arg))
             return AdbCommandResult(
                 status=AdbCommandResultStatus.SUCCESS,
                 output="posting:\n",
@@ -826,13 +832,13 @@ class TestAdbClientSendNotification:
 
         monkeypatch.setattr(client, "_execute", fake_execute)
 
-        assert client.send_notification(phone, "Hello there", "it's ready") is True
+        assert client.send_notification(connection, "Hello there", "it's ready") is True
         assert calls == [
             (
                 AdbCommands.SEND_NOTIFICATION.invoke(
                     "-t", "Hello there", "-m", "it's ready"
                 ),
-                phone,
+                connection,
             )
         ]
 

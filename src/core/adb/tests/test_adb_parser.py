@@ -61,12 +61,13 @@ def test_get_devices_parser_returns_phone() -> None:
     assert len(phones) == 1
     p = phones[0]
     assert isinstance(p, Phone)
-    assert p.descriptor.id == "adb-AYLVBB5220900344-bReb3a._adb-tls-connect._tcp"
-    assert p.descriptor.state == "device"
+    connection = p.connections[0]
+    assert connection.id == "adb-AYLVBB5220900344-bReb3a._adb-tls-connect._tcp"
+    assert connection.state == "device"
     assert "ALT_NX1" in p.descriptor.model
     assert p.descriptor.name == "ALT_NX1"
     assert p.descriptor.device == "HNALT-Q1"
-    assert p.connectivity_type == "wifi"
+    assert connection.connectivity_type == "wifi"
 
 
 def test_parse_devices_line_success() -> None:
@@ -78,15 +79,16 @@ abc123 device product:model model:pixel device:Pixel transport_id:1
     assert len(phones) == 1
     p = phones[0]
     assert isinstance(p, Phone)
-    assert p.descriptor.id == "abc123"
+    connection = p.connections[0]
+    assert connection.id == "abc123"
     assert p.descriptor.name == "pixel"
     assert p.descriptor.product == "model"
     assert p.descriptor.model == "pixel"
     assert p.descriptor.device == "Pixel"
-    assert p.descriptor.state == "device"
-    assert p.descriptor.transport_id == "1"
+    assert connection.state == "device"
+    assert connection.transport_id == "1"
     assert p.stable_key == ""
-    assert p.connectivity_type == "usb"
+    assert connection.connectivity_type == "usb"
 
 
 def test_parse_devices_preserves_direct_tcp_endpoint() -> None:
@@ -97,10 +99,11 @@ def test_parse_devices_preserves_direct_tcp_endpoint() -> None:
 
     assert len(phones) == 1
     phone = phones[0]
-    assert phone.id == "192.168.1.20:5555"
-    assert phone.ip == "192.168.1.20"
-    assert phone.port == 5555
-    assert phone.connectivity_type == "wifi"
+    connection = phone.connections[0]
+    assert connection.id == "192.168.1.20:5555"
+    assert connection.ip == "192.168.1.20"
+    assert connection.port == 5555
+    assert connection.connectivity_type == "wifi"
 
 
 def test_parse_devices_emulator_line() -> None:
@@ -112,13 +115,14 @@ emulator-5554 offline product:sdk model:sdk_gphone device:emulator transport_id:
     assert len(phones) == 1
     p = phones[0]
     assert isinstance(p, Phone)
-    assert p.descriptor.id == "emulator-5554"
+    connection = p.connections[0]
+    assert connection.id == "emulator-5554"
     assert p.descriptor.name == "sdk_gphone"
     assert p.descriptor.product == "sdk"
     assert p.descriptor.model == "sdk_gphone"
     assert p.descriptor.device == "emulator"
-    assert p.descriptor.state == "offline"
-    assert p.descriptor.transport_id == "9"
+    assert connection.state == "offline"
+    assert connection.transport_id == "9"
 
 
 def test_parse_devices_skips_short_or_malformed_lines() -> None:
@@ -131,7 +135,7 @@ emulator-5554 offline product:sdk model:sdk_gphone device:emulator transport_id:
     assert len(phones) == 1
     p = phones[0]
     assert isinstance(p, Phone)
-    assert p.descriptor.id == "emulator-5554"
+    assert p.connections[0].id == "emulator-5554"
 
 
 @pytest.mark.parametrize("state", ["offline", "unauthorized"])
@@ -272,12 +276,13 @@ def test_parse_pair_success_builds_phone() -> None:
     )
     phone = AdbCommands.PAIR.parse(out)
     assert phone is not None
-    assert phone.descriptor.id == "adb-X9ZZ99000012345678-aBc1dE"
+    connection = phone.connections[0]
+    assert connection.id == "adb-X9ZZ99000012345678-aBc1dE"
     assert phone.descriptor.name == f"{DEFAULT_PHONE_DISPLAY_NAME} (8-aBc1dE)"
-    assert phone.descriptor.ip == "10.0.0.42"
-    assert phone.descriptor.port == 37125
-    assert phone.descriptor.state == "device"
-    assert phone.connectivity_type == "wifi"
+    assert connection.ip == "10.0.0.42"
+    assert connection.port == 37125
+    assert connection.state == "device"
+    assert connection.connectivity_type == "wifi"
 
 
 @pytest.mark.parametrize(
@@ -291,17 +296,17 @@ def test_parse_pair_success_builds_phone() -> None:
 def test_parse_pair_case_insensitive_fixed_phrase(line: str) -> None:
     phone = AdbCommands.PAIR.parse(line)
     assert phone is not None
-    assert phone.descriptor.id == "adb-AA11bb22CC"
-    assert phone.descriptor.port == 40000
+    assert phone.connections[0].id == "adb-AA11bb22CC"
+    assert phone.connections[0].port == 40000
 
 
 def test_parse_pair_port_boundaries() -> None:
     low = AdbCommands.PAIR.parse("Successfully paired to 10.0.0.1:1 [guid=adb-low]")
-    assert low is not None and low.descriptor.port == 1
+    assert low is not None and low.connections[0].port == 1
     high = AdbCommands.PAIR.parse(
         "Successfully paired to 10.0.0.1:65535 [guid=adb-high]"
     )
-    assert high is not None and high.descriptor.port == 65535
+    assert high is not None and high.connections[0].port == 65535
 
 
 def test_parse_pair_picks_first_matching_line() -> None:
@@ -312,9 +317,9 @@ def test_parse_pair_picks_first_matching_line() -> None:
     )
     phone = AdbCommands.PAIR.parse(blob)
     assert phone is not None
-    assert phone.descriptor.id == "adb-first"
-    assert phone.descriptor.ip == "10.1.1.1"
-    assert phone.descriptor.port == 11111
+    assert phone.connections[0].id == "adb-first"
+    assert phone.connections[0].ip == "10.1.1.1"
+    assert phone.connections[0].port == 11111
 
 
 def test_parse_pair_finds_line_in_mixed_blob() -> None:
@@ -327,9 +332,9 @@ def test_parse_pair_finds_line_in_mixed_blob() -> None:
     )
     phone = AdbCommands.PAIR.parse(blob)
     assert phone is not None
-    assert phone.descriptor.id == "adb-QQ77aa000099887766-ZzYy9x"
-    assert phone.descriptor.ip == "172.16.254.9"
-    assert phone.descriptor.port == 41008
+    assert phone.connections[0].id == "adb-QQ77aa000099887766-ZzYy9x"
+    assert phone.connections[0].ip == "172.16.254.9"
+    assert phone.connections[0].port == 41008
 
 
 def test_parse_pair_merged_stdout_stderr_shape() -> None:
@@ -339,9 +344,9 @@ def test_parse_pair_merged_stdout_stderr_shape() -> None:
     combined = f"{stdout}\n{stderr}".strip()
     phone = AdbCommands.PAIR.parse(combined)
     assert phone is not None
-    assert phone.descriptor.id == "adb-mergeStdStreams01"
-    assert phone.descriptor.ip == "203.0.113.7"
-    assert phone.descriptor.port == 49152
+    assert phone.connections[0].id == "adb-mergeStdStreams01"
+    assert phone.connections[0].ip == "203.0.113.7"
+    assert phone.connections[0].port == 49152
 
 
 @pytest.mark.parametrize(

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +22,7 @@ from core.signals import (
     SimulationRestoredPayload,
 )
 from core.simulation import Simulation, SimulationRepository
+from core.tests.phone_test_factory import make_phone
 from core.work import startup_work
 from core.work.startup_work import StartupCoreRuntimeWork, StartupOutcome
 
@@ -113,7 +115,7 @@ def test_start_adb_server_checks_binary_before_constructing_server(
 
         def get_known_devices(self) -> list[Phone]:
             calls.append("get_known_devices")
-            return [Phone(id="device-1", state="device")]
+            return [make_phone(id="device-1", state="device")]
 
         def refresh_mdns_availability(self) -> bool:
             calls.append("refresh_mdns_availability")
@@ -314,7 +316,7 @@ def test_startup_apply_restores_last_active_device_after_adb_id_rebind(
     application_paths: ApplicationPaths,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    phone = Phone(
+    phone = make_phone(
         id="device-old",
         name="Pixel",
         os="14",
@@ -327,13 +329,13 @@ def test_startup_apply_restores_last_active_device_after_adb_id_rebind(
     repository.last_active_device_id = phone.id
     repository.write_all()
 
-    rebound_phone = Phone(
+    rebound_phone = make_phone(
         id="device-new",
         name=phone.name,
         state="device",
         hardware_serial=phone.hardware_serial,
     )
-    rebound_phone.descriptor.os = phone.os
+    rebound_phone.os = phone.os
     rebound_state = MockAdbState(seed=222, initial_devices=0)
     rebound_server = MockAdbServer(state=rebound_state)
     rebound_server.paired_devices.add(rebound_phone)
@@ -380,7 +382,7 @@ def test_startup_apply_skips_last_active_device_when_offline(
     monkeypatch.setattr(startup_work, "mock_adb_seed_from_env", lambda: 111)
     first_outcome = _startup_work(application_paths, use_mock_adb=True).run()
     phone = first_outcome.devices[0]
-    phone.state = "offline"
+    phone.add_connection(replace(phone.connections[0], state="offline"))
     repository = SimulationRepository(application_paths.simulations_dir)
     simulation = Simulation(id="sim-1", device=phone, active=True)
     repository.add(simulation)
@@ -391,7 +393,7 @@ def test_startup_apply_skips_last_active_device_when_offline(
     assert second_outcome.adb_server is not None
     paired_phone = second_outcome.adb_server.paired_devices.get(phone.id)
     assert paired_phone is not None
-    paired_phone.state = "offline"
+    paired_phone.add_connection(replace(paired_phone.connections[0], state="offline"))
 
     model_entrypoint = ModelEntrypoint(paths=application_paths)
     simulation_created: list[str] = []
@@ -448,7 +450,7 @@ def test_startup_apply_binds_mock_runtime_and_emits_startup_signals(
 def test_startup_apply_restores_persisted_simulations(
     application_paths: ApplicationPaths,
 ) -> None:
-    phone = Phone(id="device-1", state="device", model="Pixel")
+    phone = make_phone(id="device-1", state="device", model="Pixel")
     simulation = Simulation(id="sim-1", device=phone, active=True)
     state = MockAdbState(seed=111, initial_devices=1)
     server = MockAdbServer(state=state)

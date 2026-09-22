@@ -70,6 +70,21 @@ class SimulationService:
         """Update the in-memory last-active device id without writing the index."""
         self._simulations.sync_last_active_device_id(device_id)
 
+    def rebind_phone_identity(self, old_phone_id: str, new_phone_id: str) -> None:
+        """Persist a physical identity promotion for simulations using that phone."""
+        last_active_rebound = self._simulations.last_active_device_id == old_phone_id
+        if last_active_rebound:
+            self._simulations.sync_last_active_device_id(new_phone_id)
+        simulation_rebound = any(
+            simulation.device is not None
+            and simulation.device.identity.value == new_phone_id
+            for simulation in self._simulations
+        )
+        if simulation_rebound:
+            self._simulations.write_all()
+        elif last_active_rebound:
+            self._simulations.write_index()
+
     def create_simulation(self, device_id: str) -> None:
         """
         Create a new simulation or restore an existing one for a paired device.
@@ -102,14 +117,14 @@ class SimulationService:
                 logger.info(
                     "Simulation created",
                     simulation_id=simulation.id,
-                    device_id=device.id,
+                    device_id=device.identity.value,
                     device_name=device.name,
                 )
                 self._entrypoint.emit_core_signal(
                     CoreSignals.SIMULATION_CREATED,
                     SimulationCreatedPayload(
                         simulation_id=simulation.id,
-                        device_id=device.id,
+                        device_id=device.identity.value,
                         device_name=device.name,
                     ),
                 )
@@ -136,13 +151,13 @@ class SimulationService:
         logger.info(
             "Simulation restored",
             simulation_id=simulation.id,
-            device_id=device.id,
+            device_id=device.identity.value,
         )
         self._entrypoint.emit_core_signal(
             CoreSignals.SIMULATION_RESTORED,
             SimulationRestoredPayload(
                 simulation_id=simulation.id,
-                device_id=device.id,
+                device_id=device.identity.value,
                 device_name=device.name,
             ),
         )
@@ -351,7 +366,7 @@ class SimulationService:
         """Return the existing simulation for a device when one is already tracked."""
         for simulation in self._simulations:
             device = simulation.device
-            if device is not None and device.id == device_id:
+            if device is not None and device.identity.value == device_id:
                 return simulation
         return None
 
@@ -387,7 +402,10 @@ class SimulationService:
         )
         if self._adb_server is not None:
             working_device = self._adb_server.get_working_device()
-            if working_device is not None and working_device.id == device_id:
+            if (
+                working_device is not None
+                and working_device.identity.value == device_id
+            ):
                 self._adb_server.clear_working_device()
         if self._simulations.last_active_device_id == device_id:
             self._simulations.last_active_device_id = None

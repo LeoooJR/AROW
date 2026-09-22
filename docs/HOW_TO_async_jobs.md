@@ -373,6 +373,9 @@ possible.
 
 The refresh path is no longer “replace whatever list the server had”.
 
+For the complete grouping, matching, mutation, and event workflow, see
+[`HOW_TO_device_reconciliation.md`](HOW_TO_device_reconciliation.md).
+
 ### Request-side guard
 
 `AdbSubController._on_refresh_device_list_requested()` submits with `coalesce_key="refresh_device_list"` and `at_most_once=True`, so timer and UI requests cannot create overlapping refresh jobs.
@@ -393,15 +396,27 @@ Shell-property enrichment is best-effort. Failures inside `AdbClient` enrichment
 
 Reconciliation rules:
 
-- Match by current ADB connection id first.
-- If the ADB id changed, fall back to `stable_key` **only** when the key is Tier-1 / collision-resistant (`hw:v1:` from `ro.serialno`).
-- Never merge devices using Tier-2 fingerprint keys (`fp:v1:`); identical devices can collide.
-- Update matching `Phone` objects in place so existing simulation references stay valid.
+- Treat `Phone` as the physical aggregate and `AdbConnection` as one USB or
+  Wi-Fi endpoint. A phone can own multiple current connections.
+- Group discovery rows by Tier-1 identity (`hw:v1:` from `ro.serialno`) or by
+  an existing connection owner. Tier-2 fingerprint keys (`fp:v1:`) never merge
+  physical phones because identical models can collide.
+- Match the physical phone first, then replace its complete connection snapshot.
+  This prunes endpoints that disappeared while preserving the existing `Phone`
+  instance used by simulations.
+- Record `last_connection` on each `AdbConnection` whenever ADB reports that
+  endpoint in the active `device` state. Inactive observations preserve that
+  endpoint's last known active timestamp.
+- Choose an active command target deterministically: keep the selected active
+  endpoint when possible, otherwise prefer USB, then Wi-Fi.
 - Remove stale paired phones that are absent from discovery.
 - Best-effort delete any simulation attached to a removed phone.
-- Emit `CoreSignal.DEVICES_UPDATED` only when the paired set or device state actually changed.
+- Emit `CoreSignal.DEVICES_UPDATED` when the paired set, device state, metadata, or
+  active connection timestamp changed. Repeated inactive observations remain no-ops.
 
-There is one more normalization step before matching: discovery payloads are deduplicated by ADB connection id, keeping the **last** payload for each non-empty id and dropping blank ids.
+There is one more normalization step before matching: discovery payloads are
+deduplicated by ADB connection id, keeping the **last** payload for each id.
+`AdbConnection` rejects blank ids at construction.
 
 ## Types you will import
 

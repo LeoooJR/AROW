@@ -4,7 +4,7 @@ from gui.blocks.device.device_item import (
     DeviceBadge,
     DeviceItem,
     DeviceKind,
-    format_last_communication_short,
+    format_last_connection_short,
 )
 from gui.blocks.device.device_selection import DeviceSelectionBlock
 
@@ -13,5 +13,5 @@ __all__ = [
     "DeviceItem",
     "DeviceKind",
     "DeviceSelectionBlock",
-    "format_last_communication_short",
+    "format_last_connection_short",
 ]

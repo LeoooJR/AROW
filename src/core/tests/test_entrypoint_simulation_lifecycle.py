@@ -17,6 +17,7 @@ from core.signals import (
     SimulationDeletedPayload,
     SimulationDeleteSkippedPayload,
 )
+from core.tests.phone_test_factory import make_phone
 from core.tests.signal_test_helpers import seed_adb_startup_for_entrypoint
 
 
@@ -64,7 +65,7 @@ def test_delete_simulation_for_device_emits_deleted_with_device_id(
 ) -> None:
     model_entrypoint = _make_model(
         tmp_path,
-        device=Phone(id="device-1", state="device", model="Pixel"),
+        device=make_phone(id="device-1", state="device", model="Pixel"),
     )
     created_ids: list[str] = []
 
@@ -99,7 +100,7 @@ def test_delete_simulation_for_device_without_simulation_emits_skipped(
 ) -> None:
     model_entrypoint = _make_model(
         tmp_path,
-        device=Phone(id="device-1", state="device", model="Pixel"),
+        device=make_phone(id="device-1", state="device", model="Pixel"),
     )
     captured: list[SimulationDeleteSkippedPayload] = []
 

@@ -18,6 +18,7 @@ from controller.runner import JobError, JobHandler, JobHandlerSignals
 from core.devices.phone import Phone
 from core.entrypoint import ModelEntrypoint
 from core.signals import DevicesUpdatedPayload
+from core.tests.phone_test_factory import make_phone
 from core.work.refresh_known_devices_work import RefreshKnownDevicesOutcome
 from core.work.startup_work import StartupOutcome
 
@@ -116,7 +117,9 @@ def test_refresh_submission_completed_applies_result() -> None:
     apply_calls: list[object] = []
     app.model_entrypoint.apply_result = lambda result: apply_calls.append(result)  # type: ignore[method-assign]
     adb = _make_adb_sub_controller(app)
-    outcome = RefreshKnownDevicesOutcome(devices=[Phone(id="device-1", state="device")])
+    outcome = RefreshKnownDevicesOutcome(
+        devices=[make_phone(id="device-1", state="device")]
+    )
 
     adb._on_refresh_device_list_requested()
     app.handle_signals["cron-1"].Completed.emit(outcome)
@@ -185,13 +188,13 @@ def test_run_shutdown_submits_close_with_core_appliers() -> None:
     assert submission["on_failed"] == app.model_entrypoint.apply_failure
 
 
-def test_on_devices_updated_forwards_device_id_rebindings_to_view() -> None:
+def test_on_devices_updated_forwards_phone_id_rebindings_to_view() -> None:
     app = _AppStub()
     adb = _make_adb_sub_controller(app)
-    phone = Phone(id="device-1", state="device", model="Pixel")
+    phone = make_phone(id="device-1", state="device", model="Pixel")
     payload = DevicesUpdatedPayload(
         devices=[phone.serialize()],
-        device_id_rebindings={"old-device-1": "device-1"},
+        phone_id_rebindings={"old-device-1": "device-1"},
     )
 
     adb._on_devices_updated(payload)

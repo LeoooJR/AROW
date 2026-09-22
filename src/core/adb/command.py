@@ -23,7 +23,7 @@ from core.adb.parser import (
     parse_stripped_output,
     parse_window_summary,
 )
-from core.devices.phone import Phone
+from core.devices.phone import AdbConnection, Phone
 
 _REDACTED_LOG_VALUE: Final[str] = "<redacted>"
 _LOG_PREVIEW_LIMIT: Final[int] = 200
@@ -104,8 +104,9 @@ class AdbCommandResult:
         metadata={"description": "The status of the command execution"},
         default=AdbCommandResultStatus.UNKNOWN_ERROR,
     )
-    phone: Phone | None = field(
-        metadata={"description": "The phone the command was executed on"}, default=None
+    connection: AdbConnection | None = field(
+        metadata={"description": "The ADB connection the command targeted"},
+        default=None,
     )
     time: datetime.datetime = field(
         metadata={"description": "The time the command was executed"},

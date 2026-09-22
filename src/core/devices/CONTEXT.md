@@ -11,6 +11,13 @@ identity keys, and device-related repository semantics.
   consume those objects through model APIs.
 - Maintain stable identity independently from transient transport metadata such as
   display names, IP addresses, and ports.
+- Model a handset as one `Phone` aggregate with immutable `AdbConnection`
+  snapshots. Endpoint ids, state, transport metadata, and connection timestamps
+  belong to `AdbConnection`, never to `PhoneDescriptor`.
+- Index phones by physical `PhoneIdentity`; use the repository's secondary
+  connection index only to resolve an ADB endpoint to its owning phone.
+- Pass a concrete `AdbConnection` into ADB command APIs. Do not add endpoint
+  forwarding properties back to `Phone`.
 - Keep descriptors and related value objects explicit and type annotated.
 - Route operations that execute ADB commands through `core.adb`; this package does
   not open subprocesses.

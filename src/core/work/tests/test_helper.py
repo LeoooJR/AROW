@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
 
 from core.adb.binary import AdbBinary
-from core.devices.phone import Phone
+from core.tests.phone_test_factory import make_phone
 from core.work.helper import preflight
 
 
@@ -120,7 +121,7 @@ def test_preflight_missing_client_blocks_body() -> None:
 
 def test_preflight_exact_device_endpoint_blocks_before_health_probe() -> None:
     server = _healthy_server()
-    server.paired_devices = [Phone(id="paired", ip="192.168.1.10", port=37777)]
+    server.paired_devices = [make_phone(id="paired", ip="192.168.1.10", port=37777)]
     work = _FakeWork(server=server)
 
     with pytest.raises(RuntimeError, match="mdns preflight failed"):
@@ -150,7 +151,7 @@ def test_preflight_allows_nonmatching_device_endpoint(
     paired_ip: str, paired_port: int
 ) -> None:
     server = _healthy_server()
-    server.paired_devices = [Phone(id="paired", ip=paired_ip, port=paired_port)]
+    server.paired_devices = [make_phone(id="paired", ip=paired_ip, port=paired_port)]
     work = _FakeWork(server=server)
 
     outcome = work.run_device_check()
@@ -161,7 +162,9 @@ def test_preflight_allows_nonmatching_device_endpoint(
 
 def test_preflight_ignores_invalid_paired_device_port() -> None:
     server = _healthy_server()
-    server.paired_devices = [Phone(id="paired", ip="192.168.1.10", port=True)]
+    server.paired_devices = [
+        SimpleNamespace(connections=[SimpleNamespace(ip="192.168.1.10", port=True)])
+    ]
     work = _FakeWork(server=server, port=1)
 
     outcome = work.run_device_check()

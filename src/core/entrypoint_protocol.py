@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from typing import TYPE_CHECKING, Protocol, TypeVar
 
 if TYPE_CHECKING:
@@ -11,6 +10,7 @@ if TYPE_CHECKING:
     from core.adb.client import AdbClient
     from core.adb.server import AdbServer
     from core.devices.phone import Phone
+    from core.devices.reconciliation import PhoneIdentityChanged
     from core.signals import (
         CoreSignal,
         SimulationLocationValidatedPayload,
@@ -69,16 +69,16 @@ class SimulationMutationEntrypoint(SimulationLookupEntrypoint, Protocol):
         """Clear and persist a rendered map path."""
 
 
-class DeviceReconcileResultProtocol(Protocol):
-    """Structural type for paired-device reconciliation outcomes."""
+class PhoneReconciliationReportProtocol(Protocol):
+    """Structural type for semantic phone-reconciliation reports."""
 
     @property
-    def changed(self) -> bool:
-        """True when paired devices were added, removed, or rebound."""
+    def has_changes(self) -> bool:
+        """Return whether reconciliation produced any domain event."""
 
     @property
-    def device_id_rebindings(self) -> Mapping[str, str]:
-        """Old device id to new id when ADB serials were rebound."""
+    def identity_changes(self) -> tuple[PhoneIdentityChanged, ...]:
+        """Return physical identity changes in event order."""
 
 
 class AdbRuntimeEntrypoint(CoreSignalEmitter, Protocol):
@@ -115,7 +115,7 @@ class DeviceReconcileEntrypoint(CoreSignalEmitter, Protocol):
 
     def reconcile_paired_devices(
         self, phones: list[Phone]
-    ) -> DeviceReconcileResultProtocol:
+    ) -> PhoneReconciliationReportProtocol:
         """Merge a fresh ADB discovery list into paired devices."""
 
 

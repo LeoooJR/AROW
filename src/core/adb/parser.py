@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Final
 
 from core.adb.binary import AdbBinary
-from core.devices.phone import Phone
+from core.devices.phone import AdbConnection, Phone
 
 _PAIR_SUCCESS_LINE = re.compile(
     r"Successfully\s+paired\s+to\s+(\S+)\s+\[guid=([^\]]+)\]",
@@ -63,11 +63,13 @@ def parse_pair(output: str) -> Phone | None:
         if not (1 <= port_num <= 65535):
             continue
         return Phone(
-            id=device_id,
+            AdbConnection.observed(
+                device_id,
+                ip=host,
+                port=port_num,
+                state="device",
+            ),
             name=None,
-            ip=host,
-            port=port_num,
-            state="device",
         )
     return None
 
@@ -136,13 +138,15 @@ def parse_devices(output: str) -> list[Phone]:
                     ip, port = host, parsed_port
             phones.append(
                 Phone(
-                    id=connection_id,
-                    ip=ip,
-                    port=port,
+                    AdbConnection.observed(
+                        connection_id,
+                        ip=ip,
+                        port=port,
+                        state=state,
+                        transport_id=transport_id,
+                    ),
                     product=product,
                     model=model,
-                    state=state,
-                    transport_id=transport_id,
                     device=device,
                 )
             )

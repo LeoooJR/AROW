@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-import datetime
 import platform
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Optional
 
 from loguru import logger
@@ -22,26 +21,28 @@ def compute_computer_stable_key(install_token: str) -> str:
     return f"{_STABLE_PC_INSTALL_PREFIX}{token.casefold()}" if token else ""
 
 
-@dataclass(unsafe_hash=True, match_args=True)
+@dataclass(frozen=True, match_args=True)
 class ComputerDescriptor(DeviceDescriptor):
     """Metadata about the host computer."""
+
+    __hash__ = None
+
+    id: str = field(metadata={"description": "The id of the computer"}, default="")
+    ip: str = field(
+        metadata={"description": "The IP address of the computer"}, default=""
+    )
+    port: int | None = field(
+        metadata={"description": "The computer communication port"}, default=None
+    )
 
     state: Optional[str] = field(
         metadata={"description": "The state of the computer"},
         default=None,
         compare=False,
-        hash=False,
-    )
-    last_communication: Optional[datetime.datetime] = field(
-        metadata={"description": "The last communication time of the computer"},
-        default=None,
-        compare=False,
-        hash=False,
     )
     stable_key: str = field(
         metadata={"description": "Stable install-scoped host identity"},
         default="",
-        hash=True,
     )
     network_available: bool = field(
         metadata={
@@ -49,18 +50,32 @@ class ComputerDescriptor(DeviceDescriptor):
         },
         default=False,
         compare=False,
-        hash=False,
     )
 
     def __str__(self) -> str:
-        return f"{self.id} - {self.name} - {self.os} - {self.ip}:{self.port} - {self.state} - {self.stable_key} - {self.network_available} - {self.last_communication}"
+        return f"{self.id} - {self.name} - {self.os} - {self.ip}:{self.port} - {self.state} - {self.stable_key} - {self.network_available}"
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(id={self.id}, name={self.name}, os={self.os}, ip={self.ip}, port={self.port}, state={self.state}, stable_key={self.stable_key!r}, network_available={self.network_available!r}, last_communication={self.last_communication})"
+        return f"{self.__class__.__name__}(id={self.id}, name={self.name}, os={self.os}, ip={self.ip}, port={self.port}, state={self.state}, stable_key={self.stable_key!r}, network_available={self.network_available!r})"
 
 
 class Computer(Device[ComputerDescriptor]):
     """Host computer device."""
+
+    @property
+    def id(self) -> str:
+        """Return the host identifier."""
+        return self._descriptor.id
+
+    @property
+    def ip(self) -> str:
+        """Return the host IP address."""
+        return self._descriptor.ip
+
+    @property
+    def port(self) -> int | None:
+        """Return the host communication port."""
+        return self._descriptor.port
 
     def __init__(
         self,
@@ -70,7 +85,6 @@ class Computer(Device[ComputerDescriptor]):
         ip: str | None = None,
         port: int | None = None,
         state: str | None = None,
-        last_communication: datetime.datetime | None = None,
     ) -> None:
         """Initialize the host computer and resolve missing local metadata.
 
@@ -81,7 +95,6 @@ class Computer(Device[ComputerDescriptor]):
             ip: Host IP address, or ``None`` to resolve the network identity.
             port: Optional host communication port.
             state: Optional host connection state.
-            last_communication: Time of the latest host communication.
         """
         resolved_name, resolved_os = name or platform.node(), os or platform.system()
         resolved_ip, network_available = (
@@ -96,18 +109,10 @@ class Computer(Device[ComputerDescriptor]):
             ip=resolved_ip,
             port=port,
             state=state,
-            last_communication=last_communication,
             stable_key="",
             network_available=network_available,
         )
-        super().__init__(
-            id=id,
-            name=resolved_name,
-            os=resolved_os.lower(),
-            ip=resolved_ip,
-            port=port,
-            descriptor=descriptor,
-        )
+        super().__init__(descriptor=descriptor)
 
     @property
     def stable_key(self) -> str:
@@ -122,35 +127,24 @@ class Computer(Device[ComputerDescriptor]):
     @state.setter
     def state(self, value: str | None) -> None:
         """Set the current host state."""
-        self._descriptor.state = value
-
-    @property
-    def last_communication(self) -> datetime.datetime | None:
-        """Return the time of the latest host communication."""
-        return self._descriptor.last_communication
-
-    @last_communication.setter
-    def last_communication(self, value: datetime.datetime | None) -> None:
-        """Set the time of the latest host communication."""
-        self._descriptor.last_communication = value
+        self._descriptor = replace(self._descriptor, state=value)
 
     @property
     def network_available(self) -> bool:
         """Return whether the host has a usable network identity."""
         return self._descriptor.network_available
 
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, Computer):
-            return NotImplemented
-        return self.descriptor == other.descriptor
-
-    def __hash__(self) -> int:
-        return hash(self.descriptor)
+    def set_stable_key(self, stable_key: str) -> None:
+        """Replace the persisted install-scoped host identity."""
+        self._descriptor = replace(self._descriptor, stable_key=stable_key)
 
     def refresh_network_identity(self) -> None:
         """Refresh the host IP address and network availability flag."""
-        self._descriptor.ip, self._descriptor.network_available = (
-            self._resolve_network_identity()
+        ip, network_available = self._resolve_network_identity()
+        self._descriptor = replace(
+            self._descriptor,
+            ip=ip,
+            network_available=network_available,
         )
 
     def _resolve_network_identity(self) -> tuple[str, bool]:
@@ -172,7 +166,13 @@ class ComputerRepository(Repository[Computer]):
 
     @working_device.setter
     def working_device(self, device: Computer) -> None:
-        """Set the currently selected host computer."""
+        """Select a host computer owned by this repository.
+
+        Raises:
+            ValueError: If ``device`` is not the stored instance for its id.
+        """
+        if device not in self:
+            raise ValueError(f"Device with id {device.id} is not in the repository")
         self._working_device = device
 
     def add(self, item: Computer) -> None:
@@ -194,5 +194,5 @@ class ComputerRepository(Repository[Computer]):
                 "Computer could not be removed from repository", error=str(error)
             )
             return
-        if self._working_device == item:
+        if self._working_device is item:
             self._working_device = None

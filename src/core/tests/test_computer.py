@@ -4,7 +4,7 @@ Tests for core device model modules.
 
 from __future__ import annotations
 
-import datetime
+from dataclasses import FrozenInstanceError, replace
 
 import pytest
 
@@ -12,6 +12,7 @@ import core.devices.computer as computer_devices
 from core.devices.computer import (
     Computer,
     ComputerDescriptor,
+    ComputerRepository,
     compute_computer_stable_key,
 )
 
@@ -25,14 +26,12 @@ class TestComputer:
 
     def test_computer_creation(self) -> None:
         """Computer can be created with explicit values without relying on host lookup."""
-        now = datetime.datetime.now()
         computer = Computer(
             id="host-1",
             name="Workstation",
             os="macOS",
             ip="192.168.1.10",
             state="online",
-            last_communication=now,
         )
         assert computer.descriptor.id == "host-1"
         assert computer.descriptor.name == "Workstation"
@@ -40,7 +39,6 @@ class TestComputer:
         assert computer.descriptor.ip == "192.168.1.10"
         assert computer.descriptor.port is None
         assert computer.descriptor.state == "online"
-        assert computer.descriptor.last_communication is now
         assert computer.descriptor.stable_key == ""
         assert computer.stable_key == ""
         assert computer.network_available is True
@@ -107,38 +105,66 @@ class TestComputer:
         assert computer.network_available is True
 
     def test_computer_properties_update_descriptor_state(self) -> None:
-        computer = Computer(id="host-1", state=None, last_communication=None)
-        now = datetime.datetime(2025, 6, 15, 10, 30, 0)
+        computer = Computer(id="host-1", state=None)
 
         computer.state = "online"
-        computer.last_communication = now
 
         assert computer.state == "online"
-        assert computer.last_communication is now
 
-    def test_computer_equality_and_hash_delegate_to_descriptor(self) -> None:
+    def test_computer_set_stable_key_replaces_descriptor_snapshot(self) -> None:
+        computer = Computer(id="host-1", ip="127.0.0.1")
+        original = computer.descriptor
+
+        computer.set_stable_key("pc:v1:install:token")
+
+        assert computer.descriptor is not original
+        assert computer.stable_key == "pc:v1:install:token"
+
+    def test_computer_uses_object_identity(self) -> None:
         first = Computer(id="host-1", name="Workstation", os="macOS", ip="10.0.0.1")
         second = Computer(id="host-1", name="Workstation", os="macOS", ip="10.0.0.1")
 
-        assert first == second
-        assert hash(first) == hash(second)
+        assert first == first
+        assert first != second
 
-        second.state = "online"
-        assert first == second
-        assert hash(first) == hash(second)
+    def test_computer_is_unhashable_before_and_after_update(self) -> None:
+        computer = Computer(id="host-1", name="Workstation", os="macOS", ip="10.0.0.1")
 
-        third = Computer(id="host-1", name="Workstation 2", os="macOS", ip="10.0.0.1")
+        with pytest.raises(TypeError):
+            hash(computer)
 
-        assert first != third
-        assert hash(first) != hash(third)
+        computer.state = "online"
 
-    def test_computer_equality_returns_not_implemented_for_unrelated_types(
-        self,
-    ) -> None:
+        with pytest.raises(TypeError):
+            hash(computer)
+
+    def test_computer_is_not_equal_to_unrelated_types(self) -> None:
         computer = Computer(id="host-1", ip="127.0.0.1")
 
-        assert computer.__eq__(object()) is NotImplemented
         assert computer != object()
+
+
+class TestComputerRepository:
+    """Computer repository ownership and selection behavior."""
+
+    def test_selection_and_removal_require_the_stored_computer_instance(self) -> None:
+        stored = Computer(id="host-1", name="Stored", ip="127.0.0.1")
+        same_id_clone = Computer(id="host-1", name="Clone", ip="127.0.0.1")
+        repository = ComputerRepository()
+        repository.add(stored)
+
+        repository.working_device = stored
+        with pytest.raises(ValueError, match="not in the repository"):
+            repository.working_device = same_id_clone
+        repository.remove(same_id_clone)
+
+        assert repository.get("host-1") is stored
+        assert repository.working_device is stored
+
+        repository.remove(stored)
+
+        assert repository.get("host-1") is None
+        assert repository.working_device is None
 
 
 class TestComputeComputerStableKey:
@@ -154,10 +180,10 @@ class TestComputeComputerStableKey:
         assert compute_computer_stable_key(u) == expected
 
 
-class TestComputerDescriptorHash:
-    """ComputerDescriptor equality and hashing include ``stable_key`` (parity with PhoneDescriptor tests)."""
+class TestComputerDescriptorEquality:
+    """ComputerDescriptor supports state comparison without mutable hashing."""
 
-    def test_stable_key_participates_in_hash_and_eq(self) -> None:
+    def test_stable_key_participates_in_equality(self) -> None:
         token_a = compute_computer_stable_key("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
         token_b = compute_computer_stable_key("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
         d1 = ComputerDescriptor(
@@ -167,7 +193,6 @@ class TestComputerDescriptorHash:
             ip="127.0.0.1",
             port=None,
             state=None,
-            last_communication=None,
             stable_key=token_a,
         )
         d2 = ComputerDescriptor(
@@ -177,10 +202,17 @@ class TestComputerDescriptorHash:
             ip="127.0.0.1",
             port=None,
             state=None,
-            last_communication=None,
             stable_key=token_b,
         )
-        assert d1 == d2 and hash(d1) == hash(d2)
+        assert d1 == d2
+        with pytest.raises(TypeError):
+            hash(d1)
+
+        with pytest.raises(FrozenInstanceError):
+            d1.name = "updated"  # type: ignore[misc]
+        updated = replace(d1, name="updated")
+        with pytest.raises(TypeError):
+            hash(updated)
 
         d3 = ComputerDescriptor(
             id="host-1",
@@ -189,7 +221,6 @@ class TestComputerDescriptorHash:
             ip="127.0.0.1",
             port=None,
             state=None,
-            last_communication=None,
             stable_key=compute_computer_stable_key(
                 "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
             ),

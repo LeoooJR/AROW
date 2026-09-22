@@ -21,6 +21,7 @@ from core.signals import (
     SimulationCreationFailedPayload,
     SimulationDeletedPayload,
 )
+from core.tests.phone_test_factory import make_phone
 from core.tests.signal_test_helpers import seed_adb_startup_for_entrypoint
 
 
@@ -103,7 +104,7 @@ def test_device_selection_confirmed_creates_simulation_and_waits_for_signal(
     tmp_path: Path, log_records
 ) -> None:
     model_entrypoint = _make_model(
-        tmp_path, device=Phone(id="device-1", state="device", model="Pixel")
+        tmp_path, device=make_phone(id="device-1", state="device", model="Pixel")
     )
     subcontroller = _make_subcontroller(model_entrypoint)
     captured: list[str] = []
@@ -158,7 +159,7 @@ def test_on_simulation_created_forwards_success_with_simulation_id(
     tmp_path: Path,
 ) -> None:
     model_entrypoint = _make_model(
-        tmp_path, device=Phone(id="device-1", state="device", model="Pixel")
+        tmp_path, device=make_phone(id="device-1", state="device", model="Pixel")
     )
     subcontroller = _make_subcontroller(model_entrypoint)
     simulation_id = _create_simulation_id(model_entrypoint, "device-1")
@@ -192,7 +193,7 @@ def test_remove_device_requested_deletes_simulation_and_forwards_success(
     tmp_path: Path,
 ) -> None:
     model_entrypoint = _make_model(
-        tmp_path, device=Phone(id="device-1", state="device", model="Pixel")
+        tmp_path, device=make_phone(id="device-1", state="device", model="Pixel")
     )
     simulation_id = _create_simulation_id(model_entrypoint, "device-1")
     subcontroller = _make_subcontroller(model_entrypoint)
@@ -210,7 +211,7 @@ def test_remove_device_requested_ignores_devices_without_active_simulation(
     tmp_path: Path,
 ) -> None:
     model_entrypoint = _make_model(
-        tmp_path, device=Phone(id="device-1", state="device", model="Pixel")
+        tmp_path, device=make_phone(id="device-1", state="device", model="Pixel")
     )
     subcontroller = _make_subcontroller(model_entrypoint)
 
@@ -259,7 +260,7 @@ def test_run_stop_pause_and_resume_update_simulation_active_state(
     tmp_path: Path,
 ) -> None:
     model_entrypoint = _make_model(
-        tmp_path, device=Phone(id="device-1", state="device", model="Pixel")
+        tmp_path, device=make_phone(id="device-1", state="device", model="Pixel")
     )
     simulation_id = _create_simulation_id(model_entrypoint, "device-1")
     subcontroller = _make_subcontroller(model_entrypoint)

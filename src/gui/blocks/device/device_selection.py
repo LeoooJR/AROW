@@ -33,6 +33,21 @@ from gui.wrapper import GridLayoutWrapper, HorizontalLayoutWrapper
 from logger import logger
 
 
+def _latest_phone_connection(payload: dict) -> dt.datetime | None:
+    """Return the most recent timestamp across a phone's current connections."""
+    connections = payload.get("connections")
+    if not isinstance(connections, list):
+        return None
+    timestamps: list[dt.datetime] = []
+    for connection in connections:
+        if not isinstance(connection, dict):
+            continue
+        timestamp = connection.get("last_connection")
+        if isinstance(timestamp, dt.datetime):
+            timestamps.append(timestamp)
+    return max(timestamps) if timestamps else None
+
+
 class DeviceSelectionBlock(QFrame, Block):
     """Available-device list block used by the device selection panel."""
 
@@ -58,9 +73,9 @@ class DeviceSelectionBlock(QFrame, Block):
         placeholder_location_secondary: Final[str] = field(
             default_factory=ui_faker.generate_city_state_location
         )
-        placeholder_last_communication_active: Final[str] = "Active now"
-        placeholder_last_communication_recent: Final[str] = "30 min ago"
-        placeholder_last_communication_old: Final[str] = "2 hours ago"
+        placeholder_last_connection_active: Final[str] = "Active now"
+        placeholder_last_connection_recent: Final[str] = "30 min ago"
+        placeholder_last_connection_old: Final[str] = "2 hours ago"
         placeholder_primary_device_id: Final[str] = field(
             default_factory=lambda: str(uuid.uuid4())
         )
@@ -266,11 +281,11 @@ class DeviceSelectionBlock(QFrame, Block):
 
     @Slot()
     def _on_refresh_timer_tick(self, *, now: dt.datetime | None = None) -> None:
-        """Refresh live last-communication labels on every device row."""
+        """Refresh live last-connection labels on every device row."""
         ref = now if now is not None else dt.datetime.now()
         for list_item in self.ui.available_device_list.iter_items():
             if isinstance(list_item, self._device_item_type):
-                list_item.refresh_last_communication_label(now=ref)
+                list_item.refresh_last_connection_label(now=ref)
                 list_item.refresh_badge(now=ref)
 
     def _reposition_available_device_empty_state(self) -> None:
@@ -350,7 +365,7 @@ class DeviceSelectionBlock(QFrame, Block):
     @Slot(dict)
     def _on_authentification_succeeded(self, device: dict) -> None:
         """Add a newly authenticated device and mark it as the active selection."""
-        last_communication = device.get("last_communication", dt.datetime.now())
+        last_connection = _latest_phone_connection(device)
         item = self._device_item_type.add_to_list(
             self.ui.available_device_list,
             id=device["id"],
@@ -359,7 +374,7 @@ class DeviceSelectionBlock(QFrame, Block):
             badge="new",
             operating_system=device["os"],
             location="N/A",
-            last_communication=last_communication,
+            last_connection=last_connection,
             alert_highlight=True,
         )
         self.ui.available_device_list.sortItems()
@@ -422,18 +437,18 @@ class DeviceSelectionBlock(QFrame, Block):
     def _on_devices_updated(
         self,
         devices: list[dict],
-        device_id_rebindings: dict[str, str] | None = None,
+        phone_id_rebindings: dict[str, str] | None = None,
     ) -> None:
         """Replace the available-device list from controller-provided device data."""
         previous_active_device_id = self._active_device_id
         if previous_active_device_id is not None:
-            previous_active_device_id = (device_id_rebindings or {}).get(
+            previous_active_device_id = (phone_id_rebindings or {}).get(
                 previous_active_device_id,
                 previous_active_device_id,
             )
         self.ui.available_device_list.clear()
         for device in devices:
-            last_communication = device.get("last_communication", dt.datetime.now())
+            last_connection = _latest_phone_connection(device)
             self._device_item_type.add_to_list(
                 self.ui.available_device_list,
                 id=device["id"],
@@ -443,7 +458,7 @@ class DeviceSelectionBlock(QFrame, Block):
                 badge="new",
                 operating_system=device["os"],
                 location="N/A",
-                last_communication=last_communication,
+                last_connection=last_connection,
             )
         self.ui.available_device_list.sortItems()
         if previous_active_device_id is None:
@@ -579,7 +594,7 @@ class DeviceSelectionBlock(QFrame, Block):
             badge="trusted",
             operating_system=self.texts.placeholder_operating_system,
             location=self.texts.placeholder_location_primary,
-            last_communication=self.texts.placeholder_last_communication_active,
+            last_connection=self.texts.placeholder_last_connection_active,
         )
         self._device_item_type.add_to_list(
             self.ui.available_device_list,
@@ -590,7 +605,7 @@ class DeviceSelectionBlock(QFrame, Block):
             badge="trusted",
             operating_system=self.texts.placeholder_operating_system,
             location=self.texts.placeholder_location_primary,
-            last_communication=self.texts.placeholder_last_communication_recent,
+            last_connection=self.texts.placeholder_last_connection_recent,
         )
         self._device_item_type.add_to_list(
             self.ui.available_device_list,
@@ -601,7 +616,7 @@ class DeviceSelectionBlock(QFrame, Block):
             badge="new",
             operating_system=self.texts.placeholder_operating_system,
             location=self.texts.placeholder_location_secondary,
-            last_communication=self.texts.placeholder_last_communication_old,
+            last_connection=self.texts.placeholder_last_connection_old,
             alert_highlight=True,
         )
         self._on_available_device_list_model_changed()

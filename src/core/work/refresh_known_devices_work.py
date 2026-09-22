@@ -16,6 +16,7 @@ from typing import cast
 from core.adb.client import AdbClient
 from core.adb.server import AdbServer
 from core.devices.phone import (
+    AdbConnection,
     Phone,
     serialize_phone_collection,
 )
@@ -31,8 +32,15 @@ _EXECUTABLE_STATES = frozenset(("device",))
 
 def _phone_is_shell_targetable(phone: Phone) -> bool:
     """True when ``adb -s … shell …`` should target this handset reliably."""
-    st = (phone.descriptor.state or "").strip().casefold()
-    return st in _EXECUTABLE_STATES
+    connection = phone.target_connection
+    return connection is not None and connection.state.casefold() in _EXECUTABLE_STATES
+
+
+def _target_connection(phone: Phone) -> AdbConnection:
+    connection = phone.target_connection
+    if connection is None:
+        raise ValueError("phone has no active ADB connection")
+    return connection
 
 
 def enrich_phones_with_manufacturer(adb_client: AdbClient, phones: list[Phone]) -> None:
@@ -40,7 +48,9 @@ def enrich_phones_with_manufacturer(adb_client: AdbClient, phones: list[Phone]) 
     for phone in phones:
         if not _phone_is_shell_targetable(phone):
             continue
-        phone.manufacturer = adb_client.get_product_manufacturer(phone)
+        phone.manufacturer = adb_client.get_product_manufacturer(
+            _target_connection(phone)
+        )
 
 
 def enrich_phones_with_product_model(
@@ -50,7 +60,7 @@ def enrich_phones_with_product_model(
     for phone in phones:
         if not _phone_is_shell_targetable(phone):
             continue
-        phone.model = adb_client.get_product_model(phone)
+        phone.model = adb_client.get_product_model(_target_connection(phone))
 
 
 def enrich_phones_with_device_name(adb_client: AdbClient, phones: list[Phone]) -> None:
@@ -58,7 +68,9 @@ def enrich_phones_with_device_name(adb_client: AdbClient, phones: list[Phone]) -
     for phone in phones:
         if not _phone_is_shell_targetable(phone):
             continue
-        phone.shell_device_name = adb_client.get_device_name_prop(phone)
+        phone.shell_device_name = adb_client.get_device_name_prop(
+            _target_connection(phone)
+        )
 
 
 def enrich_phones_with_android_release(
@@ -68,7 +80,7 @@ def enrich_phones_with_android_release(
     for phone in phones:
         if not _phone_is_shell_targetable(phone):
             continue
-        phone.os = adb_client.get_android_release(phone)
+        phone.os = adb_client.get_android_release(_target_connection(phone))
 
 
 def enrich_phones_with_android_sdk(adb_client: AdbClient, phones: list[Phone]) -> None:
@@ -76,7 +88,9 @@ def enrich_phones_with_android_sdk(adb_client: AdbClient, phones: list[Phone]) -
     for phone in phones:
         if not _phone_is_shell_targetable(phone):
             continue
-        phone.android_api_level = adb_client.get_android_sdk_api_level(phone)
+        phone.android_api_level = adb_client.get_android_sdk_api_level(
+            _target_connection(phone)
+        )
 
 
 def enrich_phones_with_ro_serialno(adb_client: AdbClient, phones: list[Phone]) -> None:
@@ -84,19 +98,24 @@ def enrich_phones_with_ro_serialno(adb_client: AdbClient, phones: list[Phone]) -
     for phone in phones:
         if not _phone_is_shell_targetable(phone):
             continue
-        phone.hardware_serial = adb_client.get_ro_serialno(phone)
+        phone.hardware_serial = adb_client.get_ro_serialno(_target_connection(phone))
 
 
 def _enrich_phone_with_shell_properties(adb_client: AdbClient, phone: Phone) -> None:
     """Apply the batch ADB shell enrichment payload to one targetable phone."""
-    props = adb_client.get_shell_enrichment_properties(phone)
-    phone.manufacturer = str(props.get("manufacturer") or "")
-    phone.model = str(props.get("model") or "")
-    phone.shell_device_name = str(props.get("device_name") or "")
-    phone.os = str(props.get("android_release") or "")
+    connection = phone.target_connection
+    if connection is None:
+        return
+    props = adb_client.get_shell_enrichment_properties(connection)
     sdk_value = props.get("sdk")
-    phone.android_api_level = sdk_value if isinstance(sdk_value, int) else None
-    phone.hardware_serial = str(props.get("ro_serialno") or "")
+    phone.apply_shell_enrichment(
+        manufacturer=str(props.get("manufacturer") or ""),
+        model=str(props.get("model") or ""),
+        shell_device_name=str(props.get("device_name") or ""),
+        os=str(props.get("android_release") or ""),
+        android_api_level=sdk_value if isinstance(sdk_value, int) else None,
+        hardware_serial=str(props.get("ro_serialno") or ""),
+    )
 
 
 def enrich_phones_with_adb_shell_properties(
@@ -208,13 +227,17 @@ class RefreshKnownDevicesWork(CoreRuntimeWork[RefreshKnownDevicesOutcome]):
         reconcile_result = reconcile_entrypoint.reconcile_paired_devices(
             outcome.devices
         )
-        if not reconcile_result.changed:
+        if not reconcile_result.has_changes:
             return
+        phone_id_rebindings = {
+            change.previous_phone_id: change.current_phone_id
+            for change in reconcile_result.identity_changes
+        }
         reconcile_entrypoint.emit_core_signal(
             CoreSignals.DEVICES_UPDATED,
             DevicesUpdatedPayload(
                 devices=serialize_phone_collection(adb_server.paired_devices),
-                device_id_rebindings=reconcile_result.device_id_rebindings,
+                phone_id_rebindings=phone_id_rebindings,
             ),
         )
 
