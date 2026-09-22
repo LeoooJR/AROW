@@ -802,7 +802,7 @@ class Phone(Device[PhoneDescriptor], Payload):
             self._preferred_connection_id = self._choose_target_connection_id()
         self._descriptor = self._with_derived_name(self._descriptor)
 
-    def apply_discovery(self, discovered: Phone) -> None:
+    def apply_discovery(self, discovered: Phone) -> bool:
         """Apply a complete discovery aggregate while preserving this instance.
 
         Inactive observations retain the previous connection timestamp for the
@@ -810,7 +810,11 @@ class Phone(Device[PhoneDescriptor], Payload):
 
         Args:
             discovered: Fresh physical-phone aggregate from ADB discovery.
+
+        Returns:
+            ``True`` when effective identity, metadata, or connections changed.
         """
+        previous_state = self._discovery_state()
         previous = {connection.id: connection for connection in self._connections}
         connections: list[AdbConnection] = []
         for connection in discovered.connections:
@@ -826,6 +830,13 @@ class Phone(Device[PhoneDescriptor], Payload):
         if preferred is None or not preferred.is_active:
             self._preferred_connection_id = self._choose_target_connection_id()
         self._descriptor = self._with_derived_name(self._descriptor)
+        return self._discovery_state() != previous_state
+
+    def _discovery_state(
+        self,
+    ) -> tuple[PhoneIdentity, PhoneDescriptor, tuple[AdbConnection, ...]]:
+        """Return the aggregate state controlled by discovery reconciliation."""
+        return self._identity, self._descriptor, self._connections
 
     def serialize(self, **kwargs: object) -> dict[str, object]:
         """Serialize physical metadata and all ADB connections.

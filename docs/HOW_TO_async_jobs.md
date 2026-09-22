@@ -373,6 +373,9 @@ possible.
 
 The refresh path is no longer “replace whatever list the server had”.
 
+For the complete grouping, matching, mutation, and event workflow, see
+[`HOW_TO_device_reconciliation.md`](HOW_TO_device_reconciliation.md).
+
 ### Request-side guard
 
 `AdbSubController._on_refresh_device_list_requested()` submits with `coalesce_key="refresh_device_list"` and `at_most_once=True`, so timer and UI requests cannot create overlapping refresh jobs.

@@ -118,6 +118,8 @@ This repository uses two long-lived branches:
 - Async jobs and result application: `docs/HOW_TO_async_jobs.md`
 - Controller boundaries and signal flows:
   `docs/HOW_TO_controller_and_signals.md`
+- Device discovery and reconciliation:
+  `docs/HOW_TO_device_reconciliation.md`
 - Simulation persistence: `docs/HOW_TO_simulation_persistence.md`
 - Desktop and mobile communication contract: `docs/HOW_TO_mobile_communication.md`
 - Development without real ADB: `docs/HOW_TO_mock_adb.md`

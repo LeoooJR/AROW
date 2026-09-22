@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, replace
-from types import MappingProxyType
-from typing import Mapping
+from dataclasses import dataclass
+from typing import Literal, TypeVar
 
 from core.devices.phone import Phone, PhoneRepository
 from core.devices.stable_key import FirstTierStableKey, StableKey
@@ -12,67 +11,360 @@ from logger import logger
 
 
 @dataclass(frozen=True, slots=True)
-class DeviceReconcileResult:
-    """Immutable physical-phone reconciliation summary.
+class PhoneAdded:
+    """Record a physical phone added to the canonical repository.
 
     Attributes:
-        changed: Whether repository-visible state changed.
-        phone_id_rebindings: Previous-to-current physical identity mappings.
-        removed_phone_ids: Physical identities removed from the repository.
+        phone_id: Added physical-phone identity.
     """
 
-    changed: bool
-    phone_id_rebindings: Mapping[str, str] = field(
-        default_factory=lambda: MappingProxyType({})
-    )
-    removed_phone_ids: tuple[str, ...] = ()
+    phone_id: str
 
 
-@dataclass(slots=True)
-class _ReconciliationState:
-    """Mutable state shared by one reconciliation pass.
+@dataclass(frozen=True, slots=True)
+class PhoneUpdated:
+    """Record a canonical phone refreshed without changing identity.
 
     Attributes:
-        paired_devices: Repository being reconciled.
-        paired_by_stable_identity: Tier-1 identity index captured before updates.
-        matched_paired_object_ids: Python identities of already matched phones.
-        phone_id_rebindings: Physical identity changes produced by the pass.
-        changed: Whether any repository-visible state changed.
+        phone_id: Updated physical-phone identity.
     """
 
-    paired_devices: PhoneRepository
-    paired_by_stable_identity: dict[FirstTierStableKey, Phone]
-    matched_paired_object_ids: set[int] = field(default_factory=set)
-    phone_id_rebindings: dict[str, str] = field(default_factory=dict)
-    changed: bool = False
+    phone_id: str
 
 
-def _tier_one_value(phone: Phone) -> str | None:
-    """Return a phone's serialized Tier-1 identity when available.
+@dataclass(frozen=True, slots=True)
+class PhoneIdentityChanged:
+    """Record a canonical phone changed to a new physical identity.
+
+    Attributes:
+        previous_phone_id: Physical identity before discovery enrichment.
+        current_phone_id: Physical identity after discovery enrichment.
+    """
+
+    previous_phone_id: str
+    current_phone_id: str
+
+
+@dataclass(frozen=True, slots=True)
+class PhoneRemoved:
+    """Record a physical phone removed from the canonical repository.
+
+    Attributes:
+        phone_id: Removed physical-phone identity.
+    """
+
+    phone_id: str
+
+
+type PhoneReconciliationChange = (
+    PhoneAdded | PhoneUpdated | PhoneIdentityChanged | PhoneRemoved
+)
+
+
+@dataclass(frozen=True, slots=True)
+class PhoneReconciliationReport:
+    """Describe repository changes as an ordered domain event journal.
+
+    Attributes:
+        changes: Reconciliation events in the order they occurred.
+    """
+
+    changes: tuple[PhoneReconciliationChange, ...] = ()
+
+    @property
+    def has_changes(self) -> bool:
+        """Return whether reconciliation changed canonical phone state."""
+        return bool(self.changes)
+
+    @property
+    def identity_changes(self) -> tuple[PhoneIdentityChanged, ...]:
+        """Return physical identity changes in journal order."""
+        return tuple(
+            change
+            for change in self.changes
+            if isinstance(change, PhoneIdentityChanged)
+        )
+
+    @property
+    def removals(self) -> tuple[PhoneRemoved, ...]:
+        """Return physical-phone removals in journal order."""
+        return tuple(
+            change for change in self.changes if isinstance(change, PhoneRemoved)
+        )
+
+
+_PhoneGroupReason = Literal["tier_one", "repository_owner", "connection"]
+
+
+@dataclass(frozen=True, slots=True)
+class _PhoneGroupKey:
+    """Identify why discovery observations belong to one physical phone.
+
+    Attributes:
+        reason: Matching rule that established the group.
+        value: Stable identity, repository identity, or connection identifier.
+    """
+
+    reason: _PhoneGroupReason
+    value: str
+
+
+_ValueT = TypeVar("_ValueT")
+
+
+def _first_nonblank(*values: str) -> str:
+    """Return the first non-empty discovery value.
+
+    Args:
+        *values: Values in descending precedence order.
+
+    Returns:
+        The first truthy value, or an empty string when none exists.
+    """
+    return next((value for value in values if value), "")
+
+
+def _first_defined(primary: _ValueT | None, fallback: _ValueT | None) -> _ValueT | None:
+    """Return the first value that is not ``None``.
+
+    Args:
+        primary: Preferred value.
+        fallback: Value used when ``primary`` is ``None``.
+
+    Returns:
+        ``primary`` when defined; otherwise ``fallback``.
+    """
+    return primary if primary is not None else fallback
+
+
+def _tier_one_key(phone: Phone) -> FirstTierStableKey | None:
+    """Return a phone's parsed Tier-1 identity when available.
 
     Args:
         phone: Phone whose stable key should be parsed.
 
     Returns:
-        The serialized Tier-1 value, or ``None`` for missing and Tier-2 keys.
+        The Tier-1 key, or ``None`` for missing and Tier-2 keys.
     """
     parsed = StableKey.from_value(phone.stable_key)
-    return parsed.value if isinstance(parsed, FirstTierStableKey) else None
+    return parsed if isinstance(parsed, FirstTierStableKey) else None
+
+
+@dataclass(frozen=True, slots=True)
+class _DiscoverySnapshot:
+    """Own normalized physical phones from one complete ADB observation.
+
+    Attributes:
+        phones: Grouped physical phones in deterministic discovery order.
+    """
+
+    phones: tuple[Phone, ...]
+
+    @classmethod
+    def from_observations(
+        cls,
+        repository: PhoneRepository,
+        phones: list[Phone],
+    ) -> _DiscoverySnapshot:
+        """Normalize raw observations into physical-phone aggregates.
+
+        Args:
+            repository: Canonical phones used to recognize endpoint ownership.
+            phones: Raw phone observations returned by ADB discovery.
+
+        Returns:
+            A deterministic snapshot containing one aggregate per group.
+        """
+        latest_by_connection = cls._latest_by_connection(phones)
+        observation_groups = cls._group_observations(
+            repository,
+            latest_by_connection,
+        )
+        return cls(
+            phones=tuple(
+                cls._merge_observation_group(group) for group in observation_groups
+            )
+        )
+
+    @staticmethod
+    def _latest_by_connection(phones: list[Phone]) -> dict[str, Phone]:
+        """Keep the last observation for each ADB connection identifier."""
+        latest: dict[str, Phone] = {}
+        for phone in phones:
+            for connection in phone.connections:
+                latest[connection.id] = phone
+        return latest
+
+    @classmethod
+    def _group_observations(
+        cls,
+        repository: PhoneRepository,
+        latest_by_connection: dict[str, Phone],
+    ) -> tuple[tuple[Phone, ...], ...]:
+        """Group observations by their strongest available physical identity."""
+        groups: dict[_PhoneGroupKey, dict[int, Phone]] = {}
+        for connection_id, phone in latest_by_connection.items():
+            key = cls._group_key(repository, connection_id, phone)
+            groups.setdefault(key, {})[id(phone)] = phone
+        return tuple(tuple(group.values()) for group in groups.values())
+
+    @staticmethod
+    def _group_key(
+        repository: PhoneRepository,
+        connection_id: str,
+        phone: Phone,
+    ) -> _PhoneGroupKey:
+        """Choose Tier-1, repository-owner, then endpoint grouping."""
+        tier_one = _tier_one_key(phone)
+        if tier_one is not None:
+            return _PhoneGroupKey("tier_one", tier_one.value)
+        owner = repository.get_by_connection_id(connection_id)
+        if owner is not None:
+            return _PhoneGroupKey("repository_owner", owner.identity.value)
+        return _PhoneGroupKey("connection", connection_id)
+
+    @classmethod
+    def _merge_observation_group(cls, observations: tuple[Phone, ...]) -> Phone:
+        """Merge one ordered observation group into its primary aggregate."""
+        ordered = sorted(observations, key=cls._observation_priority)
+        aggregate = ordered[0]
+        for observation in ordered[1:]:
+            cls._merge_observation(aggregate, observation)
+        return aggregate
+
+    @staticmethod
+    def _observation_priority(phone: Phone) -> tuple[bool, str]:
+        """Sort USB observations before Wi-Fi, then by endpoint identifier."""
+        connection = phone.display_connection
+        return connection.connectivity_type != "usb", connection.id
+
+    @staticmethod
+    def _merge_observation(aggregate: Phone, observation: Phone) -> None:
+        """Merge one secondary observation into the primary aggregate."""
+        for connection in observation.connections:
+            aggregate.add_connection(connection)
+        aggregate.apply_shell_enrichment(
+            manufacturer=_first_nonblank(
+                aggregate.manufacturer,
+                observation.manufacturer,
+            ),
+            model=_first_nonblank(aggregate.model, observation.model),
+            shell_device_name=_first_nonblank(
+                aggregate.shell_device_name,
+                observation.shell_device_name,
+            ),
+            os=_first_nonblank(aggregate.os, observation.os),
+            android_api_level=_first_defined(
+                aggregate.android_api_level,
+                observation.android_api_level,
+            ),
+            hardware_serial=_first_nonblank(
+                aggregate.hardware_serial,
+                observation.hardware_serial,
+            ),
+        )
+
+
+class _CanonicalPhoneMatcher:
+    """Claim each canonical phone at most once during reconciliation."""
+
+    def __init__(self, repository: PhoneRepository) -> None:
+        """Capture canonical lookup indexes before repository mutations.
+
+        Args:
+            repository: Repository containing canonical phone instances.
+        """
+        self._repository = repository
+        self._by_stable_identity = repository.index_by_stable_identity()
+        self._unclaimed = {id(phone): phone for phone in repository}
+
+    def claim(self, discovered: Phone) -> Phone | None:
+        """Claim the strongest available canonical match.
+
+        Args:
+            discovered: Grouped discovery aggregate to match.
+
+        Returns:
+            An unclaimed canonical phone, or ``None`` when no match exists.
+        """
+        candidate = self._repository.get(discovered.identity.value)
+        if candidate is None:
+            candidate = self._connection_owner(discovered)
+        if candidate is None:
+            candidate = self._stable_identity_match(discovered)
+        return self._claim_candidate(candidate)
+
+    def _connection_owner(self, discovered: Phone) -> Phone | None:
+        """Return the unique canonical owner of discovered endpoints."""
+        owners = {
+            id(owner): owner
+            for connection in discovered.connections
+            if (owner := self._repository.get_by_connection_id(connection.id))
+            is not None
+        }
+        return next(iter(owners.values())) if len(owners) == 1 else None
+
+    def _stable_identity_match(self, discovered: Phone) -> Phone | None:
+        """Return the canonical phone sharing a Tier-1 stable identity."""
+        stable_identity = _tier_one_key(discovered)
+        if stable_identity is None:
+            return None
+        return self._by_stable_identity.get(stable_identity)
+
+    def _claim_candidate(self, candidate: Phone | None) -> Phone | None:
+        """Remove and return an available candidate from the match pool."""
+        if candidate is None:
+            return None
+        return self._unclaimed.pop(id(candidate), None)
+
+    @property
+    def unclaimed_phones(self) -> tuple[Phone, ...]:
+        """Return canonical phones absent from the discovery snapshot."""
+        return tuple(self._unclaimed.values())
+
+
+class _PhoneChangeJournal:
+    """Record reconciliation outcomes using domain-specific events."""
+
+    def __init__(self) -> None:
+        """Initialize an empty ordered change journal."""
+        self._changes: list[PhoneReconciliationChange] = []
+
+    def record_added(self, phone: Phone) -> None:
+        """Record a newly canonical phone."""
+        self._changes.append(PhoneAdded(phone.id))
+
+    def record_updated(self, phone: Phone) -> None:
+        """Record a canonical phone changed without identity promotion."""
+        self._changes.append(PhoneUpdated(phone.id))
+
+    def record_identity_change(self, previous_phone_id: str, phone: Phone) -> None:
+        """Record a canonical phone changed to a new physical identity."""
+        self._changes.append(
+            PhoneIdentityChanged(previous_phone_id, phone.identity.value)
+        )
+
+    def record_removed(self, phone: Phone) -> None:
+        """Record a canonical phone removed after missing discovery."""
+        self._changes.append(PhoneRemoved(phone.id))
+
+    def finish(self) -> PhoneReconciliationReport:
+        """Freeze the ordered events into a public reconciliation report."""
+        return PhoneReconciliationReport(tuple(self._changes))
 
 
 class ReconciliationEngine:
-    """Merge a complete ADB snapshot into physical-phone aggregates.
+    """Merge a complete ADB snapshot into canonical physical phones.
 
-    Exact endpoint ownership takes precedence over Tier-1 stable identity. Each
-    canonical phone can be consumed only once per pass, preventing simultaneous
-    USB and Wi-Fi observations from rebinding the same aggregate twice.
+    Discovery normalization, canonical matching, and outcome reporting are owned
+    by focused collaborators so this class reads as the domain workflow.
     """
 
     def reconcile(
         self,
         paired_devices: PhoneRepository,
         discovered_phones: list[Phone],
-    ) -> DeviceReconcileResult:
+    ) -> PhoneReconciliationReport:
         """Reconcile one complete discovery snapshot with stored phones.
 
         Args:
@@ -80,219 +372,75 @@ class ReconciliationEngine:
             discovered_phones: Fresh phone observations from ADB discovery.
 
         Returns:
-            An immutable summary of changes, rebindings, and removals.
+            An ordered semantic report of repository-visible changes.
 
         Raises:
-            ValueError: If a reconciled phone collides with an existing identity
-                or ADB endpoint during repository reindexing.
-        """
-        grouped = self._group_discovered_phones(paired_devices, discovered_phones)
-        state = _ReconciliationState(
-            paired_devices=paired_devices,
-            paired_by_stable_identity=paired_devices.index_by_stable_identity(),
-        )
-        for discovered in grouped:
-            self._reconcile_discovered_phone(state, discovered)
-        removed_phone_ids = self._remove_unmatched_paired_phones(state)
-        if state.changed:
-            logger.info(
-                "Paired devices reconciled",
-                discovered_count=len(grouped),
-                paired_count=len(paired_devices),
-            )
-        return DeviceReconcileResult(
-            changed=state.changed,
-            phone_id_rebindings=MappingProxyType(state.phone_id_rebindings.copy()),
-            removed_phone_ids=removed_phone_ids,
-        )
-
-    @staticmethod
-    def _group_discovered_phones(
-        paired_devices: PhoneRepository,
-        phones: list[Phone],
-    ) -> list[Phone]:
-        """Group rows by Tier-1 identity or existing endpoint ownership.
-
-        Args:
-            paired_devices: Repository used to resolve existing endpoint owners.
-            phones: Raw phone observations to deduplicate and group.
-
-        Returns:
-            Physical-phone aggregates with merged connections and enrichment.
-        """
-        deduplicated: dict[str, Phone] = {}
-        for phone in phones:
-            for connection in phone.connections:
-                deduplicated[connection.id] = phone
-
-        groups: dict[str, list[Phone]] = {}
-        for connection_id, phone in deduplicated.items():
-            tier_one = _tier_one_value(phone)
-            owner = paired_devices.get_by_connection_id(connection_id)
-            group_key = (
-                f"stable:{tier_one}"
-                if tier_one is not None
-                else (
-                    f"owned:{owner.identity.value}"
-                    if owner is not None
-                    else f"connection:{connection_id}"
-                )
-            )
-            groups.setdefault(group_key, []).append(phone)
-
-        grouped: list[Phone] = []
-        for observations in groups.values():
-            observations.sort(
-                key=lambda phone: (
-                    phone.display_connection.connectivity_type != "usb",
-                    phone.display_connection.id,
-                )
-            )
-            aggregate = observations[0]
-            for observation in observations[1:]:
-                for connection in observation.connections:
-                    aggregate.add_connection(connection)
-                aggregate.apply_shell_enrichment(
-                    manufacturer=aggregate.manufacturer or observation.manufacturer,
-                    model=aggregate.model or observation.model,
-                    shell_device_name=(
-                        aggregate.shell_device_name or observation.shell_device_name
-                    ),
-                    os=aggregate.os or observation.os,
-                    android_api_level=(
-                        aggregate.android_api_level
-                        if aggregate.android_api_level is not None
-                        else observation.android_api_level
-                    ),
-                    hardware_serial=(
-                        aggregate.hardware_serial or observation.hardware_serial
-                    ),
-                )
-            grouped.append(aggregate)
-        return grouped
-
-    def _reconcile_discovered_phone(
-        self,
-        state: _ReconciliationState,
-        discovered: Phone,
-    ) -> None:
-        """Add, retain, or update one grouped discovery aggregate.
-
-        Args:
-            state: Mutable state for the current reconciliation pass.
-            discovered: Grouped phone aggregate to reconcile.
-
-        Raises:
-            ValueError: If repository reindexing detects an identity or endpoint
+            ValueError: If repository reindexing finds an identity or endpoint
                 collision.
         """
-        paired = self._find_paired_phone(state, discovered)
-        if paired is None:
-            state.paired_devices.add(discovered)
-            state.matched_paired_object_ids.add(id(discovered))
-            state.changed = True
-            return
-        state.matched_paired_object_ids.add(id(paired))
-        if self._phones_are_unchanged(paired, discovered):
-            return
-        old_identity = paired.identity.value
-        old_connection_ids = tuple(connection.id for connection in paired.connections)
-        paired.apply_discovery(discovered)
-        state.paired_devices.reindex(
-            paired,
-            old_identity=old_identity,
-            old_connection_ids=old_connection_ids,
+        snapshot = _DiscoverySnapshot.from_observations(
+            paired_devices,
+            discovered_phones,
         )
-        if old_identity != paired.identity.value:
-            state.phone_id_rebindings[old_identity] = paired.identity.value
-        state.changed = True
+        matcher = _CanonicalPhoneMatcher(paired_devices)
+        journal = _PhoneChangeJournal()
+        for discovered in snapshot.phones:
+            self._reconcile_phone(paired_devices, matcher, journal, discovered)
+        self._remove_unclaimed_phones(paired_devices, matcher, journal)
+        report = journal.finish()
+        self._log_changes(report, snapshot, paired_devices)
+        return report
 
     @staticmethod
-    def _find_paired_phone(
-        state: _ReconciliationState,
+    def _reconcile_phone(
+        repository: PhoneRepository,
+        matcher: _CanonicalPhoneMatcher,
+        journal: _PhoneChangeJournal,
         discovered: Phone,
-    ) -> Phone | None:
-        """Find the canonical phone matching a discovery aggregate.
-
-        Args:
-            state: Mutable state for the current reconciliation pass.
-            discovered: Grouped phone aggregate to match.
-
-        Returns:
-            The direct, endpoint-owned, or unused Tier-1 match; otherwise
-            ``None``.
-        """
-        direct = state.paired_devices.get(discovered.identity.value)
-        if direct is not None:
-            return direct
-        owners = {
-            id(owner): owner
-            for connection in discovered.connections
-            if (owner := state.paired_devices.get_by_connection_id(connection.id))
-            is not None
-        }
-        if len(owners) == 1:
-            return next(iter(owners.values()))
-        stable_identity = StableKey.from_value(discovered.stable_key)
-        if isinstance(stable_identity, FirstTierStableKey):
-            candidate = state.paired_by_stable_identity.get(stable_identity)
-            if (
-                candidate is not None
-                and id(candidate) not in state.matched_paired_object_ids
-            ):
-                return candidate
-        return None
+    ) -> None:
+        """Add, retain, or update one grouped discovery aggregate."""
+        paired = matcher.claim(discovered)
+        if paired is None:
+            repository.add(discovered)
+            journal.record_added(discovered)
+            return
+        previous_phone_id = paired.identity.value
+        previous_connection_ids = tuple(
+            connection.id for connection in paired.connections
+        )
+        if not paired.apply_discovery(discovered):
+            return
+        repository.reindex(
+            paired,
+            old_identity=previous_phone_id,
+            old_connection_ids=previous_connection_ids,
+        )
+        if previous_phone_id == paired.identity.value:
+            journal.record_updated(paired)
+            return
+        journal.record_identity_change(previous_phone_id, paired)
 
     @staticmethod
-    def _phones_are_unchanged(paired: Phone, discovered: Phone) -> bool:
-        """Compare effective discovery state with a canonical phone.
-
-        Inactive observations preserve the last known connection timestamp, and
-        provisional discovery identities preserve the canonical identity.
-
-        Args:
-            paired: Canonical repository phone.
-            discovered: Fresh grouped discovery aggregate.
-
-        Returns:
-            ``True`` when applying discovery would not change effective state.
-        """
-        previous = {connection.id: connection for connection in paired.connections}
-        effective_connections = []
-        for connection in discovered.connections:
-            old = previous.get(connection.id)
-            if connection.last_connection is None and old is not None:
-                connection = replace(connection, last_connection=old.last_connection)
-            effective_connections.append(connection)
-        effective_identity = (
-            paired.identity
-            if discovered.identity.is_provisional
-            else discovered.identity
-        )
-        return (
-            paired.identity == effective_identity
-            and paired.descriptor == discovered.descriptor
-            and paired.connections
-            == tuple(sorted(effective_connections, key=lambda item: item.id))
-        )
+    def _remove_unclaimed_phones(
+        repository: PhoneRepository,
+        matcher: _CanonicalPhoneMatcher,
+        journal: _PhoneChangeJournal,
+    ) -> None:
+        """Remove and record canonical phones absent from discovery."""
+        for phone in matcher.unclaimed_phones:
+            repository.remove(phone)
+            journal.record_removed(phone)
 
     @staticmethod
-    def _remove_unmatched_paired_phones(
-        state: _ReconciliationState,
-    ) -> tuple[str, ...]:
-        """Remove canonical phones absent from the discovery snapshot.
-
-        Args:
-            state: Mutable state for the current reconciliation pass.
-
-        Returns:
-            Removed physical identities in repository iteration order.
-        """
-        removed: list[str] = []
-        for paired in list(state.paired_devices):
-            if id(paired) in state.matched_paired_object_ids:
-                continue
-            removed.append(paired.identity.value)
-            state.paired_devices.remove(paired)
-            state.changed = True
-        return tuple(removed)
+    def _log_changes(
+        report: PhoneReconciliationReport,
+        snapshot: _DiscoverySnapshot,
+        repository: PhoneRepository,
+    ) -> None:
+        """Log one summary when reconciliation changed canonical state."""
+        if report.has_changes:
+            logger.info(
+                "Paired devices reconciled",
+                discovered_count=len(snapshot.phones),
+                paired_count=len(repository),
+            )

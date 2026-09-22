@@ -11,7 +11,10 @@ from core.devices.phone import (
     Phone,
     serialize_phone_collection,
 )
-from core.devices.reconciliation import DeviceReconcileResult, ReconciliationEngine
+from core.devices.reconciliation import (
+    PhoneReconciliationReport,
+    ReconciliationEngine,
+)
 from core.signal_bus import InMemoryCoreSignalBus
 from core.signals import (
     ActivityLogFileUpdatedPayload,
@@ -332,7 +335,9 @@ class ModelEntrypoint(Entrypoint):
             return []
         return resolved.get_known_devices()
 
-    def reconcile_paired_devices(self, phones: list[Phone]) -> DeviceReconcileResult:
+    def reconcile_paired_devices(
+        self, phones: list[Phone]
+    ) -> PhoneReconciliationReport:
         """
         Reconcile paired devices with a freshly discovered handset list.
 
@@ -342,8 +347,7 @@ class ModelEntrypoint(Entrypoint):
         dropped best-effort.
 
         Returns:
-            Result carrying whether the paired repository changed and any
-            provisional physical id -> Tier-1 id promotions.
+            Ordered domain events describing repository-visible changes.
         """
         if self._adb_server is None:
             raise AttributeError(
@@ -353,13 +357,13 @@ class ModelEntrypoint(Entrypoint):
             self._adb_server.paired_devices,
             phones,
         )
-        for old_phone_id, new_phone_id in result.phone_id_rebindings.items():
+        for change in result.identity_changes:
             self._simulation_service.rebind_phone_identity(
-                old_phone_id,
-                new_phone_id,
+                change.previous_phone_id,
+                change.current_phone_id,
             )
-        for phone_id in result.removed_phone_ids:
-            self.delete_simulation_for_device(phone_id)
+        for removal in result.removals:
+            self.delete_simulation_for_device(removal.phone_id)
         return result
 
     def create_simulation(self, device_id: str) -> None:

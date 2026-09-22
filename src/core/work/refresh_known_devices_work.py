@@ -227,13 +227,17 @@ class RefreshKnownDevicesWork(CoreRuntimeWork[RefreshKnownDevicesOutcome]):
         reconcile_result = reconcile_entrypoint.reconcile_paired_devices(
             outcome.devices
         )
-        if not reconcile_result.changed:
+        if not reconcile_result.has_changes:
             return
+        phone_id_rebindings = {
+            change.previous_phone_id: change.current_phone_id
+            for change in reconcile_result.identity_changes
+        }
         reconcile_entrypoint.emit_core_signal(
             CoreSignals.DEVICES_UPDATED,
             DevicesUpdatedPayload(
                 devices=serialize_phone_collection(adb_server.paired_devices),
-                phone_id_rebindings=reconcile_result.phone_id_rebindings,
+                phone_id_rebindings=phone_id_rebindings,
             ),
         )
 

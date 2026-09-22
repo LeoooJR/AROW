@@ -131,10 +131,24 @@ class TestPhone:
             _connection("usb-1", state="offline"), identity=phone.identity
         )
 
-        phone.apply_discovery(discovered)
+        changed = phone.apply_discovery(discovered)
 
+        assert changed is True
         assert phone.connections[0].state == "offline"
         assert phone.connections[0].last_connection == at
+
+    def test_apply_discovery_reports_effective_noop(self) -> None:
+        at = datetime.datetime(2025, 6, 15, 10, 30)
+        phone = Phone(_connection("usb-1", at=at), model="Pixel")
+        discovered = Phone(
+            _connection("usb-1", at=at),
+            identity=phone.identity,
+            model="Pixel",
+        )
+
+        changed = phone.apply_discovery(discovered)
+
+        assert changed is False
 
     def test_nested_serialization_round_trip(self) -> None:
         phone = Phone(
