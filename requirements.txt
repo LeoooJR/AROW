@@ -207,7 +207,7 @@ uc-micro-py==2.0.0
     # via linkify-it-py
 urllib3==2.7.0
     # via requests
-virtualenv==21.6.1
+virtualenv==21.7.13
     # via pre-commit
 win32-setctime==1.2.0 ; sys_platform == 'win32'
     # via loguru
