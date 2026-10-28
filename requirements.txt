@@ -5,7 +5,7 @@ annotated-doc==0.0.4
 annotated-types==0.7.0
     # via pydantic
 bandit==1.9.4
-black==26.5.1
+black==26.10.1
 branca==0.8.2
     # via folium
 certifi==2026.6.17
